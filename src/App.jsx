@@ -533,8 +533,16 @@ export default function TrainingsApp() {
                         </div>
                         <div style={{display:'flex',gap:'6px',flexShrink:0}}>
                           <button onClick={()=>startEdit(session)} style={{padding:'6px',background:'#e0f2fe',border:'none',borderRadius:'6px',cursor:'pointer',color:'#0369a1'}}><Edit2 size={16}/></button>
-                          <button onClick={()=>deleteSession(session.id)} style={{padding:'6px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626'}}><Trash2 size={16}/></button>
-                          {session.repeatId&&<button onClick={()=>deleteRepeatBlock(session.repeatId)} title="Block löschen" style={{padding:'6px',background:'#fef3c7',border:'none',borderRadius:'6px',cursor:'pointer',color:'#d97706'}}><RefreshCw size={16}/></button>}
+                          <button onClick={()=>{
+                            if (session.repeatId) {
+                              const blockSize=(repeatBlocks[session.repeatId]||[]).length;
+                              const choice=window.confirm(`Nur diese Einheit löschen?\n\nOK = Nur diese eine\nAbbrechen = Alle ${blockSize} der Wiederholungsreihe`);
+                              if (choice) deleteSession(session.id);
+                              else deleteRepeatBlock(session.repeatId);
+                            } else {
+                              deleteSession(session.id);
+                            }
+                          }} style={{padding:'6px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626'}}><Trash2 size={16}/></button>
                         </div>
                       </div>
                     )}
