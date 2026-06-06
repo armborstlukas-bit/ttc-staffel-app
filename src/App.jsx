@@ -56,6 +56,7 @@ export default function TrainingsApp() {
   const [activeGroup, setActiveGroup]       = useState(null);
   const [activeSubgroup, setActiveSubgroup] = useState(null);
   const [activeChild, setActiveChild]       = useState(null);
+  const [activeSession, setActiveSession]   = useState(null);
 
   const [trainingDate, setTrainingDate]         = useState(new Date().toISOString().split('T')[0]);
   const [newSubgroupName, setNewSubgroupName]   = useState('');
