@@ -1,15 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
-import {
-  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  signOut, onAuthStateChanged
-} from 'firebase/auth';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
-import {
-  Check, X, Plus, Trash2, Download, ChevronDown, LogOut,
-  ArrowLeft, Clock, BarChart2, MoveRight, Shield, Users,
-  Calendar, Info, RefreshCw, ChevronRight
-} from 'lucide-react';
+import { Check, X, Plus, Trash2, Download, ChevronDown, LogOut, ArrowLeft, Clock, BarChart2, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save } from 'lucide-react';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCrx34HEgaHnRE187Cja4JNAtbexvrA6Vg",
@@ -47,6 +40,8 @@ const ROLE_CONFIG = {
 
 const WEEKDAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
 
+const emptySession = { subgroupIds: [], date: new Date().toISOString().split('T')[0], time: '17:00', trainer: '', info: '', repeat: false, repeatWeeks: 8 };
+
 export default function TrainingsApp() {
   const [user, setUser]               = useState(null);
   const [userRole, setUserRole]       = useState(null);
@@ -57,33 +52,24 @@ export default function TrainingsApp() {
   const [allUsers, setAllUsers]       = useState({});
   const [sessions, setSessions]       = useState({});
 
-  const [view, setView]                       = useState('home');
-  const [activeGroup, setActiveGroup]         = useState(null);
-  const [activeSubgroup, setActiveSubgroup]   = useState(null);
-  const [activeChild, setActiveChild]         = useState(null);
-  const [activeSession, setActiveSession]     = useState(null);
+  const [view, setView]                     = useState('home');
+  const [activeGroup, setActiveGroup]       = useState(null);
+  const [activeSubgroup, setActiveSubgroup] = useState(null);
+  const [activeChild, setActiveChild]       = useState(null);
 
-  const [trainingDate, setTrainingDate] = useState(new Date().toISOString().split('T')[0]);
-  const [newSubgroupName, setNewSubgroupName] = useState('');
-  const [newChildName, setNewChildName]       = useState('');
-  const [moveChildId, setMoveChildId]         = useState(null);
+  const [trainingDate, setTrainingDate]         = useState(new Date().toISOString().split('T')[0]);
+  const [newSubgroupName, setNewSubgroupName]   = useState('');
+  const [newChildName, setNewChildName]         = useState('');
+  const [moveChildId, setMoveChildId]           = useState(null);
+  const [newSession, setNewSession]             = useState(emptySession);
+  const [editingSession, setEditingSession]     = useState(null); // session being edited
+  const [editForm, setEditForm]                 = useState({});
 
   const [authMode, setAuthMode]           = useState('login');
   const [loginEmail, setLoginEmail]       = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginName, setLoginName]         = useState('');
   const [error, setError]                 = useState('');
-
-  // Neues Training Form
-  const [newSession, setNewSession] = useState({
-    groupId: 'jugend',
-    date: new Date().toISOString().split('T')[0],
-    time: '17:00',
-    trainer: '',
-    info: '',
-    repeat: false,
-    repeatWeeks: 8,
-  });
 
   // ── Auth ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -92,14 +78,11 @@ export default function TrainingsApp() {
         setUser(u);
         const snap = await getDoc(doc(db, 'users', u.uid));
         if (snap.exists()) { setUserRole(snap.data().role); setUserProfile(snap.data()); }
-      } else {
-        setUser(null); setUserRole(null); setUserProfile(null);
-      }
+      } else { setUser(null); setUserRole(null); setUserProfile(null); }
       setLoading(false);
     });
   }, []);
 
-  // ── Listeners ────────────────────────────────────────────────
   useEffect(() => {
     if (!user || !userRole) return;
     const unsubs = [
@@ -112,16 +95,13 @@ export default function TrainingsApp() {
     return () => unsubs.forEach(u=>u());
   }, [user, userRole]);
 
-  // ── Speichern ────────────────────────────────────────────────
   const saveSubgroups = u => { setSubgroups(u); setDoc(doc(db,'ttc','subgroups'),u); };
   const saveChildren  = u => { setChildren(u);  setDoc(doc(db,'ttc','children'), u); };
   const saveSessions  = u => { setSessions(u);  setDoc(doc(db,'ttc','sessions'), u); };
 
-  // ── Helfer ───────────────────────────────────────────────────
   const canEdit = () => ['admin','trainer'].includes(userRole);
   const getSubgroupsForGroup = gid => Object.values(subgroups).filter(s=>s.groupId===gid);
-  const getChildrenForSubgroup = sid =>
-    Object.values(children).filter(c=>c.subgroupId===sid).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+  const getChildrenForSubgroup = sid => Object.values(children).filter(c=>c.subgroupId===sid).sort((a,b)=>a.name.localeCompare(b.name,'de'));
   const getMyChild = () => userProfile?.linkedChildId ? children[userProfile.linkedChildId]||null : null;
 
   const getAttendanceStats = (childId, subgroupId) => {
@@ -131,24 +111,30 @@ export default function TrainingsApp() {
     const present=dates.filter(d=>att[d]==='present').length;
     const unexcused=dates.filter(d=>att[d]==='absent_unexcused').length;
     const excused=dates.filter(d=>att[d]==='absent_excused').length;
-    return {present,unexcused,excused,total:dates.length,
-      percent:dates.length>0?Math.round((present/dates.length)*100):0};
+    return {present,unexcused,excused,total:dates.length, percent:dates.length>0?Math.round((present/dates.length)*100):0};
   };
 
-  // Trainingseinheiten für eine Gruppe (zukünftige)
-  const getUpcomingSessions = (groupId) => {
+  // Sessions für eine Untergruppe (zukünftig)
+  const getUpcomingSessionsForSubgroup = (subgroupId) => {
     const today = new Date().toISOString().split('T')[0];
     return Object.values(sessions)
-      .filter(s => s.groupId === groupId && s.date >= today)
+      .filter(s => s.date >= today && (s.subgroupIds||[]).includes(subgroupId))
       .sort((a,b) => a.date.localeCompare(b.date));
   };
 
-  // Alle zukünftigen Einheiten (für Trainer/Admin)
   const getAllUpcomingSessions = () => {
     const today = new Date().toISOString().split('T')[0];
-    return Object.values(sessions)
-      .filter(s => s.date >= today)
-      .sort((a,b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+    return Object.values(sessions).filter(s=>s.date>=today).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+  };
+
+  // Prüfen ob Eltern/Jugendliche das Kind für ein Datum abgemeldet/angemeldet haben
+  const getParentResponse = (childId, date) => {
+    const matching = Object.values(sessions).filter(s => s.date===date && (s.subgroupIds||[]).some(sid => children[childId]?.subgroupId===sid));
+    for (const s of matching) {
+      const r = (s.responses||{})[childId];
+      if (r) return r; // 'coming' oder 'missing'
+    }
+    return null;
   };
 
   // ── Auth Handler ─────────────────────────────────────────────
@@ -173,151 +159,175 @@ export default function TrainingsApp() {
 
   // ── Training anlegen ─────────────────────────────────────────
   const createSession = () => {
-    const { groupId, date, time, trainer, info, repeat, repeatWeeks } = newSession;
-    if (!date || !time) return;
+    const { subgroupIds, date, time, trainer, info, repeat, repeatWeeks } = newSession;
+    if (!date || !time || subgroupIds.length===0) { alert('Bitte mindestens eine Untergruppe auswählen!'); return; }
     const updated = { ...sessions };
-
+    const repeatId = repeat ? 'repeat_' + Date.now() : null;
     if (repeat) {
-      // Wöchentlich wiederkehrend
-      for (let i = 0; i < repeatWeeks; i++) {
-        const d = new Date(date + 'T12:00:00');
-        d.setDate(d.getDate() + i * 7);
+      for (let i=0; i<repeatWeeks; i++) {
+        const d = new Date(date+'T12:00:00');
+        d.setDate(d.getDate()+i*7);
         const dateStr = d.toISOString().split('T')[0];
-        const id = 'session_' + Date.now() + '_' + i;
-        updated[id] = { id, groupId, date: dateStr, time, trainer, info, responses: {} };
+        const id = 'session_'+Date.now()+'_'+i;
+        updated[id] = { id, subgroupIds, date:dateStr, time, trainer, info, repeatId, responses:{} };
       }
     } else {
-      const id = 'session_' + Date.now();
-      updated[id] = { id, groupId, date, time, trainer, info, responses: {} };
+      const id = 'session_'+Date.now();
+      updated[id] = { id, subgroupIds, date, time, trainer, info, repeatId:null, responses:{} };
     }
     saveSessions(updated);
-    setNewSession({ ...newSession, info: '', repeat: false, repeatWeeks: 8 });
+    setNewSession(emptySession);
   };
 
   const deleteSession = (id) => {
-    if (!window.confirm('Trainingseinheit löschen?')) return;
-    const u = { ...sessions }; delete u[id]; saveSessions(u);
+    if (!window.confirm('Diese Trainingseinheit löschen?')) return;
+    const u={...sessions}; delete u[id]; saveSessions(u);
   };
 
-  // Eltern/Jugendliche: Antwort auf Trainingseinheit
+  const deleteRepeatBlock = (repeatId) => {
+    if (!window.confirm('Alle Einheiten dieser Wiederholungsreihe löschen?')) return;
+    const u = Object.fromEntries(Object.entries(sessions).filter(([,s])=>s.repeatId!==repeatId));
+    saveSessions(u);
+  };
+
+  const startEdit = (session) => {
+    setEditingSession(session.id);
+    setEditForm({ ...session });
+  };
+
+  const saveEdit = (blockEdit=false) => {
+    const updated = {...sessions};
+    if (blockEdit && editForm.repeatId) {
+      // Alle Einheiten der Reihe bearbeiten (nur Zeit/Trainer/Info/Untergruppen, nicht Datum)
+      Object.keys(updated).forEach(key => {
+        if (updated[key].repeatId===editForm.repeatId) {
+          updated[key] = { ...updated[key], time:editForm.time, trainer:editForm.trainer, info:editForm.info, subgroupIds:editForm.subgroupIds };
+        }
+      });
+    } else {
+      updated[editForm.id] = { ...editForm };
+    }
+    saveSessions(updated);
+    setEditingSession(null);
+  };
+
   const respondToSession = (sessionId, response) => {
     const myChild = getMyChild();
     const childId = myChild?.id || user?.uid;
     const session = sessions[sessionId];
     if (!session) return;
     const cur = (session.responses||{})[childId];
-    const updated = {
-      ...sessions,
-      [sessionId]: {
-        ...session,
-        responses: {
-          ...(session.responses||{}),
-          [childId]: cur === response ? null : response,
-        }
-      }
-    };
+    const updated = { ...sessions, [sessionId]: { ...session, responses: { ...(session.responses||{}), [childId]: cur===response?null:response } } };
     saveSessions(updated);
   };
 
-  // ── Admin Funktionen ─────────────────────────────────────────
-  const changeUserRole = async (uid, newRole) => {
-    const updated = { ...allUsers, [uid]: { ...allUsers[uid], role: newRole } };
-    await setDoc(doc(db,'ttc','users'), updated);
-    await setDoc(doc(db,'users',uid), { ...allUsers[uid], role: newRole });
-    setAllUsers(updated);
-  };
-
-  const linkChildToUser = async (uid, childId) => {
-    const updated = { ...allUsers, [uid]: { ...allUsers[uid], linkedChildId: childId||null } };
-    await setDoc(doc(db,'ttc','users'), updated);
-    await setDoc(doc(db,'users',uid), { ...allUsers[uid], linkedChildId: childId||null });
-    setAllUsers(updated);
-  };
-
-  // Prüfen ob Eltern das Kind für ein bestimmtes Datum abgemeldet haben
-  const isExcusedByParent = (childId, date) => {
-    return Object.values(sessions).some(session =>
-      session.date === date &&
-      (session.responses||{})[childId] === 'missing'
-    );
-  };
-
-  // Anwesenheit setzen
   const ensureTrainingDate = (sid, date) => {
-    const sub = subgroups[sid];
+    const sub=subgroups[sid];
     if (!sub) return;
-    const dates = sub.trainingDates||[];
-    if (!dates.includes(date))
-      saveSubgroups({ ...subgroups, [sid]: { ...sub, trainingDates:[...dates,date].sort() } });
+    const dates=sub.trainingDates||[];
+    if (!dates.includes(date)) saveSubgroups({...subgroups,[sid]:{...sub,trainingDates:[...dates,date].sort()}});
   };
 
   const setStatus = (childId, status) => {
     ensureTrainingDate(activeSubgroup.id, trainingDate);
-    const child = children[childId];
-    const cur = (child.attendance||{})[trainingDate];
-    const next = cur===status?null:status;
-    const att = { ...(child.attendance||{}), [trainingDate]:next };
+    const child=children[childId];
+    const cur=(child.attendance||{})[trainingDate];
+    const next=cur===status?null:status;
+    const att={...(child.attendance||{}),[trainingDate]:next};
     if (next===null) delete att[trainingDate];
-    saveChildren({ ...children, [childId]:{ ...child, attendance:att } });
+    saveChildren({...children,[childId]:{...child,attendance:att}});
   };
 
   const excuseMyChild = (date) => {
-    const child = getMyChild();
+    const child=getMyChild();
     if (!child) return;
-    const att = { ...(child.attendance||{}), [date]:'absent_excused' };
-    saveChildren({ ...children, [child.id]:{ ...child, attendance:att } });
+    saveChildren({...children,[child.id]:{...child,attendance:{...(child.attendance||{}),[date]:'absent_excused'}}});
   };
 
-  // ── Excel Export ─────────────────────────────────────────────
+  const changeUserRole = async (uid, newRole) => {
+    const updated={...allUsers,[uid]:{...allUsers[uid],role:newRole}};
+    await setDoc(doc(db,'ttc','users'),updated);
+    await setDoc(doc(db,'users',uid),{...allUsers[uid],role:newRole});
+    setAllUsers(updated);
+  };
+
+  const linkChildToUser = async (uid, childId) => {
+    const updated={...allUsers,[uid]:{...allUsers[uid],linkedChildId:childId||null}};
+    await setDoc(doc(db,'ttc','users'),updated);
+    await setDoc(doc(db,'users',uid),{...allUsers[uid],linkedChildId:childId||null});
+    setAllUsers(updated);
+  };
+
   const exportSubgroupExcel = (sub) => {
-    const kids  = getChildrenForSubgroup(sub.id);
-    const dates = (sub.trainingDates||[]).sort();
-    const grp   = FIXED_GROUPS.find(g=>g.id===sub.groupId);
-    const standDatum = new Date().toLocaleDateString('de-DE');
-    let csv = `TTC Grün-Weiß Staffel\n${grp?.name} - ${sub.name}\nExportiert am: ${standDatum}\n\n`;
-    csv += `Datum;Name;Anwesend;Entschuldigt;Unentschuldigt\n`;
-    dates.forEach(date => {
-      const d = new Date(date+'T12:00:00').toLocaleDateString('de-DE');
-      kids.forEach(child => {
+    const kids=getChildrenForSubgroup(sub.id);
+    const dates=(sub.trainingDates||[]).sort();
+    const grp=FIXED_GROUPS.find(g=>g.id===sub.groupId);
+    const standDatum=new Date().toLocaleDateString('de-DE');
+    let csv=`TTC Grün-Weiß Staffel\n${grp?.name} - ${sub.name}\nExportiert am: ${standDatum}\n\nDatum;Name;Anwesend;Entschuldigt;Unentschuldigt\n`;
+    dates.forEach(date=>{
+      const d=new Date(date+'T12:00:00').toLocaleDateString('de-DE');
+      kids.forEach(child=>{
         const s=(child.attendance||{})[date];
-        csv += `${d};${child.name};${s==='present'?1:0};${s==='absent_excused'?1:0};${s==='absent_unexcused'?1:0}\n`;
+        csv+=`${d};${child.name};${s==='present'?1:0};${s==='absent_excused'?1:0};${s==='absent_unexcused'?1:0}\n`;
       });
     });
-    csv += `\nZusammenfassung\nName;Trainings;Anwesend;Entschuldigt;Unentschuldigt;Quote\n`;
-    kids.forEach(child => {
+    csv+=`\nZusammenfassung\nName;Trainings;Anwesend;Entschuldigt;Unentschuldigt;Quote\n`;
+    kids.forEach(child=>{
       const st=getAttendanceStats(child.id,sub.id);
-      csv += `${child.name};${st.total};${st.present};${st.excused};${st.unexcused};${st.percent}%\n`;
+      csv+=`${child.name};${st.total};${st.present};${st.excused};${st.unexcused};${st.percent}%\n`;
     });
-    const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `TTC_${grp?.name}_${sub.name}_Stand_${standDatum}.csv`;
+    const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+    const link=document.createElement('a');
+    link.href=URL.createObjectURL(blob);
+    link.download=`TTC_${grp?.name}_${sub.name}_Stand_${standDatum}.csv`;
     link.click();
   };
 
-  // ── Styles ───────────────────────────────────────────────────
+  function addSubgroup() {
+    if (!newSubgroupName.trim()) return;
+    const id='sub_'+Date.now();
+    saveSubgroups({...subgroups,[id]:{id,name:newSubgroupName,groupId:activeGroup.id,trainingDates:[]}});
+    setNewSubgroupName('');
+  }
+  function deleteSubgroup(sid) {
+    if (!window.confirm('Untergruppe löschen?')) return;
+    const u={...subgroups}; delete u[sid]; saveSubgroups(u);
+  }
+  function addChild() {
+    if (!newChildName.trim()) return;
+    const id='child_'+Date.now();
+    saveChildren({...children,[id]:{id,name:newChildName,subgroupId:activeSubgroup.id,attendance:{}}});
+    setNewChildName('');
+  }
+  function deleteChild(cid) {
+    if (!window.confirm('Kind löschen?')) return;
+    const u={...children}; delete u[cid]; saveChildren(u);
+  }
+  function moveChild(cid,newSid) {
+    saveChildren({...children,[cid]:{...children[cid],subgroupId:newSid}});
+    setMoveChildId(null);
+  }
+
   const s = {
-    page:  { minHeight:'100vh', background:'linear-gradient(135deg, #358941 0%, #9cc18f 100%)', fontFamily:'system-ui,-apple-system,sans-serif' },
-    wrap:  { maxWidth:'900px', margin:'0 auto', padding:'20px' },
-    card:  { background:'white', borderRadius:'12px', padding:'20px', marginBottom:'16px', boxShadow:'0 4px 6px rgba(0,0,0,0.1)' },
-    btn:   (bg,col='white',sm=false) => ({ padding:sm?'6px 12px':'10px 16px', background:bg, color:col, border:'none', borderRadius:'8px', cursor:'pointer', fontWeight:'600', fontSize:sm?'13px':'14px', display:'flex', alignItems:'center', gap:'6px', whiteSpace:'nowrap' }),
-    input: { padding:'10px 12px', border:'1px solid #ddd', borderRadius:'8px', fontSize:'14px', flex:1, minWidth:0 },
-    label: { fontSize:'13px', fontWeight:'600', color:'#555', marginBottom:'4px', display:'block' },
+    page:  {minHeight:'100vh',background:'linear-gradient(135deg, #358941 0%, #9cc18f 100%)',fontFamily:'system-ui,-apple-system,sans-serif'},
+    wrap:  {maxWidth:'900px',margin:'0 auto',padding:'20px'},
+    card:  {background:'white',borderRadius:'12px',padding:'20px',marginBottom:'16px',boxShadow:'0 4px 6px rgba(0,0,0,0.1)'},
+    btn:   (bg,col='white',sm=false)=>({padding:sm?'6px 12px':'10px 16px',background:bg,color:col,border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:sm?'13px':'14px',display:'flex',alignItems:'center',gap:'6px',whiteSpace:'nowrap'}),
+    input: {padding:'10px 12px',border:'1px solid #ddd',borderRadius:'8px',fontSize:'14px',flex:1,minWidth:0},
+    label: {fontSize:'13px',fontWeight:'600',color:'#555',marginBottom:'4px',display:'block'},
   };
 
   if (loading) return <div style={{...s.page,display:'flex',alignItems:'center',justifyContent:'center'}}><p style={{color:'white',fontSize:'20px'}}>Laden...</p></div>;
 
-  // ── LOGIN ────────────────────────────────────────────────────
   if (!user) return (
     <div style={{...s.page,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
       <div style={{background:'white',borderRadius:'16px',padding:'40px',maxWidth:'420px',width:'100%',boxShadow:'0 10px 40px rgba(0,0,0,0.2)'}}>
         <h1 style={{margin:'0 0 4px',color:'#358941',fontSize:'28px',textAlign:'center'}}>TTC Grün-Weiß Staffel</h1>
         <p style={{margin:'0 0 28px',color:'#666',textAlign:'center'}}>Vereinsapp</p>
-        {error && <p style={{color:'red',marginBottom:'16px',fontSize:'13px',textAlign:'center'}}>{error}</p>}
+        {error&&<p style={{color:'red',marginBottom:'16px',fontSize:'13px',textAlign:'center'}}>{error}</p>}
         <div style={{display:'flex',marginBottom:'20px',borderRadius:'8px',overflow:'hidden',border:'1px solid #ddd'}}>
           {['login','register'].map(m=>(
-            <button key={m} onClick={()=>{setAuthMode(m);setError('');}}
-              style={{flex:1,padding:'10px',background:authMode===m?'#358941':'white',color:authMode===m?'white':'#666',border:'none',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
+            <button key={m} onClick={()=>{setAuthMode(m);setError('');}} style={{flex:1,padding:'10px',background:authMode===m?'#358941':'white',color:authMode===m?'white':'#666',border:'none',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
               {m==='login'?'Anmelden':'Registrieren'}
             </button>
           ))}
@@ -335,7 +345,6 @@ export default function TrainingsApp() {
     </div>
   );
 
-  // ── PENDING ──────────────────────────────────────────────────
   if (userRole==='pending') return (
     <div style={{...s.page,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
       <div style={{background:'white',borderRadius:'16px',padding:'40px',maxWidth:'420px',width:'100%',textAlign:'center',boxShadow:'0 10px 40px rgba(0,0,0,0.2)'}}>
@@ -350,9 +359,8 @@ export default function TrainingsApp() {
     </div>
   );
 
-  // ── HEADER ───────────────────────────────────────────────────
-  const Header = ({ back, backLabel, backAction }) => {
-    const rc = ROLE_CONFIG[userRole]||{};
+  const Header = ({back,backLabel,backAction}) => {
+    const rc=ROLE_CONFIG[userRole]||{};
     return (
       <div style={{...s.card,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'12px'}}>
         <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
@@ -374,102 +382,162 @@ export default function TrainingsApp() {
     );
   };
 
-  // ── TRAININGSPLAN (Trainer/Admin) ────────────────────────────
+  // ── TRAININGSPLAN ────────────────────────────────────────────
   if (view==='trainingsplan') {
-    const upcoming = getAllUpcomingSessions();
+    const upcoming=getAllUpcomingSessions();
+    const allSubs=Object.values(subgroups).sort((a,b)=>{
+      const ga=FIXED_GROUPS.findIndex(g=>g.id===a.groupId), gb=FIXED_GROUPS.findIndex(g=>g.id===b.groupId);
+      return ga-gb || a.name.localeCompare(b.name,'de');
+    });
+
+    const toggleSubgroup = (sid) => {
+      const ids=newSession.subgroupIds||[];
+      setNewSession({...newSession, subgroupIds: ids.includes(sid)?ids.filter(i=>i!==sid):[...ids,sid]});
+    };
+
+    const toggleEditSubgroup = (sid) => {
+      const ids=editForm.subgroupIds||[];
+      setEditForm({...editForm, subgroupIds: ids.includes(sid)?ids.filter(i=>i!==sid):[...ids,sid]});
+    };
+
+    // Wiederholungsblöcke
+    const repeatBlocks = {};
+    upcoming.forEach(s => { if (s.repeatId) { if (!repeatBlocks[s.repeatId]) repeatBlocks[s.repeatId]=[]; repeatBlocks[s.repeatId].push(s); }});
+
     return (
       <div style={s.page}><div style={s.wrap}>
         <Header back backLabel="Startseite" backAction={()=>setView('home')}/>
 
-        {/* Neue Einheit anlegen */}
+        {/* Neue Einheit */}
         <div style={s.card}>
           <h2 style={{margin:'0 0 20px',color:'#0369a1',display:'flex',alignItems:'center',gap:'8px'}}><Plus size={20}/> Neue Trainingseinheit</h2>
+
+          {/* Untergruppen auswählen */}
+          <div style={{marginBottom:'16px'}}>
+            <label style={s.label}>Untergruppen (mehrere möglich)</label>
+            <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
+              {allSubs.length===0
+                ? <p style={{color:'#999',fontSize:'13px'}}>Noch keine Untergruppen vorhanden.</p>
+                : allSubs.map(sub=>{
+                  const grp=FIXED_GROUPS.find(g=>g.id===sub.groupId);
+                  const selected=(newSession.subgroupIds||[]).includes(sub.id);
+                  return (
+                    <button key={sub.id} onClick={()=>toggleSubgroup(sub.id)}
+                      style={{padding:'6px 12px',border:`2px solid ${grp?.color||'#ddd'}`,borderRadius:'20px',background:selected?(grp?.color||'#358941'):'white',color:selected?'white':(grp?.color||'#333'),cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>
+                      {grp?.emoji} {sub.name}
+                    </button>
+                  );
+                })
+              }
+            </div>
+          </div>
+
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',marginBottom:'12px'}}>
             <div>
-              <label style={s.label}>Gruppe</label>
-              <select value={newSession.groupId} onChange={e=>setNewSession({...newSession,groupId:e.target.value})}
-                style={{...s.input,flex:'none',width:'100%'}}>
-                {FIXED_GROUPS.map(g=><option key={g.id} value={g.id}>{g.emoji} {g.name}</option>)}
-              </select>
-            </div>
-            <div>
               <label style={s.label}>Trainer</label>
-              <input style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}
-                placeholder="Name des Trainers"
-                value={newSession.trainer} onChange={e=>setNewSession({...newSession,trainer:e.target.value})}/>
+              <input style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} placeholder="Name des Trainers" value={newSession.trainer} onChange={e=>setNewSession({...newSession,trainer:e.target.value})}/>
             </div>
+            <div></div>
             <div>
               <label style={s.label}>Datum</label>
-              <input type="date" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}
-                value={newSession.date} onChange={e=>setNewSession({...newSession,date:e.target.value})}/>
+              <input type="date" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={newSession.date} onChange={e=>setNewSession({...newSession,date:e.target.value})}/>
             </div>
             <div>
               <label style={s.label}>Uhrzeit</label>
-              <input type="time" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}
-                value={newSession.time} onChange={e=>setNewSession({...newSession,time:e.target.value})}/>
+              <input type="time" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={newSession.time} onChange={e=>setNewSession({...newSession,time:e.target.value})}/>
             </div>
           </div>
+
           <div style={{marginBottom:'12px'}}>
-            <label style={s.label}>Infos / Ausrüstung (z.B. "Laufschuhe mitbringen")</label>
-            <textarea style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box',resize:'vertical',minHeight:'70px'}}
-              placeholder="Hinweise für Eltern und Kinder..."
-              value={newSession.info} onChange={e=>setNewSession({...newSession,info:e.target.value})}/>
+            <label style={s.label}>Infos / Ausrüstung</label>
+            <textarea style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box',resize:'vertical',minHeight:'60px'}} placeholder="z.B. Laufschuhe mitbringen..." value={newSession.info} onChange={e=>setNewSession({...newSession,info:e.target.value})}/>
           </div>
 
-          {/* Wiederkehrend */}
           <div style={{marginBottom:'16px',padding:'14px',background:'#f0f9ff',borderRadius:'8px',border:'1px solid #bae6fd'}}>
-            <label style={{display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',marginBottom: newSession.repeat?'12px':0}}>
-              <input type="checkbox" checked={newSession.repeat} onChange={e=>setNewSession({...newSession,repeat:e.target.checked})}
-                style={{width:'18px',height:'18px',cursor:'pointer'}}/>
+            <label style={{display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',marginBottom:newSession.repeat?'12px':0}}>
+              <input type="checkbox" checked={newSession.repeat} onChange={e=>setNewSession({...newSession,repeat:e.target.checked})} style={{width:'18px',height:'18px',cursor:'pointer'}}/>
               <span style={{fontWeight:'600',color:'#0369a1',fontSize:'14px'}}><RefreshCw size={16} style={{display:'inline',marginRight:'6px'}}/>Wöchentlich wiederholen</span>
             </label>
             {newSession.repeat&&(
-              <div style={{display:'flex',alignItems:'center',gap:'10px',marginTop:'8px'}}>
-                <label style={{...s.label,margin:0}}>Anzahl Wochen:</label>
-                <input type="number" min="1" max="52" value={newSession.repeatWeeks}
-                  onChange={e=>setNewSession({...newSession,repeatWeeks:parseInt(e.target.value)||1})}
-                  style={{width:'70px',padding:'6px 10px',border:'1px solid #ddd',borderRadius:'6px',fontSize:'14px'}}/>
-                <span style={{fontSize:'13px',color:'#0369a1'}}>
-                  = {newSession.repeatWeeks}x jeden {WEEKDAYS[new Date(newSession.date+'T12:00:00').getDay()]}
-                </span>
+              <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                <label style={{...s.label,margin:0}}>Wochen:</label>
+                <input type="number" min="1" max="52" value={newSession.repeatWeeks} onChange={e=>setNewSession({...newSession,repeatWeeks:parseInt(e.target.value)||1})} style={{width:'70px',padding:'6px 10px',border:'1px solid #ddd',borderRadius:'6px',fontSize:'14px'}}/>
+                <span style={{fontSize:'13px',color:'#0369a1'}}>= {newSession.repeatWeeks}x jeden {WEEKDAYS[new Date(newSession.date+'T12:00:00').getDay()]}</span>
               </div>
             )}
           </div>
-
           <button onClick={createSession} style={s.btn('#0369a1')}>
             <Calendar size={18}/> {newSession.repeat?`${newSession.repeatWeeks} Einheiten anlegen`:'Einheit anlegen'}
           </button>
         </div>
 
-        {/* Übersicht geplante Einheiten */}
+        {/* Geplante Einheiten */}
         <div style={s.card}>
-          <h2 style={{margin:'0 0 16px',color:'#0369a1'}}>📅 Geplante Einheiten ({upcoming.length})</h2>
+          <h2 style={{margin:'0 0 16px',color:'#0369a1'}}>📅 Geplante Einheiten</h2>
           {upcoming.length===0
             ? <p style={{color:'#999',textAlign:'center',padding:'30px'}}>Noch keine Einheiten geplant.</p>
             : <div style={{display:'grid',gap:'10px'}}>
               {upcoming.map(session=>{
-                const grp=FIXED_GROUPS.find(g=>g.id===session.groupId);
+                const sessionSubs=(session.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean);
+                const isEditing=editingSession===session.id;
                 const responses=session.responses||{};
                 const coming=Object.values(responses).filter(r=>r==='coming').length;
                 const missing=Object.values(responses).filter(r=>r==='missing').length;
+                const blockSize=session.repeatId?(repeatBlocks[session.repeatId]||[]).length:0;
+
                 return (
-                  <div key={session.id} style={{padding:'14px',borderRadius:'10px',border:`2px solid ${grp?.color||'#ddd'}`,background:'white'}}>
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'8px'}}>
+                  <div key={session.id} style={{padding:'14px',borderRadius:'10px',border:'1px solid #ddd',background:'white'}}>
+                    {isEditing ? (
+                      /* Bearbeitungsformular */
                       <div>
-                        <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'4px'}}>
-                          <span style={{fontSize:'16px',fontWeight:'700',color:grp?.color}}>{grp?.emoji} {grp?.name}</span>
-                          <span style={{fontSize:'13px',color:'#666'}}>
-                            {new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'})} · {session.time} Uhr
-                          </span>
+                        <h4 style={{margin:'0 0 12px',color:'#0369a1'}}>Einheit bearbeiten</h4>
+                        <div style={{marginBottom:'10px'}}>
+                          <label style={s.label}>Untergruppen</label>
+                          <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+                            {allSubs.map(sub=>{
+                              const grp=FIXED_GROUPS.find(g=>g.id===sub.groupId);
+                              const sel=(editForm.subgroupIds||[]).includes(sub.id);
+                              return <button key={sub.id} onClick={()=>toggleEditSubgroup(sub.id)} style={{padding:'4px 10px',border:`2px solid ${grp?.color||'#ddd'}`,borderRadius:'20px',background:sel?(grp?.color||'#358941'):'white',color:sel?'white':(grp?.color||'#333'),cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>{grp?.emoji} {sub.name}</button>;
+                            })}
+                          </div>
                         </div>
-                        {session.trainer&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'#555'}}>👤 {session.trainer}</p>}
-                        {session.info&&<p style={{margin:'0 0 4px',fontSize:'13px',color:'#0369a1',display:'flex',alignItems:'center',gap:'4px'}}><Info size={13}/> {session.info}</p>}
-                        <p style={{margin:0,fontSize:'12px',color:'#999'}}>✓ {coming} kommen · ✗ {missing} fehlen</p>
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'8px'}}>
+                          <div><label style={s.label}>Datum</label><input type="date" value={editForm.date} onChange={e=>setEditForm({...editForm,date:e.target.value})} style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/></div>
+                          <div><label style={s.label}>Uhrzeit</label><input type="time" value={editForm.time} onChange={e=>setEditForm({...editForm,time:e.target.value})} style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/></div>
+                        </div>
+                        <div style={{marginBottom:'8px'}}><label style={s.label}>Trainer</label><input value={editForm.trainer||''} onChange={e=>setEditForm({...editForm,trainer:e.target.value})} style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/></div>
+                        <div style={{marginBottom:'12px'}}><label style={s.label}>Info</label><textarea value={editForm.info||''} onChange={e=>setEditForm({...editForm,info:e.target.value})} style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box',resize:'vertical',minHeight:'50px'}}/></div>
+                        <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                          <button onClick={()=>saveEdit(false)} style={s.btn('#358941',undefined,true)}><Save size={14}/> Diese speichern</button>
+                          {session.repeatId&&<button onClick={()=>saveEdit(true)} style={s.btn('#0369a1',undefined,true)}><Save size={14}/> Alle {blockSize} speichern</button>}
+                          <button onClick={()=>setEditingSession(null)} style={s.btn('#f3f4f6','#333',true)}>Abbrechen</button>
+                        </div>
                       </div>
-                      <button onClick={()=>deleteSession(session.id)} style={{padding:'6px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626'}}>
-                        <Trash2 size={16}/>
-                      </button>
-                    </div>
+                    ) : (
+                      /* Normale Ansicht */
+                      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'8px',flexWrap:'wrap'}}>
+                        <div style={{flex:1}}>
+                          <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'6px'}}>
+                            {sessionSubs.map(sub=>{
+                              const grp=FIXED_GROUPS.find(g=>g.id===sub.groupId);
+                              return <span key={sub.id} style={{fontSize:'12px',fontWeight:'700',color:grp?.color,background:grp?.bg||'#f3f4f6',padding:'2px 8px',borderRadius:'20px',border:`1px solid ${grp?.color}`}}>{grp?.emoji} {sub.name}</span>;
+                            })}
+                            {session.repeatId&&<span style={{fontSize:'11px',color:'#0369a1',background:'#e0f2fe',padding:'2px 8px',borderRadius:'20px'}}><RefreshCw size={10} style={{display:'inline'}}/> Block ({blockSize}x)</span>}
+                          </div>
+                          <p style={{margin:'0 0 2px',fontWeight:'600',color:'#333'}}>
+                            {new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'})} · {session.time} Uhr
+                          </p>
+                          {session.trainer&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'#555'}}>👤 Trainer: {session.trainer}</p>}
+                          {session.info&&<p style={{margin:'0 0 4px',fontSize:'13px',color:'#0369a1',display:'flex',alignItems:'center',gap:'4px'}}><Info size={13}/> {session.info}</p>}
+                          <p style={{margin:0,fontSize:'12px',color:'#999'}}>✓ {coming} kommen · ✗ {missing} fehlen</p>
+                        </div>
+                        <div style={{display:'flex',gap:'6px',flexShrink:0}}>
+                          <button onClick={()=>startEdit(session)} style={{padding:'6px',background:'#e0f2fe',border:'none',borderRadius:'6px',cursor:'pointer',color:'#0369a1'}}><Edit2 size={16}/></button>
+                          <button onClick={()=>deleteSession(session.id)} style={{padding:'6px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626'}}><Trash2 size={16}/></button>
+                          {session.repeatId&&<button onClick={()=>deleteRepeatBlock(session.repeatId)} title="Block löschen" style={{padding:'6px',background:'#fef3c7',border:'none',borderRadius:'6px',cursor:'pointer',color:'#d97706'}}><RefreshCw size={16}/></button>}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -487,26 +555,17 @@ export default function TrainingsApp() {
     const grp=sub?FIXED_GROUPS.find(g=>g.id===sub.groupId):null;
     const dates=(sub?.trainingDates||[]).sort().reverse();
     const stats=myChild?getAttendanceStats(myChild.id,myChild.subgroupId):null;
-
-    // Zukünftige Einheiten für die Gruppe des Kindes
-    const mySessions = myChild && sub
-      ? getUpcomingSessions(sub.groupId)
-      : [];
+    const mySessions=myChild&&sub ? getUpcomingSessionsForSubgroup(myChild.subgroupId) : [];
 
     return (
       <div style={s.page}><div style={s.wrap}>
         <Header/>
         {!myChild
-          ? <div style={{...s.card,textAlign:'center',padding:'40px'}}>
-              <p style={{fontSize:'18px',color:'#666'}}>Dein Account ist noch keinem Kind zugeordnet.</p>
-              <p style={{color:'#999',fontSize:'14px'}}>Bitte wende dich an den Trainer oder Admin.</p>
-            </div>
+          ? <div style={{...s.card,textAlign:'center',padding:'40px'}}><p style={{fontSize:'18px',color:'#666'}}>Dein Account ist noch keinem Kind zugeordnet.</p><p style={{color:'#999',fontSize:'14px'}}>Bitte wende dich an den Trainer oder Admin.</p></div>
           : <>
             <div style={s.card}>
               <h2 style={{margin:'0 0 4px',color:grp?.color||'#358941',fontSize:'22px'}}>{myChild.name}</h2>
               <p style={{margin:'0 0 20px',color:'#666',fontSize:'13px'}}>{grp?.emoji} {grp?.name} · {sub?.name}</p>
-
-              {/* Statistik */}
               <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'10px',marginBottom:'20px'}}>
                 {[{label:'Trainings',value:stats.total,color:'#333',bg:'#f8f9fa'},
                   {label:'Anwesend',value:stats.present,color:'#16a34a',bg:'#dcfce7'},
@@ -519,8 +578,6 @@ export default function TrainingsApp() {
                   </div>
                 ))}
               </div>
-
-              {/* Quote */}
               <div style={{marginBottom:'8px'}}>
                 <div style={{display:'flex',justifyContent:'space-between',marginBottom:'6px'}}>
                   <span style={{fontSize:'14px',fontWeight:'600'}}>Anwesenheitsquote</span>
@@ -532,7 +589,7 @@ export default function TrainingsApp() {
               </div>
             </div>
 
-            {/* Kommende Trainingseinheiten */}
+            {/* Kommende Trainings */}
             {mySessions.length>0&&(
               <div style={s.card}>
                 <h3 style={{margin:'0 0 16px',color:'#0369a1',display:'flex',alignItems:'center',gap:'8px'}}><Calendar size={18}/> Kommende 10 Trainings</h3>
@@ -541,19 +598,13 @@ export default function TrainingsApp() {
                     const childId=myChild.id;
                     const myResponse=(session.responses||{})[childId];
                     return (
-                      <div key={session.id} style={{padding:'14px',borderRadius:'10px',border:'1px solid #ddd',
-                        background:myResponse==='coming'?'#f0fdf4':myResponse==='missing'?'#fef2f2':'white'}}>
+                      <div key={session.id} style={{padding:'14px',borderRadius:'10px',border:'1px solid #ddd',background:myResponse==='coming'?'#f0fdf4':myResponse==='missing'?'#fef2f2':'white'}}>
                         <div style={{marginBottom:'10px'}}>
                           <p style={{margin:'0 0 2px',fontWeight:'700',color:'#333',fontSize:'15px'}}>
                             {new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})} · {session.time} Uhr
                           </p>
-                          {session.trainer&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'#555'}}>👤 {session.trainer}</p>}
-                          {session.info&&(
-                            <div style={{display:'flex',alignItems:'flex-start',gap:'6px',marginTop:'6px',padding:'8px',background:'#f0f9ff',borderRadius:'6px'}}>
-                              <Info size={14} color="#0369a1" style={{marginTop:'2px',flexShrink:0}}/>
-                              <p style={{margin:0,fontSize:'13px',color:'#0369a1'}}>{session.info}</p>
-                            </div>
-                          )}
+                          {session.trainer&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'#555'}}>👤 Trainer: {session.trainer}</p>}
+                          {session.info&&<div style={{display:'flex',alignItems:'flex-start',gap:'6px',marginTop:'6px',padding:'8px',background:'#f0f9ff',borderRadius:'6px'}}><Info size={14} color="#0369a1" style={{marginTop:'2px',flexShrink:0}}/><p style={{margin:0,fontSize:'13px',color:'#0369a1'}}>{session.info}</p></div>}
                         </div>
                         <div style={{display:'flex',gap:'8px'}}>
                           <button onClick={()=>respondToSession(session.id,'coming')}
@@ -572,7 +623,7 @@ export default function TrainingsApp() {
               </div>
             )}
 
-            {/* Anwesenheits-Verlauf */}
+            {/* Verlauf */}
             <div style={s.card}>
               <h3 style={{margin:'0 0 12px',color:'#333'}}>📋 Trainings-Verlauf</h3>
               <div style={{display:'grid',gap:'8px'}}>
@@ -591,9 +642,7 @@ export default function TrainingsApp() {
                             {cfg?.symbol||'–'} {cfg?.label||'Nicht erfasst'}
                           </span>
                           {status==='absent_unexcused'&&(
-                            <button onClick={()=>excuseMyChild(date)} style={s.btn('#d97706',undefined,true)}>
-                              <Clock size={14}/> Entschuldigen
-                            </button>
+                            <button onClick={()=>excuseMyChild(date)} style={s.btn('#d97706',undefined,true)}><Clock size={14}/> Entschuldigen</button>
                           )}
                         </div>
                       </div>
@@ -617,49 +666,38 @@ export default function TrainingsApp() {
         <Header back backLabel="Startseite" backAction={()=>setView('home')}/>
         <div style={s.card}>
           <h2 style={{margin:'0 0 16px',color:'#7c3aed',display:'flex',alignItems:'center',gap:'8px'}}><Users size={20}/> Nutzerverwaltung</h2>
-          {pendingCount>0&&(
-            <div style={{marginBottom:'16px',padding:'12px',background:'#fee2e2',borderRadius:'8px',border:'1px solid #fca5a5'}}>
-              <p style={{margin:0,fontWeight:'600',color:'#dc2626',fontSize:'14px'}}>⚠️ {pendingCount} Nutzer warten auf Freischaltung!</p>
-            </div>
-          )}
+          {pendingCount>0&&<div style={{marginBottom:'16px',padding:'12px',background:'#fee2e2',borderRadius:'8px',border:'1px solid #fca5a5'}}><p style={{margin:0,fontWeight:'600',color:'#dc2626',fontSize:'14px'}}>⚠️ {pendingCount} Nutzer warten auf Freischaltung!</p></div>}
           <div style={{display:'grid',gap:'10px'}}>
-            {Object.values(allUsers)
-              .sort((a,b)=>{
-                if(a.role==='pending'&&b.role!=='pending') return -1;
-                if(a.role!=='pending'&&b.role==='pending') return 1;
-                return (a.name||'').localeCompare(b.name||'');
-              })
-              .map(u=>{
-                const rc=ROLE_CONFIG[u.role]||{};
-                const linkedChild=u.linkedChildId?children[u.linkedChildId]:null;
-                return (
-                  <div key={u.uid} style={{padding:'12px 16px',background:u.role==='pending'?'#fff5f5':'#f8f9fa',borderRadius:'8px',border:u.role==='pending'?'2px solid #fca5a5':'1px solid #ddd'}}>
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'8px'}}>
-                      <div>
-                        <p style={{margin:'0 0 2px',fontWeight:'600',color:'#333'}}>{u.name||u.email}</p>
-                        <p style={{margin:0,fontSize:'12px',color:'#999'}}>{u.email}</p>
-                      </div>
-                      <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
-                        <select value={u.role} onChange={e=>changeUserRole(u.uid,e.target.value)}
-                          style={{padding:'6px 10px',border:`2px solid ${rc.color}`,borderRadius:'6px',fontSize:'13px',fontWeight:'600',color:rc.color,background:rc.bg,cursor:'pointer'}}>
-                          {Object.entries(ROLE_CONFIG).map(([key,cfg])=>(
-                            <option key={key} value={key}>{cfg.label}</option>
-                          ))}
-                        </select>
-                        {['eltern','jugendlich'].includes(u.role)&&(
-                          <select value={u.linkedChildId||''} onChange={e=>linkChildToUser(u.uid,e.target.value||null)}
-                            style={{padding:'6px 10px',border:'1px solid #ddd',borderRadius:'6px',fontSize:'13px',cursor:'pointer'}}>
-                            <option value=''>-- Kind zuordnen --</option>
-                            {allChildrenList.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-                          </select>
-                        )}
-                      </div>
+            {Object.values(allUsers).sort((a,b)=>{
+              if(a.role==='pending'&&b.role!=='pending') return -1;
+              if(a.role!=='pending'&&b.role==='pending') return 1;
+              return (a.name||'').localeCompare(b.name||'');
+            }).map(u=>{
+              const rc=ROLE_CONFIG[u.role]||{};
+              const linkedChild=u.linkedChildId?children[u.linkedChildId]:null;
+              return (
+                <div key={u.uid} style={{padding:'12px 16px',background:u.role==='pending'?'#fff5f5':'#f8f9fa',borderRadius:'8px',border:u.role==='pending'?'2px solid #fca5a5':'1px solid #ddd'}}>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'8px'}}>
+                    <div>
+                      <p style={{margin:'0 0 2px',fontWeight:'600',color:'#333'}}>{u.name||u.email}</p>
+                      <p style={{margin:0,fontSize:'12px',color:'#999'}}>{u.email}</p>
                     </div>
-                    {linkedChild&&<p style={{margin:'6px 0 0',fontSize:'12px',color:'#358941'}}>👶 Verknüpft mit: <strong>{linkedChild.name}</strong></p>}
+                    <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
+                      <select value={u.role} onChange={e=>changeUserRole(u.uid,e.target.value)} style={{padding:'6px 10px',border:`2px solid ${rc.color}`,borderRadius:'6px',fontSize:'13px',fontWeight:'600',color:rc.color,background:rc.bg,cursor:'pointer'}}>
+                        {Object.entries(ROLE_CONFIG).map(([key,cfg])=><option key={key} value={key}>{cfg.label}</option>)}
+                      </select>
+                      {['eltern','jugendlich'].includes(u.role)&&(
+                        <select value={u.linkedChildId||''} onChange={e=>linkChildToUser(u.uid,e.target.value||null)} style={{padding:'6px 10px',border:'1px solid #ddd',borderRadius:'6px',fontSize:'13px',cursor:'pointer'}}>
+                          <option value=''>-- Kind zuordnen --</option>
+                          {allChildrenList.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      )}
+                    </div>
                   </div>
-                );
-              })
-            }
+                  {linkedChild&&<p style={{margin:'6px 0 0',fontSize:'12px',color:'#358941'}}>👶 Verknüpft mit: <strong>{linkedChild.name}</strong></p>}
+                </div>
+              );
+            })}
             {Object.keys(allUsers).length===0&&<p style={{color:'#999',textAlign:'center',padding:'20px'}}>Noch keine Nutzer.</p>}
           </div>
         </div>
@@ -671,35 +709,39 @@ export default function TrainingsApp() {
   if (view==='home') return (
     <div style={s.page}><div style={s.wrap}>
       <Header/>
-
-      {/* Trainings der nächsten 7 Tage */}
       {(()=>{
-        const today = new Date();
-        const in6days = new Date(); in6days.setDate(today.getDate()+6);
-        const todayStr = today.toISOString().split('T')[0];
-        const in6Str = in6days.toISOString().split('T')[0];
-        const week = getAllUpcomingSessions().filter(s=>s.date>=todayStr && s.date<=in6Str);
-        if (week.length===0) return null;
+        const today=new Date(), in6=new Date(); in6.setDate(today.getDate()+6);
+        const todayStr=today.toISOString().split('T')[0], in6Str=in6.toISOString().split('T')[0];
+        const week=getAllUpcomingSessions().filter(s=>s.date>=todayStr&&s.date<=in6Str);
+        if (!week.length) return null;
         return (
           <div style={s.card}>
             <h3 style={{margin:'0 0 12px',color:'#0369a1',display:'flex',alignItems:'center',gap:'8px'}}><Calendar size={16}/> Trainings heute & nächste 6 Tage</h3>
             <div style={{display:'grid',gap:'8px'}}>
               {week.map(session=>{
-                const grp=FIXED_GROUPS.find(g=>g.id===session.groupId);
+                const sessionSubs=(session.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean);
                 return (
                   <div key={session.id}
                     onClick={()=>{
-                      setTrainingDate(session.date);
-                      const grpObj=FIXED_GROUPS.find(g=>g.id===session.groupId);
-                      setActiveGroup(grpObj);
-                      setView('group');
+                      const firstSub=sessionSubs[0];
+                      if (firstSub) {
+                        const grpObj=FIXED_GROUPS.find(g=>g.id===firstSub.groupId);
+                        setActiveGroup(grpObj);
+                        setTrainingDate(session.date);
+                        setView('group');
+                      }
                     }}
                     style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'#f0f9ff',borderRadius:'8px',border:'1px solid #bae6fd',cursor:'pointer'}}
                     onMouseEnter={e=>e.currentTarget.style.background='#e0f2fe'}
                     onMouseLeave={e=>e.currentTarget.style.background='#f0f9ff'}>
                     <div>
-                      <span style={{fontWeight:'600',color:grp?.color}}>{grp?.emoji} {grp?.name}</span>
-                      <span style={{fontSize:'13px',color:'#555',marginLeft:'10px'}}>
+                      <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'4px'}}>
+                        {sessionSubs.map(sub=>{
+                          const grp=FIXED_GROUPS.find(g=>g.id===sub.groupId);
+                          return <span key={sub.id} style={{fontSize:'12px',fontWeight:'700',color:grp?.color}}>{grp?.emoji} {sub.name}</span>;
+                        })}
+                      </div>
+                      <span style={{fontSize:'13px',color:'#555'}}>
                         {new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})} · {session.time} Uhr
                       </span>
                       {session.trainer&&<span style={{fontSize:'12px',color:'#999',marginLeft:'8px'}}>· {session.trainer}</span>}
@@ -715,12 +757,10 @@ export default function TrainingsApp() {
           </div>
         );
       })()}
-
       <div style={{display:'grid',gap:'14px'}}>
         {FIXED_GROUPS.map(group=>{
           const subs=getSubgroupsForGroup(group.id);
           const totalKids=subs.reduce((sum,sub)=>sum+getChildrenForSubgroup(sub.id).length,0);
-          const upcoming=getUpcomingSessions(group.id).length;
           return (
             <div key={group.id} onClick={()=>{setActiveGroup(group);setView('group');}}
               style={{...s.card,cursor:'pointer',borderLeft:`6px solid ${group.color}`,display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:0}}
@@ -748,8 +788,7 @@ export default function TrainingsApp() {
           <h2 style={{margin:'0 0 16px',color:activeGroup.color}}>{activeGroup.emoji} {activeGroup.name}</h2>
           {canEdit()&&(
             <div style={{display:'flex',gap:'8px',marginBottom:'20px'}}>
-              <input style={s.input} placeholder="Neue Trainingsgruppe..." value={newSubgroupName}
-                onChange={e=>setNewSubgroupName(e.target.value)} onKeyPress={e=>e.key==='Enter'&&addSubgroup()}/>
+              <input style={s.input} placeholder="Neue Trainingsgruppe..." value={newSubgroupName} onChange={e=>setNewSubgroupName(e.target.value)} onKeyPress={e=>e.key==='Enter'&&addSubgroup()}/>
               <button onClick={addSubgroup} style={s.btn(activeGroup.color)}><Plus size={18}/> Gruppe</button>
             </div>
           )}
@@ -761,8 +800,7 @@ export default function TrainingsApp() {
                 const presentToday=kids.filter(c=>(c.attendance||{})[trainingDate]==='present').length;
                 return (
                   <div key={sub.id} style={{border:'1px solid #ddd',borderRadius:'10px',overflow:'hidden'}}>
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px',background:'#f8f9fa',cursor:'pointer'}}
-                      onClick={()=>{setActiveSubgroup(sub);setView('subgroup');}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px',background:'#f8f9fa',cursor:'pointer'}} onClick={()=>{setActiveSubgroup(sub);setView('subgroup');}}>
                       <div>
                         <h3 style={{margin:'0 0 4px',color:'#333',fontSize:'17px'}}>{sub.name}</h3>
                         <p style={{margin:0,color:'#666',fontSize:'12px'}}>{kids.length} Kinder · {(sub.trainingDates||[]).length} Trainings · heute {presentToday} anwesend</p>
@@ -783,32 +821,6 @@ export default function TrainingsApp() {
     );
   }
 
-  // Hilfsfunktionen für Gruppe/Untergruppe (müssen hier stehen für den JSX-Scope)
-  function addSubgroup() {
-    if (!newSubgroupName.trim()) return;
-    const id='sub_'+Date.now();
-    saveSubgroups({...subgroups,[id]:{id,name:newSubgroupName,groupId:activeGroup.id,trainingDates:[]}});
-    setNewSubgroupName('');
-  }
-  function deleteSubgroup(sid) {
-    if (!window.confirm('Untergruppe löschen?')) return;
-    const u={...subgroups}; delete u[sid]; saveSubgroups(u);
-  }
-  function addChild() {
-    if (!newChildName.trim()) return;
-    const id='child_'+Date.now();
-    saveChildren({...children,[id]:{id,name:newChildName,subgroupId:activeSubgroup.id,attendance:{}}});
-    setNewChildName('');
-  }
-  function deleteChild(cid) {
-    if (!window.confirm('Kind löschen?')) return;
-    const u={...children}; delete u[cid]; saveChildren(u);
-  }
-  function moveChild(cid,newSid) {
-    saveChildren({...children,[cid]:{...children[cid],subgroupId:newSid}});
-    setMoveChildId(null);
-  }
-
   // ── UNTERGRUPPE ──────────────────────────────────────────────
   if (view==='subgroup') {
     const sub=subgroups[activeSubgroup.id]||activeSubgroup;
@@ -821,8 +833,7 @@ export default function TrainingsApp() {
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px',flexWrap:'wrap',gap:'8px'}}>
             <h2 style={{margin:0,color:activeGroup.color}}>{sub.name}</h2>
             <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
-              {canEdit()&&<input type="date" value={trainingDate} onChange={e=>setTrainingDate(e.target.value)}
-                style={{padding:'8px 14px',border:'2px solid #358941',borderRadius:'8px',fontSize:'16px',fontWeight:'600'}}/>}
+              {canEdit()&&<input type="date" value={trainingDate} onChange={e=>setTrainingDate(e.target.value)} style={{padding:'8px 14px',border:'2px solid #358941',borderRadius:'8px',fontSize:'16px',fontWeight:'600'}}/>}
               <span style={{fontSize:'18px',fontWeight:'700',color:'#333',background:'#f3f4f6',padding:'8px 16px',borderRadius:'10px'}}>
                 {new Date(trainingDate+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}
               </span>
@@ -842,8 +853,7 @@ export default function TrainingsApp() {
           </div>
           {canEdit()&&(
             <div style={{display:'flex',gap:'8px',marginBottom:'20px',paddingBottom:'20px',borderBottom:'1px solid #eee'}}>
-              <input style={s.input} placeholder="Kind hinzufügen..." value={newChildName}
-                onChange={e=>setNewChildName(e.target.value)} onKeyPress={e=>e.key==='Enter'&&addChild()}/>
+              <input style={s.input} placeholder="Kind hinzufügen..." value={newChildName} onChange={e=>setNewChildName(e.target.value)} onKeyPress={e=>e.key==='Enter'&&addChild()}/>
               <button onClick={addChild} style={s.btn(activeGroup.color)}><Plus size={18}/> Kind</button>
             </div>
           )}
@@ -852,35 +862,31 @@ export default function TrainingsApp() {
               ? <p style={{color:'#999',textAlign:'center',padding:'30px'}}>Noch keine Kinder.</p>
               : kids.map(child=>{
                 const todayStatus=(child.attendance||{})[trainingDate];
-                // Wenn Eltern abgemeldet haben und noch kein Status gesetzt → als entschuldigt anzeigen
-                const parentExcused = !todayStatus && isExcusedByParent(child.id, trainingDate);
-                const displayStatus = todayStatus || (parentExcused ? 'absent_excused' : null);
+                const parentResponse=getParentResponse(child.id, trainingDate);
+                // parentResponse: 'coming' = angemeldet, 'missing' = abgemeldet
+                const parentExcused=parentResponse==='missing';
+                const parentComing=parentResponse==='coming';
+                const displayStatus=todayStatus||(parentExcused?'absent_excused':null);
                 const stats=getAttendanceStats(child.id,sub.id);
                 return (
-                  <div key={child.id} style={{padding:'14px',borderRadius:'10px',border: parentExcused&&!todayStatus ? '2px solid #d97706' : '1px solid #ddd',
+                  <div key={child.id} style={{padding:'14px',borderRadius:'10px',
+                    border:parentExcused&&!todayStatus?'2px solid #d97706':parentComing&&!todayStatus?'2px solid #16a34a':'1px solid #ddd',
                     background:displayStatus==='present'?'#f0fdf4':displayStatus==='absent_unexcused'?'#f9fafb':displayStatus==='absent_excused'?'#fffbeb':'white'}}>
                     <div style={{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
                       <div style={{flex:1,minWidth:'120px'}}>
-                        <p style={{margin:'0 0 2px',fontWeight:'600',color:'#333',fontSize:'16px'}}>{child.name}</p>
-                        <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
-                          <p style={{margin:0,fontSize:'12px',color:'#999'}}>{stats.total} Trainings · {stats.present}x da · {stats.percent}%</p>
-                          {parentExcused&&!todayStatus&&<span style={{fontSize:'11px',fontWeight:'600',color:'#d97706',background:'#fef3c7',padding:'1px 6px',borderRadius:'10px'}}>Eltern abgemeldet</span>}
+                        <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
+                          <p style={{margin:0,fontWeight:'600',color:'#333',fontSize:'16px'}}>{child.name}</p>
+                          {/* Eltern-Badge - bleibt immer sichtbar */}
+                          {parentExcused&&<span style={{fontSize:'11px',fontWeight:'600',color:'#d97706',background:'#fef3c7',padding:'2px 8px',borderRadius:'20px',border:'1px solid #d97706'}}>Eltern abgemeldet</span>}
+                          {parentComing&&<span style={{fontSize:'11px',fontWeight:'600',color:'#16a34a',background:'#dcfce7',padding:'2px 8px',borderRadius:'20px',border:'1px solid #16a34a'}}>Eltern angemeldet</span>}
                         </div>
+                        <p style={{margin:'2px 0 0',fontSize:'12px',color:'#999'}}>{stats.total} Trainings · {stats.present}x da · {stats.percent}%</p>
                       </div>
                       {canEdit()&&(
                         <div style={{display:'flex',gap:'6px'}}>
-                          <button onClick={()=>setStatus(child.id,'present')}
-                            style={{width:'44px',height:'44px',border:'2px solid #16a34a',background:displayStatus==='present'?'#16a34a':'white',color:displayStatus==='present'?'white':'#16a34a',borderRadius:'8px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                            <Check size={22}/>
-                          </button>
-                          <button onClick={()=>setStatus(child.id,'absent_unexcused')}
-                            style={{width:'44px',height:'44px',border:'2px solid #9ca3af',background:displayStatus==='absent_unexcused'?'#6b7280':'white',color:displayStatus==='absent_unexcused'?'white':'#6b7280',borderRadius:'8px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'22px',fontWeight:'700'}}>
-                            –
-                          </button>
-                          <button onClick={()=>setStatus(child.id,'absent_excused')}
-                            style={{width:'44px',height:'44px',border:'2px solid #d97706',background:displayStatus==='absent_excused'?'#d97706':'white',color:displayStatus==='absent_excused'?'white':'#d97706',borderRadius:'8px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                            <Clock size={20}/>
-                          </button>
+                          <button onClick={()=>setStatus(child.id,'present')} style={{width:'44px',height:'44px',border:'2px solid #16a34a',background:displayStatus==='present'?'#16a34a':'white',color:displayStatus==='present'?'white':'#16a34a',borderRadius:'8px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}><Check size={22}/></button>
+                          <button onClick={()=>setStatus(child.id,'absent_unexcused')} style={{width:'44px',height:'44px',border:'2px solid #9ca3af',background:displayStatus==='absent_unexcused'?'#6b7280':'white',color:displayStatus==='absent_unexcused'?'white':'#6b7280',borderRadius:'8px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'22px',fontWeight:'700'}}>–</button>
+                          <button onClick={()=>setStatus(child.id,'absent_excused')} style={{width:'44px',height:'44px',border:'2px solid #d97706',background:displayStatus==='absent_excused'?'#d97706':'white',color:displayStatus==='absent_excused'?'white':'#d97706',borderRadius:'8px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}><Clock size={20}/></button>
                         </div>
                       )}
                       <div style={{display:'flex',gap:'6px'}}>
