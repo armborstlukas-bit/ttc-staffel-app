@@ -51,6 +51,8 @@ export default function TrainingsApp() {
   const [children, setChildren]       = useState({});
   const [allUsers, setAllUsers]       = useState({});
   const [sessions, setSessions]       = useState({});
+  const [tournaments, setTournaments] = useState({});
+  const [activePage, setActivePage]   = useState('training'); // 'training' | 'tournament'
 
   const [view, setView]                     = useState('home');
   const [activeGroup, setActiveGroup]       = useState(null);
@@ -100,7 +102,8 @@ export default function TrainingsApp() {
     const unsubs = [
       onSnapshot(doc(db,'ttc','subgroups'), s => setSubgroups(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','children'),  s => setChildren(s.exists()?s.data():{})),
-      onSnapshot(doc(db,'ttc','sessions'),  s => setSessions(s.exists()?s.data():{})),
+      onSnapshot(doc(db,'ttc','sessions'),    s => setSessions(s.exists()?s.data():{})),
+      onSnapshot(doc(db,'ttc','tournaments'), s => setTournaments(s.exists()?s.data():{})),
     ];
     if (userRole==='admin')
       unsubs.push(onSnapshot(doc(db,'ttc','users'), s => setAllUsers(s.exists()?s.data():{})));
@@ -109,7 +112,8 @@ export default function TrainingsApp() {
 
   const saveSubgroups = u => { setSubgroups(u); setDoc(doc(db,'ttc','subgroups'),u); };
   const saveChildren  = u => { setChildren(u);  setDoc(doc(db,'ttc','children'), u); };
-  const saveSessions  = u => { setSessions(u);  setDoc(doc(db,'ttc','sessions'), u); };
+  const saveSessions   = u => { setSessions(u);    setDoc(doc(db,'ttc','sessions'),    u); };
+  const saveTournaments= u => { setTournaments(u); setDoc(doc(db,'ttc','tournaments'), u); };
 
   const canEdit = () => ['admin','trainer'].includes(userRole);
   const getSubgroupsForGroup = gid => Object.values(subgroups).filter(s=>s.groupId===gid);
@@ -307,7 +311,46 @@ export default function TrainingsApp() {
     saveChildren({...children,[child.id]:{...child,attendance:{...(child.attendance||{}),[date]:'absent_excused'}}});
   };
 
-  const handleResetAllAttendance = async () => {
+  const [newTournament, setNewTournament] = useState({ name:'', date:'', location:'', info:'', childIds:[] });
+
+  const getMyTournaments = () => {
+    const myChild = getMyChild();
+    if (!myChild) return [];
+    return Object.values(tournaments)
+      .filter(t => (t.childIds||[]).includes(myChild.id))
+      .sort((a,b) => a.date.localeCompare(b.date));
+  };
+
+  const createTournament = () => {
+    if (!newTournament.name.trim() || !newTournament.date) { alert('Bitte Name und Datum eingeben!'); return; }
+    const id = 'tournament_' + Date.now();
+    saveTournaments({ ...tournaments, [id]: { id, ...newTournament, responses:{} } });
+    setNewTournament({ name:'', date:'', location:'', info:'', childIds:[] });
+  };
+
+  const deleteTournament = (id) => {
+    if (!window.confirm('Turnier löschen?')) return;
+    const u = {...tournaments}; delete u[id]; saveTournaments(u);
+  };
+
+  const toggleChildInTournament = (tournamentId, childId) => {
+    const t = tournaments[tournamentId];
+    const ids = t.childIds||[];
+    const updated = ids.includes(childId) ? ids.filter(i=>i!==childId) : [...ids, childId];
+    saveTournaments({ ...tournaments, [tournamentId]: { ...t, childIds: updated } });
+  };
+
+  const respondToTournament = (tournamentId, response) => {
+    const myChild = getMyChild();
+    const childId = myChild?.id;
+    if (!childId) return;
+    const t = tournaments[tournamentId];
+    const cur = (t.responses||{})[childId];
+    saveTournaments({ ...tournaments, [tournamentId]: { ...t, responses: { ...(t.responses||{}), [childId]: cur===response?null:response } } });
+  };
+
+  const GOLD = '#b8860b';
+  const GOLD_BG = 'linear-gradient(135deg, #d4a017 0%, #f0c040 100%)';
     setResetError('');
     try {
       const credential = EmailAuthProvider.credential(user.email, resetPassword);
@@ -410,7 +453,7 @@ export default function TrainingsApp() {
       <div style={{background:'white',borderRadius:'16px',padding:'40px',maxWidth:'420px',width:'100%',boxShadow:'0 10px 40px rgba(0,0,0,0.2)'}}>
         <h1 style={{margin:'0 0 4px',color:'#358941',fontSize:'28px',textAlign:'center'}}>TTC Grün-Weiß Staffel</h1>
         <p style={{margin:'0 0 4px',color:'#666',textAlign:'center'}}>Vereinsapp</p>
-        <p style={{margin:'0 0 28px',color:'#bbb',textAlign:'center',fontSize:'11px'}}>v0.4.1</p>
+        <p style={{margin:'0 0 28px',color:'#bbb',textAlign:'center',fontSize:'11px'}}>v0.4.2</p>
         {error&&<p style={{color:'red',marginBottom:'16px',fontSize:'13px',textAlign:'center'}}>{error}</p>}
         <div style={{display:'flex',marginBottom:'20px',borderRadius:'8px',overflow:'hidden',border:'1px solid #ddd'}}>
           {['login','register'].map(m=>(
@@ -496,7 +539,18 @@ export default function TrainingsApp() {
           </div>
           <div style={{display:'flex',gap:'8px'}}>
             {userRole==='admin'&&<button onClick={()=>setView('admin')} style={s.btn('#7c3aed')}><Shield size={16}/> Admin</button>}
-            {canEdit()&&<button onClick={()=>setView('trainingsplan')} style={s.btn('#0369a1')}><Calendar size={16}/> Trainingsplan</button>}
+            {canEdit()&&(
+              <div style={{display:'flex',borderRadius:'8px',overflow:'hidden',border:'2px solid #0369a1'}}>
+                <button onClick={()=>{setActivePage('training');setView('home');}}
+                  style={{padding:'8px 14px',background:activePage==='training'?'#0369a1':'white',color:activePage==='training'?'white':'#0369a1',border:'none',cursor:'pointer',fontWeight:'600',fontSize:'13px',display:'flex',alignItems:'center',gap:'5px'}}>
+                  <Calendar size={14}/> Training
+                </button>
+                <button onClick={()=>{setActivePage('tournament');setView('tournamentAdmin');}}
+                  style={{padding:'8px 14px',background:activePage==='tournament'?GOLD:'white',color:activePage==='tournament'?'white':GOLD,border:'none',cursor:'pointer',fontWeight:'600',fontSize:'13px',display:'flex',alignItems:'center',gap:'5px'}}>
+                  🏆 Turnier
+                </button>
+              </div>
+            )}
             <button onClick={()=>signOut(auth)} style={s.btn('#ef4444')}><LogOut size={16}/></button>
           </div>
         </div>
@@ -745,6 +799,61 @@ export default function TrainingsApp() {
                 </div>
               </div>
             </div>
+
+            {/* Turniere - goldenes Feld */}
+            {(()=>{
+              const myTournaments = getMyTournaments();
+              if (!myTournaments.length) return null;
+              const myChild = getMyChild();
+              return (
+                <div style={{...s.card,border:`2px solid ${GOLD}`,background:'#fffbeb'}}>
+                  <h3 style={{margin:'0 0 16px',color:GOLD,display:'flex',alignItems:'center',gap:'8px',fontSize:'17px'}}>
+                    🏆 Meine Turniere
+                  </h3>
+                  <div style={{display:'grid',gap:'10px'}}>
+                    {myTournaments.map(t=>{
+                      const childId = myChild?.id;
+                      const myResponse = (t.responses||{})[childId];
+                      const isPast = t.date < new Date().toISOString().split('T')[0];
+                      return (
+                        <div key={t.id} style={{padding:'14px',borderRadius:'10px',border:`1px solid ${GOLD}`,
+                          background:myResponse==='attending'?'#f0fdf4':myResponse==='not_attending'?'#fef2f2':'white'}}>
+                          <h4 style={{margin:'0 0 6px',color:GOLD,fontSize:'15px'}}>🏆 {t.name}</h4>
+                          <p style={{margin:'0 0 2px',fontSize:'13px',color:'#555'}}>
+                            📅 {new Date(t.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}
+                          </p>
+                          {t.location&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'#555'}}>📍 {t.location}</p>}
+                          {t.info&&<p style={{margin:'0 0 8px',fontSize:'13px',color:'#0369a1'}}>ℹ️ {t.info}</p>}
+
+                          {/* Teilnahme-Buttons */}
+                          {!isPast&&(
+                            <div style={{display:'flex',gap:'8px',marginTop:'10px'}}>
+                              <button onClick={()=>respondToTournament(t.id,'attending')}
+                                style={{flex:1,padding:'10px',border:`2px solid #16a34a`,
+                                  background:myResponse==='attending'?'#16a34a':'white',
+                                  color:myResponse==='attending'?'white':'#16a34a',
+                                  borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px',
+                                  display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>
+                                <Check size={18}/> Nehme teil
+                              </button>
+                              <button onClick={()=>respondToTournament(t.id,'not_attending')}
+                                style={{flex:1,padding:'10px',border:`2px solid #dc2626`,
+                                  background:myResponse==='not_attending'?'#dc2626':'white',
+                                  color:myResponse==='not_attending'?'white':'#dc2626',
+                                  borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px',
+                                  display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>
+                                <X size={18}/> Nehme nicht teil
+                              </button>
+                            </div>
+                          )}
+                          {isPast&&<p style={{margin:'8px 0 0',fontSize:'12px',color:'#999',fontStyle:'italic'}}>Turnier bereits vergangen</p>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Kommende Trainings */}
             {mySessions.length>0&&(
@@ -1318,6 +1427,136 @@ export default function TrainingsApp() {
             <span style={{fontSize:'13px',color:'#6b7280'}}>– Fehlt unentschuldigt</span>
             <span style={{fontSize:'13px',color:'#d97706'}}>~ Fehlt entschuldigt</span>
           </div>
+        </div>
+      </div></div>
+    );
+  }
+
+  // ── TURNIERVERWALTUNG (Trainer/Admin) ───────────────────────
+  if (view==='tournamentAdmin') {
+    const allChildrenList = Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+    const sortedTournaments = Object.values(tournaments).sort((a,b)=>a.date.localeCompare(b.date));
+
+    return (
+      <div style={{...s.page(), background: GOLD_BG}}><div style={s.wrap}>
+        <Header/>
+
+        {/* Neues Turnier */}
+        <div style={s.card}>
+          <h2 style={{margin:'0 0 20px',color:GOLD,display:'flex',alignItems:'center',gap:'8px'}}>
+            🏆 Neues Turnier anlegen
+          </h2>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',marginBottom:'12px'}}>
+            <div style={{gridColumn:'1/-1'}}>
+              <label style={s.label}>Turnierbezeichnung</label>
+              <input style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}
+                placeholder="z.B. Kreismeisterschaft U13 2026"
+                value={newTournament.name} onChange={e=>setNewTournament({...newTournament,name:e.target.value})}/>
+            </div>
+            <div>
+              <label style={s.label}>Datum</label>
+              <input type="date" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}
+                value={newTournament.date} onChange={e=>setNewTournament({...newTournament,date:e.target.value})}/>
+            </div>
+            <div>
+              <label style={s.label}>Ort</label>
+              <input style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}
+                placeholder="z.B. Sporthalle Staffel"
+                value={newTournament.location} onChange={e=>setNewTournament({...newTournament,location:e.target.value})}/>
+            </div>
+            <div style={{gridColumn:'1/-1'}}>
+              <label style={s.label}>Infos / Hinweise</label>
+              <textarea style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box',resize:'vertical',minHeight:'60px'}}
+                placeholder="z.B. Anmeldeschluss, Kosten, Ausrüstung..."
+                value={newTournament.info} onChange={e=>setNewTournament({...newTournament,info:e.target.value})}/>
+            </div>
+          </div>
+
+          {/* Kinder auswählen */}
+          <div style={{marginBottom:'16px'}}>
+            <label style={s.label}>Teilnehmende Kinder</label>
+            <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
+              {allChildrenList.length===0
+                ? <p style={{color:'#999',fontSize:'13px'}}>Noch keine Kinder vorhanden.</p>
+                : allChildrenList.map(child=>{
+                  const sub = subgroups[child.subgroupId];
+                  const grp = FIXED_GROUPS.find(g=>g.id===sub?.groupId);
+                  const selected = (newTournament.childIds||[]).includes(child.id);
+                  return (
+                    <button key={child.id} onClick={()=>{
+                      const ids = newTournament.childIds||[];
+                      setNewTournament({...newTournament, childIds: selected?ids.filter(i=>i!==child.id):[...ids,child.id]});
+                    }}
+                      style={{padding:'6px 12px',border:`2px solid ${selected?GOLD:'#ddd'}`,borderRadius:'20px',
+                        background:selected?GOLD:'white',color:selected?'white':'#333',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>
+                      {child.name} {grp&&<span style={{fontSize:'11px',opacity:0.8}}>· {grp.emoji}</span>}
+                    </button>
+                  );
+                })
+              }
+            </div>
+            {(newTournament.childIds||[]).length>0&&(
+              <p style={{margin:'8px 0 0',fontSize:'13px',color:GOLD,fontWeight:'600'}}>{newTournament.childIds.length} Kind(er) ausgewählt</p>
+            )}
+          </div>
+
+          <button onClick={createTournament} style={{...s.btn(GOLD),justifyContent:'center'}}>
+            🏆 Turnier anlegen
+          </button>
+        </div>
+
+        {/* Turnierliste */}
+        <div style={s.card}>
+          <h2 style={{margin:'0 0 16px',color:GOLD}}>📋 Alle Turniere ({sortedTournaments.length})</h2>
+          {sortedTournaments.length===0
+            ? <p style={{color:'#999',textAlign:'center',padding:'30px'}}>Noch keine Turniere angelegt.</p>
+            : <div style={{display:'grid',gap:'12px'}}>
+              {sortedTournaments.map(t=>{
+                const isPast = t.date < new Date().toISOString().split('T')[0];
+                const attending = Object.values(t.responses||{}).filter(r=>r==='attending').length;
+                const notAttending = Object.values(t.responses||{}).filter(r=>'not_attending').length;
+                return (
+                  <div key={t.id} style={{padding:'16px',borderRadius:'10px',border:`2px solid ${GOLD}`,background:isPast?'#f9f9f9':'white'}}>
+                    <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'8px'}}>
+                      <div style={{flex:1}}>
+                        <h3 style={{margin:'0 0 6px',color:GOLD,fontSize:'17px'}}>🏆 {t.name}</h3>
+                        <p style={{margin:'0 0 2px',fontSize:'13px',color:'#555'}}>
+                          📅 {new Date(t.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}
+                        </p>
+                        {t.location&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'#555'}}>📍 {t.location}</p>}
+                        {t.info&&<p style={{margin:'0 0 6px',fontSize:'13px',color:'#0369a1'}}>ℹ️ {t.info}</p>}
+
+                        {/* Teilnehmer */}
+                        <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginTop:'8px'}}>
+                          {(t.childIds||[]).map(cid=>{
+                            const child = children[cid];
+                            if (!child) return null;
+                            const response = (t.responses||{})[cid];
+                            return (
+                              <span key={cid} style={{
+                                fontSize:'12px',fontWeight:'600',padding:'3px 10px',borderRadius:'20px',
+                                background:response==='attending'?'#dcfce7':response==='not_attending'?'#fee2e2':'#f3f4f6',
+                                color:response==='attending'?'#16a34a':response==='not_attending'?'#dc2626':'#666',
+                                border:`1px solid ${response==='attending'?'#16a34a':response==='not_attending'?'#dc2626':'#ddd'}`
+                              }}>
+                                {child.name} {response==='attending'?'✓':response==='not_attending'?'✗':'?'}
+                              </span>
+                            );
+                          })}
+                        </div>
+                        <p style={{margin:'8px 0 0',fontSize:'12px',color:'#999'}}>
+                          {(t.childIds||[]).length} Teilnehmer · ✓ {attending} dabei · ✗ {notAttending} absagen
+                        </p>
+                      </div>
+                      <button onClick={()=>deleteTournament(t.id)} style={{padding:'6px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626',flexShrink:0}}>
+                        <Trash2 size={16}/>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          }
         </div>
       </div></div>
     );
