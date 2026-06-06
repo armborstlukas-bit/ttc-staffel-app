@@ -329,8 +329,8 @@ export default function TrainingsApp() {
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'16px', flexWrap:'wrap', gap:'8px' }}>
             <h2 style={{ margin:0, color:activeGroup.color }}>{sub.name}</h2>
             <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
-              <span style={{ fontSize:'13px', color:'#666', background:'#f3f4f6', padding:'4px 10px', borderRadius:'20px' }}>
-                {new Date(trainingDate+'T12:00:00').toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'2-digit', year:'numeric' })}
+              <span style={{ fontSize:'18px', fontWeight:'700', color:'#333', background:'#f3f4f6', padding:'8px 16px', borderRadius:'10px' }}>
+                {new Date(trainingDate+'T12:00:00').toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' })}
               </span>
               <button onClick={()=>exportSubgroupExcel(sub)} style={s.btn('#16a34a',undefined,true)}>
                 <Download size={15}/> Excel Export
