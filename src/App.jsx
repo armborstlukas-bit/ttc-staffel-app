@@ -307,6 +307,7 @@ export default function TrainingsApp() {
     saveChildren({...children,[child.id]:{...child,attendance:{...(child.attendance||{}),[date]:'absent_excused'}}});
   };
 
+  const handleResetAllAttendance = async () => {
     setResetError('');
     try {
       const credential = EmailAuthProvider.credential(user.email, resetPassword);
