@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
 import { Check, X, Plus, Trash2, Download, ChevronDown, LogOut, ArrowLeft, Clock, BarChart2, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save } from 'lucide-react';
 
@@ -147,6 +147,17 @@ export default function TrainingsApp() {
     e.preventDefault(); setError('');
     try { await signInWithEmailAndPassword(auth, loginEmail, loginPassword); }
     catch { setError('Login fehlgeschlagen!'); }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!loginEmail.trim()) { setError('Bitte zuerst deine E-Mail eingeben!'); return; }
+    try {
+      await sendPasswordResetEmail(auth, loginEmail);
+      setError('');
+      alert(`✅ Passwort-Reset E-Mail wurde an ${loginEmail} gesendet! Bitte prüfe dein Postfach.`);
+    } catch {
+      setError('E-Mail nicht gefunden. Bitte prüfe die Adresse.');
+    }
   };
 
   const handleRegister = async (e) => {
@@ -337,7 +348,10 @@ export default function TrainingsApp() {
   }
 
   const s = {
-    page:  {minHeight:'100vh',background:'linear-gradient(135deg, #358941 0%, #9cc18f 100%)',fontFamily:'system-ui,-apple-system,sans-serif'},
+    page:  (color=null) => ({minHeight:'100vh', background: color
+      ? `linear-gradient(135deg, ${color} 0%, ${color}99 100%)`
+      : 'linear-gradient(135deg, #358941 0%, #9cc18f 100%)',
+      fontFamily:'system-ui,-apple-system,sans-serif'}),
     wrap:  {maxWidth:'900px',margin:'0 auto',padding:'20px'},
     card:  {background:'white',borderRadius:'12px',padding:'20px',marginBottom:'16px',boxShadow:'0 4px 6px rgba(0,0,0,0.1)'},
     btn:   (bg,col='white',sm=false)=>({padding:sm?'6px 12px':'10px 16px',background:bg,color:col,border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:sm?'13px':'14px',display:'flex',alignItems:'center',gap:'6px',whiteSpace:'nowrap'}),
@@ -345,10 +359,10 @@ export default function TrainingsApp() {
     label: {fontSize:'13px',fontWeight:'600',color:'#555',marginBottom:'4px',display:'block'},
   };
 
-  if (loading) return <div style={{...s.page,display:'flex',alignItems:'center',justifyContent:'center'}}><p style={{color:'white',fontSize:'20px'}}>Laden...</p></div>;
+  if (loading) return <div style={{...s.page(activeGroup?.color),display:'flex',alignItems:'center',justifyContent:'center'}}><p style={{color:'white',fontSize:'20px'}}>Laden...</p></div>;
 
   if (!user) return (
-    <div style={{...s.page,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
+    <div style={{...s.page(activeGroup?.color),display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
       <div style={{background:'white',borderRadius:'16px',padding:'40px',maxWidth:'420px',width:'100%',boxShadow:'0 10px 40px rgba(0,0,0,0.2)'}}>
         <h1 style={{margin:'0 0 4px',color:'#358941',fontSize:'28px',textAlign:'center'}}>TTC Grün-Weiß Staffel</h1>
         <p style={{margin:'0 0 28px',color:'#666',textAlign:'center'}}>Vereinsapp</p>
@@ -369,12 +383,19 @@ export default function TrainingsApp() {
           </button>
         </form>
         {authMode==='register'&&<div style={{marginTop:'16px',padding:'12px',background:'#f0fdf4',borderRadius:'8px',fontSize:'13px',color:'#358941'}}>Nach der Registrierung wird dein Account von einem Admin freigeschaltet.</div>}
+        {authMode==='login'&&(
+          <div style={{marginTop:'12px',textAlign:'center'}}>
+            <button onClick={handleForgotPassword} style={{background:'none',border:'none',color:'#358941',cursor:'pointer',fontSize:'13px',textDecoration:'underline'}}>
+              Passwort vergessen?
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 
   if (userRole==='pending') return (
-    <div style={{...s.page,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
+    <div style={{...s.page(activeGroup?.color),display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
       <div style={{background:'white',borderRadius:'16px',padding:'40px',maxWidth:'420px',width:'100%',textAlign:'center',boxShadow:'0 10px 40px rgba(0,0,0,0.2)'}}>
         <div style={{fontSize:'48px',marginBottom:'16px'}}>⏳</div>
         <h2 style={{margin:'0 0 12px',color:'#333'}}>Account wird freigeschaltet</h2>
@@ -462,7 +483,7 @@ export default function TrainingsApp() {
     upcoming.forEach(s => { if (s.repeatId) { if (!repeatBlocks[s.repeatId]) repeatBlocks[s.repeatId]=[]; repeatBlocks[s.repeatId].push(s); }});
 
     return (
-      <div style={s.page}><div style={s.wrap}>
+      <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
         <DeleteDialog/>
         <Header back backLabel="Startseite" backAction={()=>setView('home')}/>
 
@@ -621,7 +642,7 @@ export default function TrainingsApp() {
     const mySessions=myChild&&sub ? getUpcomingSessionsForSubgroup(myChild.subgroupId) : [];
 
     return (
-      <div style={s.page}><div style={s.wrap}>
+      <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
         <Header/>
         {!myChild
           ? <div style={{...s.card,textAlign:'center',padding:'40px'}}><p style={{fontSize:'18px',color:'#666'}}>Dein Account ist noch keinem Kind zugeordnet.</p><p style={{color:'#999',fontSize:'14px'}}>Bitte wende dich an den Trainer oder Admin.</p></div>
@@ -725,7 +746,7 @@ export default function TrainingsApp() {
     const allChildrenList=Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
     const pendingCount=Object.values(allUsers).filter(u=>u.role==='pending').length;
     return (
-      <div style={s.page}><div style={s.wrap}>
+      <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
         <Header back backLabel="Startseite" backAction={()=>setView('home')}/>
 
         {/* Passwort-Bestätigungs-Dialog */}
@@ -816,7 +837,7 @@ export default function TrainingsApp() {
 
   // ── STARTSEITE ───────────────────────────────────────────────
   if (view==='home') return (
-    <div style={s.page}><div style={s.wrap}>
+    <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
       <Header/>
       {(()=>{
         const today=new Date(), in6=new Date(); in6.setDate(today.getDate()+6);
@@ -886,7 +907,7 @@ export default function TrainingsApp() {
   if (view==='group') {
     const subs=getSubgroupsForGroup(activeGroup.id);
     return (
-      <div style={s.page}><div style={s.wrap}>
+      <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
         <Header back backLabel="Startseite" backAction={()=>setView('home')}/>
         <div style={s.card}>
           <h2 style={{margin:'0 0 16px',color:activeGroup.color}}>{activeGroup.emoji} {activeGroup.name}</h2>
@@ -904,7 +925,7 @@ export default function TrainingsApp() {
                 const presentToday=kids.filter(c=>(c.attendance||{})[trainingDate]==='present').length;
                 return (
                   <div key={sub.id} style={{border:'1px solid #ddd',borderRadius:'10px',overflow:'hidden'}}>
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px',background:'#f8f9fa',cursor:'pointer'}} onClick={()=>{setActiveSubgroup(sub);setView('subgroup');}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px',background:`${activeGroup.color}18`,borderLeft:`5px solid ${activeGroup.color}`,cursor:'pointer'}} onClick={()=>{setActiveSubgroup(sub);setView('subgroup');}}>
                       <div>
                         <h3 style={{margin:'0 0 4px',color:'#333',fontSize:'17px'}}>{sub.name}</h3>
                         <p style={{margin:0,color:'#666',fontSize:'12px'}}>{kids.length} Kinder · {(sub.trainingDates||[]).length} Trainings · heute {presentToday} anwesend</p>
@@ -936,7 +957,7 @@ export default function TrainingsApp() {
     const totalSessions=(sub.trainingDates||[]).length;
 
     return (
-      <div style={s.page}><div style={s.wrap}>
+      <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
         <Header back backLabel={activeGroup.name} backAction={()=>setView('group')}/>
         <div style={s.card}>
           {/* Header */}
@@ -1035,7 +1056,7 @@ export default function TrainingsApp() {
     const excusedCount = allKids.filter(c=>(children[c.id]?.attendance||{})[sessionDate]==='absent_excused').length;
 
     return (
-      <div style={s.page}><div style={s.wrap}>
+      <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
         <Header back backLabel="Startseite" backAction={()=>setView('home')}/>
         <div style={s.card}>
           {/* Session Info */}
@@ -1149,7 +1170,7 @@ export default function TrainingsApp() {
     };
 
     return (
-      <div style={s.page}><div style={s.wrap}>
+      <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
         <Header back backLabel={sub?.name||'Zurück'} backAction={()=>setView('subgroup')}/>
         <div style={s.card}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px',flexWrap:'wrap',gap:'8px'}}>
