@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail } from 'firebase/auth';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
 import { Check, X, Plus, Trash2, Download, ChevronDown, LogOut, ArrowLeft, Clock, BarChart2, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save } from 'lucide-react';
 
@@ -68,7 +68,13 @@ export default function TrainingsApp() {
   const [deleteDialog, setDeleteDialog]         = useState(null);
   const [resetDialog, setResetDialog]           = useState(false);
   const [resetPassword, setResetPassword]       = useState('');
-  const [resetError, setResetError]             = useState(''); // {sessionId, repeatId, blockSize}
+  const [resetError, setResetError]             = useState('');
+  const [showProfile, setShowProfile]           = useState(false);
+  const [pwCurrent, setPwCurrent]               = useState('');
+  const [pwNew, setPwNew]                       = useState('');
+  const [pwConfirm, setPwConfirm]               = useState('');
+  const [pwError, setPwError]                   = useState('');
+  const [pwSuccess, setPwSuccess]               = useState(false); // {sessionId, repeatId, blockSize}
 
   const [authMode, setAuthMode]           = useState('login');
   const [loginEmail, setLoginEmail]       = useState('');
@@ -147,6 +153,23 @@ export default function TrainingsApp() {
     e.preventDefault(); setError('');
     try { await signInWithEmailAndPassword(auth, loginEmail, loginPassword); }
     catch { setError('Login fehlgeschlagen!'); }
+  };
+
+  const handleChangePassword = async () => {
+    setPwError(''); setPwSuccess(false);
+    if (!pwCurrent) { setPwError('Bitte aktuelles Passwort eingeben!'); return; }
+    if (pwNew.length < 6) { setPwError('Neues Passwort muss mindestens 6 Zeichen lang sein!'); return; }
+    if (pwNew !== pwConfirm) { setPwError('Neue Passwörter stimmen nicht überein!'); return; }
+    try {
+      const credential = EmailAuthProvider.credential(user.email, pwCurrent);
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, pwNew);
+      setPwSuccess(true);
+      setPwCurrent(''); setPwNew(''); setPwConfirm('');
+    } catch (err) {
+      if (err.code === 'auth/wrong-password') setPwError('Aktuelles Passwort ist falsch!');
+      else setPwError('Fehler: ' + err.message);
+    }
   };
 
   const handleForgotPassword = async () => {
@@ -348,10 +371,7 @@ export default function TrainingsApp() {
   }
 
   const s = {
-    page:  (color=null) => ({minHeight:'100vh', background: color
-      ? `linear-gradient(135deg, ${color} 0%, ${color}99 100%)`
-      : 'linear-gradient(135deg, #358941 0%, #9cc18f 100%)',
-      fontFamily:'system-ui,-apple-system,sans-serif'}),
+    page:  (color=null) => ({minHeight:'100vh', background: 'linear-gradient(135deg, #358941 0%, #9cc18f 100%)', fontFamily:'system-ui,-apple-system,sans-serif'}),
     wrap:  {maxWidth:'900px',margin:'0 auto',padding:'20px'},
     card:  {background:'white',borderRadius:'12px',padding:'20px',marginBottom:'16px',boxShadow:'0 4px 6px rgba(0,0,0,0.1)'},
     btn:   (bg,col='white',sm=false)=>({padding:sm?'6px 12px':'10px 16px',background:bg,color:col,border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:sm?'13px':'14px',display:'flex',alignItems:'center',gap:'6px',whiteSpace:'nowrap'}),
@@ -411,23 +431,51 @@ export default function TrainingsApp() {
   const Header = ({back,backLabel,backAction}) => {
     const rc=ROLE_CONFIG[userRole]||{};
     return (
-      <div style={{...s.card,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'12px'}}>
-        <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
-          {back&&<button onClick={backAction} style={s.btn('#f3f4f6','#333')}><ArrowLeft size={18}/> {backLabel}</button>}
-          <div>
-            <h1 style={{margin:'0 0 2px',color:'#358941',fontSize:'20px'}}>TTC Grün-Weiß Staffel</h1>
-            <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-              <p style={{margin:0,color:'#999',fontSize:'12px'}}>{userProfile?.name||user?.email}</p>
-              <span style={{fontSize:'11px',fontWeight:'700',color:rc.color,background:rc.bg,padding:'2px 8px',borderRadius:'20px'}}>{rc.label}</span>
+      <>
+        {/* Profil Modal */}
+        {showProfile&&(
+          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px'}}>
+            <div style={{background:'white',borderRadius:'16px',padding:'28px',maxWidth:'400px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
+              <h3 style={{margin:'0 0 4px',color:'#333',fontSize:'20px'}}>Mein Profil</h3>
+              <p style={{margin:'0 0 24px',color:'#999',fontSize:'13px'}}>{user?.email} · <span style={{color:rc.color,fontWeight:'600'}}>{rc.label}</span></p>
+              <h4 style={{margin:'0 0 12px',color:'#333',fontSize:'15px'}}>Passwort ändern</h4>
+              {pwSuccess&&<div style={{marginBottom:'12px',padding:'10px',background:'#dcfce7',borderRadius:'8px',fontSize:'13px',color:'#16a34a',fontWeight:'600'}}>✅ Passwort erfolgreich geändert!</div>}
+              {pwError&&<div style={{marginBottom:'12px',padding:'10px',background:'#fee2e2',borderRadius:'8px',fontSize:'13px',color:'#dc2626'}}>{pwError}</div>}
+              <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'20px'}}>
+                <input type="password" placeholder="Aktuelles Passwort" value={pwCurrent} onChange={e=>setPwCurrent(e.target.value)} style={{...s.input,flex:'none'}}/>
+                <input type="password" placeholder="Neues Passwort (min. 6 Zeichen)" value={pwNew} onChange={e=>setPwNew(e.target.value)} style={{...s.input,flex:'none'}}/>
+                <input type="password" placeholder="Neues Passwort bestätigen" value={pwConfirm} onChange={e=>setPwConfirm(e.target.value)} onKeyPress={e=>e.key==='Enter'&&handleChangePassword()} style={{...s.input,flex:'none'}}/>
+                <button onClick={handleChangePassword} style={{padding:'10px',background:'#358941',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
+                  Passwort ändern
+                </button>
+              </div>
+              <button onClick={()=>{setShowProfile(false);setPwError('');setPwSuccess(false);setPwCurrent('');setPwNew('');setPwConfirm('');}}
+                style={{width:'100%',padding:'10px',background:'#f3f4f6',color:'#333',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
+                Schließen
+              </button>
             </div>
           </div>
+        )}
+        <div style={{...s.card,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'12px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+            {back&&<button onClick={backAction} style={s.btn('#f3f4f6','#333')}><ArrowLeft size={18}/> {backLabel}</button>}
+            <div>
+              <h1 style={{margin:'0 0 2px',color:'#358941',fontSize:'20px'}}>TTC Grün-Weiß Staffel</h1>
+              <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{background:'none',border:'none',padding:0,cursor:'pointer'}}>
+                  <p style={{margin:0,color:'#999',fontSize:'12px',textDecoration:'underline'}}>{userProfile?.name||user?.email}</p>
+                </button>
+                <span style={{fontSize:'11px',fontWeight:'700',color:rc.color,background:rc.bg,padding:'2px 8px',borderRadius:'20px'}}>{rc.label}</span>
+              </div>
+            </div>
+          </div>
+          <div style={{display:'flex',gap:'8px'}}>
+            {userRole==='admin'&&<button onClick={()=>setView('admin')} style={s.btn('#7c3aed')}><Shield size={16}/> Admin</button>}
+            {canEdit()&&<button onClick={()=>setView('trainingsplan')} style={s.btn('#0369a1')}><Calendar size={16}/> Trainingsplan</button>}
+            <button onClick={()=>signOut(auth)} style={s.btn('#ef4444')}><LogOut size={16}/></button>
+          </div>
         </div>
-        <div style={{display:'flex',gap:'8px'}}>
-          {userRole==='admin'&&<button onClick={()=>setView('admin')} style={s.btn('#7c3aed')}><Shield size={16}/> Admin</button>}
-          {canEdit()&&<button onClick={()=>setView('trainingsplan')} style={s.btn('#0369a1')}><Calendar size={16}/> Trainingsplan</button>}
-          <button onClick={()=>signOut(auth)} style={s.btn('#ef4444')}><LogOut size={16}/></button>
-        </div>
-      </div>
+      </>
     );
   };
 
@@ -925,7 +973,7 @@ export default function TrainingsApp() {
                 const presentToday=kids.filter(c=>(c.attendance||{})[trainingDate]==='present').length;
                 return (
                   <div key={sub.id} style={{border:'1px solid #ddd',borderRadius:'10px',overflow:'hidden'}}>
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px',background:`${activeGroup.color}18`,borderLeft:`5px solid ${activeGroup.color}`,cursor:'pointer'}} onClick={()=>{setActiveSubgroup(sub);setView('subgroup');}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px',background:'#f8f9fa',cursor:'pointer'}} onClick={()=>{setActiveSubgroup(sub);setView('subgroup');}}>
                       <div>
                         <h3 style={{margin:'0 0 4px',color:'#333',fontSize:'17px'}}>{sub.name}</h3>
                         <p style={{margin:0,color:'#666',fontSize:'12px'}}>{kids.length} Kinder · {(sub.trainingDates||[]).length} Trainings · heute {presentToday} anwesend</p>
