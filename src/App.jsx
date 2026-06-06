@@ -68,7 +68,10 @@ export default function TrainingsApp() {
   const saveChildren = (updated) => { setChildren(updated); setDoc(doc(db, 'ttc', 'children'), updated); };
 
   const getSubgroupsForGroup = (groupId) => Object.values(subgroups).filter(s => s.groupId === groupId);
-  const getChildrenForSubgroup = (subgroupId) => Object.values(children).filter(c => c.subgroupId === subgroupId);
+  const getChildrenForSubgroup = (subgroupId) =>
+    Object.values(children)
+      .filter(c => c.subgroupId === subgroupId)
+      .sort((a, b) => a.name.localeCompare(b.name, 'de'));
 
   const getAttendanceStats = (childId, subgroupId) => {
     const child = children[childId];
@@ -175,7 +178,8 @@ export default function TrainingsApp() {
     const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `TTC_${grp?.name}_${sub.name}_${new Date().toISOString().split('T')[0]}.csv`;
+    const standDatum = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    link.download = `TTC_${grp?.name}_${sub.name}_Stand_${standDatum}.csv`;
     link.click();
   };
 
