@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
-import { Check, X, Plus, Trash2, Download, ChevronDown, LogOut, ArrowLeft, Clock, BarChart2, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save, Trophy } from 'lucide-react';
+import { Check, X, Plus, Trash2, Download, ChevronDown, LogOut, ArrowLeft, Clock, BarChart2, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save, Trophy, Home } from 'lucide-react';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCrx34HEgaHnRE187Cja4JNAtbexvrA6Vg",
@@ -42,8 +42,77 @@ const WEEKDAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag
 
 const emptySession = { subgroupIds: [], date: new Date().toISOString().split('T')[0], time: '17:00', trainer: '', info: '', repeat: false, repeatWeeks: 8 };
 
-const emptyTournament = { name: '', date: new Date().toISOString().split('T')[0], konkurrenzen: [] };
-const emptyKonkurrenz = () => ({ id: 'konk_' + Date.now() + '_' + Math.random().toString(36).slice(2,6), name: '', time: '10:00', participantIds: [], departureTimes: {} });
+const TODAY = new Date().toISOString().split('T')[0];
+const emptyTournament = { name: '', location: '', dateFrom: TODAY, dateTo: TODAY, konkurrenzen: [] };
+const emptyKonkurrenz = () => ({ id: 'konk_' + Date.now() + '_' + Math.random().toString(36).slice(2,6), name: '', date: '', time: '10:00', participantIds: [], departureTimes: {} });
+
+function getDatesInRange(from, to) {
+  if (!from || !to || to < from) return from ? [from] : [];
+  const dates = [];
+  const d = new Date(from + 'T12:00:00');
+  const end = new Date(to + 'T12:00:00');
+  while (d <= end) { dates.push(d.toISOString().split('T')[0]); d.setDate(d.getDate() + 1); }
+  return dates;
+}
+
+function KonkurrenzForm({ konk, helpers, childList, tournamentDates, subgroups }) {
+  return (
+    <div style={{border:'1px solid #fde68a',borderRadius:'10px',overflow:'hidden',marginBottom:'10px'}}>
+      <div style={{background:'#fef9c3',padding:'10px 12px',display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+        <input placeholder="Konkurrenzbezeichnung (z.B. Einzel U13)" value={konk.name}
+          onChange={e=>helpers.update(konk.id,'name',e.target.value)}
+          style={{flex:1,minWidth:'150px',padding:'6px 10px',border:'1px solid #d97706',borderRadius:'7px',fontSize:'13px'}}/>
+        {tournamentDates.length > 1 && (
+          <select value={konk.date||''} onChange={e=>helpers.update(konk.id,'date',e.target.value)}
+            style={{padding:'6px 8px',border:'1px solid #d97706',borderRadius:'6px',fontSize:'13px',cursor:'pointer'}}>
+            <option value=''>Tag wählen</option>
+            {tournamentDates.map(d=>(
+              <option key={d} value={d}>{new Date(d+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})}</option>
+            ))}
+          </select>
+        )}
+        <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
+          <Clock size={13} color="#b45309"/>
+          <input type="time" value={konk.time} onChange={e=>helpers.update(konk.id,'time',e.target.value)}
+            style={{padding:'6px 8px',border:'1px solid #d97706',borderRadius:'6px',fontSize:'13px',width:'90px'}}/>
+        </div>
+        <button onClick={()=>helpers.remove(konk.id)}
+          style={{padding:'4px 8px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626',flexShrink:0}}>
+          <Trash2 size={14}/>
+        </button>
+      </div>
+      <div style={{padding:'10px 12px',display:'grid',gap:'6px'}}>
+        {childList.length===0
+          ? <p style={{color:'#999',fontSize:'12px',margin:0}}>Keine Kinder in dieser Gruppe.</p>
+          : childList.map(child=>{
+            const sub2 = subgroups[child.subgroupId];
+            const grp2 = FIXED_GROUPS.find(g=>g.id===sub2?.groupId);
+            const sel = (konk.participantIds||[]).includes(child.id);
+            return (
+              <div key={child.id} onClick={()=>helpers.toggleParticipant(konk.id,child.id)}
+                style={{display:'flex',alignItems:'center',gap:'8px',padding:'7px 10px',borderRadius:'7px',border:`2px solid ${sel?(grp2?.color||'#b45309'):'#eee'}`,background:sel?'#fffbeb':'white',cursor:'pointer'}}>
+                <div style={{width:'16px',height:'16px',borderRadius:'3px',border:`2px solid ${sel?(grp2?.color||'#b45309'):'#ccc'}`,background:sel?(grp2?.color||'#b45309'):'white',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                  {sel&&<Check size={10} color="white"/>}
+                </div>
+                <span style={{flex:1,fontSize:'13px',fontWeight:'600',color:'#333'}}>{child.name}
+                  {sub2&&<span style={{fontSize:'11px',color:'#999',fontWeight:'400',marginLeft:'5px'}}>{grp2?.emoji} {sub2.name}</span>}
+                </span>
+                {sel&&(
+                  <div onClick={e=>e.stopPropagation()} style={{display:'flex',alignItems:'center',gap:'4px'}}>
+                    <Clock size={11} color="#b45309"/>
+                    <input type="time" value={konk.departureTimes?.[child.id]||''}
+                      onChange={e=>helpers.setDeparture(konk.id,child.id,e.target.value)}
+                      style={{padding:'3px 6px',border:'1px solid #d97706',borderRadius:'5px',fontSize:'12px',width:'82px'}}/>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        }
+      </div>
+    </div>
+  );
+}
 
 export default function TrainingsApp() {
   const [user, setUser]               = useState(null);
@@ -318,10 +387,10 @@ export default function TrainingsApp() {
   };
 
   const createTournament = () => {
-    const { name, date, konkurrenzen } = newTournament;
-    if (!name.trim() || !date) { alert('Bitte Name und Datum angeben!'); return; }
+    const { name, location, dateFrom, dateTo, konkurrenzen } = newTournament;
+    if (!name.trim() || !dateFrom) { alert('Bitte Name und Datum angeben!'); return; }
     const id = 'tournament_' + Date.now();
-    saveTournaments({ ...tournaments, [id]: { id, name, date, konkurrenzen: konkurrenzen||[], responses: {} } });
+    saveTournaments({ ...tournaments, [id]: { id, name, location, dateFrom, dateTo: dateTo||dateFrom, konkurrenzen: konkurrenzen||[], responses: {} } });
     setNewTournament(emptyTournament);
   };
 
@@ -346,7 +415,9 @@ export default function TrainingsApp() {
 
   const getUpcomingTournaments = () => {
     const today = new Date().toISOString().split('T')[0];
-    return Object.values(tournaments).filter(t => t.date >= today).sort((a,b) => a.date.localeCompare(b.date));
+    return Object.values(tournaments)
+      .filter(t => (t.dateTo||t.dateFrom||t.date||'') >= today)
+      .sort((a,b) => (a.dateFrom||a.date||'').localeCompare(b.dateFrom||b.date||''));
   };
 
   // Alle childIds die in mindestens einer Konkurrenz eines Turniers sind
@@ -358,8 +429,8 @@ export default function TrainingsApp() {
     if (!myChild) return [];
     const today = new Date().toISOString().split('T')[0];
     return Object.values(tournaments)
-      .filter(t => t.date >= today && getTournamentParticipantIds(t).includes(myChild.id))
-      .sort((a,b) => a.date.localeCompare(b.date));
+      .filter(t => (t.dateTo||t.dateFrom||t.date||'') >= today && getTournamentParticipantIds(t).includes(myChild.id))
+      .sort((a,b) => (a.dateFrom||a.date||'').localeCompare(b.dateFrom||b.date||''));
   };
 
   // Hilfsfunktionen für Konkurrenz-Bearbeitung in einem Formular
@@ -545,6 +616,7 @@ export default function TrainingsApp() {
             </div>
           </div>
           <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+            {view!=='home'&&<button onClick={()=>setView('home')} style={s.btn('#f3f4f6','#333')} title="Startseite"><Home size={16}/></button>}
             {userRole==='admin'&&<button onClick={()=>setView('admin')} style={s.btn('#7c3aed')}><Shield size={16}/> Admin</button>}
             {canEdit()&&<button onClick={()=>setView('trainingsplan')} style={s.btn('#0369a1')}><Calendar size={16}/> Trainingsplan</button>}
             {canEdit()&&<button onClick={()=>setView('turniere')} style={s.btn('#b45309')}><Trophy size={16}/> Turniere</button>}
@@ -609,7 +681,7 @@ export default function TrainingsApp() {
     return (
       <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
         <DeleteDialog/>
-        <Header back backLabel="Startseite" backAction={()=>setView('home')}/>
+        <Header/>
 
         {/* Neue Einheit */}
         <div style={s.card}>
@@ -760,88 +832,73 @@ export default function TrainingsApp() {
   if (view==='turniere') {
     const upcoming = getUpcomingTournaments();
     const allChildrenSorted = Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+    const jugendSubs = Object.values(subgroups).filter(sg=>sg.groupId==='jugend').sort((a,b)=>a.name.localeCompare(b.name,'de'));
     const filteredChildren = tournGroupFilter
-      ? allChildrenSorted.filter(c => FIXED_GROUPS.find(g=>g.id===subgroups[c.subgroupId]?.groupId)?.id === tournGroupFilter)
+      ? allChildrenSorted.filter(c => c.subgroupId === tournGroupFilter)
       : allChildrenSorted;
 
     const nh = konkurrenzHelpers(newTournament, setNewTournament);
     const eh = konkurrenzHelpers(editTournForm, setEditTournForm);
 
-    const KonkurrenzForm = ({ konk, helpers, childList }) => (
-      <div style={{border:'1px solid #fde68a',borderRadius:'10px',overflow:'hidden',marginBottom:'10px'}}>
-        <div style={{background:'#fef9c3',padding:'10px 12px',display:'flex',alignItems:'center',gap:'8px'}}>
-          <input placeholder="Konkurrenzbezeichnung (z.B. Einzel U13)" value={konk.name}
-            onChange={e=>helpers.update(konk.id,'name',e.target.value)}
-            style={{...s.input,flex:1,fontSize:'13px',padding:'6px 10px'}}/>
-          <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
-            <Clock size={13} color="#b45309"/>
-            <input type="time" value={konk.time} onChange={e=>helpers.update(konk.id,'time',e.target.value)}
-              style={{padding:'6px 8px',border:'1px solid #d97706',borderRadius:'6px',fontSize:'13px',width:'90px'}}/>
-          </div>
-          <button onClick={()=>helpers.remove(konk.id)} style={{padding:'4px 8px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626',flexShrink:0}}><Trash2 size={14}/></button>
-        </div>
-        <div style={{padding:'10px 12px',display:'grid',gap:'6px'}}>
-          {childList.length===0
-            ? <p style={{color:'#999',fontSize:'12px',margin:0}}>Keine Kinder in dieser Gruppe.</p>
-            : childList.map(child=>{
-              const sub2=subgroups[child.subgroupId]; const grp2=FIXED_GROUPS.find(g=>g.id===sub2?.groupId);
-              const sel=(konk.participantIds||[]).includes(child.id);
-              return (
-                <div key={child.id} style={{display:'flex',alignItems:'center',gap:'8px',padding:'7px 10px',borderRadius:'7px',border:`2px solid ${sel?(grp2?.color||'#b45309'):'#eee'}`,background:sel?'#fffbeb':'white',cursor:'pointer'}}
-                  onClick={()=>helpers.toggleParticipant(konk.id,child.id)}>
-                  <div style={{width:'16px',height:'16px',borderRadius:'3px',border:`2px solid ${sel?(grp2?.color||'#b45309'):'#ccc'}`,background:sel?(grp2?.color||'#b45309'):'white',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                    {sel&&<Check size={10} color="white"/>}
-                  </div>
-                  <span style={{flex:1,fontSize:'13px',fontWeight:'600',color:'#333'}}>{child.name}
-                    {sub2&&<span style={{fontSize:'11px',color:'#999',fontWeight:'400',marginLeft:'5px'}}>{grp2?.emoji} {sub2.name}</span>}
-                  </span>
-                  {sel&&(
-                    <div onClick={e=>e.stopPropagation()} style={{display:'flex',alignItems:'center',gap:'4px'}}>
-                      <Clock size={11} color="#b45309"/>
-                      <input type="time" value={konk.departureTimes?.[child.id]||''}
-                        onChange={e=>helpers.setDeparture(konk.id,child.id,e.target.value)}
-                        style={{padding:'3px 6px',border:'1px solid #d97706',borderRadius:'5px',fontSize:'12px',width:'82px'}}/>
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          }
-        </div>
+    const SubgroupFilterBar = ({small=false}) => (
+      <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+        <button onClick={()=>setTournGroupFilter(null)} style={{padding:small?'3px 8px':'5px 12px',borderRadius:'20px',border:'2px solid #b45309',background:!tournGroupFilter?'#b45309':'white',color:!tournGroupFilter?'white':'#b45309',cursor:'pointer',fontWeight:'600',fontSize:small?'11px':'13px'}}>Alle</button>
+        {jugendSubs.map(sg=>(
+          <button key={sg.id} onClick={()=>setTournGroupFilter(tournGroupFilter===sg.id?null:sg.id)}
+            style={{padding:small?'3px 8px':'5px 12px',borderRadius:'20px',border:'2px solid #358941',background:tournGroupFilter===sg.id?'#358941':'white',color:tournGroupFilter===sg.id?'white':'#358941',cursor:'pointer',fontWeight:'600',fontSize:small?'11px':'13px'}}>
+            🏓 {sg.name}
+          </button>
+        ))}
       </div>
     );
 
+    const newDates = getDatesInRange(newTournament.dateFrom, newTournament.dateTo);
+    const editDates = getDatesInRange(editTournForm.dateFrom, editTournForm.dateTo);
+
+    const formatDateRange = (t) => {
+      const from = t.dateFrom||t.date||'';
+      const to = t.dateTo||from;
+      if (!from) return '';
+      const f = new Date(from+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'});
+      if (to === from) return f;
+      const t2 = new Date(to+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'});
+      return `${f} – ${t2}`;
+    };
+
     return (
       <div style={s.page()}><div style={s.wrap}>
-        <Header back backLabel="Startseite" backAction={()=>setView('home')}/>
+        <Header/>
 
         {/* Neues Turnier */}
         <div style={s.card}>
           <h2 style={{margin:'0 0 20px',color:'#b45309',display:'flex',alignItems:'center',gap:'8px'}}><Trophy size={20}/> Neues Turnier anlegen</h2>
 
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',marginBottom:'16px'}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',marginBottom:'12px'}}>
             <div style={{gridColumn:'1/-1'}}>
               <label style={s.label}>Turnierbezeichnung</label>
               <input style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} placeholder="z.B. Kreismeisterschaft" value={newTournament.name} onChange={e=>setNewTournament({...newTournament,name:e.target.value})}/>
             </div>
+            <div style={{gridColumn:'1/-1'}}>
+              <label style={s.label}>Ort</label>
+              <input style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} placeholder="z.B. TTC Halle, Musterstadt" value={newTournament.location||''} onChange={e=>setNewTournament({...newTournament,location:e.target.value})}/>
+            </div>
             <div>
-              <label style={s.label}>Datum</label>
-              <input type="date" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={newTournament.date} onChange={e=>setNewTournament({...newTournament,date:e.target.value})}/>
+              <label style={s.label}>Von (erster Tag)</label>
+              <input type="date" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={newTournament.dateFrom} onChange={e=>setNewTournament({...newTournament,dateFrom:e.target.value})}/>
+            </div>
+            <div>
+              <label style={s.label}>Bis (letzter Tag)</label>
+              <input type="date" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={newTournament.dateTo} onChange={e=>setNewTournament({...newTournament,dateTo:e.target.value})}/>
             </div>
           </div>
 
-          {/* Gruppenfilter */}
-          <div style={{marginBottom:'14px'}}>
-            <label style={s.label}>Kinder filtern nach Gruppe</label>
-            <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-              <button onClick={()=>setTournGroupFilter(null)} style={{padding:'5px 12px',borderRadius:'20px',border:'2px solid #b45309',background:!tournGroupFilter?'#b45309':'white',color:!tournGroupFilter?'white':'#b45309',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Alle</button>
-              {FIXED_GROUPS.map(g=>(
-                <button key={g.id} onClick={()=>setTournGroupFilter(tournGroupFilter===g.id?null:g.id)} style={{padding:'5px 12px',borderRadius:'20px',border:`2px solid ${g.color}`,background:tournGroupFilter===g.id?g.color:'white',color:tournGroupFilter===g.id?'white':g.color,cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>{g.emoji} {g.name}</button>
-              ))}
+          {jugendSubs.length>0&&(
+            <div style={{marginBottom:'14px'}}>
+              <label style={s.label}>Kinder filtern nach Untergruppe</label>
+              <SubgroupFilterBar/>
             </div>
-          </div>
+          )}
 
-          {/* Konkurrenzen */}
           <div style={{marginBottom:'16px'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
               <label style={{...s.label,margin:0}}>Konkurrenzen ({(newTournament.konkurrenzen||[]).length})</label>
@@ -850,7 +907,7 @@ export default function TrainingsApp() {
             {(newTournament.konkurrenzen||[]).length===0
               ? <p style={{color:'#999',fontSize:'13px',padding:'12px',background:'#fef9c3',borderRadius:'8px',textAlign:'center'}}>Noch keine Konkurrenzen. Oben hinzufügen!</p>
               : (newTournament.konkurrenzen||[]).map(konk=>(
-                <KonkurrenzForm key={konk.id} konk={konk} helpers={nh} childList={filteredChildren}/>
+                <KonkurrenzForm key={konk.id} konk={konk} helpers={nh} childList={filteredChildren} tournamentDates={newDates} subgroups={subgroups}/>
               ))
             }
           </div>
@@ -873,6 +930,7 @@ export default function TrainingsApp() {
                 const coming = allParticipants.filter(c=>(t.responses||{})[c.id]==='coming');
                 const missing = allParticipants.filter(c=>(t.responses||{})[c.id]==='missing');
                 const noAnswer = allParticipants.filter(c=>!(t.responses||{})[c.id]);
+                const tDates = getDatesInRange(t.dateFrom||t.date, t.dateTo||t.dateFrom||t.date);
 
                 return (
                   <div key={t.id} style={{borderRadius:'10px',border:'2px solid #fde68a',background:'#fffbeb',overflow:'hidden'}}>
@@ -884,27 +942,31 @@ export default function TrainingsApp() {
                             <label style={s.label}>Name</label>
                             <input style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={editTournForm.name||''} onChange={e=>setEditTournForm({...editTournForm,name:e.target.value})}/>
                           </div>
+                          <div style={{gridColumn:'1/-1'}}>
+                            <label style={s.label}>Ort</label>
+                            <input style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={editTournForm.location||''} onChange={e=>setEditTournForm({...editTournForm,location:e.target.value})}/>
+                          </div>
                           <div>
-                            <label style={s.label}>Datum</label>
-                            <input type="date" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={editTournForm.date||''} onChange={e=>setEditTournForm({...editTournForm,date:e.target.value})}/>
+                            <label style={s.label}>Von</label>
+                            <input type="date" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={editTournForm.dateFrom||''} onChange={e=>setEditTournForm({...editTournForm,dateFrom:e.target.value})}/>
+                          </div>
+                          <div>
+                            <label style={s.label}>Bis</label>
+                            <input type="date" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={editTournForm.dateTo||''} onChange={e=>setEditTournForm({...editTournForm,dateTo:e.target.value})}/>
                           </div>
                         </div>
-                        {/* Gruppenfilter auch beim Bearbeiten */}
-                        <div style={{marginBottom:'12px'}}>
-                          <label style={s.label}>Kinder filtern</label>
-                          <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                            <button onClick={()=>setTournGroupFilter(null)} style={{padding:'4px 10px',borderRadius:'20px',border:'2px solid #b45309',background:!tournGroupFilter?'#b45309':'white',color:!tournGroupFilter?'white':'#b45309',cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>Alle</button>
-                            {FIXED_GROUPS.map(g=>(
-                              <button key={g.id} onClick={()=>setTournGroupFilter(tournGroupFilter===g.id?null:g.id)} style={{padding:'4px 10px',borderRadius:'20px',border:`2px solid ${g.color}`,background:tournGroupFilter===g.id?g.color:'white',color:tournGroupFilter===g.id?'white':g.color,cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>{g.emoji} {g.name}</button>
-                            ))}
+                        {jugendSubs.length>0&&(
+                          <div style={{marginBottom:'12px'}}>
+                            <label style={s.label}>Kinder filtern</label>
+                            <SubgroupFilterBar small/>
                           </div>
-                        </div>
+                        )}
                         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
                           <label style={{...s.label,margin:0}}>Konkurrenzen</label>
                           <button onClick={eh.add} style={s.btn('#b45309',undefined,true)}><Plus size={13}/> Hinzufügen</button>
                         </div>
                         {(editTournForm.konkurrenzen||[]).map(konk=>(
-                          <KonkurrenzForm key={konk.id} konk={konk} helpers={eh} childList={filteredChildren}/>
+                          <KonkurrenzForm key={konk.id} konk={konk} helpers={eh} childList={filteredChildren} tournamentDates={editDates} subgroups={subgroups}/>
                         ))}
                         <div style={{display:'flex',gap:'8px',marginTop:'12px'}}>
                           <button onClick={saveTournamentEdit} style={s.btn('#358941',undefined,true)}><Save size={14}/> Speichern</button>
@@ -913,14 +975,12 @@ export default function TrainingsApp() {
                       </div>
                     ) : (
                       <div>
-                        {/* Turnier-Header */}
                         <div style={{padding:'14px 16px',borderBottom:'1px solid #fde68a',display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'8px'}}>
                           <div>
                             <h3 style={{margin:'0 0 4px',color:'#92400e',fontSize:'18px'}}>🏆 {t.name}</h3>
-                            <p style={{margin:'0 0 2px',fontWeight:'600',color:'#333',fontSize:'14px'}}>
-                              {new Date(t.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}
-                            </p>
-                            <p style={{margin:0,fontSize:'13px',color:'#666'}}>{(t.konkurrenzen||[]).length} Konkurrenzen · {allParticipantIds.length} Teilnehmer</p>
+                            <p style={{margin:'0 0 2px',fontWeight:'600',color:'#333',fontSize:'14px'}}>{formatDateRange(t)}</p>
+                            {t.location&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'#666'}}>📍 {t.location}</p>}
+                            <p style={{margin:0,fontSize:'13px',color:'#999'}}>{(t.konkurrenzen||[]).length} Konkurrenzen · {allParticipantIds.length} Teilnehmer</p>
                           </div>
                           <div style={{display:'flex',gap:'6px',flexShrink:0}}>
                             <button onClick={()=>{setEditingTournament(t.id);setEditTournForm(JSON.parse(JSON.stringify(t)));}} style={{padding:'6px',background:'#fef3c7',border:'none',borderRadius:'6px',cursor:'pointer',color:'#b45309'}}><Edit2 size={16}/></button>
@@ -928,52 +988,43 @@ export default function TrainingsApp() {
                           </div>
                         </div>
 
-                        {/* Gesamt-Rückmeldungen */}
                         <div style={{padding:'12px 16px',borderBottom:'1px solid #fde68a',display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'8px'}}>
-                          <div style={{background:'#dcfce7',borderRadius:'8px',padding:'8px',textAlign:'center'}}>
-                            <p style={{margin:0,fontSize:'20px',fontWeight:'700',color:'#16a34a'}}>{coming.length}</p>
-                            <p style={{margin:0,fontSize:'11px',color:'#16a34a'}}>Dabei</p>
-                          </div>
-                          <div style={{background:'#fee2e2',borderRadius:'8px',padding:'8px',textAlign:'center'}}>
-                            <p style={{margin:0,fontSize:'20px',fontWeight:'700',color:'#dc2626'}}>{missing.length}</p>
-                            <p style={{margin:0,fontSize:'11px',color:'#dc2626'}}>Fehlt</p>
-                          </div>
-                          <div style={{background:'#f3f4f6',borderRadius:'8px',padding:'8px',textAlign:'center'}}>
-                            <p style={{margin:0,fontSize:'20px',fontWeight:'700',color:'#6b7280'}}>{noAnswer.length}</p>
-                            <p style={{margin:0,fontSize:'11px',color:'#6b7280'}}>Ausstehend</p>
-                          </div>
+                          {[{v:coming.length,label:'Dabei',bg:'#dcfce7',c:'#16a34a'},{v:missing.length,label:'Fehlt',bg:'#fee2e2',c:'#dc2626'},{v:noAnswer.length,label:'Ausstehend',bg:'#f3f4f6',c:'#6b7280'}].map(({v,label,bg,c})=>(
+                            <div key={label} style={{background:bg,borderRadius:'8px',padding:'8px',textAlign:'center'}}>
+                              <p style={{margin:0,fontSize:'20px',fontWeight:'700',color:c}}>{v}</p>
+                              <p style={{margin:0,fontSize:'11px',color:c}}>{label}</p>
+                            </div>
+                          ))}
                         </div>
 
-                        {/* Konkurrenzen mit Teilnehmern */}
+                        {jugendSubs.length>0&&(
+                          <div style={{padding:'10px 16px',borderBottom:'1px solid #fde68a',display:'flex',gap:'6px',flexWrap:'wrap',alignItems:'center'}}>
+                            <span style={{fontSize:'12px',color:'#92400e',fontWeight:'600',marginRight:'4px'}}>Filter:</span>
+                            <SubgroupFilterBar small/>
+                          </div>
+                        )}
+
                         <div style={{padding:'14px 16px',display:'grid',gap:'12px'}}>
                           {(t.konkurrenzen||[]).length===0
                             ? <p style={{color:'#999',fontSize:'13px',textAlign:'center'}}>Keine Konkurrenzen angelegt.</p>
                             : (t.konkurrenzen||[]).map(konk=>{
                               const konkParticipants = (konk.participantIds||[]).map(id=>children[id]).filter(Boolean);
-                              // Gruppenfilter für Anzeige
-                              const filteredKonkPart = tournGroupFilter
-                                ? konkParticipants.filter(c=>FIXED_GROUPS.find(g=>g.id===subgroups[c.subgroupId]?.groupId)?.id===tournGroupFilter)
-                                : konkParticipants;
+                              const shown = tournGroupFilter ? konkParticipants.filter(c=>c.subgroupId===tournGroupFilter) : konkParticipants;
+                              const konkDate = konk.date ? new Date(konk.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}) : null;
                               return (
                                 <div key={konk.id} style={{borderRadius:'8px',border:'1px solid #fde68a',overflow:'hidden'}}>
-                                  <div style={{background:'#fef9c3',padding:'8px 12px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                                    <div>
+                                  <div style={{background:'#fef9c3',padding:'8px 12px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'6px'}}>
+                                    <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
                                       <span style={{fontWeight:'700',color:'#92400e',fontSize:'15px'}}>{konk.name||'(Unbenannte Konkurrenz)'}</span>
-                                      <span style={{fontSize:'13px',color:'#b45309',marginLeft:'10px',display:'inline-flex',alignItems:'center',gap:'4px'}}><Clock size={12}/> {konk.time} Uhr</span>
+                                      {konkDate&&<span style={{fontSize:'12px',color:'#92400e',background:'#fde68a',padding:'2px 8px',borderRadius:'10px'}}>{konkDate}</span>}
+                                      <span style={{fontSize:'13px',color:'#b45309',display:'inline-flex',alignItems:'center',gap:'3px'}}><Clock size={12}/> {konk.time} Uhr</span>
                                     </div>
-                                    <span style={{fontSize:'12px',color:'#92400e',fontWeight:'600'}}>{konkParticipants.length} Teilnehmer</span>
-                                  </div>
-                                  {/* Gruppenfilter-Buttons je Konkurrenz */}
-                                  <div style={{padding:'8px 12px',background:'#fefce8',borderBottom:'1px solid #fde68a',display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                                    <button onClick={()=>setTournGroupFilter(null)} style={{padding:'3px 8px',borderRadius:'12px',border:'1px solid #b45309',background:!tournGroupFilter?'#b45309':'white',color:!tournGroupFilter?'white':'#b45309',cursor:'pointer',fontSize:'11px',fontWeight:'600'}}>Alle</button>
-                                    {FIXED_GROUPS.map(g=>(
-                                      <button key={g.id} onClick={()=>setTournGroupFilter(tournGroupFilter===g.id?null:g.id)} style={{padding:'3px 8px',borderRadius:'12px',border:`1px solid ${g.color}`,background:tournGroupFilter===g.id?g.color:'white',color:tournGroupFilter===g.id?'white':g.color,cursor:'pointer',fontSize:'11px',fontWeight:'600'}}>{g.emoji} {g.name}</button>
-                                    ))}
+                                    <span style={{fontSize:'12px',color:'#92400e',fontWeight:'600'}}>{konkParticipants.length} TN</span>
                                   </div>
                                   <div style={{padding:'8px 12px',display:'grid',gap:'5px'}}>
-                                    {filteredKonkPart.length===0
-                                      ? <p style={{color:'#999',fontSize:'12px',margin:0,padding:'6px 0'}}>Keine Teilnehmer in dieser Gruppe.</p>
-                                      : filteredKonkPart.sort((a,b)=>a.name.localeCompare(b.name,'de')).map(child=>{
+                                    {shown.length===0
+                                      ? <p style={{color:'#999',fontSize:'12px',margin:0,padding:'4px 0'}}>Keine Teilnehmer{tournGroupFilter?' in dieser Gruppe':' eingetragen'}.</p>
+                                      : shown.sort((a,b)=>a.name.localeCompare(b.name,'de')).map(child=>{
                                         const resp=(t.responses||{})[child.id];
                                         const dep=konk.departureTimes?.[child.id];
                                         const sub2=subgroups[child.subgroupId];
@@ -1068,9 +1119,16 @@ export default function TrainingsApp() {
                         <div key={t.id} style={{borderRadius:'10px',border:`2px solid ${myResponse==='coming'?'#16a34a':myResponse==='missing'?'#dc2626':'#fde68a'}`,background:myResponse==='coming'?'#f0fdf4':myResponse==='missing'?'#fef2f2':'#fffbeb',overflow:'hidden'}}>
                           <div style={{padding:'12px 14px',borderBottom:'1px solid #fde68a'}}>
                             <p style={{margin:'0 0 2px',fontWeight:'700',color:'#92400e',fontSize:'16px'}}>🏆 {t.name}</p>
-                            <p style={{margin:0,fontSize:'14px',color:'#333',fontWeight:'600'}}>
-                              {new Date(t.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}
+                            <p style={{margin:'0 0 2px',fontSize:'14px',color:'#333',fontWeight:'600'}}>
+                              {(()=>{
+                                const from=t.dateFrom||t.date||''; const to=t.dateTo||from;
+                                if(!from) return '';
+                                const f=new Date(from+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'});
+                                if(to===from) return f;
+                                return `${f} – ${new Date(to+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'})}`;
+                              })()}
                             </p>
+                            {t.location&&<p style={{margin:0,fontSize:'13px',color:'#b45309'}}>📍 {t.location}</p>}
                           </div>
                           {/* Meine Konkurrenzen */}
                           {myKonkurrenzen.length>0&&(
@@ -1181,7 +1239,7 @@ export default function TrainingsApp() {
     const pendingCount=Object.values(allUsers).filter(u=>u.role==='pending').length;
     return (
       <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
-        <Header back backLabel="Startseite" backAction={()=>setView('home')}/>
+        <Header/>
 
         {/* Passwort-Bestätigungs-Dialog */}
         {resetDialog&&(
@@ -1342,7 +1400,7 @@ export default function TrainingsApp() {
     const subs=getSubgroupsForGroup(activeGroup.id);
     return (
       <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
-        <Header back backLabel="Startseite" backAction={()=>setView('home')}/>
+        <Header/>
         <div style={s.card}>
           <h2 style={{margin:'0 0 16px',color:activeGroup.color}}>{activeGroup.emoji} {activeGroup.name}</h2>
           {canEdit()&&(
@@ -1491,7 +1549,7 @@ export default function TrainingsApp() {
 
     return (
       <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
-        <Header back backLabel="Startseite" backAction={()=>setView('home')}/>
+        <Header/>
         <div style={s.card}>
           {/* Session Info */}
           <div style={{marginBottom:'20px'}}>
