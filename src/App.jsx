@@ -616,7 +616,7 @@ export default function TrainingsApp() {
             </div>
           </div>
           <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-            {view!=='home'&&<button onClick={()=>setView('home')} style={s.btn('#f3f4f6','#333')} title="Startseite"><Home size={16}/></button>}
+            {view!=='home'&&<button onClick={()=>setView('home')} style={s.btn('#358941')} title="Startseite"><Home size={16}/></button>}
             {userRole==='admin'&&<button onClick={()=>setView('admin')} style={s.btn('#7c3aed')}><Shield size={16}/> Admin</button>}
             {canEdit()&&<button onClick={()=>setView('trainingsplan')} style={s.btn('#0369a1')}><Calendar size={16}/> Trainingsplan</button>}
             {canEdit()&&<button onClick={()=>setView('turniere')} style={s.btn('#b45309')}><Trophy size={16}/> Turniere</button>}
@@ -833,9 +833,11 @@ export default function TrainingsApp() {
     const upcoming = getUpcomingTournaments();
     const allChildrenSorted = Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
     const jugendSubs = Object.values(subgroups).filter(sg=>sg.groupId==='jugend').sort((a,b)=>a.name.localeCompare(b.name,'de'));
+    const jugendSubIds = new Set(jugendSubs.map(sg=>sg.id));
+    const jugendChildren = allChildrenSorted.filter(c => jugendSubIds.has(c.subgroupId));
     const filteredChildren = tournGroupFilter
-      ? allChildrenSorted.filter(c => c.subgroupId === tournGroupFilter)
-      : allChildrenSorted;
+      ? jugendChildren.filter(c => c.subgroupId === tournGroupFilter)
+      : jugendChildren;
 
     const nh = konkurrenzHelpers(newTournament, setNewTournament);
     const eh = konkurrenzHelpers(editTournForm, setEditTournForm);
@@ -1366,6 +1368,47 @@ export default function TrainingsApp() {
                     <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
                       {session.info&&<Info size={16} color="#0369a1"/>}
                       <ChevronRight size={16} color="#0369a1"/>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+      {canEdit()&&(()=>{
+        const todayStr=new Date().toISOString().split('T')[0];
+        const in3m=new Date(); in3m.setMonth(in3m.getMonth()+3);
+        const in3mStr=in3m.toISOString().split('T')[0];
+        const tourneys=getUpcomingTournaments().filter(t=>(t.dateFrom||t.date||'')<=in3mStr);
+        if (!tourneys.length) return null;
+        return (
+          <div style={{...s.card,borderLeft:'5px solid #f59e0b',borderTop:'2px solid #fde68a'}}>
+            <h3 style={{margin:'0 0 12px',color:'#b45309',display:'flex',alignItems:'center',gap:'8px'}}><Trophy size={16}/> Turniere – nächste 3 Monate</h3>
+            <div style={{display:'grid',gap:'8px'}}>
+              {tourneys.map(t=>{
+                const from=t.dateFrom||t.date||''; const to=t.dateTo||from;
+                const dateLabel=to!==from
+                  ? `${new Date(from+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})} – ${new Date(to+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}`
+                  : new Date(from+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'});
+                const total=getTournamentParticipantIds(t).length;
+                const coming=Object.values(t.responses||{}).filter(r=>r==='coming').length;
+                const missing=Object.values(t.responses||{}).filter(r=>r==='missing').length;
+                return (
+                  <div key={t.id} onClick={()=>setView('turniere')}
+                    style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'#fffbeb',borderRadius:'8px',border:'1px solid #fde68a',cursor:'pointer'}}
+                    onMouseEnter={e=>e.currentTarget.style.background='#fef3c7'}
+                    onMouseLeave={e=>e.currentTarget.style.background='#fffbeb'}>
+                    <div>
+                      <p style={{margin:'0 0 2px',fontWeight:'700',color:'#92400e',fontSize:'14px'}}>🏆 {t.name}</p>
+                      <span style={{fontSize:'12px',color:'#555'}}>{dateLabel}</span>
+                      {t.location&&<span style={{fontSize:'12px',color:'#999',marginLeft:'8px'}}>· 📍 {t.location}</span>}
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:'10px',flexShrink:0}}>
+                      <span style={{fontSize:'12px',color:'#16a34a',fontWeight:'600'}}>✓ {coming}</span>
+                      <span style={{fontSize:'12px',color:'#dc2626',fontWeight:'600'}}>✗ {missing}</span>
+                      <span style={{fontSize:'12px',color:'#9ca3af'}}>– {total-coming-missing}</span>
+                      <ChevronRight size={15} color="#b45309"/>
                     </div>
                   </div>
                 );
