@@ -42,7 +42,8 @@ const WEEKDAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag
 
 const emptySession = { subgroupIds: [], date: new Date().toISOString().split('T')[0], time: '17:00', trainer: '', info: '', repeat: false, repeatWeeks: 8 };
 
-const emptyTournament = { name: '', date: new Date().toISOString().split('T')[0], time: '10:00', participantIds: [], departureTimes: {} };
+const emptyTournament = { name: '', date: new Date().toISOString().split('T')[0], konkurrenzen: [] };
+const emptyKonkurrenz = () => ({ id: 'konk_' + Date.now() + '_' + Math.random().toString(36).slice(2,6), name: '', time: '10:00', participantIds: [], departureTimes: {} });
 
 export default function TrainingsApp() {
   const [user, setUser]               = useState(null);
@@ -82,6 +83,7 @@ export default function TrainingsApp() {
   const [newTournament, setNewTournament]         = useState(emptyTournament);
   const [editingTournament, setEditingTournament] = useState(null);
   const [editTournForm, setEditTournForm]         = useState({});
+  const [tournGroupFilter, setTournGroupFilter]   = useState(null);
 
   const [authMode, setAuthMode]           = useState('login');
   const [loginEmail, setLoginEmail]       = useState('');
@@ -316,10 +318,10 @@ export default function TrainingsApp() {
   };
 
   const createTournament = () => {
-    const { name, date, time, participantIds, departureTimes } = newTournament;
-    if (!name.trim() || !date || !time) { alert('Bitte Name, Datum und Uhrzeit angeben!'); return; }
+    const { name, date, konkurrenzen } = newTournament;
+    if (!name.trim() || !date) { alert('Bitte Name und Datum angeben!'); return; }
     const id = 'tournament_' + Date.now();
-    saveTournaments({ ...tournaments, [id]: { id, name, date, time, participantIds, departureTimes, responses: {} } });
+    saveTournaments({ ...tournaments, [id]: { id, name, date, konkurrenzen: konkurrenzen||[], responses: {} } });
     setNewTournament(emptyTournament);
   };
 
@@ -347,14 +349,37 @@ export default function TrainingsApp() {
     return Object.values(tournaments).filter(t => t.date >= today).sort((a,b) => a.date.localeCompare(b.date));
   };
 
+  // Alle childIds die in mindestens einer Konkurrenz eines Turniers sind
+  const getTournamentParticipantIds = (t) =>
+    [...new Set((t.konkurrenzen||[]).flatMap(k => k.participantIds||[]))];
+
   const getMyUpcomingTournaments = () => {
     const myChild = getMyChild();
     if (!myChild) return [];
     const today = new Date().toISOString().split('T')[0];
     return Object.values(tournaments)
-      .filter(t => t.date >= today && (t.participantIds||[]).includes(myChild.id))
+      .filter(t => t.date >= today && getTournamentParticipantIds(t).includes(myChild.id))
       .sort((a,b) => a.date.localeCompare(b.date));
   };
+
+  // Hilfsfunktionen für Konkurrenz-Bearbeitung in einem Formular
+  const konkurrenzHelpers = (form, setForm) => ({
+    add: () => setForm({ ...form, konkurrenzen: [...(form.konkurrenzen||[]), emptyKonkurrenz()] }),
+    remove: (kid) => setForm({ ...form, konkurrenzen: (form.konkurrenzen||[]).filter(k=>k.id!==kid) }),
+    update: (kid, field, val) => setForm({ ...form, konkurrenzen: (form.konkurrenzen||[]).map(k=>k.id===kid?{...k,[field]:val}:k) }),
+    toggleParticipant: (kid, childId) => {
+      const konk = (form.konkurrenzen||[]).find(k=>k.id===kid);
+      if (!konk) return;
+      const ids = konk.participantIds||[];
+      const next = ids.includes(childId) ? ids.filter(i=>i!==childId) : [...ids, childId];
+      const dep = { ...konk.departureTimes };
+      if (!next.includes(childId)) delete dep[childId];
+      setForm({ ...form, konkurrenzen: (form.konkurrenzen||[]).map(k=>k.id===kid?{...k,participantIds:next,departureTimes:dep}:k) });
+    },
+    setDeparture: (kid, childId, time) => {
+      setForm({ ...form, konkurrenzen: (form.konkurrenzen||[]).map(k=>k.id===kid?{...k,departureTimes:{...k.departureTimes,[childId]:time}}:k) });
+    },
+  });
 
   const changeUserRole = async (uid, newRole) => {
     const updated={...allUsers,[uid]:{...allUsers[uid],role:newRole}};
@@ -421,7 +446,7 @@ export default function TrainingsApp() {
   }
 
   const s = {
-    page:  (color=null) => ({minHeight:'100vh', background: 'linear-gradient(135deg, #358941 0%, #9cc18f 100%)', fontFamily:'system-ui,-apple-system,sans-serif'}),
+    page:  (color=null) => ({minHeight:'100vh', background: view==='turniere' ? 'linear-gradient(135deg, #92400e 0%, #f59e0b 100%)' : 'linear-gradient(135deg, #358941 0%, #9cc18f 100%)', fontFamily:'system-ui,-apple-system,sans-serif'}),
     wrap:  {maxWidth:'900px',margin:'0 auto',padding:'20px'},
     card:  {background:'white',borderRadius:'12px',padding:'20px',marginBottom:'16px',boxShadow:'0 4px 6px rgba(0,0,0,0.1)'},
     btn:   (bg,col='white',sm=false)=>({padding:sm?'6px 12px':'10px 16px',background:bg,color:col,border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:sm?'13px':'14px',display:'flex',alignItems:'center',gap:'6px',whiteSpace:'nowrap'}),
@@ -735,18 +760,56 @@ export default function TrainingsApp() {
   if (view==='turniere') {
     const upcoming = getUpcomingTournaments();
     const allChildrenSorted = Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+    const filteredChildren = tournGroupFilter
+      ? allChildrenSorted.filter(c => FIXED_GROUPS.find(g=>g.id===subgroups[c.subgroupId]?.groupId)?.id === tournGroupFilter)
+      : allChildrenSorted;
 
-    const toggleParticipant = (childId, form, setForm) => {
-      const ids = form.participantIds||[];
-      const next = ids.includes(childId) ? ids.filter(i=>i!==childId) : [...ids, childId];
-      const dep = { ...form.departureTimes };
-      if (!next.includes(childId)) delete dep[childId];
-      setForm({ ...form, participantIds: next, departureTimes: dep });
-    };
+    const nh = konkurrenzHelpers(newTournament, setNewTournament);
+    const eh = konkurrenzHelpers(editTournForm, setEditTournForm);
 
-    const setDeparture = (childId, time, form, setForm) => {
-      setForm({ ...form, departureTimes: { ...form.departureTimes, [childId]: time } });
-    };
+    const KonkurrenzForm = ({ konk, helpers, childList }) => (
+      <div style={{border:'1px solid #fde68a',borderRadius:'10px',overflow:'hidden',marginBottom:'10px'}}>
+        <div style={{background:'#fef9c3',padding:'10px 12px',display:'flex',alignItems:'center',gap:'8px'}}>
+          <input placeholder="Konkurrenzbezeichnung (z.B. Einzel U13)" value={konk.name}
+            onChange={e=>helpers.update(konk.id,'name',e.target.value)}
+            style={{...s.input,flex:1,fontSize:'13px',padding:'6px 10px'}}/>
+          <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
+            <Clock size={13} color="#b45309"/>
+            <input type="time" value={konk.time} onChange={e=>helpers.update(konk.id,'time',e.target.value)}
+              style={{padding:'6px 8px',border:'1px solid #d97706',borderRadius:'6px',fontSize:'13px',width:'90px'}}/>
+          </div>
+          <button onClick={()=>helpers.remove(konk.id)} style={{padding:'4px 8px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626',flexShrink:0}}><Trash2 size={14}/></button>
+        </div>
+        <div style={{padding:'10px 12px',display:'grid',gap:'6px'}}>
+          {childList.length===0
+            ? <p style={{color:'#999',fontSize:'12px',margin:0}}>Keine Kinder in dieser Gruppe.</p>
+            : childList.map(child=>{
+              const sub2=subgroups[child.subgroupId]; const grp2=FIXED_GROUPS.find(g=>g.id===sub2?.groupId);
+              const sel=(konk.participantIds||[]).includes(child.id);
+              return (
+                <div key={child.id} style={{display:'flex',alignItems:'center',gap:'8px',padding:'7px 10px',borderRadius:'7px',border:`2px solid ${sel?(grp2?.color||'#b45309'):'#eee'}`,background:sel?'#fffbeb':'white',cursor:'pointer'}}
+                  onClick={()=>helpers.toggleParticipant(konk.id,child.id)}>
+                  <div style={{width:'16px',height:'16px',borderRadius:'3px',border:`2px solid ${sel?(grp2?.color||'#b45309'):'#ccc'}`,background:sel?(grp2?.color||'#b45309'):'white',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                    {sel&&<Check size={10} color="white"/>}
+                  </div>
+                  <span style={{flex:1,fontSize:'13px',fontWeight:'600',color:'#333'}}>{child.name}
+                    {sub2&&<span style={{fontSize:'11px',color:'#999',fontWeight:'400',marginLeft:'5px'}}>{grp2?.emoji} {sub2.name}</span>}
+                  </span>
+                  {sel&&(
+                    <div onClick={e=>e.stopPropagation()} style={{display:'flex',alignItems:'center',gap:'4px'}}>
+                      <Clock size={11} color="#b45309"/>
+                      <input type="time" value={konk.departureTimes?.[child.id]||''}
+                        onChange={e=>helpers.setDeparture(konk.id,child.id,e.target.value)}
+                        style={{padding:'3px 6px',border:'1px solid #d97706',borderRadius:'5px',fontSize:'12px',width:'82px'}}/>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          }
+        </div>
+      </div>
+    );
 
     return (
       <div style={s.page()}><div style={s.wrap}>
@@ -756,7 +819,7 @@ export default function TrainingsApp() {
         <div style={s.card}>
           <h2 style={{margin:'0 0 20px',color:'#b45309',display:'flex',alignItems:'center',gap:'8px'}}><Trophy size={20}/> Neues Turnier anlegen</h2>
 
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',marginBottom:'12px'}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',marginBottom:'16px'}}>
             <div style={{gridColumn:'1/-1'}}>
               <label style={s.label}>Turnierbezeichnung</label>
               <input style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} placeholder="z.B. Kreismeisterschaft" value={newTournament.name} onChange={e=>setNewTournament({...newTournament,name:e.target.value})}/>
@@ -765,41 +828,30 @@ export default function TrainingsApp() {
               <label style={s.label}>Datum</label>
               <input type="date" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={newTournament.date} onChange={e=>setNewTournament({...newTournament,date:e.target.value})}/>
             </div>
-            <div>
-              <label style={s.label}>Turnierzeit</label>
-              <input type="time" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={newTournament.time} onChange={e=>setNewTournament({...newTournament,time:e.target.value})}/>
+          </div>
+
+          {/* Gruppenfilter */}
+          <div style={{marginBottom:'14px'}}>
+            <label style={s.label}>Kinder filtern nach Gruppe</label>
+            <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+              <button onClick={()=>setTournGroupFilter(null)} style={{padding:'5px 12px',borderRadius:'20px',border:'2px solid #b45309',background:!tournGroupFilter?'#b45309':'white',color:!tournGroupFilter?'white':'#b45309',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Alle</button>
+              {FIXED_GROUPS.map(g=>(
+                <button key={g.id} onClick={()=>setTournGroupFilter(tournGroupFilter===g.id?null:g.id)} style={{padding:'5px 12px',borderRadius:'20px',border:`2px solid ${g.color}`,background:tournGroupFilter===g.id?g.color:'white',color:tournGroupFilter===g.id?'white':g.color,cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>{g.emoji} {g.name}</button>
+              ))}
             </div>
           </div>
 
-          {/* Teilnehmer + Abfahrtszeiten */}
+          {/* Konkurrenzen */}
           <div style={{marginBottom:'16px'}}>
-            <label style={s.label}>Teilnehmer & individuelle Abfahrtszeiten</label>
-            {allChildrenSorted.length===0
-              ? <p style={{color:'#999',fontSize:'13px'}}>Noch keine Kinder vorhanden.</p>
-              : <div style={{display:'grid',gap:'8px'}}>
-                {allChildrenSorted.map(child=>{
-                  const sub = subgroups[child.subgroupId];
-                  const grp = FIXED_GROUPS.find(g=>g.id===sub?.groupId);
-                  const selected = (newTournament.participantIds||[]).includes(child.id);
-                  return (
-                    <div key={child.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',borderRadius:'8px',border:`2px solid ${selected?(grp?.color||'#358941'):'#ddd'}`,background:selected?'#f8fdf8':'white',cursor:'pointer'}} onClick={()=>toggleParticipant(child.id,newTournament,setNewTournament)}>
-                      <div style={{width:'20px',height:'20px',borderRadius:'4px',border:`2px solid ${selected?(grp?.color||'#358941'):'#ccc'}`,background:selected?(grp?.color||'#358941'):'white',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                        {selected&&<Check size={13} color="white"/>}
-                      </div>
-                      <div style={{flex:1}}>
-                        <span style={{fontWeight:'600',color:'#333',fontSize:'14px'}}>{child.name}</span>
-                        {sub&&<span style={{fontSize:'12px',color:'#999',marginLeft:'6px'}}>{grp?.emoji} {sub.name}</span>}
-                      </div>
-                      {selected&&(
-                        <div onClick={e=>e.stopPropagation()} style={{display:'flex',alignItems:'center',gap:'6px'}}>
-                          <Clock size={13} color="#b45309"/>
-                          <input type="time" placeholder="Abfahrt" value={newTournament.departureTimes?.[child.id]||''} onChange={e=>setDeparture(child.id,e.target.value,newTournament,setNewTournament)} style={{padding:'4px 8px',border:'1px solid #d97706',borderRadius:'6px',fontSize:'13px',width:'90px'}}/>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
+              <label style={{...s.label,margin:0}}>Konkurrenzen ({(newTournament.konkurrenzen||[]).length})</label>
+              <button onClick={nh.add} style={s.btn('#b45309',undefined,true)}><Plus size={14}/> Konkurrenz hinzufügen</button>
+            </div>
+            {(newTournament.konkurrenzen||[]).length===0
+              ? <p style={{color:'#999',fontSize:'13px',padding:'12px',background:'#fef9c3',borderRadius:'8px',textAlign:'center'}}>Noch keine Konkurrenzen. Oben hinzufügen!</p>
+              : (newTournament.konkurrenzen||[]).map(konk=>(
+                <KonkurrenzForm key={konk.id} konk={konk} helpers={nh} childList={filteredChildren}/>
+              ))
             }
           </div>
 
@@ -813,20 +865,21 @@ export default function TrainingsApp() {
           <h2 style={{margin:'0 0 16px',color:'#b45309'}}>🏆 Kommende Turniere</h2>
           {upcoming.length===0
             ? <p style={{color:'#999',textAlign:'center',padding:'30px'}}>Noch keine Turniere geplant.</p>
-            : <div style={{display:'grid',gap:'12px'}}>
+            : <div style={{display:'grid',gap:'16px'}}>
               {upcoming.map(t=>{
                 const isEditing = editingTournament===t.id;
-                const participants = (t.participantIds||[]).map(id=>children[id]).filter(Boolean);
-                const coming = participants.filter(c=>(t.responses||{})[c.id]==='coming');
-                const missing = participants.filter(c=>(t.responses||{})[c.id]==='missing');
-                const noAnswer = participants.filter(c=>!(t.responses||{})[c.id]);
+                const allParticipantIds = getTournamentParticipantIds(t);
+                const allParticipants = allParticipantIds.map(id=>children[id]).filter(Boolean);
+                const coming = allParticipants.filter(c=>(t.responses||{})[c.id]==='coming');
+                const missing = allParticipants.filter(c=>(t.responses||{})[c.id]==='missing');
+                const noAnswer = allParticipants.filter(c=>!(t.responses||{})[c.id]);
 
                 return (
                   <div key={t.id} style={{borderRadius:'10px',border:'2px solid #fde68a',background:'#fffbeb',overflow:'hidden'}}>
                     {isEditing ? (
                       <div style={{padding:'16px'}}>
                         <h4 style={{margin:'0 0 12px',color:'#b45309'}}>Turnier bearbeiten</h4>
-                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px',marginBottom:'10px'}}>
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px',marginBottom:'12px'}}>
                           <div style={{gridColumn:'1/-1'}}>
                             <label style={s.label}>Name</label>
                             <input style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={editTournForm.name||''} onChange={e=>setEditTournForm({...editTournForm,name:e.target.value})}/>
@@ -835,94 +888,115 @@ export default function TrainingsApp() {
                             <label style={s.label}>Datum</label>
                             <input type="date" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={editTournForm.date||''} onChange={e=>setEditTournForm({...editTournForm,date:e.target.value})}/>
                           </div>
-                          <div>
-                            <label style={s.label}>Turnierzeit</label>
-                            <input type="time" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={editTournForm.time||''} onChange={e=>setEditTournForm({...editTournForm,time:e.target.value})}/>
+                        </div>
+                        {/* Gruppenfilter auch beim Bearbeiten */}
+                        <div style={{marginBottom:'12px'}}>
+                          <label style={s.label}>Kinder filtern</label>
+                          <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                            <button onClick={()=>setTournGroupFilter(null)} style={{padding:'4px 10px',borderRadius:'20px',border:'2px solid #b45309',background:!tournGroupFilter?'#b45309':'white',color:!tournGroupFilter?'white':'#b45309',cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>Alle</button>
+                            {FIXED_GROUPS.map(g=>(
+                              <button key={g.id} onClick={()=>setTournGroupFilter(tournGroupFilter===g.id?null:g.id)} style={{padding:'4px 10px',borderRadius:'20px',border:`2px solid ${g.color}`,background:tournGroupFilter===g.id?g.color:'white',color:tournGroupFilter===g.id?'white':g.color,cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>{g.emoji} {g.name}</button>
+                            ))}
                           </div>
                         </div>
-                        <label style={{...s.label,marginBottom:'8px'}}>Teilnehmer & Abfahrtszeiten</label>
-                        <div style={{display:'grid',gap:'6px',marginBottom:'12px'}}>
-                          {allChildrenSorted.map(child=>{
-                            const sub = subgroups[child.subgroupId];
-                            const grp = FIXED_GROUPS.find(g=>g.id===sub?.groupId);
-                            const selected = (editTournForm.participantIds||[]).includes(child.id);
-                            return (
-                              <div key={child.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 10px',borderRadius:'8px',border:`2px solid ${selected?(grp?.color||'#358941'):'#ddd'}`,background:selected?'#f8fdf8':'white',cursor:'pointer'}} onClick={()=>toggleParticipant(child.id,editTournForm,setEditTournForm)}>
-                                <div style={{width:'18px',height:'18px',borderRadius:'4px',border:`2px solid ${selected?(grp?.color||'#358941'):'#ccc'}`,background:selected?(grp?.color||'#358941'):'white',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                                  {selected&&<Check size={11} color="white"/>}
-                                </div>
-                                <span style={{flex:1,fontWeight:'600',color:'#333',fontSize:'13px'}}>{child.name} {sub&&<span style={{fontSize:'11px',color:'#999',fontWeight:'400'}}>{grp?.emoji} {sub.name}</span>}</span>
-                                {selected&&(
-                                  <div onClick={e=>e.stopPropagation()} style={{display:'flex',alignItems:'center',gap:'4px'}}>
-                                    <Clock size={12} color="#b45309"/>
-                                    <input type="time" value={editTournForm.departureTimes?.[child.id]||''} onChange={e=>setDeparture(child.id,e.target.value,editTournForm,setEditTournForm)} style={{padding:'3px 6px',border:'1px solid #d97706',borderRadius:'6px',fontSize:'12px',width:'85px'}}/>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
+                          <label style={{...s.label,margin:0}}>Konkurrenzen</label>
+                          <button onClick={eh.add} style={s.btn('#b45309',undefined,true)}><Plus size={13}/> Hinzufügen</button>
                         </div>
-                        <div style={{display:'flex',gap:'8px'}}>
+                        {(editTournForm.konkurrenzen||[]).map(konk=>(
+                          <KonkurrenzForm key={konk.id} konk={konk} helpers={eh} childList={filteredChildren}/>
+                        ))}
+                        <div style={{display:'flex',gap:'8px',marginTop:'12px'}}>
                           <button onClick={saveTournamentEdit} style={s.btn('#358941',undefined,true)}><Save size={14}/> Speichern</button>
                           <button onClick={()=>setEditingTournament(null)} style={s.btn('#f3f4f6','#333',true)}>Abbrechen</button>
                         </div>
                       </div>
                     ) : (
                       <div>
-                        {/* Header */}
+                        {/* Turnier-Header */}
                         <div style={{padding:'14px 16px',borderBottom:'1px solid #fde68a',display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'8px'}}>
                           <div>
                             <h3 style={{margin:'0 0 4px',color:'#92400e',fontSize:'18px'}}>🏆 {t.name}</h3>
                             <p style={{margin:'0 0 2px',fontWeight:'600',color:'#333',fontSize:'14px'}}>
-                              {new Date(t.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})} · {t.time} Uhr
+                              {new Date(t.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}
                             </p>
-                            <p style={{margin:0,fontSize:'13px',color:'#666'}}>{participants.length} Teilnehmer eingeladen</p>
+                            <p style={{margin:0,fontSize:'13px',color:'#666'}}>{(t.konkurrenzen||[]).length} Konkurrenzen · {allParticipantIds.length} Teilnehmer</p>
                           </div>
                           <div style={{display:'flex',gap:'6px',flexShrink:0}}>
-                            <button onClick={()=>{setEditingTournament(t.id);setEditTournForm({...t});}} style={{padding:'6px',background:'#fef3c7',border:'none',borderRadius:'6px',cursor:'pointer',color:'#b45309'}}><Edit2 size={16}/></button>
+                            <button onClick={()=>{setEditingTournament(t.id);setEditTournForm(JSON.parse(JSON.stringify(t)));}} style={{padding:'6px',background:'#fef3c7',border:'none',borderRadius:'6px',cursor:'pointer',color:'#b45309'}}><Edit2 size={16}/></button>
                             <button onClick={()=>deleteTournament(t.id)} style={{padding:'6px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626'}}><Trash2 size={16}/></button>
                           </div>
                         </div>
 
-                        {/* Rückmeldungen */}
-                        <div style={{padding:'14px 16px'}}>
-                          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'8px',marginBottom:'14px'}}>
-                            <div style={{background:'#dcfce7',borderRadius:'8px',padding:'10px',textAlign:'center'}}>
-                              <p style={{margin:0,fontSize:'22px',fontWeight:'700',color:'#16a34a'}}>{coming.length}</p>
-                              <p style={{margin:0,fontSize:'11px',color:'#16a34a'}}>Dabei</p>
-                            </div>
-                            <div style={{background:'#fee2e2',borderRadius:'8px',padding:'10px',textAlign:'center'}}>
-                              <p style={{margin:0,fontSize:'22px',fontWeight:'700',color:'#dc2626'}}>{missing.length}</p>
-                              <p style={{margin:0,fontSize:'11px',color:'#dc2626'}}>Fehlt</p>
-                            </div>
-                            <div style={{background:'#f3f4f6',borderRadius:'8px',padding:'10px',textAlign:'center'}}>
-                              <p style={{margin:0,fontSize:'22px',fontWeight:'700',color:'#6b7280'}}>{noAnswer.length}</p>
-                              <p style={{margin:0,fontSize:'11px',color:'#6b7280'}}>Ausstehend</p>
-                            </div>
+                        {/* Gesamt-Rückmeldungen */}
+                        <div style={{padding:'12px 16px',borderBottom:'1px solid #fde68a',display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'8px'}}>
+                          <div style={{background:'#dcfce7',borderRadius:'8px',padding:'8px',textAlign:'center'}}>
+                            <p style={{margin:0,fontSize:'20px',fontWeight:'700',color:'#16a34a'}}>{coming.length}</p>
+                            <p style={{margin:0,fontSize:'11px',color:'#16a34a'}}>Dabei</p>
                           </div>
+                          <div style={{background:'#fee2e2',borderRadius:'8px',padding:'8px',textAlign:'center'}}>
+                            <p style={{margin:0,fontSize:'20px',fontWeight:'700',color:'#dc2626'}}>{missing.length}</p>
+                            <p style={{margin:0,fontSize:'11px',color:'#dc2626'}}>Fehlt</p>
+                          </div>
+                          <div style={{background:'#f3f4f6',borderRadius:'8px',padding:'8px',textAlign:'center'}}>
+                            <p style={{margin:0,fontSize:'20px',fontWeight:'700',color:'#6b7280'}}>{noAnswer.length}</p>
+                            <p style={{margin:0,fontSize:'11px',color:'#6b7280'}}>Ausstehend</p>
+                          </div>
+                        </div>
 
-                          {participants.length>0&&(
-                            <div style={{display:'grid',gap:'6px'}}>
-                              {participants.sort((a,b)=>a.name.localeCompare(b.name,'de')).map(child=>{
-                                const resp = (t.responses||{})[child.id];
-                                const dep = t.departureTimes?.[child.id];
-                                const sub = subgroups[child.subgroupId];
-                                const grp = FIXED_GROUPS.find(g=>g.id===sub?.groupId);
-                                return (
-                                  <div key={child.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 10px',borderRadius:'6px',background:resp==='coming'?'#f0fdf4':resp==='missing'?'#fef2f2':'#f9fafb',border:'1px solid #eee'}}>
+                        {/* Konkurrenzen mit Teilnehmern */}
+                        <div style={{padding:'14px 16px',display:'grid',gap:'12px'}}>
+                          {(t.konkurrenzen||[]).length===0
+                            ? <p style={{color:'#999',fontSize:'13px',textAlign:'center'}}>Keine Konkurrenzen angelegt.</p>
+                            : (t.konkurrenzen||[]).map(konk=>{
+                              const konkParticipants = (konk.participantIds||[]).map(id=>children[id]).filter(Boolean);
+                              // Gruppenfilter für Anzeige
+                              const filteredKonkPart = tournGroupFilter
+                                ? konkParticipants.filter(c=>FIXED_GROUPS.find(g=>g.id===subgroups[c.subgroupId]?.groupId)?.id===tournGroupFilter)
+                                : konkParticipants;
+                              return (
+                                <div key={konk.id} style={{borderRadius:'8px',border:'1px solid #fde68a',overflow:'hidden'}}>
+                                  <div style={{background:'#fef9c3',padding:'8px 12px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                                     <div>
-                                      <span style={{fontWeight:'600',fontSize:'14px',color:'#333'}}>{child.name}</span>
-                                      {sub&&<span style={{fontSize:'11px',color:'#999',marginLeft:'6px'}}>{grp?.emoji} {sub.name}</span>}
-                                      {dep&&<span style={{fontSize:'12px',color:'#b45309',marginLeft:'8px',display:'inline-flex',alignItems:'center',gap:'3px'}}><Clock size={11}/> Abfahrt: {dep} Uhr</span>}
+                                      <span style={{fontWeight:'700',color:'#92400e',fontSize:'15px'}}>{konk.name||'(Unbenannte Konkurrenz)'}</span>
+                                      <span style={{fontSize:'13px',color:'#b45309',marginLeft:'10px',display:'inline-flex',alignItems:'center',gap:'4px'}}><Clock size={12}/> {konk.time} Uhr</span>
                                     </div>
-                                    <span style={{fontSize:'12px',fontWeight:'700',color:resp==='coming'?'#16a34a':resp==='missing'?'#dc2626':'#9ca3af'}}>
-                                      {resp==='coming'?'✓ Dabei':resp==='missing'?'✗ Fehlt':'–'}
-                                    </span>
+                                    <span style={{fontSize:'12px',color:'#92400e',fontWeight:'600'}}>{konkParticipants.length} Teilnehmer</span>
                                   </div>
-                                );
-                              })}
-                            </div>
-                          )}
+                                  {/* Gruppenfilter-Buttons je Konkurrenz */}
+                                  <div style={{padding:'8px 12px',background:'#fefce8',borderBottom:'1px solid #fde68a',display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                                    <button onClick={()=>setTournGroupFilter(null)} style={{padding:'3px 8px',borderRadius:'12px',border:'1px solid #b45309',background:!tournGroupFilter?'#b45309':'white',color:!tournGroupFilter?'white':'#b45309',cursor:'pointer',fontSize:'11px',fontWeight:'600'}}>Alle</button>
+                                    {FIXED_GROUPS.map(g=>(
+                                      <button key={g.id} onClick={()=>setTournGroupFilter(tournGroupFilter===g.id?null:g.id)} style={{padding:'3px 8px',borderRadius:'12px',border:`1px solid ${g.color}`,background:tournGroupFilter===g.id?g.color:'white',color:tournGroupFilter===g.id?'white':g.color,cursor:'pointer',fontSize:'11px',fontWeight:'600'}}>{g.emoji} {g.name}</button>
+                                    ))}
+                                  </div>
+                                  <div style={{padding:'8px 12px',display:'grid',gap:'5px'}}>
+                                    {filteredKonkPart.length===0
+                                      ? <p style={{color:'#999',fontSize:'12px',margin:0,padding:'6px 0'}}>Keine Teilnehmer in dieser Gruppe.</p>
+                                      : filteredKonkPart.sort((a,b)=>a.name.localeCompare(b.name,'de')).map(child=>{
+                                        const resp=(t.responses||{})[child.id];
+                                        const dep=konk.departureTimes?.[child.id];
+                                        const sub2=subgroups[child.subgroupId];
+                                        const grp2=FIXED_GROUPS.find(g=>g.id===sub2?.groupId);
+                                        return (
+                                          <div key={child.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 10px',borderRadius:'6px',background:resp==='coming'?'#f0fdf4':resp==='missing'?'#fef2f2':'#f9fafb',border:'1px solid #eee'}}>
+                                            <div>
+                                              <span style={{fontWeight:'600',fontSize:'13px',color:'#333'}}>{child.name}</span>
+                                              {sub2&&<span style={{fontSize:'11px',color:'#999',marginLeft:'5px'}}>{grp2?.emoji} {sub2.name}</span>}
+                                              {dep&&<span style={{fontSize:'11px',color:'#b45309',marginLeft:'6px',display:'inline-flex',alignItems:'center',gap:'2px'}}><Clock size={10}/> {dep} Uhr</span>}
+                                            </div>
+                                            <span style={{fontSize:'12px',fontWeight:'700',color:resp==='coming'?'#16a34a':resp==='missing'?'#dc2626':'#9ca3af'}}>
+                                              {resp==='coming'?'✓ Dabei':resp==='missing'?'✗ Fehlt':'–'}
+                                            </span>
+                                          </div>
+                                        );
+                                      })
+                                    }
+                                  </div>
+                                </div>
+                              );
+                            })
+                          }
                         </div>
                       </div>
                     )}
@@ -982,21 +1056,40 @@ export default function TrainingsApp() {
               const myTournaments = getMyUpcomingTournaments();
               if (!myTournaments.length) return null;
               return (
-                <div style={s.card}>
+                <div style={{...s.card,borderLeft:'5px solid #f59e0b',borderTop:'2px solid #fde68a'}}>
                   <h3 style={{margin:'0 0 16px',color:'#b45309',display:'flex',alignItems:'center',gap:'8px'}}><Trophy size={18}/> Kommende Turniere</h3>
-                  <div style={{display:'grid',gap:'10px'}}>
+                  <div style={{display:'grid',gap:'12px'}}>
                     {myTournaments.map(t=>{
                       const childId = myChild.id;
                       const myResponse = (t.responses||{})[childId];
-                      const dep = t.departureTimes?.[childId];
+                      // Nur Konkurrenzen in denen das Kind eingetragen ist
+                      const myKonkurrenzen = (t.konkurrenzen||[]).filter(k=>(k.participantIds||[]).includes(childId));
                       return (
-                        <div key={t.id} style={{padding:'14px',borderRadius:'10px',border:`2px solid ${myResponse==='coming'?'#16a34a':myResponse==='missing'?'#dc2626':'#fde68a'}`,background:myResponse==='coming'?'#f0fdf4':myResponse==='missing'?'#fef2f2':'#fffbeb'}}>
-                          <p style={{margin:'0 0 2px',fontWeight:'700',color:'#92400e',fontSize:'16px'}}>🏆 {t.name}</p>
-                          <p style={{margin:'0 0 6px',fontSize:'14px',color:'#333',fontWeight:'600'}}>
-                            {new Date(t.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})} · {t.time} Uhr
-                          </p>
-                          {dep&&<p style={{margin:'0 0 10px',fontSize:'13px',color:'#b45309',display:'flex',alignItems:'center',gap:'4px'}}><Clock size={13}/> Deine Abfahrtszeit: <strong>{dep} Uhr</strong></p>}
-                          <div style={{display:'flex',gap:'8px'}}>
+                        <div key={t.id} style={{borderRadius:'10px',border:`2px solid ${myResponse==='coming'?'#16a34a':myResponse==='missing'?'#dc2626':'#fde68a'}`,background:myResponse==='coming'?'#f0fdf4':myResponse==='missing'?'#fef2f2':'#fffbeb',overflow:'hidden'}}>
+                          <div style={{padding:'12px 14px',borderBottom:'1px solid #fde68a'}}>
+                            <p style={{margin:'0 0 2px',fontWeight:'700',color:'#92400e',fontSize:'16px'}}>🏆 {t.name}</p>
+                            <p style={{margin:0,fontSize:'14px',color:'#333',fontWeight:'600'}}>
+                              {new Date(t.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}
+                            </p>
+                          </div>
+                          {/* Meine Konkurrenzen */}
+                          {myKonkurrenzen.length>0&&(
+                            <div style={{padding:'10px 14px',borderBottom:'1px solid #fde68a',display:'grid',gap:'6px'}}>
+                              {myKonkurrenzen.map(konk=>{
+                                const dep = konk.departureTimes?.[childId];
+                                return (
+                                  <div key={konk.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 10px',background:'#fef9c3',borderRadius:'6px'}}>
+                                    <span style={{fontWeight:'600',color:'#92400e',fontSize:'14px'}}>{konk.name||'Konkurrenz'}</span>
+                                    <div style={{display:'flex',gap:'12px',alignItems:'center'}}>
+                                      <span style={{fontSize:'13px',color:'#b45309',display:'inline-flex',alignItems:'center',gap:'3px'}}><Clock size={12}/> {konk.time} Uhr</span>
+                                      {dep&&<span style={{fontSize:'13px',color:'#b45309',fontWeight:'600',display:'inline-flex',alignItems:'center',gap:'3px'}}>🚗 Abfahrt: {dep} Uhr</span>}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                          <div style={{padding:'12px 14px',display:'flex',gap:'8px'}}>
                             <button onClick={()=>respondToTournament(t.id,'coming')}
                               style={{flex:1,padding:'10px',border:'2px solid #16a34a',background:myResponse==='coming'?'#16a34a':'white',color:myResponse==='coming'?'white':'#16a34a',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>
                               <Check size={18}/> Ich bin dabei
@@ -1016,8 +1109,8 @@ export default function TrainingsApp() {
 
             {/* Kommende Trainings */}
             {mySessions.length>0&&(
-              <div style={s.card}>
-                <h3 style={{margin:'0 0 16px',color:'#0369a1',display:'flex',alignItems:'center',gap:'8px'}}><Calendar size={18}/> Kommende 10 Trainings</h3>
+              <div style={{...s.card,borderLeft:'5px solid #358941',borderTop:'2px solid #bbf7d0'}}>
+                <h3 style={{margin:'0 0 16px',color:'#358941',display:'flex',alignItems:'center',gap:'8px'}}><Calendar size={18}/> Kommende 10 Trainings</h3>
                 <div style={{display:'grid',gap:'10px'}}>
                   {mySessions.slice(0,10).map(session=>{
                     const childId=myChild.id;
