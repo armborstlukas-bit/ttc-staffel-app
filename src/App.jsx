@@ -759,13 +759,8 @@ export default function TrainingsApp() {
                 return (
                   <div key={session.id}
                     onClick={()=>{
-                      const firstSub=sessionSubs[0];
-                      if (firstSub) {
-                        const grpObj=FIXED_GROUPS.find(g=>g.id===firstSub.groupId);
-                        setActiveGroup(grpObj);
-                        setTrainingDate(session.date);
-                        setView('group');
-                      }
+                      setActiveSession(session);
+                      setView('sessionAttendance');
                     }}
                     style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'#f0f9ff',borderRadius:'8px',border:'1px solid #bae6fd',cursor:'pointer'}}
                     onMouseEnter={e=>e.currentTarget.style.background='#e0f2fe'}
@@ -939,6 +934,123 @@ export default function TrainingsApp() {
                 );
               })
             }
+          </div>
+        </div>
+      </div></div>
+    );
+  }
+
+  // ── SESSION ANWESENHEIT ──────────────────────────────────────
+  if (view==='sessionAttendance') {
+    const session = sessions[activeSession?.id] || activeSession;
+    const sessionSubs = (session?.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean);
+    const allKids = sessionSubs.flatMap(sub => getChildrenForSubgroup(sub.id));
+    const sessionDate = session?.date;
+
+    const setSessionStatus = (childId, subgroupId, status) => {
+      ensureTrainingDate(subgroupId, sessionDate);
+      const child = children[childId];
+      const cur = (child.attendance||{})[sessionDate];
+      const next = cur===status ? null : status;
+      const att = { ...(child.attendance||{}), [sessionDate]: next };
+      if (next===null) delete att[sessionDate];
+      saveChildren({ ...children, [childId]: { ...child, attendance: att } });
+    };
+
+    const presentCount = allKids.filter(c=>(children[c.id]?.attendance||{})[sessionDate]==='present').length;
+    const absentCount = allKids.filter(c=>(children[c.id]?.attendance||{})[sessionDate]==='absent_unexcused').length;
+    const excusedCount = allKids.filter(c=>(children[c.id]?.attendance||{})[sessionDate]==='absent_excused').length;
+
+    return (
+      <div style={s.page}><div style={s.wrap}>
+        <Header back backLabel="Startseite" backAction={()=>setView('home')}/>
+        <div style={s.card}>
+          {/* Session Info */}
+          <div style={{marginBottom:'20px'}}>
+            <h2 style={{margin:'0 0 8px',color:'#0369a1',fontSize:'22px'}}>
+              {new Date(sessionDate+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})} · {session?.time} Uhr
+            </h2>
+            <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'6px'}}>
+              {sessionSubs.map(sub=>{
+                const grp=FIXED_GROUPS.find(g=>g.id===sub.groupId);
+                return <span key={sub.id} style={{fontSize:'13px',fontWeight:'700',color:grp?.color,background:'#f8f9fa',padding:'3px 10px',borderRadius:'20px',border:`1px solid ${grp?.color}`}}>{grp?.emoji} {sub.name}</span>;
+              })}
+            </div>
+            {session?.trainer&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'#555'}}>👤 Trainer: {session.trainer}</p>}
+            {session?.info&&<div style={{display:'flex',gap:'6px',marginTop:'8px',padding:'8px',background:'#f0f9ff',borderRadius:'6px'}}><Info size={14} color="#0369a1" style={{flexShrink:0,marginTop:'2px'}}/><p style={{margin:0,fontSize:'13px',color:'#0369a1'}}>{session.info}</p></div>}
+          </div>
+
+          {/* Schnell-Statistik */}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'10px',marginBottom:'20px'}}>
+            <div style={{background:'#dcfce7',borderRadius:'8px',padding:'12px',textAlign:'center'}}>
+              <p style={{margin:0,fontSize:'28px',fontWeight:'700',color:'#16a34a'}}>{presentCount}</p>
+              <p style={{margin:0,fontSize:'12px',color:'#16a34a'}}>Anwesend</p>
+            </div>
+            <div style={{background:'#f3f4f6',borderRadius:'8px',padding:'12px',textAlign:'center'}}>
+              <p style={{margin:0,fontSize:'28px',fontWeight:'700',color:'#6b7280'}}>{absentCount}</p>
+              <p style={{margin:0,fontSize:'12px',color:'#6b7280'}}>Unentschuldigt</p>
+            </div>
+            <div style={{background:'#fef3c7',borderRadius:'8px',padding:'12px',textAlign:'center'}}>
+              <p style={{margin:0,fontSize:'28px',fontWeight:'700',color:'#d97706'}}>{excusedCount}</p>
+              <p style={{margin:0,fontSize:'12px',color:'#d97706'}}>Entschuldigt</p>
+            </div>
+          </div>
+
+          {/* Kinderliste mit Anwesenheits-Buttons */}
+          <div style={{display:'grid',gap:'10px'}}>
+            {allKids.length===0
+              ? <p style={{color:'#999',textAlign:'center',padding:'30px'}}>Keine Kinder in den zugewiesenen Gruppen.</p>
+              : allKids.map(child=>{
+                const currentChild = children[child.id] || child;
+                const status = (currentChild.attendance||{})[sessionDate];
+                const parentResponse = getParentResponse(child.id, sessionDate);
+                const parentExcused = parentResponse==='missing';
+                const parentComing = parentResponse==='coming';
+                const sub = subgroups[child.subgroupId];
+
+                return (
+                  <div key={child.id} style={{
+                    padding:'14px', borderRadius:'10px',
+                    border: parentExcused&&!status?'2px solid #d97706': parentComing&&!status?'2px solid #16a34a':'1px solid #ddd',
+                    background: status==='present'?'#f0fdf4': status==='absent_unexcused'?'#f9fafb': status==='absent_excused'?'#fffbeb':'white'
+                  }}>
+                    <div style={{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+                      <div style={{flex:1,minWidth:'120px'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
+                          <p style={{margin:0,fontWeight:'600',color:'#333',fontSize:'16px'}}>{child.name}</p>
+                          {parentExcused&&<span style={{fontSize:'11px',fontWeight:'600',color:'#d97706',background:'#fef3c7',padding:'2px 8px',borderRadius:'20px',border:'1px solid #d97706'}}>Eltern abgemeldet</span>}
+                          {parentComing&&<span style={{fontSize:'11px',fontWeight:'600',color:'#16a34a',background:'#dcfce7',padding:'2px 8px',borderRadius:'20px',border:'1px solid #16a34a'}}>Eltern angemeldet</span>}
+                        </div>
+                        {sub&&<p style={{margin:'2px 0 0',fontSize:'11px',color:'#999'}}>{sub.name}</p>}
+                      </div>
+
+                      {/* 3 Anwesenheits-Buttons */}
+                      <div style={{display:'flex',gap:'8px'}}>
+                        <button onClick={()=>setSessionStatus(child.id, child.subgroupId, 'present')}
+                          style={{width:'50px',height:'50px',border:'2px solid #16a34a',background:status==='present'?'#16a34a':'white',color:status==='present'?'white':'#16a34a',borderRadius:'10px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                          <Check size={26}/>
+                        </button>
+                        <button onClick={()=>setSessionStatus(child.id, child.subgroupId, 'absent_unexcused')}
+                          style={{width:'50px',height:'50px',border:'2px solid #9ca3af',background:status==='absent_unexcused'?'#6b7280':'white',color:status==='absent_unexcused'?'white':'#6b7280',borderRadius:'10px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'26px',fontWeight:'700'}}>
+                          –
+                        </button>
+                        <button onClick={()=>setSessionStatus(child.id, child.subgroupId, 'absent_excused')}
+                          style={{width:'50px',height:'50px',border:'2px solid #d97706',background:status==='absent_excused'?'#d97706':'white',color:status==='absent_excused'?'white':'#d97706',borderRadius:'10px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                          <Clock size={24}/>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            }
+          </div>
+
+          {/* Legende */}
+          <div style={{marginTop:'20px',paddingTop:'16px',borderTop:'1px solid #eee',display:'flex',gap:'16px',flexWrap:'wrap'}}>
+            <span style={{fontSize:'13px',color:'#16a34a'}}>✓ Anwesend</span>
+            <span style={{fontSize:'13px',color:'#6b7280'}}>– Fehlt unentschuldigt</span>
+            <span style={{fontSize:'13px',color:'#d97706'}}>~ Fehlt entschuldigt</span>
           </div>
         </div>
       </div></div>
