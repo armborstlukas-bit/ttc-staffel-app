@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
 import { Check, X, Plus, Trash2, Download, ChevronDown, LogOut, ArrowLeft, Clock, BarChart2, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save } from 'lucide-react';
 
@@ -65,7 +65,10 @@ export default function TrainingsApp() {
   const [newSession, setNewSession]             = useState(emptySession);
   const [editingSession, setEditingSession]     = useState(null); // session being edited
   const [editForm, setEditForm]                 = useState({});
-  const [deleteDialog, setDeleteDialog]         = useState(null); // {sessionId, repeatId, blockSize}
+  const [deleteDialog, setDeleteDialog]         = useState(null);
+  const [resetDialog, setResetDialog]           = useState(false);
+  const [resetPassword, setResetPassword]       = useState('');
+  const [resetError, setResetError]             = useState(''); // {sessionId, repeatId, blockSize}
 
   const [authMode, setAuthMode]           = useState('login');
   const [loginEmail, setLoginEmail]       = useState('');
@@ -244,6 +247,26 @@ export default function TrainingsApp() {
     const child=getMyChild();
     if (!child) return;
     saveChildren({...children,[child.id]:{...child,attendance:{...(child.attendance||{}),[date]:'absent_excused'}}});
+  };
+
+  const handleResetAllAttendance = async () => {
+    setResetError('');
+    try {
+      const credential = EmailAuthProvider.credential(user.email, resetPassword);
+      await reauthenticateWithCredential(user, credential);
+      // Passwort korrekt - alle Anwesenheiten löschen
+      const updatedChildren = Object.fromEntries(
+        Object.entries(children).map(([id, child]) => [id, { ...child, attendance: {} }])
+      );
+      saveChildren(updatedChildren);
+      // Sessions löschen
+      saveSessions({});
+      setResetDialog(false);
+      setResetPassword('');
+      alert('✅ Alle Anwesenheitsdaten wurden erfolgreich zurückgesetzt!');
+    } catch {
+      setResetError('Falsches Passwort! Bitte nochmal versuchen.');
+    }
   };
 
   const changeUserRole = async (uid, newRole) => {
@@ -701,6 +724,40 @@ export default function TrainingsApp() {
     return (
       <div style={s.page}><div style={s.wrap}>
         <Header back backLabel="Startseite" backAction={()=>setView('home')}/>
+
+        {/* Passwort-Bestätigungs-Dialog */}
+        {resetDialog&&(
+          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px'}}>
+            <div style={{background:'white',borderRadius:'16px',padding:'28px',maxWidth:'380px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
+              <h3 style={{margin:'0 0 8px',color:'#dc2626',fontSize:'18px'}}>⚠️ Anwesenheiten zurücksetzen</h3>
+              <p style={{margin:'0 0 16px',color:'#666',fontSize:'14px'}}>
+                Das löscht <strong>alle Anwesenheitsdaten</strong> aller Kinder sowie alle geplanten Einheiten.<br/><br/>
+                Bitte bestätige mit deinem Admin-Passwort:
+              </p>
+              {resetError&&<p style={{color:'#dc2626',fontSize:'13px',marginBottom:'12px',padding:'8px',background:'#fee2e2',borderRadius:'6px'}}>{resetError}</p>}
+              <input
+                type="password"
+                placeholder="Dein Admin-Passwort"
+                value={resetPassword}
+                onChange={e=>setResetPassword(e.target.value)}
+                onKeyPress={e=>e.key==='Enter'&&handleResetAllAttendance()}
+                style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box',marginBottom:'16px',borderColor:'#dc2626',borderWidth:'2px'}}
+              />
+              <div style={{display:'grid',gap:'8px'}}>
+                <button onClick={handleResetAllAttendance}
+                  style={{padding:'12px',background:'#dc2626',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
+                  🗑️ Ja, alles zurücksetzen
+                </button>
+                <button onClick={()=>{setResetDialog(false);setResetPassword('');setResetError('');}}
+                  style={{padding:'12px',background:'#f3f4f6',color:'#333',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Nutzerverwaltung */}
         <div style={s.card}>
           <h2 style={{margin:'0 0 16px',color:'#7c3aed',display:'flex',alignItems:'center',gap:'8px'}}><Users size={20}/> Nutzerverwaltung</h2>
           {pendingCount>0&&<div style={{marginBottom:'16px',padding:'12px',background:'#fee2e2',borderRadius:'8px',border:'1px solid #fca5a5'}}><p style={{margin:0,fontWeight:'600',color:'#dc2626',fontSize:'14px'}}>⚠️ {pendingCount} Nutzer warten auf Freischaltung!</p></div>}
@@ -738,6 +795,18 @@ export default function TrainingsApp() {
             {Object.keys(allUsers).length===0&&<p style={{color:'#999',textAlign:'center',padding:'20px'}}>Noch keine Nutzer.</p>}
           </div>
         </div>
+
+        {/* Gefahrenzone */}
+        <div style={{...s.card,border:'2px solid #fca5a5',background:'#fff5f5'}}>
+          <h2 style={{margin:'0 0 8px',color:'#dc2626',fontSize:'18px'}}>⚠️ Gefahrenzone</h2>
+          <p style={{margin:'0 0 16px',color:'#666',fontSize:'14px'}}>
+            Diese Aktion löscht <strong>alle Anwesenheitsdaten</strong> aller Kinder sowie alle geplanten Trainingseinheiten. Die Kinder selbst bleiben erhalten.
+          </p>
+          <button onClick={()=>setResetDialog(true)} style={{...s.btn('#dc2626'),width:'100%',justifyContent:'center'}}>
+            🗑️ Alle Anwesenheitsdaten zurücksetzen
+          </button>
+        </div>
+
       </div></div>
     );
   }
