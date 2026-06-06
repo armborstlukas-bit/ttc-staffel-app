@@ -37,18 +37,14 @@ const STATUS_CONFIG = {
 };
 
 const ROLE_CONFIG = {
-  admin:     { label: 'Admin',       color: '#7c3aed', bg: '#ede9fe' },
-  trainer:   { label: 'Trainer',     color: '#358941', bg: '#dcfce7' },
-  eltern:    { label: 'Eltern',      color: '#2563eb', bg: '#dbeafe' },
-  jugendlich:{ label: 'Jugendliche', color: '#d97706', bg: '#fef3c7' },
+  pending:    { label: 'Wartend',      color: '#dc2626', bg: '#fee2e2' },
+  admin:      { label: 'Admin',        color: '#7c3aed', bg: '#ede9fe' },
+  trainer:    { label: 'Trainer',      color: '#358941', bg: '#dcfce7' },
+  eltern:     { label: 'Eltern',       color: '#2563eb', bg: '#dbeafe' },
+  jugendlich: { label: 'Jugendliche',  color: '#d97706', bg: '#fef3c7' },
 };
 
-// Einladungscodes (fest, kannst du ändern)
-const INVITE_CODES = {
-  'TRAINER-TTC2026':    'trainer',
-  'ELTERN-TTC2026':     'eltern',
-  'JUGEND-TTC2026':     'jugendlich',
-};
+
 
 export default function TrainingsApp() {
   const [user, setUser]           = useState(null);
@@ -74,7 +70,6 @@ export default function TrainingsApp() {
   const [loginEmail, setLoginEmail]   = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginName, setLoginName]     = useState('');
-  const [inviteCode, setInviteCode]   = useState('');
   const [error, setError]             = useState('');
 
   // Admin
@@ -152,18 +147,15 @@ export default function TrainingsApp() {
 
   const handleRegister = async (e) => {
     e.preventDefault(); setError('');
-    const code = inviteCode.trim().toUpperCase();
-    const role = INVITE_CODES[code];
-    if (!role) { setError('Ungültiger Einladungscode!'); return; }
+    if (!loginName.trim()) { setError('Bitte gib deinen Namen ein!'); return; }
     try {
       const cred = await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
-      const profile = { uid: cred.user.uid, email: loginEmail, name: loginName, role, linkedChildId: null };
+      const profile = { uid: cred.user.uid, email: loginEmail, name: loginName, role: 'pending', linkedChildId: null };
       await setDoc(doc(db, 'users', cred.user.uid), profile);
-      // Auch in allUsers speichern
       const usersSnap = await getDoc(doc(db,'ttc','users'));
       const current = usersSnap.exists() ? usersSnap.data() : {};
       await setDoc(doc(db,'ttc','users'), { ...current, [cred.user.uid]: profile });
-      setUserRole(role);
+      setUserRole('pending');
       setUserProfile(profile);
     } catch (err) {
       setError('Registrierung fehlgeschlagen: ' + err.message);
@@ -312,10 +304,6 @@ export default function TrainingsApp() {
             style={{ ...s.input, flex:'none' }} />
           <input type="password" placeholder="Passwort (min. 6 Zeichen)" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} required
             style={{ ...s.input, flex:'none' }} />
-          {authMode==='register' && (
-            <input placeholder="Einladungscode" value={inviteCode} onChange={e=>setInviteCode(e.target.value)} required
-              style={{ ...s.input, flex:'none', borderColor:'#358941', borderWidth:'2px' }} />
-          )}
           <button type="submit" style={{ padding:'12px', background:'#358941', color:'white', border:'none', borderRadius:'8px', fontSize:'16px', fontWeight:'600', cursor:'pointer' }}>
             {authMode==='login'?'Anmelden':'Registrieren'}
           </button>
@@ -323,7 +311,7 @@ export default function TrainingsApp() {
 
         {authMode==='register' && (
           <div style={{ marginTop:'16px', padding:'12px', background:'#f0fdf4', borderRadius:'8px', fontSize:'13px', color:'#358941' }}>
-            Du benötigst einen Einladungscode vom Trainer oder Admin.
+            Nach der Registrierung wird dein Account von einem Admin freigeschaltet.
           </div>
         )}
       </div>
@@ -357,7 +345,30 @@ export default function TrainingsApp() {
     );
   };
 
-  // ── ELTERN / JUGENDLICHE VIEW ────────────────────────────────
+  // ── WARTESCREEN ──────────────────────────────────────────────
+  if (user && userRole === 'pending') return (
+    <div style={{ ...s.page, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }}>
+      <div style={{ background:'white', borderRadius:'16px', padding:'40px', maxWidth:'420px', width:'100%', boxShadow:'0 10px 40px rgba(0,0,0,0.2)', textAlign:'center' }}>
+        <div style={{ fontSize:'48px', marginBottom:'16px' }}>⏳</div>
+        <h2 style={{ margin:'0 0 12px', color:'#333' }}>Account wird freigeschaltet</h2>
+        <p style={{ margin:'0 0 24px', color:'#666', fontSize:'15px' }}>
+          Hallo <strong>{userProfile?.name}</strong>! Dein Account wurde erfolgreich erstellt.<br/><br/>
+          Ein Admin muss dir noch die richtige Rolle zuweisen. Das dauert meist nur kurz!
+        </p>
+        <div style={{ padding:'16px', background:'#f0fdf4', borderRadius:'8px', marginBottom:'24px', fontSize:'13px', color:'#358941' }}>
+          Sobald dein Account freigeschaltet ist, lade die Seite neu.
+        </div>
+        <div style={{ display:'flex', gap:'12px', justifyContent:'center' }}>
+          <button onClick={()=>window.location.reload()} style={s.btn('#358941')}>
+            🔄 Neu laden
+          </button>
+          <button onClick={()=>signOut(auth)} style={s.btn('#ef4444')}>
+            <LogOut size={16}/> Abmelden
+          </button>
+        </div>
+      </div>
+    </div>
+  );
   if (['eltern','jugendlich'].includes(userRole)) {
     const myChild = getMyChild();
     const sub = myChild ? subgroups[myChild.subgroupId] : null;
@@ -474,8 +485,21 @@ export default function TrainingsApp() {
         {/* Nutzerverwaltung */}
         <div style={s.card}>
           <h2 style={{ margin:'0 0 16px', color:'#7c3aed', display:'flex', alignItems:'center', gap:'8px' }}><Users size={20}/> Nutzerverwaltung</h2>
-          <div style={{ display:'grid', gap:'10px' }}>
-            {Object.values(allUsers).sort((a,b)=>a.name?.localeCompare(b.name||'')).map(u => {
+        {/* Wartende Nutzer oben hervorheben */}
+        {Object.values(allUsers).some(u => u.role === 'pending') && (
+          <div style={{ marginBottom:'16px', padding:'12px', background:'#fee2e2', borderRadius:'8px', border:'1px solid #fca5a5' }}>
+            <p style={{ margin:0, fontWeight:'600', color:'#dc2626', fontSize:'14px' }}>
+              ⚠️ {Object.values(allUsers).filter(u=>u.role==='pending').length} Nutzer warten auf Freischaltung!
+            </p>
+          </div>
+        )}
+        <div style={{ display:'grid', gap:'10px' }}>
+            {Object.values(allUsers).sort((a,b) => {
+              // Wartende zuerst anzeigen
+              if (a.role==='pending' && b.role!=='pending') return -1;
+              if (a.role!=='pending' && b.role==='pending') return 1;
+              return (a.name||'').localeCompare(b.name||'');
+            }).map(u => {
               const roleCfg = ROLE_CONFIG[u.role] || {};
               const linkedChild = u.linkedChildId ? children[u.linkedChildId] : null;
               return (
