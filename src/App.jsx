@@ -66,6 +66,7 @@ export default function TrainingsApp() {
   const [editingSession, setEditingSession]     = useState(null); // session being edited
   const [editForm, setEditForm]                 = useState({});
   const [deleteDialog, setDeleteDialog]         = useState(null);
+  const [archiveWarning, setArchiveWarning]     = useState(null); // {sessionId, missingKids:[]}
   const [resetDialog, setResetDialog]           = useState(false);
   const [resetPassword, setResetPassword]       = useState('');
   const [resetError, setResetError]             = useState('');
@@ -135,7 +136,30 @@ export default function TrainingsApp() {
 
   const getAllUpcomingSessions = () => {
     const today = new Date().toISOString().split('T')[0];
-    return Object.values(sessions).filter(s=>s.date>=today).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+    return Object.values(sessions).filter(s=>s.date>=today && !s.archived).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+  };
+
+  // Vergangene, noch nicht abgeschlossene Einheiten
+  const getUnclosedPastSessions = () => {
+    const today = new Date().toISOString().split('T')[0];
+    return Object.values(sessions)
+      .filter(s => s.date < today && !s.archived)
+      .sort((a,b) => b.date.localeCompare(a.date));
+  };
+
+  // Einheit abschließen
+  const archiveSession = (sessionId, force=false) => {
+    const session = sessions[sessionId];
+    const sessionSubs = (session?.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean);
+    const allKids = sessionSubs.flatMap(sub => getChildrenForSubgroup(sub.id));
+    const missing = allKids.filter(c => !(children[c.id]?.attendance||{})[session.date]);
+
+    if (missing.length > 0 && !force) {
+      return missing; // Gibt fehlende Kinder zurück
+    }
+    // Archivieren
+    saveSessions({ ...sessions, [sessionId]: { ...session, archived: true } });
+    return [];
   };
 
   // Prüfen ob Eltern/Jugendliche das Kind für ein Datum abgemeldet/angemeldet haben
@@ -385,7 +409,8 @@ export default function TrainingsApp() {
     <div style={{...s.page(activeGroup?.color),display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
       <div style={{background:'white',borderRadius:'16px',padding:'40px',maxWidth:'420px',width:'100%',boxShadow:'0 10px 40px rgba(0,0,0,0.2)'}}>
         <h1 style={{margin:'0 0 4px',color:'#358941',fontSize:'28px',textAlign:'center'}}>TTC Grün-Weiß Staffel</h1>
-        <p style={{margin:'0 0 28px',color:'#666',textAlign:'center'}}>Vereinsapp</p>
+        <p style={{margin:'0 0 4px',color:'#666',textAlign:'center'}}>Vereinsapp</p>
+        <p style={{margin:'0 0 28px',color:'#bbb',textAlign:'center',fontSize:'11px'}}>v0.4.1</p>
         {error&&<p style={{color:'red',marginBottom:'16px',fontSize:'13px',textAlign:'center'}}>{error}</p>}
         <div style={{display:'flex',marginBottom:'20px',borderRadius:'8px',overflow:'hidden',border:'1px solid #ddd'}}>
           {['login','register'].map(m=>(
@@ -887,8 +912,45 @@ export default function TrainingsApp() {
   if (view==='home') return (
     <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
       <Header/>
+      {/* Nicht abgeschlossene vergangene Einheiten */}
       {(()=>{
-        const today=new Date(), in6=new Date(); in6.setDate(today.getDate()+6);
+        const unclosed = getUnclosedPastSessions();
+        if (!unclosed.length || !canEdit()) return null;
+        return (
+          <div style={{...s.card,border:'2px solid #fca5a5',background:'#fff5f5'}}>
+            <h3 style={{margin:'0 0 12px',color:'#dc2626',display:'flex',alignItems:'center',gap:'8px'}}>
+              ⚠️ Nicht abgeschlossene Trainings ({unclosed.length})
+            </h3>
+            <div style={{display:'grid',gap:'8px'}}>
+              {unclosed.map(session=>{
+                const sessionSubs=(session.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean);
+                return (
+                  <div key={session.id}
+                    onClick={()=>{ setActiveSession(session); setView('sessionAttendance'); }}
+                    style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'white',borderRadius:'8px',border:'1px solid #fca5a5',cursor:'pointer'}}
+                    onMouseEnter={e=>e.currentTarget.style.background='#fff5f5'}
+                    onMouseLeave={e=>e.currentTarget.style.background='white'}>
+                    <div>
+                      <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'3px'}}>
+                        {sessionSubs.map(sub=>{
+                          const grp=FIXED_GROUPS.find(g=>g.id===sub.groupId);
+                          return <span key={sub.id} style={{fontSize:'12px',fontWeight:'700',color:grp?.color}}>{grp?.emoji} {sub.name}</span>;
+                        })}
+                      </div>
+                      <span style={{fontSize:'13px',color:'#555'}}>
+                        {new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'})} · {session.time} Uhr
+                      </span>
+                    </div>
+                    <ChevronRight size={16} color="#dc2626"/>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Heute & nächste 6 Tage */}
         const todayStr=today.toISOString().split('T')[0], in6Str=in6.toISOString().split('T')[0];
         const week=getAllUpcomingSessions().filter(s=>s.date>=todayStr&&s.date<=in6Str);
         if (!week.length) return null;
@@ -1088,6 +1150,7 @@ export default function TrainingsApp() {
     const sessionSubs = (session?.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean);
     const allKids = sessionSubs.flatMap(sub => getChildrenForSubgroup(sub.id));
     const sessionDate = session?.date;
+    const isArchived = session?.archived;
 
     const setSessionStatus = (childId, subgroupId, status) => {
       ensureTrainingDate(subgroupId, sessionDate);
@@ -1099,19 +1162,67 @@ export default function TrainingsApp() {
       saveChildren({ ...children, [childId]: { ...child, attendance: att } });
     };
 
+    const handleArchive = () => {
+      const missing = archiveSession(session.id, false);
+      if (missing.length > 0) {
+        setArchiveWarning({ sessionId: session.id, missingKids: missing });
+      } else {
+        setView('home');
+      }
+    };
+
     const presentCount = allKids.filter(c=>(children[c.id]?.attendance||{})[sessionDate]==='present').length;
     const absentCount = allKids.filter(c=>(children[c.id]?.attendance||{})[sessionDate]==='absent_unexcused').length;
     const excusedCount = allKids.filter(c=>(children[c.id]?.attendance||{})[sessionDate]==='absent_excused').length;
+    const notRecorded = allKids.filter(c=>!(children[c.id]?.attendance||{})[sessionDate]).length;
 
     return (
       <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
         <Header back backLabel="Startseite" backAction={()=>setView('home')}/>
+
+        {/* Archiv-Warnung Modal */}
+        {archiveWarning&&(
+          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px'}}>
+            <div style={{background:'white',borderRadius:'16px',padding:'28px',maxWidth:'400px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
+              <h3 style={{margin:'0 0 8px',color:'#d97706',fontSize:'18px'}}>⚠️ Anwesenheit nicht vollständig</h3>
+              <p style={{margin:'0 0 12px',color:'#666',fontSize:'14px'}}>Bei folgenden Kindern wurde noch keine Anwesenheit erfasst:</p>
+              <div style={{marginBottom:'16px',padding:'12px',background:'#fef3c7',borderRadius:'8px'}}>
+                {archiveWarning.missingKids.map(c=>(
+                  <p key={c.id} style={{margin:'2px 0',fontSize:'14px',color:'#333'}}>• {c.name}</p>
+                ))}
+              </div>
+              <p style={{margin:'0 0 16px',color:'#666',fontSize:'13px'}}>Trotzdem abschließen?</p>
+              <div style={{display:'grid',gap:'8px'}}>
+                <button onClick={()=>{ archiveSession(archiveWarning.sessionId, true); setArchiveWarning(null); setView('home'); }}
+                  style={{padding:'12px',background:'#d97706',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
+                  Trotzdem abschließen
+                </button>
+                <button onClick={()=>setArchiveWarning(null)}
+                  style={{padding:'12px',background:'#f3f4f6',color:'#333',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
+                  Zurück & vervollständigen
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div style={s.card}>
           {/* Session Info */}
-          <div style={{marginBottom:'20px'}}>
-            <h2 style={{margin:'0 0 8px',color:'#0369a1',fontSize:'22px'}}>
-              {new Date(sessionDate+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})} · {session?.time} Uhr
-            </h2>
+          <div style={{marginBottom:'16px'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'8px',marginBottom:'8px'}}>
+              <h2 style={{margin:0,color:'#0369a1',fontSize:'20px'}}>
+                {new Date(sessionDate+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})} · {session?.time} Uhr
+              </h2>
+              {isArchived
+                ? <span style={{fontSize:'13px',fontWeight:'700',color:'#16a34a',background:'#dcfce7',padding:'4px 12px',borderRadius:'20px',border:'1px solid #16a34a'}}>✓ Abgeschlossen</span>
+                : canEdit()&&(
+                  <button onClick={handleArchive}
+                    style={{...s.btn('#358941'),gap:'6px'}}>
+                    ✓ Training abschließen
+                  </button>
+                )
+              }
+            </div>
             <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'6px'}}>
               {sessionSubs.map(sub=>{
                 const grp=FIXED_GROUPS.find(g=>g.id===sub.groupId);
@@ -1122,7 +1233,22 @@ export default function TrainingsApp() {
             {session?.info&&<div style={{display:'flex',gap:'6px',marginTop:'8px',padding:'8px',background:'#f0f9ff',borderRadius:'6px'}}><Info size={14} color="#0369a1" style={{flexShrink:0,marginTop:'2px'}}/><p style={{margin:0,fontSize:'13px',color:'#0369a1'}}>{session.info}</p></div>}
           </div>
 
-          {/* Schnell-Statistik */}
+          {/* Fortschrittsbalken Erfassung */}
+          {!isArchived&&allKids.length>0&&(
+            <div style={{marginBottom:'16px'}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:'4px'}}>
+                <span style={{fontSize:'13px',color:'#555'}}>Erfassung</span>
+                <span style={{fontSize:'13px',fontWeight:'600',color:notRecorded===0?'#16a34a':'#d97706'}}>
+                  {allKids.length-notRecorded}/{allKids.length} erfasst {notRecorded>0&&`· ${notRecorded} fehlen noch`}
+                </span>
+              </div>
+              <div style={{background:'#f3f4f6',borderRadius:'99px',height:'8px',overflow:'hidden'}}>
+                <div style={{width:`${((allKids.length-notRecorded)/allKids.length)*100}%`,height:'100%',background:notRecorded===0?'#16a34a':'#d97706',borderRadius:'99px',transition:'width 0.3s'}}/>
+              </div>
+            </div>
+          )}
+
+          {/* Statistik */}
           <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'10px',marginBottom:'20px'}}>
             <div style={{background:'#dcfce7',borderRadius:'8px',padding:'12px',textAlign:'center'}}>
               <p style={{margin:0,fontSize:'28px',fontWeight:'700',color:'#16a34a'}}>{presentCount}</p>
@@ -1138,7 +1264,7 @@ export default function TrainingsApp() {
             </div>
           </div>
 
-          {/* Kinderliste mit Anwesenheits-Buttons */}
+          {/* Kinderliste */}
           <div style={{display:'grid',gap:'10px'}}>
             {allKids.length===0
               ? <p style={{color:'#999',textAlign:'center',padding:'30px'}}>Keine Kinder in den zugewiesenen Gruppen.</p>
@@ -1153,20 +1279,19 @@ export default function TrainingsApp() {
                 return (
                   <div key={child.id} style={{
                     padding:'14px', borderRadius:'10px',
-                    border: parentExcused&&!status?'2px solid #d97706': parentComing&&!status?'2px solid #16a34a':'1px solid #ddd',
-                    background: status==='present'?'#f0fdf4': status==='absent_unexcused'?'#f9fafb': status==='absent_excused'?'#fffbeb':'white'
+                    border: !status?'2px solid #fbbf24': parentExcused?'2px solid #d97706': parentComing?'2px solid #16a34a':'1px solid #ddd',
+                    background: status==='present'?'#f0fdf4': status==='absent_unexcused'?'#f9fafb': status==='absent_excused'?'#fffbeb':'#fffbeb'
                   }}>
                     <div style={{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
                       <div style={{flex:1,minWidth:'120px'}}>
                         <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
                           <p style={{margin:0,fontWeight:'600',color:'#333',fontSize:'16px'}}>{child.name}</p>
+                          {!status&&<span style={{fontSize:'11px',fontWeight:'600',color:'#d97706',background:'#fef3c7',padding:'2px 8px',borderRadius:'20px'}}>Noch nicht erfasst</span>}
                           {parentExcused&&<span style={{fontSize:'11px',fontWeight:'600',color:'#d97706',background:'#fef3c7',padding:'2px 8px',borderRadius:'20px',border:'1px solid #d97706'}}>Eltern abgemeldet</span>}
                           {parentComing&&<span style={{fontSize:'11px',fontWeight:'600',color:'#16a34a',background:'#dcfce7',padding:'2px 8px',borderRadius:'20px',border:'1px solid #16a34a'}}>Eltern angemeldet</span>}
                         </div>
                         {sub&&<p style={{margin:'2px 0 0',fontSize:'11px',color:'#999'}}>{sub.name}</p>}
                       </div>
-
-                      {/* 3 Anwesenheits-Buttons */}
                       <div style={{display:'flex',gap:'8px'}}>
                         <button onClick={()=>setSessionStatus(child.id, child.subgroupId, 'present')}
                           style={{width:'50px',height:'50px',border:'2px solid #16a34a',background:status==='present'?'#16a34a':'white',color:status==='present'?'white':'#16a34a',borderRadius:'10px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -1188,7 +1313,6 @@ export default function TrainingsApp() {
             }
           </div>
 
-          {/* Legende */}
           <div style={{marginTop:'20px',paddingTop:'16px',borderTop:'1px solid #eee',display:'flex',gap:'16px',flexWrap:'wrap'}}>
             <span style={{fontSize:'13px',color:'#16a34a'}}>✓ Anwesend</span>
             <span style={{fontSize:'13px',color:'#6b7280'}}>– Fehlt unentschuldigt</span>
