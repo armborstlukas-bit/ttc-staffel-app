@@ -234,7 +234,15 @@ export default function TrainingsApp() {
     setAllUsers(updated);
   };
 
-  // ── Anwesenheit ──────────────────────────────────────────────
+  // Prüfen ob Eltern das Kind für ein bestimmtes Datum abgemeldet haben
+  const isExcusedByParent = (childId, date) => {
+    return Object.values(sessions).some(session =>
+      session.date === date &&
+      (session.responses||{})[childId] === 'missing'
+    );
+  };
+
+  // Anwesenheit setzen
   const ensureTrainingDate = (sid, date) => {
     const sub = subgroups[sid];
     if (!sub) return;
@@ -527,9 +535,9 @@ export default function TrainingsApp() {
             {/* Kommende Trainingseinheiten */}
             {mySessions.length>0&&(
               <div style={s.card}>
-                <h3 style={{margin:'0 0 16px',color:'#0369a1',display:'flex',alignItems:'center',gap:'8px'}}><Calendar size={18}/> Kommende Trainings</h3>
+                <h3 style={{margin:'0 0 16px',color:'#0369a1',display:'flex',alignItems:'center',gap:'8px'}}><Calendar size={18}/> Kommende 10 Trainings</h3>
                 <div style={{display:'grid',gap:'10px'}}>
-                  {mySessions.map(session=>{
+                  {mySessions.slice(0,10).map(session=>{
                     const childId=myChild.id;
                     const myResponse=(session.responses||{})[childId];
                     return (
@@ -664,29 +672,49 @@ export default function TrainingsApp() {
     <div style={s.page}><div style={s.wrap}>
       <Header/>
 
-      {/* Nächste Trainings Vorschau */}
-      {getAllUpcomingSessions().slice(0,3).length>0&&(
-        <div style={s.card}>
-          <h3 style={{margin:'0 0 12px',color:'#0369a1',display:'flex',alignItems:'center',gap:'8px'}}><Calendar size={16}/> Nächste Trainings</h3>
-          <div style={{display:'grid',gap:'8px'}}>
-            {getAllUpcomingSessions().slice(0,3).map(session=>{
-              const grp=FIXED_GROUPS.find(g=>g.id===session.groupId);
-              return (
-                <div key={session.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'#f0f9ff',borderRadius:'8px',border:'1px solid #bae6fd'}}>
-                  <div>
-                    <span style={{fontWeight:'600',color:grp?.color}}>{grp?.emoji} {grp?.name}</span>
-                    <span style={{fontSize:'13px',color:'#666',marginLeft:'10px'}}>
-                      {new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})} · {session.time} Uhr
-                    </span>
-                    {session.trainer&&<span style={{fontSize:'12px',color:'#999',marginLeft:'8px'}}>· {session.trainer}</span>}
+      {/* Trainings der nächsten 7 Tage */}
+      {(()=>{
+        const today = new Date();
+        const in6days = new Date(); in6days.setDate(today.getDate()+6);
+        const todayStr = today.toISOString().split('T')[0];
+        const in6Str = in6days.toISOString().split('T')[0];
+        const week = getAllUpcomingSessions().filter(s=>s.date>=todayStr && s.date<=in6Str);
+        if (week.length===0) return null;
+        return (
+          <div style={s.card}>
+            <h3 style={{margin:'0 0 12px',color:'#0369a1',display:'flex',alignItems:'center',gap:'8px'}}><Calendar size={16}/> Trainings heute & nächste 6 Tage</h3>
+            <div style={{display:'grid',gap:'8px'}}>
+              {week.map(session=>{
+                const grp=FIXED_GROUPS.find(g=>g.id===session.groupId);
+                return (
+                  <div key={session.id}
+                    onClick={()=>{
+                      setTrainingDate(session.date);
+                      const grpObj=FIXED_GROUPS.find(g=>g.id===session.groupId);
+                      setActiveGroup(grpObj);
+                      setView('group');
+                    }}
+                    style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'#f0f9ff',borderRadius:'8px',border:'1px solid #bae6fd',cursor:'pointer'}}
+                    onMouseEnter={e=>e.currentTarget.style.background='#e0f2fe'}
+                    onMouseLeave={e=>e.currentTarget.style.background='#f0f9ff'}>
+                    <div>
+                      <span style={{fontWeight:'600',color:grp?.color}}>{grp?.emoji} {grp?.name}</span>
+                      <span style={{fontSize:'13px',color:'#555',marginLeft:'10px'}}>
+                        {new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})} · {session.time} Uhr
+                      </span>
+                      {session.trainer&&<span style={{fontSize:'12px',color:'#999',marginLeft:'8px'}}>· {session.trainer}</span>}
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                      {session.info&&<Info size={16} color="#0369a1"/>}
+                      <ChevronRight size={16} color="#0369a1"/>
+                    </div>
                   </div>
-                  {session.info&&<Info size={16} color="#0369a1"/>}
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       <div style={{display:'grid',gap:'14px'}}>
         {FIXED_GROUPS.map(group=>{
@@ -700,7 +728,7 @@ export default function TrainingsApp() {
               onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
               <div>
                 <h2 style={{margin:'0 0 6px',color:group.color,fontSize:'22px'}}>{group.emoji} {group.name}</h2>
-                <p style={{margin:0,color:'#666',fontSize:'13px'}}>{subs.length} Gruppen · {totalKids} Kinder · {upcoming} geplante Trainings</p>
+                <p style={{margin:0,color:'#666',fontSize:'13px'}}>{subs.length} Gruppen · {totalKids} Kinder</p>
               </div>
               <ChevronDown size={24} color="#999" style={{transform:'rotate(-90deg)'}}/>
             </div>
@@ -824,27 +852,33 @@ export default function TrainingsApp() {
               ? <p style={{color:'#999',textAlign:'center',padding:'30px'}}>Noch keine Kinder.</p>
               : kids.map(child=>{
                 const todayStatus=(child.attendance||{})[trainingDate];
+                // Wenn Eltern abgemeldet haben und noch kein Status gesetzt → als entschuldigt anzeigen
+                const parentExcused = !todayStatus && isExcusedByParent(child.id, trainingDate);
+                const displayStatus = todayStatus || (parentExcused ? 'absent_excused' : null);
                 const stats=getAttendanceStats(child.id,sub.id);
                 return (
-                  <div key={child.id} style={{padding:'14px',borderRadius:'10px',border:'1px solid #ddd',
-                    background:todayStatus==='present'?'#f0fdf4':todayStatus==='absent_unexcused'?'#f9fafb':todayStatus==='absent_excused'?'#fffbeb':'white'}}>
+                  <div key={child.id} style={{padding:'14px',borderRadius:'10px',border: parentExcused&&!todayStatus ? '2px solid #d97706' : '1px solid #ddd',
+                    background:displayStatus==='present'?'#f0fdf4':displayStatus==='absent_unexcused'?'#f9fafb':displayStatus==='absent_excused'?'#fffbeb':'white'}}>
                     <div style={{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
                       <div style={{flex:1,minWidth:'120px'}}>
                         <p style={{margin:'0 0 2px',fontWeight:'600',color:'#333',fontSize:'16px'}}>{child.name}</p>
-                        <p style={{margin:0,fontSize:'12px',color:'#999'}}>{stats.total} Trainings · {stats.present}x da · {stats.percent}%</p>
+                        <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+                          <p style={{margin:0,fontSize:'12px',color:'#999'}}>{stats.total} Trainings · {stats.present}x da · {stats.percent}%</p>
+                          {parentExcused&&!todayStatus&&<span style={{fontSize:'11px',fontWeight:'600',color:'#d97706',background:'#fef3c7',padding:'1px 6px',borderRadius:'10px'}}>Eltern abgemeldet</span>}
+                        </div>
                       </div>
                       {canEdit()&&(
                         <div style={{display:'flex',gap:'6px'}}>
                           <button onClick={()=>setStatus(child.id,'present')}
-                            style={{width:'44px',height:'44px',border:'2px solid #16a34a',background:todayStatus==='present'?'#16a34a':'white',color:todayStatus==='present'?'white':'#16a34a',borderRadius:'8px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                            style={{width:'44px',height:'44px',border:'2px solid #16a34a',background:displayStatus==='present'?'#16a34a':'white',color:displayStatus==='present'?'white':'#16a34a',borderRadius:'8px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
                             <Check size={22}/>
                           </button>
                           <button onClick={()=>setStatus(child.id,'absent_unexcused')}
-                            style={{width:'44px',height:'44px',border:'2px solid #9ca3af',background:todayStatus==='absent_unexcused'?'#6b7280':'white',color:todayStatus==='absent_unexcused'?'white':'#6b7280',borderRadius:'8px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'22px',fontWeight:'700'}}>
+                            style={{width:'44px',height:'44px',border:'2px solid #9ca3af',background:displayStatus==='absent_unexcused'?'#6b7280':'white',color:displayStatus==='absent_unexcused'?'white':'#6b7280',borderRadius:'8px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'22px',fontWeight:'700'}}>
                             –
                           </button>
                           <button onClick={()=>setStatus(child.id,'absent_excused')}
-                            style={{width:'44px',height:'44px',border:'2px solid #d97706',background:todayStatus==='absent_excused'?'#d97706':'white',color:todayStatus==='absent_excused'?'white':'#d97706',borderRadius:'8px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                            style={{width:'44px',height:'44px',border:'2px solid #d97706',background:displayStatus==='absent_excused'?'#d97706':'white',color:displayStatus==='absent_excused'?'white':'#d97706',borderRadius:'8px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
                             <Clock size={20}/>
                           </button>
                         </div>
