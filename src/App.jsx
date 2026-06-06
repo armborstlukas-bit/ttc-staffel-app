@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
-import { Check, X, Plus, Trash2, Download, ChevronDown, LogOut, ArrowLeft, Clock, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save } from 'lucide-react';
+import { Check, X, Plus, Trash2, Download, ChevronDown, LogOut, ArrowLeft, Clock, BarChart2, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save, Trophy } from 'lucide-react';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCrx34HEgaHnRE187Cja4JNAtbexvrA6Vg",
@@ -42,6 +42,8 @@ const WEEKDAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag
 
 const emptySession = { subgroupIds: [], date: new Date().toISOString().split('T')[0], time: '17:00', trainer: '', info: '', repeat: false, repeatWeeks: 8 };
 
+const emptyTournament = { name: '', date: new Date().toISOString().split('T')[0], time: '10:00', participantIds: [], departureTimes: {} };
+
 export default function TrainingsApp() {
   const [user, setUser]               = useState(null);
   const [userRole, setUserRole]       = useState(null);
@@ -51,6 +53,7 @@ export default function TrainingsApp() {
   const [children, setChildren]       = useState({});
   const [allUsers, setAllUsers]       = useState({});
   const [sessions, setSessions]       = useState({});
+  const [tournaments, setTournaments] = useState({});
 
   const [view, setView]                     = useState('home');
   const [activeGroup, setActiveGroup]       = useState(null);
@@ -66,7 +69,6 @@ export default function TrainingsApp() {
   const [editingSession, setEditingSession]     = useState(null); // session being edited
   const [editForm, setEditForm]                 = useState({});
   const [deleteDialog, setDeleteDialog]         = useState(null);
-  const [archiveWarning, setArchiveWarning]     = useState(null); // {sessionId, missingKids:[]}
   const [resetDialog, setResetDialog]           = useState(false);
   const [resetPassword, setResetPassword]       = useState('');
   const [resetError, setResetError]             = useState('');
@@ -76,6 +78,10 @@ export default function TrainingsApp() {
   const [pwConfirm, setPwConfirm]               = useState('');
   const [pwError, setPwError]                   = useState('');
   const [pwSuccess, setPwSuccess]               = useState(false); // {sessionId, repeatId, blockSize}
+
+  const [newTournament, setNewTournament]         = useState(emptyTournament);
+  const [editingTournament, setEditingTournament] = useState(null);
+  const [editTournForm, setEditTournForm]         = useState({});
 
   const [authMode, setAuthMode]           = useState('login');
   const [loginEmail, setLoginEmail]       = useState('');
@@ -98,18 +104,20 @@ export default function TrainingsApp() {
   useEffect(() => {
     if (!user || !userRole) return;
     const unsubs = [
-      onSnapshot(doc(db,'ttc','subgroups'), s => setSubgroups(s.exists()?s.data():{})),
-      onSnapshot(doc(db,'ttc','children'),  s => setChildren(s.exists()?s.data():{})),
+      onSnapshot(doc(db,'ttc','subgroups'),   s => setSubgroups(s.exists()?s.data():{})),
+      onSnapshot(doc(db,'ttc','children'),    s => setChildren(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','sessions'),    s => setSessions(s.exists()?s.data():{})),
+      onSnapshot(doc(db,'ttc','tournaments'), s => setTournaments(s.exists()?s.data():{})),
     ];
     if (userRole==='admin')
       unsubs.push(onSnapshot(doc(db,'ttc','users'), s => setAllUsers(s.exists()?s.data():{})));
     return () => unsubs.forEach(u=>u());
   }, [user, userRole]);
 
-  const saveSubgroups = u => { setSubgroups(u); setDoc(doc(db,'ttc','subgroups'),u); };
-  const saveChildren  = u => { setChildren(u);  setDoc(doc(db,'ttc','children'), u); };
-  const saveSessions   = u => { setSessions(u);    setDoc(doc(db,'ttc','sessions'),    u); };
+  const saveSubgroups  = u => { setSubgroups(u);  setDoc(doc(db,'ttc','subgroups'),  u); };
+  const saveChildren   = u => { setChildren(u);   setDoc(doc(db,'ttc','children'),   u); };
+  const saveSessions   = u => { setSessions(u);   setDoc(doc(db,'ttc','sessions'),   u); };
+  const saveTournaments= u => { setTournaments(u);setDoc(doc(db,'ttc','tournaments'),u); };
 
   const canEdit = () => ['admin','trainer'].includes(userRole);
   const getSubgroupsForGroup = gid => Object.values(subgroups).filter(s=>s.groupId===gid);
@@ -136,30 +144,7 @@ export default function TrainingsApp() {
 
   const getAllUpcomingSessions = () => {
     const today = new Date().toISOString().split('T')[0];
-    return Object.values(sessions).filter(s=>s.date>=today && !s.archived).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
-  };
-
-  // Vergangene, noch nicht abgeschlossene Einheiten
-  const getUnclosedPastSessions = () => {
-    const today = new Date().toISOString().split('T')[0];
-    return Object.values(sessions)
-      .filter(s => s.date < today && !s.archived)
-      .sort((a,b) => b.date.localeCompare(a.date));
-  };
-
-  // Einheit abschließen
-  const archiveSession = (sessionId, force=false) => {
-    const session = sessions[sessionId];
-    const sessionSubs = (session?.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean);
-    const allKids = sessionSubs.flatMap(sub => getChildrenForSubgroup(sub.id));
-    const missing = allKids.filter(c => !(children[c.id]?.attendance||{})[session.date]);
-
-    if (missing.length > 0 && !force) {
-      return missing; // Gibt fehlende Kinder zurück
-    }
-    // Archivieren
-    saveSessions({ ...sessions, [sessionId]: { ...session, archived: true } });
-    return [];
+    return Object.values(sessions).filter(s=>s.date>=today).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
   };
 
   // Prüfen ob Eltern/Jugendliche das Kind für ein Datum abgemeldet/angemeldet haben
@@ -330,6 +315,47 @@ export default function TrainingsApp() {
     }
   };
 
+  const createTournament = () => {
+    const { name, date, time, participantIds, departureTimes } = newTournament;
+    if (!name.trim() || !date || !time) { alert('Bitte Name, Datum und Uhrzeit angeben!'); return; }
+    const id = 'tournament_' + Date.now();
+    saveTournaments({ ...tournaments, [id]: { id, name, date, time, participantIds, departureTimes, responses: {} } });
+    setNewTournament(emptyTournament);
+  };
+
+  const deleteTournament = (id) => {
+    if (!window.confirm('Turnier löschen?')) return;
+    const u = { ...tournaments }; delete u[id]; saveTournaments(u);
+  };
+
+  const saveTournamentEdit = () => {
+    saveTournaments({ ...tournaments, [editTournForm.id]: { ...editTournForm } });
+    setEditingTournament(null);
+  };
+
+  const respondToTournament = (tournamentId, response) => {
+    const myChild = getMyChild();
+    const childId = myChild?.id || user?.uid;
+    const t = tournaments[tournamentId];
+    if (!t) return;
+    const cur = (t.responses||{})[childId];
+    saveTournaments({ ...tournaments, [tournamentId]: { ...t, responses: { ...(t.responses||{}), [childId]: cur===response?null:response } } });
+  };
+
+  const getUpcomingTournaments = () => {
+    const today = new Date().toISOString().split('T')[0];
+    return Object.values(tournaments).filter(t => t.date >= today).sort((a,b) => a.date.localeCompare(b.date));
+  };
+
+  const getMyUpcomingTournaments = () => {
+    const myChild = getMyChild();
+    if (!myChild) return [];
+    const today = new Date().toISOString().split('T')[0];
+    return Object.values(tournaments)
+      .filter(t => t.date >= today && (t.participantIds||[]).includes(myChild.id))
+      .sort((a,b) => a.date.localeCompare(b.date));
+  };
+
   const changeUserRole = async (uid, newRole) => {
     const updated={...allUsers,[uid]:{...allUsers[uid],role:newRole}};
     await setDoc(doc(db,'ttc','users'),updated);
@@ -409,8 +435,7 @@ export default function TrainingsApp() {
     <div style={{...s.page(activeGroup?.color),display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
       <div style={{background:'white',borderRadius:'16px',padding:'40px',maxWidth:'420px',width:'100%',boxShadow:'0 10px 40px rgba(0,0,0,0.2)'}}>
         <h1 style={{margin:'0 0 4px',color:'#358941',fontSize:'28px',textAlign:'center'}}>TTC Grün-Weiß Staffel</h1>
-        <p style={{margin:'0 0 4px',color:'#666',textAlign:'center'}}>Vereinsapp</p>
-        <p style={{margin:'0 0 28px',color:'#bbb',textAlign:'center',fontSize:'11px'}}>v0.4.1</p>
+        <p style={{margin:'0 0 28px',color:'#666',textAlign:'center'}}>Vereinsapp</p>
         {error&&<p style={{color:'red',marginBottom:'16px',fontSize:'13px',textAlign:'center'}}>{error}</p>}
         <div style={{display:'flex',marginBottom:'20px',borderRadius:'8px',overflow:'hidden',border:'1px solid #ddd'}}>
           {['login','register'].map(m=>(
@@ -494,9 +519,10 @@ export default function TrainingsApp() {
               </div>
             </div>
           </div>
-          <div style={{display:'flex',gap:'8px'}}>
+          <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
             {userRole==='admin'&&<button onClick={()=>setView('admin')} style={s.btn('#7c3aed')}><Shield size={16}/> Admin</button>}
             {canEdit()&&<button onClick={()=>setView('trainingsplan')} style={s.btn('#0369a1')}><Calendar size={16}/> Trainingsplan</button>}
+            {canEdit()&&<button onClick={()=>setView('turniere')} style={s.btn('#b45309')}><Trophy size={16}/> Turniere</button>}
             <button onClick={()=>signOut(auth)} style={s.btn('#ef4444')}><LogOut size={16}/></button>
           </div>
         </div>
@@ -705,6 +731,211 @@ export default function TrainingsApp() {
     );
   }
 
+  // ── TURNIERWELT ──────────────────────────────────────────────
+  if (view==='turniere') {
+    const upcoming = getUpcomingTournaments();
+    const allChildrenSorted = Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+
+    const toggleParticipant = (childId, form, setForm) => {
+      const ids = form.participantIds||[];
+      const next = ids.includes(childId) ? ids.filter(i=>i!==childId) : [...ids, childId];
+      const dep = { ...form.departureTimes };
+      if (!next.includes(childId)) delete dep[childId];
+      setForm({ ...form, participantIds: next, departureTimes: dep });
+    };
+
+    const setDeparture = (childId, time, form, setForm) => {
+      setForm({ ...form, departureTimes: { ...form.departureTimes, [childId]: time } });
+    };
+
+    return (
+      <div style={s.page()}><div style={s.wrap}>
+        <Header back backLabel="Startseite" backAction={()=>setView('home')}/>
+
+        {/* Neues Turnier */}
+        <div style={s.card}>
+          <h2 style={{margin:'0 0 20px',color:'#b45309',display:'flex',alignItems:'center',gap:'8px'}}><Trophy size={20}/> Neues Turnier anlegen</h2>
+
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',marginBottom:'12px'}}>
+            <div style={{gridColumn:'1/-1'}}>
+              <label style={s.label}>Turnierbezeichnung</label>
+              <input style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} placeholder="z.B. Kreismeisterschaft" value={newTournament.name} onChange={e=>setNewTournament({...newTournament,name:e.target.value})}/>
+            </div>
+            <div>
+              <label style={s.label}>Datum</label>
+              <input type="date" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={newTournament.date} onChange={e=>setNewTournament({...newTournament,date:e.target.value})}/>
+            </div>
+            <div>
+              <label style={s.label}>Turnierzeit</label>
+              <input type="time" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={newTournament.time} onChange={e=>setNewTournament({...newTournament,time:e.target.value})}/>
+            </div>
+          </div>
+
+          {/* Teilnehmer + Abfahrtszeiten */}
+          <div style={{marginBottom:'16px'}}>
+            <label style={s.label}>Teilnehmer & individuelle Abfahrtszeiten</label>
+            {allChildrenSorted.length===0
+              ? <p style={{color:'#999',fontSize:'13px'}}>Noch keine Kinder vorhanden.</p>
+              : <div style={{display:'grid',gap:'8px'}}>
+                {allChildrenSorted.map(child=>{
+                  const sub = subgroups[child.subgroupId];
+                  const grp = FIXED_GROUPS.find(g=>g.id===sub?.groupId);
+                  const selected = (newTournament.participantIds||[]).includes(child.id);
+                  return (
+                    <div key={child.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',borderRadius:'8px',border:`2px solid ${selected?(grp?.color||'#358941'):'#ddd'}`,background:selected?'#f8fdf8':'white',cursor:'pointer'}} onClick={()=>toggleParticipant(child.id,newTournament,setNewTournament)}>
+                      <div style={{width:'20px',height:'20px',borderRadius:'4px',border:`2px solid ${selected?(grp?.color||'#358941'):'#ccc'}`,background:selected?(grp?.color||'#358941'):'white',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                        {selected&&<Check size={13} color="white"/>}
+                      </div>
+                      <div style={{flex:1}}>
+                        <span style={{fontWeight:'600',color:'#333',fontSize:'14px'}}>{child.name}</span>
+                        {sub&&<span style={{fontSize:'12px',color:'#999',marginLeft:'6px'}}>{grp?.emoji} {sub.name}</span>}
+                      </div>
+                      {selected&&(
+                        <div onClick={e=>e.stopPropagation()} style={{display:'flex',alignItems:'center',gap:'6px'}}>
+                          <Clock size={13} color="#b45309"/>
+                          <input type="time" placeholder="Abfahrt" value={newTournament.departureTimes?.[child.id]||''} onChange={e=>setDeparture(child.id,e.target.value,newTournament,setNewTournament)} style={{padding:'4px 8px',border:'1px solid #d97706',borderRadius:'6px',fontSize:'13px',width:'90px'}}/>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            }
+          </div>
+
+          <button onClick={createTournament} style={s.btn('#b45309')}>
+            <Trophy size={18}/> Turnier anlegen
+          </button>
+        </div>
+
+        {/* Kommende Turniere */}
+        <div style={s.card}>
+          <h2 style={{margin:'0 0 16px',color:'#b45309'}}>🏆 Kommende Turniere</h2>
+          {upcoming.length===0
+            ? <p style={{color:'#999',textAlign:'center',padding:'30px'}}>Noch keine Turniere geplant.</p>
+            : <div style={{display:'grid',gap:'12px'}}>
+              {upcoming.map(t=>{
+                const isEditing = editingTournament===t.id;
+                const participants = (t.participantIds||[]).map(id=>children[id]).filter(Boolean);
+                const coming = participants.filter(c=>(t.responses||{})[c.id]==='coming');
+                const missing = participants.filter(c=>(t.responses||{})[c.id]==='missing');
+                const noAnswer = participants.filter(c=>!(t.responses||{})[c.id]);
+
+                return (
+                  <div key={t.id} style={{borderRadius:'10px',border:'2px solid #fde68a',background:'#fffbeb',overflow:'hidden'}}>
+                    {isEditing ? (
+                      <div style={{padding:'16px'}}>
+                        <h4 style={{margin:'0 0 12px',color:'#b45309'}}>Turnier bearbeiten</h4>
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px',marginBottom:'10px'}}>
+                          <div style={{gridColumn:'1/-1'}}>
+                            <label style={s.label}>Name</label>
+                            <input style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={editTournForm.name||''} onChange={e=>setEditTournForm({...editTournForm,name:e.target.value})}/>
+                          </div>
+                          <div>
+                            <label style={s.label}>Datum</label>
+                            <input type="date" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={editTournForm.date||''} onChange={e=>setEditTournForm({...editTournForm,date:e.target.value})}/>
+                          </div>
+                          <div>
+                            <label style={s.label}>Turnierzeit</label>
+                            <input type="time" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={editTournForm.time||''} onChange={e=>setEditTournForm({...editTournForm,time:e.target.value})}/>
+                          </div>
+                        </div>
+                        <label style={{...s.label,marginBottom:'8px'}}>Teilnehmer & Abfahrtszeiten</label>
+                        <div style={{display:'grid',gap:'6px',marginBottom:'12px'}}>
+                          {allChildrenSorted.map(child=>{
+                            const sub = subgroups[child.subgroupId];
+                            const grp = FIXED_GROUPS.find(g=>g.id===sub?.groupId);
+                            const selected = (editTournForm.participantIds||[]).includes(child.id);
+                            return (
+                              <div key={child.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 10px',borderRadius:'8px',border:`2px solid ${selected?(grp?.color||'#358941'):'#ddd'}`,background:selected?'#f8fdf8':'white',cursor:'pointer'}} onClick={()=>toggleParticipant(child.id,editTournForm,setEditTournForm)}>
+                                <div style={{width:'18px',height:'18px',borderRadius:'4px',border:`2px solid ${selected?(grp?.color||'#358941'):'#ccc'}`,background:selected?(grp?.color||'#358941'):'white',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                                  {selected&&<Check size={11} color="white"/>}
+                                </div>
+                                <span style={{flex:1,fontWeight:'600',color:'#333',fontSize:'13px'}}>{child.name} {sub&&<span style={{fontSize:'11px',color:'#999',fontWeight:'400'}}>{grp?.emoji} {sub.name}</span>}</span>
+                                {selected&&(
+                                  <div onClick={e=>e.stopPropagation()} style={{display:'flex',alignItems:'center',gap:'4px'}}>
+                                    <Clock size={12} color="#b45309"/>
+                                    <input type="time" value={editTournForm.departureTimes?.[child.id]||''} onChange={e=>setDeparture(child.id,e.target.value,editTournForm,setEditTournForm)} style={{padding:'3px 6px',border:'1px solid #d97706',borderRadius:'6px',fontSize:'12px',width:'85px'}}/>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div style={{display:'flex',gap:'8px'}}>
+                          <button onClick={saveTournamentEdit} style={s.btn('#358941',undefined,true)}><Save size={14}/> Speichern</button>
+                          <button onClick={()=>setEditingTournament(null)} style={s.btn('#f3f4f6','#333',true)}>Abbrechen</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        {/* Header */}
+                        <div style={{padding:'14px 16px',borderBottom:'1px solid #fde68a',display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'8px'}}>
+                          <div>
+                            <h3 style={{margin:'0 0 4px',color:'#92400e',fontSize:'18px'}}>🏆 {t.name}</h3>
+                            <p style={{margin:'0 0 2px',fontWeight:'600',color:'#333',fontSize:'14px'}}>
+                              {new Date(t.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})} · {t.time} Uhr
+                            </p>
+                            <p style={{margin:0,fontSize:'13px',color:'#666'}}>{participants.length} Teilnehmer eingeladen</p>
+                          </div>
+                          <div style={{display:'flex',gap:'6px',flexShrink:0}}>
+                            <button onClick={()=>{setEditingTournament(t.id);setEditTournForm({...t});}} style={{padding:'6px',background:'#fef3c7',border:'none',borderRadius:'6px',cursor:'pointer',color:'#b45309'}}><Edit2 size={16}/></button>
+                            <button onClick={()=>deleteTournament(t.id)} style={{padding:'6px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626'}}><Trash2 size={16}/></button>
+                          </div>
+                        </div>
+
+                        {/* Rückmeldungen */}
+                        <div style={{padding:'14px 16px'}}>
+                          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'8px',marginBottom:'14px'}}>
+                            <div style={{background:'#dcfce7',borderRadius:'8px',padding:'10px',textAlign:'center'}}>
+                              <p style={{margin:0,fontSize:'22px',fontWeight:'700',color:'#16a34a'}}>{coming.length}</p>
+                              <p style={{margin:0,fontSize:'11px',color:'#16a34a'}}>Dabei</p>
+                            </div>
+                            <div style={{background:'#fee2e2',borderRadius:'8px',padding:'10px',textAlign:'center'}}>
+                              <p style={{margin:0,fontSize:'22px',fontWeight:'700',color:'#dc2626'}}>{missing.length}</p>
+                              <p style={{margin:0,fontSize:'11px',color:'#dc2626'}}>Fehlt</p>
+                            </div>
+                            <div style={{background:'#f3f4f6',borderRadius:'8px',padding:'10px',textAlign:'center'}}>
+                              <p style={{margin:0,fontSize:'22px',fontWeight:'700',color:'#6b7280'}}>{noAnswer.length}</p>
+                              <p style={{margin:0,fontSize:'11px',color:'#6b7280'}}>Ausstehend</p>
+                            </div>
+                          </div>
+
+                          {participants.length>0&&(
+                            <div style={{display:'grid',gap:'6px'}}>
+                              {participants.sort((a,b)=>a.name.localeCompare(b.name,'de')).map(child=>{
+                                const resp = (t.responses||{})[child.id];
+                                const dep = t.departureTimes?.[child.id];
+                                const sub = subgroups[child.subgroupId];
+                                const grp = FIXED_GROUPS.find(g=>g.id===sub?.groupId);
+                                return (
+                                  <div key={child.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 10px',borderRadius:'6px',background:resp==='coming'?'#f0fdf4':resp==='missing'?'#fef2f2':'#f9fafb',border:'1px solid #eee'}}>
+                                    <div>
+                                      <span style={{fontWeight:'600',fontSize:'14px',color:'#333'}}>{child.name}</span>
+                                      {sub&&<span style={{fontSize:'11px',color:'#999',marginLeft:'6px'}}>{grp?.emoji} {sub.name}</span>}
+                                      {dep&&<span style={{fontSize:'12px',color:'#b45309',marginLeft:'8px',display:'inline-flex',alignItems:'center',gap:'3px'}}><Clock size={11}/> Abfahrt: {dep} Uhr</span>}
+                                    </div>
+                                    <span style={{fontSize:'12px',fontWeight:'700',color:resp==='coming'?'#16a34a':resp==='missing'?'#dc2626':'#9ca3af'}}>
+                                      {resp==='coming'?'✓ Dabei':resp==='missing'?'✗ Fehlt':'–'}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          }
+        </div>
+      </div></div>
+    );
+  }
+
   // ── ELTERN / JUGENDLICHE ─────────────────────────────────────
   if (['eltern','jugendlich'].includes(userRole)) {
     const myChild=getMyChild();
@@ -745,6 +976,43 @@ export default function TrainingsApp() {
                 </div>
               </div>
             </div>
+
+            {/* Kommende Turniere */}
+            {(()=>{
+              const myTournaments = getMyUpcomingTournaments();
+              if (!myTournaments.length) return null;
+              return (
+                <div style={s.card}>
+                  <h3 style={{margin:'0 0 16px',color:'#b45309',display:'flex',alignItems:'center',gap:'8px'}}><Trophy size={18}/> Kommende Turniere</h3>
+                  <div style={{display:'grid',gap:'10px'}}>
+                    {myTournaments.map(t=>{
+                      const childId = myChild.id;
+                      const myResponse = (t.responses||{})[childId];
+                      const dep = t.departureTimes?.[childId];
+                      return (
+                        <div key={t.id} style={{padding:'14px',borderRadius:'10px',border:`2px solid ${myResponse==='coming'?'#16a34a':myResponse==='missing'?'#dc2626':'#fde68a'}`,background:myResponse==='coming'?'#f0fdf4':myResponse==='missing'?'#fef2f2':'#fffbeb'}}>
+                          <p style={{margin:'0 0 2px',fontWeight:'700',color:'#92400e',fontSize:'16px'}}>🏆 {t.name}</p>
+                          <p style={{margin:'0 0 6px',fontSize:'14px',color:'#333',fontWeight:'600'}}>
+                            {new Date(t.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})} · {t.time} Uhr
+                          </p>
+                          {dep&&<p style={{margin:'0 0 10px',fontSize:'13px',color:'#b45309',display:'flex',alignItems:'center',gap:'4px'}}><Clock size={13}/> Deine Abfahrtszeit: <strong>{dep} Uhr</strong></p>}
+                          <div style={{display:'flex',gap:'8px'}}>
+                            <button onClick={()=>respondToTournament(t.id,'coming')}
+                              style={{flex:1,padding:'10px',border:'2px solid #16a34a',background:myResponse==='coming'?'#16a34a':'white',color:myResponse==='coming'?'white':'#16a34a',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>
+                              <Check size={18}/> Ich bin dabei
+                            </button>
+                            <button onClick={()=>respondToTournament(t.id,'missing')}
+                              style={{flex:1,padding:'10px',border:'2px solid #dc2626',background:myResponse==='missing'?'#dc2626':'white',color:myResponse==='missing'?'white':'#dc2626',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>
+                              <X size={18}/> Ich fehle
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Kommende Trainings */}
             {mySessions.length>0&&(
@@ -912,45 +1180,8 @@ export default function TrainingsApp() {
   if (view==='home') return (
     <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
       <Header/>
-      {/* Nicht abgeschlossene vergangene Einheiten */}
       {(()=>{
-        const unclosed = getUnclosedPastSessions();
-        if (!unclosed.length || !canEdit()) return null;
-        return (
-          <div style={{...s.card,border:'2px solid #fca5a5',background:'#fff5f5'}}>
-            <h3 style={{margin:'0 0 12px',color:'#dc2626',display:'flex',alignItems:'center',gap:'8px'}}>
-              ⚠️ Nicht abgeschlossene Trainings ({unclosed.length})
-            </h3>
-            <div style={{display:'grid',gap:'8px'}}>
-              {unclosed.map(session=>{
-                const sessionSubs=(session.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean);
-                return (
-                  <div key={session.id}
-                    onClick={()=>{ setActiveSession(session); setView('sessionAttendance'); }}
-                    style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'white',borderRadius:'8px',border:'1px solid #fca5a5',cursor:'pointer'}}
-                    onMouseEnter={e=>e.currentTarget.style.background='#fff5f5'}
-                    onMouseLeave={e=>e.currentTarget.style.background='white'}>
-                    <div>
-                      <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'3px'}}>
-                        {sessionSubs.map(sub=>{
-                          const grp=FIXED_GROUPS.find(g=>g.id===sub.groupId);
-                          return <span key={sub.id} style={{fontSize:'12px',fontWeight:'700',color:grp?.color}}>{grp?.emoji} {sub.name}</span>;
-                        })}
-                      </div>
-                      <span style={{fontSize:'13px',color:'#555'}}>
-                        {new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'})} · {session.time} Uhr
-                      </span>
-                    </div>
-                    <ChevronRight size={16} color="#dc2626"/>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Heute & nächste 6 Tage */}
+        const today=new Date(), in6=new Date(); in6.setDate(today.getDate()+6);
         const todayStr=today.toISOString().split('T')[0], in6Str=in6.toISOString().split('T')[0];
         const week=getAllUpcomingSessions().filter(s=>s.date>=todayStr&&s.date<=in6Str);
         if (!week.length) return null;
@@ -1021,7 +1252,9 @@ export default function TrainingsApp() {
         <Header back backLabel="Startseite" backAction={()=>setView('home')}/>
         <div style={s.card}>
           <h2 style={{margin:'0 0 16px',color:activeGroup.color}}>{activeGroup.emoji} {activeGroup.name}</h2>
-            {canEdit()&&<button onClick={()=>setView('trainingsplan')} style={s.btn('#0369a1')}><Calendar size={16}/> Trainingsplan</button>}
+          {canEdit()&&(
+            <div style={{display:'flex',gap:'8px',marginBottom:'20px'}}>
+              <input style={s.input} placeholder="Neue Trainingsgruppe..." value={newSubgroupName} onChange={e=>setNewSubgroupName(e.target.value)} onKeyPress={e=>e.key==='Enter'&&addSubgroup()}/>
               <button onClick={addSubgroup} style={s.btn(activeGroup.color)}><Plus size={18}/> Gruppe</button>
             </div>
           )}
@@ -1148,7 +1381,6 @@ export default function TrainingsApp() {
     const sessionSubs = (session?.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean);
     const allKids = sessionSubs.flatMap(sub => getChildrenForSubgroup(sub.id));
     const sessionDate = session?.date;
-    const isArchived = session?.archived;
 
     const setSessionStatus = (childId, subgroupId, status) => {
       ensureTrainingDate(subgroupId, sessionDate);
@@ -1160,67 +1392,19 @@ export default function TrainingsApp() {
       saveChildren({ ...children, [childId]: { ...child, attendance: att } });
     };
 
-    const handleArchive = () => {
-      const missing = archiveSession(session.id, false);
-      if (missing.length > 0) {
-        setArchiveWarning({ sessionId: session.id, missingKids: missing });
-      } else {
-        setView('home');
-      }
-    };
-
     const presentCount = allKids.filter(c=>(children[c.id]?.attendance||{})[sessionDate]==='present').length;
     const absentCount = allKids.filter(c=>(children[c.id]?.attendance||{})[sessionDate]==='absent_unexcused').length;
     const excusedCount = allKids.filter(c=>(children[c.id]?.attendance||{})[sessionDate]==='absent_excused').length;
-    const notRecorded = allKids.filter(c=>!(children[c.id]?.attendance||{})[sessionDate]).length;
 
     return (
       <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
         <Header back backLabel="Startseite" backAction={()=>setView('home')}/>
-
-        {/* Archiv-Warnung Modal */}
-        {archiveWarning&&(
-          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px'}}>
-            <div style={{background:'white',borderRadius:'16px',padding:'28px',maxWidth:'400px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
-              <h3 style={{margin:'0 0 8px',color:'#d97706',fontSize:'18px'}}>⚠️ Anwesenheit nicht vollständig</h3>
-              <p style={{margin:'0 0 12px',color:'#666',fontSize:'14px'}}>Bei folgenden Kindern wurde noch keine Anwesenheit erfasst:</p>
-              <div style={{marginBottom:'16px',padding:'12px',background:'#fef3c7',borderRadius:'8px'}}>
-                {archiveWarning.missingKids.map(c=>(
-                  <p key={c.id} style={{margin:'2px 0',fontSize:'14px',color:'#333'}}>• {c.name}</p>
-                ))}
-              </div>
-              <p style={{margin:'0 0 16px',color:'#666',fontSize:'13px'}}>Trotzdem abschließen?</p>
-              <div style={{display:'grid',gap:'8px'}}>
-                <button onClick={()=>{ archiveSession(archiveWarning.sessionId, true); setArchiveWarning(null); setView('home'); }}
-                  style={{padding:'12px',background:'#d97706',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
-                  Trotzdem abschließen
-                </button>
-                <button onClick={()=>setArchiveWarning(null)}
-                  style={{padding:'12px',background:'#f3f4f6',color:'#333',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
-                  Zurück & vervollständigen
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         <div style={s.card}>
           {/* Session Info */}
-          <div style={{marginBottom:'16px'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'8px',marginBottom:'8px'}}>
-              <h2 style={{margin:0,color:'#0369a1',fontSize:'20px'}}>
-                {new Date(sessionDate+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})} · {session?.time} Uhr
-              </h2>
-              {isArchived
-                ? <span style={{fontSize:'13px',fontWeight:'700',color:'#16a34a',background:'#dcfce7',padding:'4px 12px',borderRadius:'20px',border:'1px solid #16a34a'}}>✓ Abgeschlossen</span>
-                : canEdit()&&(
-                  <button onClick={handleArchive}
-                    style={{...s.btn('#358941'),gap:'6px'}}>
-                    ✓ Training abschließen
-                  </button>
-                )
-              }
-            </div>
+          <div style={{marginBottom:'20px'}}>
+            <h2 style={{margin:'0 0 8px',color:'#0369a1',fontSize:'22px'}}>
+              {new Date(sessionDate+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})} · {session?.time} Uhr
+            </h2>
             <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'6px'}}>
               {sessionSubs.map(sub=>{
                 const grp=FIXED_GROUPS.find(g=>g.id===sub.groupId);
@@ -1231,22 +1415,7 @@ export default function TrainingsApp() {
             {session?.info&&<div style={{display:'flex',gap:'6px',marginTop:'8px',padding:'8px',background:'#f0f9ff',borderRadius:'6px'}}><Info size={14} color="#0369a1" style={{flexShrink:0,marginTop:'2px'}}/><p style={{margin:0,fontSize:'13px',color:'#0369a1'}}>{session.info}</p></div>}
           </div>
 
-          {/* Fortschrittsbalken Erfassung */}
-          {!isArchived&&allKids.length>0&&(
-            <div style={{marginBottom:'16px'}}>
-              <div style={{display:'flex',justifyContent:'space-between',marginBottom:'4px'}}>
-                <span style={{fontSize:'13px',color:'#555'}}>Erfassung</span>
-                <span style={{fontSize:'13px',fontWeight:'600',color:notRecorded===0?'#16a34a':'#d97706'}}>
-                  {allKids.length-notRecorded}/{allKids.length} erfasst {notRecorded>0&&`· ${notRecorded} fehlen noch`}
-                </span>
-              </div>
-              <div style={{background:'#f3f4f6',borderRadius:'99px',height:'8px',overflow:'hidden'}}>
-                <div style={{width:`${((allKids.length-notRecorded)/allKids.length)*100}%`,height:'100%',background:notRecorded===0?'#16a34a':'#d97706',borderRadius:'99px',transition:'width 0.3s'}}/>
-              </div>
-            </div>
-          )}
-
-          {/* Statistik */}
+          {/* Schnell-Statistik */}
           <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'10px',marginBottom:'20px'}}>
             <div style={{background:'#dcfce7',borderRadius:'8px',padding:'12px',textAlign:'center'}}>
               <p style={{margin:0,fontSize:'28px',fontWeight:'700',color:'#16a34a'}}>{presentCount}</p>
@@ -1262,7 +1431,7 @@ export default function TrainingsApp() {
             </div>
           </div>
 
-          {/* Kinderliste */}
+          {/* Kinderliste mit Anwesenheits-Buttons */}
           <div style={{display:'grid',gap:'10px'}}>
             {allKids.length===0
               ? <p style={{color:'#999',textAlign:'center',padding:'30px'}}>Keine Kinder in den zugewiesenen Gruppen.</p>
@@ -1277,19 +1446,20 @@ export default function TrainingsApp() {
                 return (
                   <div key={child.id} style={{
                     padding:'14px', borderRadius:'10px',
-                    border: !status?'2px solid #fbbf24': parentExcused?'2px solid #d97706': parentComing?'2px solid #16a34a':'1px solid #ddd',
-                    background: status==='present'?'#f0fdf4': status==='absent_unexcused'?'#f9fafb': status==='absent_excused'?'#fffbeb':'#fffbeb'
+                    border: parentExcused&&!status?'2px solid #d97706': parentComing&&!status?'2px solid #16a34a':'1px solid #ddd',
+                    background: status==='present'?'#f0fdf4': status==='absent_unexcused'?'#f9fafb': status==='absent_excused'?'#fffbeb':'white'
                   }}>
                     <div style={{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
                       <div style={{flex:1,minWidth:'120px'}}>
                         <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
                           <p style={{margin:0,fontWeight:'600',color:'#333',fontSize:'16px'}}>{child.name}</p>
-                          {!status&&<span style={{fontSize:'11px',fontWeight:'600',color:'#d97706',background:'#fef3c7',padding:'2px 8px',borderRadius:'20px'}}>Noch nicht erfasst</span>}
                           {parentExcused&&<span style={{fontSize:'11px',fontWeight:'600',color:'#d97706',background:'#fef3c7',padding:'2px 8px',borderRadius:'20px',border:'1px solid #d97706'}}>Eltern abgemeldet</span>}
                           {parentComing&&<span style={{fontSize:'11px',fontWeight:'600',color:'#16a34a',background:'#dcfce7',padding:'2px 8px',borderRadius:'20px',border:'1px solid #16a34a'}}>Eltern angemeldet</span>}
                         </div>
                         {sub&&<p style={{margin:'2px 0 0',fontSize:'11px',color:'#999'}}>{sub.name}</p>}
                       </div>
+
+                      {/* 3 Anwesenheits-Buttons */}
                       <div style={{display:'flex',gap:'8px'}}>
                         <button onClick={()=>setSessionStatus(child.id, child.subgroupId, 'present')}
                           style={{width:'50px',height:'50px',border:'2px solid #16a34a',background:status==='present'?'#16a34a':'white',color:status==='present'?'white':'#16a34a',borderRadius:'10px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -1311,6 +1481,7 @@ export default function TrainingsApp() {
             }
           </div>
 
+          {/* Legende */}
           <div style={{marginTop:'20px',paddingTop:'16px',borderTop:'1px solid #eee',display:'flex',gap:'16px',flexWrap:'wrap'}}>
             <span style={{fontSize:'13px',color:'#16a34a'}}>✓ Anwesend</span>
             <span style={{fontSize:'13px',color:'#6b7280'}}>– Fehlt unentschuldigt</span>
@@ -1321,7 +1492,6 @@ export default function TrainingsApp() {
     );
   }
 
-  // ── TURNIERVERWALTUNG (Trainer/Admin) ───────────────────────
   // ── KIND VERLAUF ─────────────────────────────────────────────
   if (view==='childHistory') {
     const child=children[activeChild.id]||activeChild;
@@ -1455,7 +1625,11 @@ export default function TrainingsApp() {
           </div>
 
           {/* Neues Training manuell hinzufügen */}
-            {canEdit()&&<button onClick={()=>setView('trainingsplan')} style={s.btn('#0369a1')}><Calendar size={16}/> Trainingsplan</button>}
+          {canEdit()&&(
+            <div style={{marginTop:'20px',paddingTop:'16px',borderTop:'1px solid #eee'}}>
+              <p style={{margin:'0 0 10px',fontSize:'13px',fontWeight:'600',color:'#555'}}>Training manuell hinzufügen:</p>
+              <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
+                <input type="date" value={trainingDate} onChange={e=>setTrainingDate(e.target.value)} style={{padding:'8px 12px',border:'1px solid #ddd',borderRadius:'8px',fontSize:'14px'}}/>
                 <div style={{display:'flex',gap:'5px'}}>
                   <button onClick={()=>setChildStatus(trainingDate,'present')}
                     style={{...s.btn('#16a34a',undefined,true),gap:'4px'}}><Check size={14}/> Da</button>
