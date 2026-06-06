@@ -254,12 +254,15 @@ export default function TrainingsApp() {
     try {
       const credential = EmailAuthProvider.credential(user.email, resetPassword);
       await reauthenticateWithCredential(user, credential);
-      // Passwort korrekt - alle Anwesenheiten löschen
+      // Anwesenheiten + trainingDates bei allen Kindern/Gruppen löschen
       const updatedChildren = Object.fromEntries(
         Object.entries(children).map(([id, child]) => [id, { ...child, attendance: {} }])
       );
+      const updatedSubgroups = Object.fromEntries(
+        Object.entries(subgroups).map(([id, sub]) => [id, { ...sub, trainingDates: [] }])
+      );
       saveChildren(updatedChildren);
-      // Sessions löschen
+      saveSubgroups(updatedSubgroups);
       saveSessions({});
       setResetDialog(false);
       setResetPassword('');
