@@ -229,8 +229,6 @@ export default function TrainingsApp() {
         </div>
       </div>
       <div style={{ display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center' }}>
-        <input type="date" value={trainingDate} onChange={e=>setTrainingDate(e.target.value)}
-          style={{ padding:'8px 12px', border:'1px solid #ddd', borderRadius:'6px', fontSize:'14px' }} />
         <button onClick={()=>signOut(auth)} style={s.btn('#ef4444')}><LogOut size={16}/> Abmelden</button>
       </div>
     </div>
@@ -328,7 +326,9 @@ export default function TrainingsApp() {
         <div style={s.card}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'16px', flexWrap:'wrap', gap:'8px' }}>
             <h2 style={{ margin:0, color:activeGroup.color }}>{sub.name}</h2>
-            <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
+            <div style={{ display:'flex', gap:'8px', alignItems:'center', flexWrap:'wrap' }}>
+              <input type="date" value={trainingDate} onChange={e=>setTrainingDate(e.target.value)}
+                style={{ padding:'8px 14px', border:'2px solid #358941', borderRadius:'8px', fontSize:'16px', fontWeight:'600', color:'#333' }} />
               <span style={{ fontSize:'18px', fontWeight:'700', color:'#333', background:'#f3f4f6', padding:'8px 16px', borderRadius:'10px' }}>
                 {new Date(trainingDate+'T12:00:00').toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' })}
               </span>
