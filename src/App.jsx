@@ -64,6 +64,7 @@ export default function TrainingsApp() {
   const [newSession, setNewSession]             = useState(emptySession);
   const [editingSession, setEditingSession]     = useState(null); // session being edited
   const [editForm, setEditForm]                 = useState({});
+  const [deleteDialog, setDeleteDialog]         = useState(null); // {sessionId, repeatId, blockSize}
 
   const [authMode, setAuthMode]           = useState('login');
   const [loginEmail, setLoginEmail]       = useState('');
@@ -382,6 +383,35 @@ export default function TrainingsApp() {
     );
   };
 
+  // ── CUSTOM DELETE DIALOG ─────────────────────────────────────
+  const DeleteDialog = () => {
+    if (!deleteDialog) return null;
+    return (
+      <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px'}}>
+        <div style={{background:'white',borderRadius:'16px',padding:'28px',maxWidth:'380px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
+          <h3 style={{margin:'0 0 8px',color:'#333',fontSize:'18px'}}>Einheit löschen</h3>
+          <p style={{margin:'0 0 24px',color:'#666',fontSize:'14px'}}>
+            Diese Einheit gehört zu einer Wiederholungsreihe ({deleteDialog.blockSize} Einheiten). Was möchtest du löschen?
+          </p>
+          <div style={{display:'grid',gap:'10px'}}>
+            <button onClick={()=>{ deleteSession(deleteDialog.sessionId); setDeleteDialog(null); }}
+              style={{padding:'12px',background:'#fee2e2',color:'#dc2626',border:'2px solid #dc2626',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px',textAlign:'left'}}>
+              🗑️ Nur diese eine Einheit löschen
+            </button>
+            <button onClick={()=>{ deleteRepeatBlock(deleteDialog.repeatId); setDeleteDialog(null); }}
+              style={{padding:'12px',background:'#fef3c7',color:'#d97706',border:'2px solid #d97706',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px',textAlign:'left'}}>
+              🗑️ Alle {deleteDialog.blockSize} Einheiten der Reihe löschen
+            </button>
+            <button onClick={()=>setDeleteDialog(null)}
+              style={{padding:'12px',background:'#f3f4f6',color:'#333',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ── TRAININGSPLAN ────────────────────────────────────────────
   if (view==='trainingsplan') {
     const upcoming=getAllUpcomingSessions();
@@ -406,6 +436,7 @@ export default function TrainingsApp() {
 
     return (
       <div style={s.page}><div style={s.wrap}>
+        <DeleteDialog/>
         <Header back backLabel="Startseite" backAction={()=>setView('home')}/>
 
         {/* Neue Einheit */}
@@ -535,10 +566,7 @@ export default function TrainingsApp() {
                           <button onClick={()=>startEdit(session)} style={{padding:'6px',background:'#e0f2fe',border:'none',borderRadius:'6px',cursor:'pointer',color:'#0369a1'}}><Edit2 size={16}/></button>
                           <button onClick={()=>{
                             if (session.repeatId) {
-                              const blockSize=(repeatBlocks[session.repeatId]||[]).length;
-                              const choice=window.confirm(`Nur diese Einheit löschen?\n\nOK = Nur diese eine\nAbbrechen = Alle ${blockSize} der Wiederholungsreihe`);
-                              if (choice) deleteSession(session.id);
-                              else deleteRepeatBlock(session.repeatId);
+                              setDeleteDialog({sessionId:session.id, repeatId:session.repeatId, blockSize:(repeatBlocks[session.repeatId]||[]).length});
                             } else {
                               deleteSession(session.id);
                             }
@@ -834,97 +862,83 @@ export default function TrainingsApp() {
     const sub=subgroups[activeSubgroup.id]||activeSubgroup;
     const kids=getChildrenForSubgroup(sub.id);
     const allSubs=Object.values(subgroups);
+
+    // Gesamtstatistik der Gruppe
+    const totalPresent=kids.reduce((sum,c)=>sum+getAttendanceStats(c.id,sub.id).present,0);
+    const totalSessions=(sub.trainingDates||[]).length;
+
     return (
       <div style={s.page}><div style={s.wrap}>
         <Header back backLabel={activeGroup.name} backAction={()=>setView('group')}/>
         <div style={s.card}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px',flexWrap:'wrap',gap:'8px'}}>
+          {/* Header */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px',flexWrap:'wrap',gap:'8px'}}>
             <h2 style={{margin:0,color:activeGroup.color}}>{sub.name}</h2>
-            <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
-              {canEdit()&&<input type="date" value={trainingDate} onChange={e=>setTrainingDate(e.target.value)} style={{padding:'8px 14px',border:'2px solid #358941',borderRadius:'8px',fontSize:'16px',fontWeight:'600'}}/>}
-              <span style={{fontSize:'18px',fontWeight:'700',color:'#333',background:'#f3f4f6',padding:'8px 16px',borderRadius:'10px'}}>
-                {new Date(trainingDate+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}
-              </span>
+            <div style={{display:'flex',gap:'8px'}}>
               <button onClick={()=>exportSubgroupExcel(sub)} style={s.btn('#16a34a',undefined,true)}><Download size={15}/> Excel</button>
+              {canEdit()&&<button onClick={()=>deleteSubgroup(sub.id)} style={{padding:'6px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626'}}><Trash2 size={16}/></button>}
             </div>
           </div>
+
+          {/* Gruppen-Gesamtstatistik */}
           <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'10px',marginBottom:'20px'}}>
-            {[{key:'present',label:'Anwesend',color:'#16a34a',bg:'#dcfce7'},
-              {key:'absent_unexcused',label:'Unentschuldigt',color:'#6b7280',bg:'#f3f4f6'},
-              {key:'absent_excused',label:'Entschuldigt',color:'#d97706',bg:'#fef3c7'},
-            ].map(({key,label,color,bg})=>(
-              <div key={key} style={{background:bg,borderRadius:'8px',padding:'12px',textAlign:'center'}}>
-                <p style={{margin:0,fontSize:'24px',fontWeight:'700',color}}>{kids.filter(c=>(c.attendance||{})[trainingDate]===key).length}</p>
-                <p style={{margin:0,fontSize:'11px',color}}>{label}</p>
-              </div>
-            ))}
+            <div style={{background:'#f8f9fa',borderRadius:'8px',padding:'12px',textAlign:'center'}}>
+              <p style={{margin:0,fontSize:'24px',fontWeight:'700',color:'#333'}}>{kids.length}</p>
+              <p style={{margin:0,fontSize:'11px',color:'#666'}}>Kinder</p>
+            </div>
+            <div style={{background:'#f8f9fa',borderRadius:'8px',padding:'12px',textAlign:'center'}}>
+              <p style={{margin:0,fontSize:'24px',fontWeight:'700',color:'#333'}}>{totalSessions}</p>
+              <p style={{margin:0,fontSize:'11px',color:'#666'}}>Trainings gesamt</p>
+            </div>
+            <div style={{background:'#dcfce7',borderRadius:'8px',padding:'12px',textAlign:'center'}}>
+              <p style={{margin:0,fontSize:'24px',fontWeight:'700',color:'#16a34a'}}>
+                {kids.length>0&&totalSessions>0?Math.round((totalPresent/(kids.length*totalSessions))*100):0}%
+              </p>
+              <p style={{margin:0,fontSize:'11px',color:'#16a34a'}}>Ø Anwesenheit</p>
+            </div>
           </div>
+
+          {/* Kind hinzufügen */}
           {canEdit()&&(
             <div style={{display:'flex',gap:'8px',marginBottom:'20px',paddingBottom:'20px',borderBottom:'1px solid #eee'}}>
               <input style={s.input} placeholder="Kind hinzufügen..." value={newChildName} onChange={e=>setNewChildName(e.target.value)} onKeyPress={e=>e.key==='Enter'&&addChild()}/>
               <button onClick={addChild} style={s.btn(activeGroup.color)}><Plus size={18}/> Kind</button>
             </div>
           )}
+
+          {/* Kinderliste - nur Statistiken */}
           <div style={{display:'grid',gap:'10px'}}>
             {kids.length===0
-              ? <p style={{color:'#999',textAlign:'center',padding:'30px'}}>Noch keine Kinder.</p>
+              ? <p style={{color:'#999',textAlign:'center',padding:'30px'}}>Noch keine Kinder. Oben hinzufügen!</p>
               : kids.map(child=>{
-                const todayStatus=(child.attendance||{})[trainingDate];
-                const parentResponse=getParentResponse(child.id, trainingDate);
-                // parentResponse: 'coming' = angemeldet, 'missing' = abgemeldet
-                const parentExcused=parentResponse==='missing';
-                const parentComing=parentResponse==='coming';
-                const displayStatus=todayStatus||(parentExcused?'absent_excused':null);
                 const stats=getAttendanceStats(child.id,sub.id);
+                const pct=stats.percent;
                 return (
-                  <div key={child.id} style={{padding:'14px',borderRadius:'10px',
-                    border:parentExcused&&!todayStatus?'2px solid #d97706':parentComing&&!todayStatus?'2px solid #16a34a':'1px solid #ddd',
-                    background:displayStatus==='present'?'#f0fdf4':displayStatus==='absent_unexcused'?'#f9fafb':displayStatus==='absent_excused'?'#fffbeb':'white'}}>
-                    <div style={{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-                      <div style={{flex:1,minWidth:'120px'}}>
-                        <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
-                          <p style={{margin:0,fontWeight:'600',color:'#333',fontSize:'16px'}}>{child.name}</p>
-                          {/* Eltern-Badge - bleibt immer sichtbar */}
-                          {parentExcused&&<span style={{fontSize:'11px',fontWeight:'600',color:'#d97706',background:'#fef3c7',padding:'2px 8px',borderRadius:'20px',border:'1px solid #d97706'}}>Eltern abgemeldet</span>}
-                          {parentComing&&<span style={{fontSize:'11px',fontWeight:'600',color:'#16a34a',background:'#dcfce7',padding:'2px 8px',borderRadius:'20px',border:'1px solid #16a34a'}}>Eltern angemeldet</span>}
+                  <div key={child.id}
+                    onClick={()=>{setActiveChild(child);setView('childHistory');}}
+                    style={{padding:'14px',borderRadius:'10px',border:'1px solid #ddd',background:'white',cursor:'pointer',transition:'box-shadow 0.15s'}}
+                    onMouseEnter={e=>e.currentTarget.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'}
+                    onMouseLeave={e=>e.currentTarget.style.boxShadow='none'}>
+                    <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+                      <div style={{flex:1}}>
+                        <p style={{margin:'0 0 6px',fontWeight:'600',color:'#333',fontSize:'16px'}}>{child.name}</p>
+                        {/* Fortschrittsbalken */}
+                        <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                          <div style={{flex:1,background:'#f3f4f6',borderRadius:'99px',height:'8px',overflow:'hidden'}}>
+                            <div style={{width:`${pct}%`,height:'100%',background:pct>=80?'#16a34a':pct>=60?'#d97706':'#dc2626',borderRadius:'99px'}}/>
+                          </div>
+                          <span style={{fontSize:'13px',fontWeight:'700',color:pct>=80?'#16a34a':pct>=60?'#d97706':'#dc2626',minWidth:'36px'}}>{pct}%</span>
                         </div>
-                        <p style={{margin:'2px 0 0',fontSize:'12px',color:'#999'}}>{stats.total} Trainings · {stats.present}x da · {stats.percent}%</p>
+                        <p style={{margin:'4px 0 0',fontSize:'12px',color:'#999'}}>
+                          {stats.present}/{stats.total} Trainings · {stats.excused}x entschuldigt · {stats.unexcused}x unentschuldigt
+                        </p>
                       </div>
-                      {canEdit()&&(
-                        <div style={{display:'flex',gap:'6px'}}>
-                          <button onClick={()=>setStatus(child.id,'present')} style={{width:'44px',height:'44px',border:'2px solid #16a34a',background:displayStatus==='present'?'#16a34a':'white',color:displayStatus==='present'?'white':'#16a34a',borderRadius:'8px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}><Check size={22}/></button>
-                          <button onClick={()=>setStatus(child.id,'absent_unexcused')} style={{width:'44px',height:'44px',border:'2px solid #9ca3af',background:displayStatus==='absent_unexcused'?'#6b7280':'white',color:displayStatus==='absent_unexcused'?'white':'#6b7280',borderRadius:'8px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'22px',fontWeight:'700'}}>–</button>
-                          <button onClick={()=>setStatus(child.id,'absent_excused')} style={{width:'44px',height:'44px',border:'2px solid #d97706',background:displayStatus==='absent_excused'?'#d97706':'white',color:displayStatus==='absent_excused'?'white':'#d97706',borderRadius:'8px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}><Clock size={20}/></button>
-                        </div>
-                      )}
-                      <div style={{display:'flex',gap:'6px'}}>
-                        <button onClick={()=>{setActiveChild(child);setView('childHistory');}} style={s.btn('#ede9fe','#7c3aed',true)}><BarChart2 size={15}/></button>
-                        {canEdit()&&<>
-                          <button onClick={()=>setMoveChildId(moveChildId===child.id?null:child.id)} style={s.btn('#e0f2fe','#0369a1',true)}><MoveRight size={15}/></button>
-                          <button onClick={()=>deleteChild(child.id)} style={{padding:'8px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626'}}><Trash2 size={16}/></button>
-                        </>}
-                      </div>
+                      <ChevronRight size={18} color="#999"/>
                     </div>
-                    {moveChildId===child.id&&canEdit()&&(
-                      <div style={{marginTop:'12px',padding:'12px',background:'#f0f9ff',borderRadius:'8px',border:'1px solid #bae6fd'}}>
-                        <p style={{margin:'0 0 8px',fontSize:'13px',fontWeight:'600',color:'#0369a1'}}>In welche Gruppe verschieben?</p>
-                        <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
-                          {allSubs.filter(sg=>sg.id!==sub.id).map(sg=>{
-                            const grp=FIXED_GROUPS.find(g=>g.id===sg.groupId);
-                            return <button key={sg.id} onClick={()=>moveChild(child.id,sg.id)} style={s.btn(grp?.color||'#358941',undefined,true)}>{grp?.emoji} {sg.name}</button>;
-                          })}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 );
               })
             }
-          </div>
-          <div style={{marginTop:'20px',paddingTop:'16px',borderTop:'1px solid #eee',display:'flex',gap:'16px',flexWrap:'wrap'}}>
-            <span style={{fontSize:'13px',color:'#16a34a'}}>✓ Anwesend</span>
-            <span style={{fontSize:'13px',color:'#6b7280'}}>– Fehlt unentschuldigt</span>
-            <span style={{fontSize:'13px',color:'#d97706'}}>~ Fehlt entschuldigt</span>
           </div>
         </div>
       </div></div>
@@ -938,15 +952,49 @@ export default function TrainingsApp() {
     const grp=FIXED_GROUPS.find(g=>g.id===sub?.groupId);
     const dates=(sub?.trainingDates||[]).sort().reverse();
     const stats=getAttendanceStats(child.id,child.subgroupId);
+    const allSubs=Object.values(subgroups);
+
+    const setChildStatus = (date, status) => {
+      ensureTrainingDate(child.subgroupId, date);
+      const cur=(child.attendance||{})[date];
+      const next=cur===status?null:status;
+      const att={...(child.attendance||{}),[date]:next};
+      if (next===null) delete att[date];
+      saveChildren({...children,[child.id]:{...child,attendance:att}});
+    };
+
     return (
       <div style={s.page}><div style={s.wrap}>
         <Header back backLabel={sub?.name||'Zurück'} backAction={()=>setView('subgroup')}/>
         <div style={s.card}>
-          <div style={{marginBottom:'20px'}}>
-            <h2 style={{margin:'0 0 4px',color:grp?.color||'#358941',fontSize:'22px'}}>{child.name}</h2>
-            <p style={{margin:0,color:'#666',fontSize:'13px'}}>{grp?.emoji} {grp?.name} · {sub?.name}</p>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px',flexWrap:'wrap',gap:'8px'}}>
+            <div>
+              <h2 style={{margin:'0 0 4px',color:grp?.color||'#358941',fontSize:'22px'}}>{child.name}</h2>
+              <p style={{margin:0,color:'#666',fontSize:'13px'}}>{grp?.emoji} {grp?.name} · {sub?.name}</p>
+            </div>
+            {canEdit()&&(
+              <div style={{display:'flex',gap:'6px'}}>
+                <button onClick={()=>setMoveChildId(moveChildId===child.id?null:child.id)} style={s.btn('#e0f2fe','#0369a1',true)}><MoveRight size={15}/> Verschieben</button>
+                <button onClick={()=>deleteChild(child.id)} style={{padding:'6px 12px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626',fontWeight:'600',fontSize:'13px',display:'flex',alignItems:'center',gap:'4px'}}><Trash2 size={14}/> Löschen</button>
+              </div>
+            )}
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'10px',marginBottom:'24px'}}>
+
+          {/* Gruppe verschieben */}
+          {moveChildId===child.id&&canEdit()&&(
+            <div style={{marginBottom:'16px',padding:'12px',background:'#f0f9ff',borderRadius:'8px',border:'1px solid #bae6fd'}}>
+              <p style={{margin:'0 0 8px',fontSize:'13px',fontWeight:'600',color:'#0369a1'}}>In welche Gruppe verschieben?</p>
+              <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
+                {allSubs.filter(sg=>sg.id!==child.subgroupId).map(sg=>{
+                  const g=FIXED_GROUPS.find(f=>f.id===sg.groupId);
+                  return <button key={sg.id} onClick={()=>moveChild(child.id,sg.id)} style={s.btn(g?.color||'#358941',undefined,true)}>{g?.emoji} {sg.name}</button>;
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Statistik */}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'10px',marginBottom:'20px'}}>
             {[{label:'Trainings',value:stats.total,color:'#333',bg:'#f8f9fa'},
               {label:'Anwesend',value:stats.present,color:'#16a34a',bg:'#dcfce7'},
               {label:'Unentschuldigt',value:stats.unexcused,color:'#6b7280',bg:'#f3f4f6'},
@@ -958,6 +1006,8 @@ export default function TrainingsApp() {
               </div>
             ))}
           </div>
+
+          {/* Quote */}
           <div style={{marginBottom:'24px'}}>
             <div style={{display:'flex',justifyContent:'space-between',marginBottom:'6px'}}>
               <span style={{fontSize:'14px',fontWeight:'600'}}>Anwesenheitsquote</span>
@@ -967,23 +1017,83 @@ export default function TrainingsApp() {
               <div style={{width:`${stats.percent}%`,height:'100%',background:stats.percent>=80?'#16a34a':stats.percent>=60?'#d97706':'#dc2626',borderRadius:'99px'}}/>
             </div>
           </div>
-          <h3 style={{margin:'0 0 12px'}}>Trainings-Verlauf</h3>
-          <div style={{display:'grid',gap:'8px'}}>
-            {dates.map(date=>{
-              const status=(child.attendance||{})[date];
-              const cfg=STATUS_CONFIG[status];
-              return (
-                <div key={date} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 16px',background:cfg?.bg||'#f9fafb',borderRadius:'8px',border:'1px solid #eee'}}>
-                  <span style={{fontSize:'14px',color:'#333'}}>
-                    {new Date(date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}
-                  </span>
-                  <span style={{fontSize:'13px',fontWeight:'600',color:cfg?.color||'#999',background:'white',padding:'4px 10px',borderRadius:'20px',border:`1px solid ${cfg?.color||'#ddd'}`}}>
-                    {cfg?.symbol||'–'} {cfg?.label||'Nicht erfasst'}
-                  </span>
-                </div>
-              );
-            })}
+
+          {/* Trainings-Verlauf mit bearbeitbarer Anwesenheit */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px'}}>
+            <h3 style={{margin:0,color:'#333'}}>Trainings-Verlauf</h3>
+            {canEdit()&&(
+              <div style={{display:'flex',alignItems:'center',gap:'6px',padding:'4px 10px',background:'#f0f9ff',borderRadius:'20px',border:'1px solid #bae6fd'}}>
+                <Edit2 size={12} color="#0369a1"/>
+                <span style={{fontSize:'12px',color:'#0369a1',fontWeight:'600'}}>Anwesenheit anpassbar</span>
+              </div>
+            )}
           </div>
+          <div style={{display:'grid',gap:'8px'}}>
+            {dates.length===0
+              ? <p style={{color:'#999',textAlign:'center',padding:'20px'}}>Noch keine Trainings erfasst.</p>
+              : dates.map(date=>{
+                const status=(child.attendance||{})[date];
+                const cfg=STATUS_CONFIG[status];
+                const parentResponse=getParentResponse(child.id, date);
+                const parentExcused=parentResponse==='missing';
+                const parentComing=parentResponse==='coming';
+                return (
+                  <div key={date} style={{padding:'12px 14px',background:cfg?.bg||'#f9fafb',borderRadius:'8px',border:'1px solid #eee'}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'8px'}}>
+                      <div>
+                        <p style={{margin:'0 0 3px',fontSize:'14px',color:'#333',fontWeight:'500'}}>
+                          {new Date(date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}
+                        </p>
+                        <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                          {parentExcused&&<span style={{fontSize:'11px',fontWeight:'600',color:'#d97706',background:'#fef3c7',padding:'1px 6px',borderRadius:'10px',border:'1px solid #d97706'}}>Eltern abgemeldet</span>}
+                          {parentComing&&<span style={{fontSize:'11px',fontWeight:'600',color:'#16a34a',background:'#dcfce7',padding:'1px 6px',borderRadius:'10px',border:'1px solid #16a34a'}}>Eltern angemeldet</span>}
+                        </div>
+                      </div>
+                      {canEdit() ? (
+                        /* Anwesenheits-Buttons zum Anpassen */
+                        <div style={{display:'flex',gap:'5px'}}>
+                          <button onClick={()=>setChildStatus(date,'present')}
+                            style={{width:'36px',height:'36px',border:'2px solid #16a34a',background:status==='present'?'#16a34a':'white',color:status==='present'?'white':'#16a34a',borderRadius:'6px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                            <Check size={18}/>
+                          </button>
+                          <button onClick={()=>setChildStatus(date,'absent_unexcused')}
+                            style={{width:'36px',height:'36px',border:'2px solid #9ca3af',background:status==='absent_unexcused'?'#6b7280':'white',color:status==='absent_unexcused'?'white':'#6b7280',borderRadius:'6px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'18px',fontWeight:'700'}}>
+                            –
+                          </button>
+                          <button onClick={()=>setChildStatus(date,'absent_excused')}
+                            style={{width:'36px',height:'36px',border:'2px solid #d97706',background:status==='absent_excused'?'#d97706':'white',color:status==='absent_excused'?'white':'#d97706',borderRadius:'6px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                            <Clock size={16}/>
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{fontSize:'13px',fontWeight:'600',color:cfg?.color||'#999',background:'white',padding:'4px 10px',borderRadius:'20px',border:`1px solid ${cfg?.color||'#ddd'}`}}>
+                          {cfg?.symbol||'–'} {cfg?.label||'Nicht erfasst'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            }
+          </div>
+
+          {/* Neues Training manuell hinzufügen */}
+          {canEdit()&&(
+            <div style={{marginTop:'20px',paddingTop:'16px',borderTop:'1px solid #eee'}}>
+              <p style={{margin:'0 0 10px',fontSize:'13px',fontWeight:'600',color:'#555'}}>Training manuell hinzufügen:</p>
+              <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
+                <input type="date" value={trainingDate} onChange={e=>setTrainingDate(e.target.value)} style={{padding:'8px 12px',border:'1px solid #ddd',borderRadius:'8px',fontSize:'14px'}}/>
+                <div style={{display:'flex',gap:'5px'}}>
+                  <button onClick={()=>setChildStatus(trainingDate,'present')}
+                    style={{...s.btn('#16a34a',undefined,true),gap:'4px'}}><Check size={14}/> Da</button>
+                  <button onClick={()=>setChildStatus(trainingDate,'absent_unexcused')}
+                    style={{...s.btn('#6b7280',undefined,true),gap:'4px'}}>– Unentsch.</button>
+                  <button onClick={()=>setChildStatus(trainingDate,'absent_excused')}
+                    style={{...s.btn('#d97706',undefined,true),gap:'4px'}}><Clock size={14}/> Entsch.</button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div></div>
     );
