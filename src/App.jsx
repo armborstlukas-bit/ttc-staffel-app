@@ -6,6 +6,46 @@ if (typeof document !== 'undefined' && !document.getElementById('inter-font')) {
   l.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap';
   document.head.appendChild(l);
 }
+if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styles')) {
+  const st = document.createElement('style');
+  st.id = 'ttc-global-styles';
+  st.textContent = `
+    @keyframes ttcFadeSlide {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes ttcFadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes ttcScaleIn {
+      from { opacity: 0; transform: scale(0.97); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    .ttc-view-enter {
+      animation: ttcFadeSlide 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .ttc-modal-enter {
+      animation: ttcScaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(74,222,128,0.25); border-radius: 99px; }
+    input, textarea, button { font-family: inherit; }
+    @media (max-width: 600px) {
+      .ttc-hide-mobile { display: none !important; }
+      .ttc-mobile-full { width: 100% !important; }
+      .ttc-mobile-stack { flex-direction: column !important; }
+      .ttc-mobile-pad { padding: 0 12px 80px !important; }
+    }
+    @media (min-width: 601px) {
+      .ttc-hide-desktop { display: none !important; }
+    }
+  `;
+  document.head.appendChild(st);
+}
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
@@ -347,6 +387,75 @@ function ArchiveTournEditDialog({ tournament, onClose, onSave }) {
   );
 }
 
+// ── Mobile Bottom Navigation ─────────────────────────────────────────────────
+function MobileBottomNav({ view, navTo, userRole, canEdit, appSettings, unreadCount }) {
+  const isTrainer = canEdit();
+  const items = isTrainer
+    ? [
+        { icon:'🏠', label:'Home',       v:'home' },
+        { icon:'📅', label:'Training',   v:'trainingsplan' },
+        { icon:'🏆', label:'Turniere',   v:'turniere' },
+        { icon:'💬', label:'Nachrichten', v:'notifications', badge: unreadCount },
+        ...(userRole==='admin' ? [{ icon:'🛡️', label:'Admin', v:'admin' }] : []),
+      ]
+    : [
+        { icon:'🏠', label:'Home',       v:'home' },
+        { icon:'💬', label:'Nachrichten', v:'notifications', badge: unreadCount },
+        { icon:'📅', label:'Training',   v:'trainingsplan' },
+        { icon:'🏆', label:'Turniere',   v:'turniere' },
+      ];
+
+  return (
+    <div style={{
+      position:'fixed', bottom:0, left:0, right:0, zIndex:900,
+      background:'rgba(2,26,10,0.96)', backdropFilter:'blur(16px)',
+      borderTop:'1px solid rgba(74,222,128,0.12)',
+      display:'flex', alignItems:'stretch',
+      paddingBottom:'env(safe-area-inset-bottom,0px)',
+      boxShadow:'0 -8px 32px rgba(0,0,0,0.4)',
+    }}>
+      {items.map(item => {
+        const active = view === item.v;
+        return (
+          <button key={item.v} onClick={() => navTo(item.v)}
+            style={{
+              flex:1, padding:'10px 4px 8px', background:'transparent', border:'none',
+              cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center',
+              gap:'3px', position:'relative', transition:'opacity 0.12s',
+              opacity: active ? 1 : 0.45,
+            }}>
+            <span style={{
+              fontSize:'22px', lineHeight:1,
+              filter: active ? 'drop-shadow(0 0 6px rgba(74,222,128,0.7))' : 'none',
+              transition:'filter 0.2s',
+            }}>{item.icon}</span>
+            <span style={{
+              fontSize:'10px', fontWeight: active ? '800' : '600',
+              color: active ? '#4ade80' : 'rgba(255,255,255,0.5)',
+              letterSpacing:'0.2px', lineHeight:1, fontFamily:"'Inter',sans-serif",
+            }}>{item.label}</span>
+            {item.badge > 0 && (
+              <span style={{
+                position:'absolute', top:'6px', right:'calc(50% - 14px)',
+                background:'#dc2626', color:'white', borderRadius:'50%',
+                width:'16px', height:'16px', fontSize:'9px', fontWeight:'800',
+                display:'flex', alignItems:'center', justifyContent:'center',
+              }}>{item.badge > 9 ? '9+' : item.badge}</span>
+            )}
+            {active && (
+              <span style={{
+                position:'absolute', top:0, left:'20%', right:'20%', height:'2px',
+                background:'linear-gradient(90deg,transparent,#4ade80,transparent)',
+                borderRadius:'99px',
+              }}/>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function TrainingsApp() {
   const [user, setUser]               = useState(null);
   const [userRole, setUserRole]       = useState(null);
@@ -359,6 +468,8 @@ export default function TrainingsApp() {
   const [tournaments, setTournaments] = useState({});
 
   const [view, setView]                     = useState('home');
+  const [viewKey, setViewKey]               = useState(0);
+  const [isMobile, setIsMobile]             = useState(typeof window !== 'undefined' && window.innerWidth <= 600);
   const [activeGroup, setActiveGroup]       = useState(null);
   const [activeSubgroup, setActiveSubgroup] = useState(null);
   const [activeChild, setActiveChild]       = useState(null);
@@ -433,6 +544,13 @@ export default function TrainingsApp() {
   const [showRolePicker, setShowRolePicker] = useState(false);
 
   // ── Auth ─────────────────────────────────────────────────────
+  // Mobile detection
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 600);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
       if (u) {
@@ -764,6 +882,9 @@ export default function TrainingsApp() {
     }
     return { active: active.sort((a,b)=>b.createdAt.localeCompare(a.createdAt)), trashed: trashed.sort((a,b)=>b.trashedAt.localeCompare(a.trashedAt)) };
   };
+
+  // Navigation helper – increments viewKey so CSS enter-animation fires
+  const navTo = (v) => { setView(v); setViewKey(k => k + 1); };
 
   const canEdit = () => ['admin','trainer'].includes(userRole);
 
@@ -1339,8 +1460,8 @@ export default function TrainingsApp() {
 
   const s = {
     page:  (color=null) => ({minHeight:'100vh', background: view==='turniere' ? 'linear-gradient(135deg, #92400e 0%, #f59e0b 100%)' : 'linear-gradient(135deg, #358941 0%, #9cc18f 100%)', fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}),
-    wrap:  {maxWidth:'900px',margin:'0 auto',padding:'20px'},
-    card:  {background:'white',borderRadius:'12px',padding:'20px',marginBottom:'16px',boxShadow:'0 4px 6px rgba(0,0,0,0.1)'},
+    wrap:  {maxWidth:'900px',margin:'0 auto',padding:isMobile?'12px 12px 90px':'20px'},
+    card:  {background:'white',borderRadius:'12px',padding:isMobile?'14px':'20px',marginBottom:'14px',boxShadow:'0 4px 6px rgba(0,0,0,0.1)'},
     btn:   (bg,col='white',sm=false)=>({padding:sm?'6px 12px':'10px 16px',background:bg,color:col,border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:sm?'13px':'14px',display:'flex',alignItems:'center',gap:'6px',whiteSpace:'nowrap'}),
     input: {padding:'10px 12px',border:'1px solid #ddd',borderRadius:'8px',fontSize:'14px',flex:1,minWidth:0},
     label: {fontSize:'13px',fontWeight:'600',color:'#555',marginBottom:'4px',display:'block'},
@@ -1349,7 +1470,7 @@ export default function TrainingsApp() {
   if (loading) return <div style={{...s.page(activeGroup?.color),display:'flex',alignItems:'center',justifyContent:'center'}}><p style={{color:'white',fontSize:'20px'}}>Laden...</p></div>;
 
   if (!user) return (
-    <div style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
+    <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
       <div style={{width:'100%',maxWidth:'420px'}}>
         {/* Logo & Titel */}
         <div style={{textAlign:'center',marginBottom:'36px'}}>
@@ -1428,7 +1549,7 @@ export default function TrainingsApp() {
       jugendlich: {icon:'🧒', accent:'rgba(110,231,183,0.9)', accentBg:'rgba(110,231,183,0.08)', accentBorder:'rgba(110,231,183,0.25)', desc:'Eigene Übersicht, Turniere & Errungenschaften'},
     };
     return (
-      <div style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
         <div style={{width:'100%',maxWidth:'420px'}}>
           {/* Logo */}
           <div style={{textAlign:'center',marginBottom:'32px'}}>
@@ -1444,7 +1565,7 @@ export default function TrainingsApp() {
               {selectableRoles.map(role => {
                 const ra = roleAccents[role] || {icon:'👤',accent:'rgba(255,255,255,0.7)',accentBg:'rgba(255,255,255,0.05)',accentBorder:'rgba(255,255,255,0.15)',desc:''};
                 return (
-                  <button key={role} onClick={()=>{ setUserRole(role); setShowRolePicker(false); setView('home'); }}
+                  <button key={role} onClick={()=>{ setUserRole(role); setShowRolePicker(false); navTo('home'); }}
                     style={{padding:'16px 18px',background:ra.accentBg,border:`1px solid ${ra.accentBorder}`,borderRadius:'14px',cursor:'pointer',display:'flex',alignItems:'center',gap:'14px',textAlign:'left',transition:'all 0.12s',width:'100%'}}
                     onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow=`0 8px 24px rgba(0,0,0,0.3)`;}}
                     onMouseLeave={e=>{e.currentTarget.style.transform='translateY(0)';e.currentTarget.style.boxShadow='none';}}>
@@ -1470,7 +1591,7 @@ export default function TrainingsApp() {
   }
 
   if (userRole==='pending') return (
-    <div style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
+    <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
       <div style={{width:'100%',maxWidth:'400px',textAlign:'center'}}>
         <div style={{width:'80px',height:'80px',borderRadius:'22px',background:'linear-gradient(135deg,#15803d,#4ade80)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'38px',margin:'0 auto 20px',boxShadow:'0 8px 32px rgba(74,222,128,0.3)'}}>⏳</div>
         <h2 style={{margin:'0 0 10px',color:'white',fontSize:'24px',fontWeight:'800',letterSpacing:'-0.3px'}}>Account wird freigeschaltet</h2>
@@ -1537,7 +1658,7 @@ export default function TrainingsApp() {
             </div>
           </div>
           <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-            {view!=='home'&&<button onClick={()=>setView('home')} style={s.btn('#358941')} title="Startseite"><Home size={16}/></button>}
+            {view!=='home'&&<button onClick={()=>navTo('home')} style={s.btn('#358941')} title="Startseite"><Home size={16}/></button>}
             {/* Rollenwechsel – nur bei Mehrfachrollen */}
             {(()=>{
               const selectableRoles = (userProfile?.roles||[userRole]).filter(r=>r!=='pending');
@@ -1549,19 +1670,19 @@ export default function TrainingsApp() {
                 </button>
               );
             })()}
-            {userRole==='admin'&&<button onClick={()=>setView('admin')} style={s.btn('#7c3aed')}><Shield size={16}/> Admin</button>}
-            {canEdit()&&<button onClick={()=>setView('trainingsplan')} style={s.btn('#0369a1')}><Calendar size={16}/> Trainingsplan</button>}
-            {canEdit()&&<button onClick={()=>setView('turniere')} style={s.btn('#b45309')}><Trophy size={16}/> Turniere</button>}
-            {canEdit()&&<button onClick={()=>setView('archiv')} style={s.btn('#374151')}><Archive size={16}/> Archiv</button>}
-            {canEdit()&&<button onClick={()=>setView('achievements')} style={s.btn('#7c3aed')}>🏅 Errungenschaften</button>}
-            {canEdit()&&appSettings.mannschaftEnabled&&<button onClick={()=>setView('mannschaft')} style={s.btn('#0f766e')}>⚽ Mannschaft</button>}
+            {userRole==='admin'&&<button onClick={()=>navTo('admin')} style={s.btn('#7c3aed')}><Shield size={16}/> Admin</button>}
+            {canEdit()&&<button onClick={()=>navTo('trainingsplan')} style={s.btn('#0369a1')}><Calendar size={16}/> Trainingsplan</button>}
+            {canEdit()&&<button onClick={()=>navTo('turniere')} style={s.btn('#b45309')}><Trophy size={16}/> Turniere</button>}
+            {canEdit()&&<button onClick={()=>navTo('archiv')} style={s.btn('#374151')}><Archive size={16}/> Archiv</button>}
+            {canEdit()&&<button onClick={()=>navTo('achievements')} style={s.btn('#7c3aed')}>🏅 Errungenschaften</button>}
+            {canEdit()&&appSettings.mannschaftEnabled&&<button onClick={()=>navTo('mannschaft')} style={s.btn('#0f766e')}>⚽ Mannschaft</button>}
             {canEdit()&&(()=>{
               // Badge = nur eingehende Eltern-Nachrichten für zugängliche Gruppen
               const unreadCount = Object.values(notifications).filter(n =>
                 n.type === 'parent_message' && !n.trashedAt && canAccessGroup(n.toGroupId)
               ).length;
               return (
-                <button onClick={()=>setView('notifications')} style={{...s.btn('#059669'),position:'relative'}} title="Benachrichtigungen">
+                <button onClick={()=>navTo('notifications')} style={{...s.btn('#059669'),position:'relative'}} title="Benachrichtigungen">
                   <MessageSquare size={16}/>
                   {unreadCount>0&&<span style={{position:'absolute',top:'-6px',right:'-6px',background:'#dc2626',color:'white',borderRadius:'50%',width:'18px',height:'18px',fontSize:'10px',fontWeight:'700',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>{unreadCount>9?'9+':unreadCount}</span>}
                 </button>
@@ -1630,7 +1751,7 @@ export default function TrainingsApp() {
         <DeleteDialog/>
         {/* Header */}
         <div style={{background:'rgba(0,0,0,0.3)',backdropFilter:'blur(10px)',padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-          <button onClick={()=>setView('home')} style={s.btn('#0369a1')}><Home size={16}/></button>
+          <button onClick={()=>navTo('home')} style={s.btn('#0369a1')}><Home size={16}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>📅 Trainingsplan</h1>
         </div>
         <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
@@ -1827,7 +1948,7 @@ export default function TrainingsApp() {
         {archiveTournDialog && <ArchiveTournDialog tournament={archiveTournDialog} onClose={()=>setArchiveTournDialog(null)} onConfirm={confirmArchiveTournament}/>}
         {/* Header */}
         <div style={{background:'rgba(0,0,0,0.3)',backdropFilter:'blur(10px)',padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-          <button onClick={()=>setView('home')} style={s.btn('#b45309')}><Home size={16}/></button>
+          <button onClick={()=>navTo('home')} style={s.btn('#b45309')}><Home size={16}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>🏆 Turniere</h1>
         </div>
         <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
@@ -2054,7 +2175,7 @@ export default function TrainingsApp() {
       <div style={{minHeight:'100vh',background:"linear-gradient(135deg,#1e0a3c 0%,#7c3aed 100%)",fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
         {/* Header */}
         <div style={{background:'rgba(0,0,0,0.3)',backdropFilter:'blur(10px)',padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-          <button onClick={()=>setView('home')} style={s.btn('#7c3aed')}><Home size={16}/></button>
+          <button onClick={()=>navTo('home')} style={s.btn('#7c3aed')}><Home size={16}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}><Shield size={20} style={{display:'inline',verticalAlign:'middle',marginRight:'6px'}}/>Administration</h1>
           {pendingCount>0&&<span style={{background:'#dc2626',color:'white',borderRadius:'20px',padding:'4px 12px',fontWeight:'700',fontSize:'13px'}}>⚠️ {pendingCount} wartend</span>}
         </div>
@@ -2401,20 +2522,20 @@ export default function TrainingsApp() {
       alignItems:'center',gap:'8px',transition:'transform 0.12s',textAlign:'center'
     });
     const quickLinks = [
-      {label:'Trainingsplan',    icon:'📅', color:'#86efac', bg:'rgba(134,239,172,0.1)',  border:'rgba(134,239,172,0.25)', action:()=>setView('trainingsplan')},
-      {label:'Turniere',         icon:'🏆', color:'#fde68a', bg:'rgba(253,230,138,0.1)',  border:'rgba(253,230,138,0.25)', action:()=>setView('turniere')},
-      {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>setView('notifications'), badge: unreadCount},
-      {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>setView('archiv')},
-      {label:'Errungenschaften', icon:'🏅', color:'#d9f99d', bg:'rgba(217,249,157,0.1)',  border:'rgba(217,249,157,0.25)', action:()=>setView('achievements')},
-      ...(appSettings.mannschaftEnabled?[{label:'Mannschaft',icon:'⚽',color:'#6ee7b7',bg:'rgba(110,231,183,0.1)',border:'rgba(110,231,183,0.25)',action:()=>setView('mannschaft')}]:[]),
-      ...(userRole==='admin'?[{label:'Admin',icon:'🛡️',color:'#c4b5fd',bg:'rgba(196,181,253,0.1)',border:'rgba(196,181,253,0.25)',action:()=>setView('admin')}]:[]),
+      {label:'Trainingsplan',    icon:'📅', color:'#86efac', bg:'rgba(134,239,172,0.1)',  border:'rgba(134,239,172,0.25)', action:()=>navTo('trainingsplan')},
+      {label:'Turniere',         icon:'🏆', color:'#fde68a', bg:'rgba(253,230,138,0.1)',  border:'rgba(253,230,138,0.25)', action:()=>navTo('turniere')},
+      {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>navTo('notifications'), badge: unreadCount},
+      {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
+      {label:'Errungenschaften', icon:'🏅', color:'#d9f99d', bg:'rgba(217,249,157,0.1)',  border:'rgba(217,249,157,0.25)', action:()=>navTo('achievements')},
+      ...(appSettings.mannschaftEnabled?[{label:'Mannschaft',icon:'⚽',color:'#6ee7b7',bg:'rgba(110,231,183,0.1)',border:'rgba(110,231,183,0.25)',action:()=>navTo('mannschaft')}]:[]),
+      ...(userRole==='admin'?[{label:'Admin',icon:'🛡️',color:'#c4b5fd',bg:'rgba(196,181,253,0.1)',border:'rgba(196,181,253,0.25)',action:()=>navTo('admin')}]:[]),
     ];
     const groups = FIXED_GROUPS.filter(g=>canAccessGroup(g.id));
 
     const inputStyle = {padding:'10px 14px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(134,239,172,0.2)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',width:'100%',boxSizing:'border-box'};
 
     return (
-      <div style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         {archiveTournDialog&&<ArchiveTournDialog tournament={archiveTournDialog} onClose={()=>setArchiveTournDialog(null)} onConfirm={confirmArchiveTournament}/>}
 
         {/* Profil-Modal */}
@@ -2446,7 +2567,7 @@ export default function TrainingsApp() {
               {(userProfile?.roles||[userRole]).filter(r=>r!=='pending').map(role=>{
                 const rc2=ROLE_CONFIG[role]||{};
                 return (
-                  <button key={role} onClick={()=>{setUserRole(role);setShowRolePicker(false);setView('home');}}
+                  <button key={role} onClick={()=>{setUserRole(role);setShowRolePicker(false);navTo('home');}}
                     style={{display:'block',width:'100%',padding:'11px 14px',marginBottom:'8px',background:userRole===role?'rgba(74,222,128,0.15)':'rgba(255,255,255,0.05)',border:userRole===role?'1px solid rgba(74,222,128,0.4)':'1px solid rgba(255,255,255,0.1)',borderRadius:'11px',cursor:'pointer',color:'white',fontWeight:'700',fontSize:'14px',textAlign:'left'}}>
                     {rc2.label}
                   </button>
@@ -2457,10 +2578,10 @@ export default function TrainingsApp() {
           </div>
         )}
 
-        <div style={{maxWidth:'820px',margin:'0 auto',padding:'0 20px 60px'}}>
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 100px':'0 20px 60px'}}>
 
           {/* ── Top-Bar ─────────────────────────────────────────── */}
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'22px 0 30px',borderBottom:'1px solid rgba(74,222,128,0.08)',marginBottom:'32px'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:isMobile?'16px 0 20px':'22px 0 30px',borderBottom:'1px solid rgba(74,222,128,0.08)',marginBottom:isMobile?'24px':'32px'}}>
             <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
               <div style={{width:'42px',height:'42px',borderRadius:'12px',background:'linear-gradient(135deg,#15803d,#4ade80)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'20px',boxShadow:'0 4px 16px rgba(74,222,128,0.25)'}}>🏓</div>
               <div>
@@ -2468,17 +2589,17 @@ export default function TrainingsApp() {
                 <p style={{margin:0,color:'rgba(74,222,128,0.55)',fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>{userRole==='admin'?'Administrator':'Trainer'}</p>
               </div>
             </div>
-            <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
-              {(()=>{const sel=(userProfile?.roles||[userRole]).filter(r=>r!=='pending');return sel.length>1?<button onClick={()=>setShowRolePicker(true)} style={{padding:'8px 13px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'10px',color:'#86efac',fontSize:'12px',fontWeight:'700',cursor:'pointer'}}>👤 Rolle</button>:null;})()}
-              <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{padding:'8px 13px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.6)',fontSize:'12px',fontWeight:'600',cursor:'pointer'}}>⚙️ Profil</button>
-              <button onClick={()=>signOut(auth)} style={{padding:'8px 13px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',color:'#fca5a5',fontSize:'12px',fontWeight:'700',cursor:'pointer'}}>Abmelden</button>
+            <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
+              {(()=>{const sel=(userProfile?.roles||[userRole]).filter(r=>r!=='pending');return sel.length>1?<button onClick={()=>setShowRolePicker(true)} style={{padding:'8px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'10px',color:'#86efac',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'👤':'👤 Rolle'}</button>:null;})()}
+              <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{padding:'8px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.6)',fontSize:isMobile?'16px':'12px',fontWeight:'600',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'⚙️':'⚙️ Profil'}</button>
+              <button onClick={()=>signOut(auth)} style={{padding:'8px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',color:'#fca5a5',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'🚪':'Abmelden'}</button>
             </div>
           </div>
 
           {/* ── Greeting ─────────────────────────────────────────── */}
           <div style={{marginBottom:'36px'}}>
             <p style={{margin:'0 0 8px',color:'rgba(74,222,128,0.5)',fontSize:'12px',fontWeight:'700',letterSpacing:'1.5px',textTransform:'uppercase'}}>{dateLabel}</p>
-            <h1 style={{margin:0,color:'white',fontSize:'36px',fontWeight:'800',letterSpacing:'-1px',lineHeight:1.1}}>{greeting}, <span style={{color:'#4ade80'}}>{(userProfile?.name||'Trainer').split(' ')[0]}</span> 👋</h1>
+            <h1 style={{margin:0,color:'white',fontSize:isMobile?'28px':'36px',fontWeight:'800',letterSpacing:'-1px',lineHeight:1.1}}>{greeting}, <span style={{color:'#4ade80'}}>{(userProfile?.name||'Trainer').split(' ')[0]}</span> 👋</h1>
           </div>
 
           {/* ── 1. Training diese Woche ──────────────────────────── */}
@@ -2486,7 +2607,7 @@ export default function TrainingsApp() {
           <div style={{background:'rgba(74,222,128,0.03)',border:'1px solid rgba(74,222,128,0.12)',borderRadius:'20px',overflow:'hidden',marginBottom:'32px',boxShadow:'inset 0 1px 0 rgba(74,222,128,0.07)'}}>
             <div style={{padding:'16px 22px',borderBottom:'1px solid rgba(74,222,128,0.08)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
               <span style={{fontWeight:'800',color:'white',fontSize:'16px',letterSpacing:'-0.3px'}}>📅 Training diese Woche</span>
-              <button onClick={()=>setView('trainingsplan')} style={{background:'rgba(74,222,128,0.12)',border:'1px solid rgba(74,222,128,0.25)',color:'#4ade80',borderRadius:'10px',padding:'6px 14px',fontSize:'12px',cursor:'pointer',fontWeight:'700'}}>Trainingsplan →</button>
+              <button onClick={()=>navTo('trainingsplan')} style={{background:'rgba(74,222,128,0.12)',border:'1px solid rgba(74,222,128,0.25)',color:'#4ade80',borderRadius:'10px',padding:'6px 14px',fontSize:'12px',cursor:'pointer',fontWeight:'700'}}>Trainingsplan →</button>
             </div>
             <div style={{padding:'14px 18px',display:'flex',flexDirection:'column',gap:'8px'}}>
               {pastSess.length===0&&upcomingSess.length===0
@@ -2500,7 +2621,7 @@ export default function TrainingsApp() {
                     const archivable=isSessionArchivable(session);
                     const allDone=allKids2.length>0&&recorded===allKids2.length;
                     return (
-                      <div key={session.id} onClick={()=>{setActiveSession(session);setView('sessionAttendance');}}
+                      <div key={session.id} onClick={()=>{setActiveSession(session);navTo('sessionAttendance');}}
                         style={{display:'flex',alignItems:'center',gap:'14px',padding:'13px 16px',background:'rgba(220,38,38,0.07)',border:'1px solid rgba(220,38,38,0.18)',borderRadius:'14px',cursor:'pointer',transition:'background 0.12s'}}
                         onMouseEnter={e=>e.currentTarget.style.background='rgba(220,38,38,0.13)'}
                         onMouseLeave={e=>e.currentTarget.style.background='rgba(220,38,38,0.07)'}>
@@ -2526,7 +2647,7 @@ export default function TrainingsApp() {
                     const sessionSubs=(session.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean);
                     const isToday=session.date===todayStr;
                     return (
-                      <div key={session.id} onClick={()=>{setActiveSession(session);setView('sessionAttendance');}}
+                      <div key={session.id} onClick={()=>{setActiveSession(session);navTo('sessionAttendance');}}
                         style={{display:'flex',alignItems:'center',gap:'14px',padding:'13px 16px',background:isToday?'rgba(74,222,128,0.07)':'rgba(255,255,255,0.025)',border:'1px solid '+(isToday?'rgba(74,222,128,0.22)':'rgba(255,255,255,0.065)'),borderRadius:'14px',cursor:'pointer',transition:'background 0.12s'}}
                         onMouseEnter={e=>e.currentTarget.style.background=isToday?'rgba(74,222,128,0.13)':'rgba(255,255,255,0.05)'}
                         onMouseLeave={e=>e.currentTarget.style.background=isToday?'rgba(74,222,128,0.07)':'rgba(255,255,255,0.025)'}>
@@ -2566,7 +2687,7 @@ export default function TrainingsApp() {
           <div style={{background:'rgba(253,230,138,0.025)',border:'1px solid rgba(253,230,138,0.12)',borderRadius:'20px',overflow:'hidden',marginBottom:'32px',boxShadow:'inset 0 1px 0 rgba(253,230,138,0.06)'}}>
             <div style={{padding:'16px 22px',borderBottom:'1px solid rgba(253,230,138,0.08)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
               <span style={{fontWeight:'800',color:'white',fontSize:'16px',letterSpacing:'-0.3px'}}>🏆 Kommende Turniere</span>
-              <button onClick={()=>setView('turniere')} style={{background:'rgba(253,230,138,0.12)',border:'1px solid rgba(253,230,138,0.25)',color:'#fde68a',borderRadius:'10px',padding:'6px 14px',fontSize:'12px',cursor:'pointer',fontWeight:'700'}}>Alle Turniere →</button>
+              <button onClick={()=>navTo('turniere')} style={{background:'rgba(253,230,138,0.12)',border:'1px solid rgba(253,230,138,0.25)',color:'#fde68a',borderRadius:'10px',padding:'6px 14px',fontSize:'12px',cursor:'pointer',fontWeight:'700'}}>Alle Turniere →</button>
             </div>
             <div style={{padding:'14px 18px',display:'flex',flexDirection:'column',gap:'8px'}}>
               {tourneys.length===0
@@ -2585,7 +2706,7 @@ export default function TrainingsApp() {
                     <div key={t.id} style={{padding:'14px 16px',background:'rgba(253,230,138,0.04)',border:'1px solid rgba(253,230,138,0.12)',borderRadius:'14px',cursor:'pointer',transition:'background 0.12s'}}
                       onMouseEnter={e=>e.currentTarget.style.background='rgba(253,230,138,0.09)'}
                       onMouseLeave={e=>e.currentTarget.style.background='rgba(253,230,138,0.04)'}
-                      onClick={()=>{setScrollToTournId(t.id);setView('turniere');}}>
+                      onClick={()=>{setScrollToTournId(t.id);navTo('turniere');}}>
                       <div style={{display:'flex',alignItems:'flex-start',gap:'14px'}}>
                         <div style={{width:'40px',height:'40px',borderRadius:'12px',background:'rgba(253,230,138,0.1)',border:'1px solid rgba(253,230,138,0.22)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'20px'}}>🏆</div>
                         <div style={{flex:1,minWidth:0}}>
@@ -2621,7 +2742,7 @@ export default function TrainingsApp() {
               const gradSub   = isJugend ? 'rgba(134,239,172,0.5)' : 'rgba(147,197,253,0.5)';
               const gradArrow = isJugend ? 'rgba(74,222,128,0.35)' : 'rgba(96,165,250,0.35)';
               return (
-                <div key={group.id} onClick={()=>{setActiveGroup(group);setView('group');}}
+                <div key={group.id} onClick={()=>{setActiveGroup(group);navTo('group');}}
                   style={{borderRadius:'20px',padding:'22px 20px',cursor:'pointer',position:'relative',overflow:'hidden',transition:'transform 0.15s,box-shadow 0.15s',background:gradBg,border:'1px solid '+gradBorder,boxShadow:'inset 0 1px 0 rgba(255,255,255,0.07)'}}
                   onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-3px)';e.currentTarget.style.boxShadow='0 16px 48px rgba(0,0,0,0.5)';}}
                   onMouseLeave={e=>{e.currentTarget.style.transform='translateY(0)';e.currentTarget.style.boxShadow='inset 0 1px 0 rgba(255,255,255,0.07)';}}>
@@ -2636,6 +2757,7 @@ export default function TrainingsApp() {
           </div>
 
         </div>
+        {isMobile && <MobileBottomNav view={view} navTo={navTo} userRole={userRole} canEdit={canEdit} appSettings={appSettings} unreadCount={unreadCount}/>}
       </div>
     );
   }
@@ -2680,7 +2802,7 @@ export default function TrainingsApp() {
     const SECTION_LABEL = (color='rgba(74,222,128,0.45)') => ({color,fontSize:'10px',fontWeight:'800',textTransform:'uppercase',letterSpacing:'2px',margin:'0 0 10px',display:'block'});
 
     return (
-      <div style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <AchievementPopup data={achievementPopup} onClose={()=>setAchievementPopup(null)}/>
 
         {/* Profil-Modal */}
@@ -2704,10 +2826,10 @@ export default function TrainingsApp() {
           </div>
         )}
 
-        <div style={{maxWidth:'820px',margin:'0 auto',padding:'0 20px 60px'}}>
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 100px':'0 20px 60px'}}>
 
           {/* ── Top-Bar ── */}
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'22px 0 24px',borderBottom:'1px solid rgba(74,222,128,0.08)',marginBottom:'28px'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:isMobile?'16px 0 20px':'22px 0 24px',borderBottom:'1px solid rgba(74,222,128,0.08)',marginBottom:isMobile?'22px':'28px'}}>
             <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
               <div style={{width:'42px',height:'42px',borderRadius:'12px',background:'linear-gradient(135deg,#15803d,#4ade80)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'20px',boxShadow:'0 4px 16px rgba(74,222,128,0.25)'}}>🏓</div>
               <div>
@@ -2715,17 +2837,17 @@ export default function TrainingsApp() {
                 <p style={{margin:0,color:'rgba(74,222,128,0.55)',fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>{userRole==='eltern'?'Eltern-Portal':'Jugend-Portal'}</p>
               </div>
             </div>
-            <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
-              {(()=>{const sel=(userProfile?.roles||[userRole]).filter(r=>r!=='pending');return sel.length>1?<button onClick={()=>setShowRolePicker(true)} style={{padding:'8px 13px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'10px',color:'#86efac',fontSize:'12px',fontWeight:'700',cursor:'pointer'}}>👤 Rolle</button>:null;})()}
-              <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{padding:'8px 13px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.6)',fontSize:'12px',fontWeight:'600',cursor:'pointer'}}>⚙️ Profil</button>
-              <button onClick={()=>signOut(auth)} style={{padding:'8px 13px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',color:'#fca5a5',fontSize:'12px',fontWeight:'700',cursor:'pointer'}}>Abmelden</button>
+            <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
+              {(()=>{const sel=(userProfile?.roles||[userRole]).filter(r=>r!=='pending');return sel.length>1?<button onClick={()=>setShowRolePicker(true)} style={{padding:'8px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'10px',color:'#86efac',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'👤':'👤 Rolle'}</button>:null;})()}
+              <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{padding:'8px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.6)',fontSize:isMobile?'16px':'12px',fontWeight:'600',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'⚙️':'⚙️ Profil'}</button>
+              <button onClick={()=>signOut(auth)} style={{padding:'8px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',color:'#fca5a5',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'🚪':'Abmelden'}</button>
             </div>
           </div>
 
           {/* ── Greeting ── */}
           <div style={{marginBottom:'32px'}}>
             <p style={{margin:'0 0 6px',color:'rgba(74,222,128,0.5)',fontSize:'12px',fontWeight:'700',letterSpacing:'1.5px',textTransform:'uppercase'}}>{dateLabel}</p>
-            <h1 style={{margin:0,color:'white',fontSize:'32px',fontWeight:'800',letterSpacing:'-1px',lineHeight:1.1}}>
+            <h1 style={{margin:0,color:'white',fontSize:isMobile?'26px':'32px',fontWeight:'800',letterSpacing:'-1px',lineHeight:1.1}}>
               {greeting}, <span style={{color:'#4ade80'}}>{myChild?myChild.name.split(' ')[0]:(userProfile?.name||'').split(' ')[0]||'Hallo'}</span> 👋
             </h1>
           </div>
@@ -3255,6 +3377,7 @@ export default function TrainingsApp() {
             </>
           }
         </div>
+        {isMobile && <MobileBottomNav view={view} navTo={navTo} userRole={userRole} canEdit={canEdit} appSettings={appSettings} unreadCount={0}/>}
       </div>
     );
   }
@@ -3265,7 +3388,7 @@ export default function TrainingsApp() {
   if (view==='group') {
     const subs=getSubgroupsForGroup(activeGroup.id);
     return (
-      <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
+      <div className="ttc-view-enter" key={viewKey} style={s.page(activeGroup?.color)}><div style={s.wrap}>
         <Header/>
         <div style={s.card}>
           <h2 style={{margin:'0 0 16px',color:activeGroup.color}}>{activeGroup.emoji} {activeGroup.name}</h2>
@@ -3283,7 +3406,7 @@ export default function TrainingsApp() {
                 const presentToday=kids.filter(c=>(c.attendance||{})[trainingDate]==='present').length;
                 return (
                   <div key={sub.id} style={{border:'1px solid #ddd',borderRadius:'10px',overflow:'hidden'}}>
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px',background:'#f8f9fa',cursor:'pointer'}} onClick={()=>{setActiveSubgroup(sub);setView('subgroup');}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px',background:'#f8f9fa',cursor:'pointer'}} onClick={()=>{setActiveSubgroup(sub);navTo('subgroup');}}>
                       <div>
                         <h3 style={{margin:'0 0 4px',color:'#333',fontSize:'17px'}}>{sub.name}</h3>
                         <p style={{margin:0,color:'#666',fontSize:'12px'}}>{kids.length} Kinder · {(sub.trainingDates||[]).length} Trainings · heute {presentToday} anwesend</p>
@@ -3315,8 +3438,8 @@ export default function TrainingsApp() {
     const totalSessions=(sub.trainingDates||[]).length;
 
     return (
-      <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
-        <Header back backLabel={activeGroup.name} backAction={()=>setView('group')}/>
+      <div className="ttc-view-enter" key={viewKey} style={s.page(activeGroup?.color)}><div style={s.wrap}>
+        <Header back backLabel={activeGroup.name} backAction={()=>navTo('group')}/>
         <div style={s.card}>
           {/* Header */}
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px',flexWrap:'wrap',gap:'8px'}}>
@@ -3362,7 +3485,7 @@ export default function TrainingsApp() {
                 const pct=stats.percent;
                 return (
                   <div key={child.id}
-                    onClick={()=>{setActiveChild(child);setView('childHistory');}}
+                    onClick={()=>{setActiveChild(child);navTo('childHistory');}}
                     style={{padding:'14px',borderRadius:'10px',border:'1px solid #ddd',background:'white',cursor:'pointer',transition:'box-shadow 0.15s'}}
                     onMouseEnter={e=>e.currentTarget.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'}
                     onMouseLeave={e=>e.currentTarget.style.boxShadow='none'}>
@@ -3414,7 +3537,7 @@ export default function TrainingsApp() {
     const excusedCount = allKids.filter(c=>(children[c.id]?.attendance||{})[sessionDate]==='absent_excused').length;
 
     return (
-      <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
+      <div className="ttc-view-enter" key={viewKey} style={s.page(activeGroup?.color)}><div style={s.wrap}>
         <Header/>
         <div style={s.card}>
           {/* Session Info */}
@@ -3511,7 +3634,7 @@ export default function TrainingsApp() {
             return (
               <div style={{marginTop:'20px',paddingTop:'16px',borderTop:'1px solid #eee'}}>
                 {archivable
-                  ? <button onClick={()=>{if(window.confirm('Dieses Training archivieren? Es verschwindet aus der Übersicht, die Anwesenheitsdaten bleiben erhalten.')) archiveSession(session); setView('home');}}
+                  ? <button onClick={()=>{if(window.confirm('Dieses Training archivieren? Es verschwindet aus der Übersicht, die Anwesenheitsdaten bleiben erhalten.')) archiveSession(session); navTo('home');}}
                       style={{...s.btn('#374151'),width:'100%',justifyContent:'center'}}>
                       <Archive size={16}/> Training archivieren
                     </button>
@@ -3546,8 +3669,8 @@ export default function TrainingsApp() {
     };
 
     return (
-      <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
-        <Header back backLabel={sub?.name||'Zurück'} backAction={()=>setView('subgroup')}/>
+      <div className="ttc-view-enter" key={viewKey} style={s.page(activeGroup?.color)}><div style={s.wrap}>
+        <Header back backLabel={sub?.name||'Zurück'} backAction={()=>navTo('subgroup')}/>
         <div style={s.card}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px',flexWrap:'wrap',gap:'8px'}}>
             <div>
@@ -3850,9 +3973,9 @@ export default function TrainingsApp() {
     );
 
     return (
-      <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#3b0764 0%,#7c3aed 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#3b0764 0%,#7c3aed 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
         <div style={{background:'rgba(0,0,0,0.3)',backdropFilter:'blur(10px)',padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-          <button onClick={()=>setView('home')} style={s.btn('#7c3aed')}><Home size={16}/></button>
+          <button onClick={()=>navTo('home')} style={s.btn('#7c3aed')}><Home size={16}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>🏅 Errungenschaften verwalten</h1>
         </div>
         <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
@@ -4064,7 +4187,7 @@ export default function TrainingsApp() {
       <div style={{minHeight:'100vh',background:"linear-gradient(135deg,#064e3b 0%,#059669 100%)",fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
         {/* Header */}
         <div style={{background:'rgba(0,0,0,0.3)',backdropFilter:'blur(10px)',padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-          <button onClick={()=>setView('home')} style={s.btn('#059669')}><Home size={16}/></button>
+          <button onClick={()=>navTo('home')} style={s.btn('#059669')}><Home size={16}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}><Bell size={20} style={{display:'inline',verticalAlign:'middle',marginRight:'6px'}}/>Benachrichtigungen</h1>
         </div>
         <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
@@ -4354,9 +4477,9 @@ export default function TrainingsApp() {
     };
 
     return (
-      <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#0f4c3a 0%,#134e4a 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#0f4c3a 0%,#134e4a 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
         <div style={{background:'rgba(0,0,0,0.3)',backdropFilter:'blur(10px)',padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-          <button onClick={()=>setView('home')} style={s.btn('#0f766e')}><Home size={16}/></button>
+          <button onClick={()=>navTo('home')} style={s.btn('#0f766e')}><Home size={16}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>⚽ Mannschaftsverwaltung</h1>
         </div>
 
@@ -4509,10 +4632,10 @@ export default function TrainingsApp() {
     return (
       <>
       {editingArchivedTourn && <ArchiveTournEditDialog tournament={editingArchivedTourn} onClose={()=>setEditingArchivedTourn(null)} onSave={saveArchivedTournEdit}/>}
-      <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#1a3a2a 0%,#2d5a3d 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#1a3a2a 0%,#2d5a3d 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
         {/* Header */}
         <div style={{background:'rgba(0,0,0,0.3)',backdropFilter:'blur(10px)',padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-          <button onClick={()=>setView('home')} style={s.btn('#358941')}><Home size={16}/></button>
+          <button onClick={()=>navTo('home')} style={s.btn('#358941')}><Home size={16}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>📦 Archiv</h1>
         </div>
 
