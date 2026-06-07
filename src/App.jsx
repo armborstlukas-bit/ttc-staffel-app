@@ -2300,7 +2300,8 @@ export default function TrainingsApp() {
                     </div>
                   </div>
                   {linkedChild&&<p style={{margin:'6px 0 0',fontSize:'12px',color:'#358941'}}>👶 Verknüpft mit: <strong>{linkedChild.name}</strong></p>}
-                  {u.role==='trainer'&&(
+                  {/* Gruppenauswahl – sobald Trainer-Rolle aktiv */}
+                  {(u.roles||[u.role]).includes('trainer')&&(
                     <div style={{marginTop:'8px',display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
                       <span style={{fontSize:'12px',fontWeight:'600',color:'#555'}}>Gruppen:</span>
                       {FIXED_GROUPS.map(g=>{
@@ -2315,6 +2316,25 @@ export default function TrainingsApp() {
                         );
                       })}
                       {(u.groupIds||[]).length===0&&<span style={{fontSize:'11px',color:'#dc2626',fontStyle:'italic'}}>⚠️ Keine Gruppe zugewiesen</span>}
+                    </div>
+                  )}
+                  {/* Account-Aktionen: Zurück auf Wartend + Löschen */}
+                  {u.role!=='pending'&&(
+                    <div style={{marginTop:'8px',display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                      <button onClick={()=>{
+                        if(window.confirm(`"${u.name||u.email}" zurück auf Wartend setzen?`))
+                          saveUserRoles(u.uid,['pending']);
+                      }} style={{padding:'3px 10px',background:'#fef3c7',border:'1px solid #d97706',borderRadius:'6px',cursor:'pointer',color:'#92400e',fontSize:'11px',fontWeight:'600'}}>
+                        ⏳ Auf Wartend setzen
+                      </button>
+                      <button onClick={async()=>{
+                        if(!window.confirm(`Account von "${u.name||u.email}" (${u.email}) wirklich löschen?\n\nDies entfernt den Account aus der App. Die Firebase-Auth-Anmeldung bleibt bestehen.`)) return;
+                        const updated={...allUsers}; delete updated[u.uid];
+                        await setDoc(doc(db,'ttc','users'),updated);
+                        setAllUsers(updated);
+                      }} style={{padding:'3px 10px',background:'#fee2e2',border:'1px solid #fca5a5',borderRadius:'6px',cursor:'pointer',color:'#dc2626',fontSize:'11px',fontWeight:'600'}}>
+                        🗑️ Account löschen
+                      </button>
                     </div>
                   )}
                 </div>
