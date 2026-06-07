@@ -534,7 +534,7 @@ export default function TrainingsApp() {
   const [activePracticeId, setActivePracticeId]                     = useState(null);
   const [ptCreating, setPtCreating]                                 = useState(false);
   const [ptCreateStep, setPtCreateStep]                             = useState(1);
-  const [ptCreateForm, setPtCreateForm]                             = useState({type:'4er_gruppe',winSets:2,setLength:11,deciderLength:7,trackSetScores:false});
+  const [ptCreateForm, setPtCreateForm]                             = useState({type:'4er_gruppe',winSets:2,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false});
   const [ptSelectedChildren, setPtSelectedChildren]                 = useState([]);
   const [ptSubgroupFilter, setPtSubgroupFilter]                     = useState('all');
   const [ptMatchEditing, setPtMatchEditing]                         = useState(null);
@@ -4680,7 +4680,7 @@ export default function TrainingsApp() {
         id, type:'4er_gruppe',
         createdAt: new Date().toISOString(),
         createdBy: userProfile?.name || user?.email || 'Trainer',
-        settings: { winSets:ptCreateForm.winSets, setLength:ptCreateForm.setLength, deciderLength:ptCreateForm.deciderLength, trackSetScores:ptCreateForm.trackSetScores },
+        settings: { winSets:ptCreateForm.winSets, setLength:ptCreateForm.setLength, deciderLength:ptCreateForm.deciderCustom?ptCreateForm.deciderLength:ptCreateForm.setLength, trackSetScores:ptCreateForm.trackSetScores },
         players: seeded.map((p,i) => ({...p, seed:i+1})),
         matches: [
           {round:1,p1Idx:0,p2Idx:3,result:null},
@@ -4716,7 +4716,7 @@ export default function TrainingsApp() {
               <p style={{margin:0,color:'rgba(167,139,250,0.5)',fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>{allPTList.length} laufend{allPTList.length!==1?'e':''}</p>
             </div>
             {!ptCreating && (
-              <button onClick={()=>{setPtCreating(true);setPtCreateStep(1);setPtSelectedChildren([]);setPtSubgroupFilter('all');setPtCreateForm({type:'4er_gruppe',winSets:2,setLength:11,deciderLength:7,trackSetScores:false});}}
+              <button onClick={()=>{setPtCreating(true);setPtCreateStep(1);setPtSelectedChildren([]);setPtSubgroupFilter('all');setPtCreateForm({type:'4er_gruppe',winSets:2,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false});}}
                 style={{padding:'9px 16px',background:'linear-gradient(135deg,#7c3aed,#6d28d9)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'700',fontSize:'13px',display:'flex',alignItems:'center',gap:'6px',whiteSpace:'nowrap'}}>
                 <Plus size={15}/> Neuer Wettkampf
               </button>
@@ -4780,7 +4780,8 @@ export default function TrainingsApp() {
                       </div>
                     </div>
 
-                    {/* Satzlänge */}
+                    {/* Satzlänge — nur bei Satzergebnissen */}
+                    {ptCreateForm.trackSetScores && (
                     <div>
                       <p style={{margin:'0 0 8px',fontSize:'12px',color:'rgba(255,255,255,0.45)',fontWeight:'700'}}>Satzlänge</p>
                       <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
@@ -4790,16 +4791,30 @@ export default function TrainingsApp() {
                         <span style={{fontSize:'12px',color:'rgba(255,255,255,0.3)'}}>Punkte</span>
                       </div>
                     </div>
+                    )}
+                  </div>
 
-                    {/* Entscheidungssatz */}
-                    <div>
-                      <p style={{margin:'0 0 8px',fontSize:'12px',color:'rgba(255,255,255,0.45)',fontWeight:'700'}}>Entscheidungssatz</p>
-                      <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
-                        <button onClick={()=>setPtCreateForm(f=>({...f,deciderLength:Math.max(5,f.deciderLength-1)}))} style={smBtn(false)}>−</button>
-                        <span style={{fontSize:'22px',fontWeight:'900',color:'#fde68a',minWidth:'32px',textAlign:'center'}}>{ptCreateForm.deciderLength}</span>
-                        <button onClick={()=>setPtCreateForm(f=>({...f,deciderLength:Math.min(21,f.deciderLength+1)}))} style={smBtn(false)}>+</button>
-                        <span style={{fontSize:'12px',color:'rgba(255,255,255,0.3)'}}>Punkte</span>
-                      </div>
+                  {/* Entscheidungssatz — Checkbox + bedingte Länge */}
+                  <div style={{display:'flex',alignItems:'flex-start',gap:'12px',marginBottom:'20px',padding:'12px 14px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'12px'}}>
+                    <button onClick={()=>setPtCreateForm(f=>({...f,deciderCustom:!f.deciderCustom}))}
+                      style={{width:'22px',height:'22px',borderRadius:'6px',border:`2px solid ${ptCreateForm.deciderCustom?'#fde68a':'rgba(255,255,255,0.2)'}`,background:ptCreateForm.deciderCustom?'rgba(253,230,138,0.2)':'transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginTop:'1px'}}>
+                      {ptCreateForm.deciderCustom&&<span style={{fontSize:'14px',color:'#fde68a',lineHeight:1}}>✓</span>}
+                    </button>
+                    <div style={{flex:1}}>
+                      <p style={{margin:'0 0 2px',fontSize:'13px',fontWeight:'700',color:ptCreateForm.deciderCustom?'#fde68a':'rgba(255,255,255,0.5)',cursor:'pointer'}} onClick={()=>setPtCreateForm(f=>({...f,deciderCustom:!f.deciderCustom}))}>
+                        Abweichende Entscheidungssatzlänge
+                      </p>
+                      <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>
+                        {ptCreateForm.deciderCustom?'Eigene Punktzahl für den Entscheidungssatz festlegen':'Entscheidungssatz hat dieselbe Länge wie normale Sätze'}
+                      </p>
+                      {ptCreateForm.deciderCustom&&(
+                        <div style={{display:'flex',alignItems:'center',gap:'10px',marginTop:'10px'}}>
+                          <button onClick={()=>setPtCreateForm(f=>({...f,deciderLength:Math.max(5,f.deciderLength-1)}))} style={smBtn(false)}>−</button>
+                          <span style={{fontSize:'22px',fontWeight:'900',color:'#fde68a',minWidth:'32px',textAlign:'center'}}>{ptCreateForm.deciderLength}</span>
+                          <button onClick={()=>setPtCreateForm(f=>({...f,deciderLength:Math.min(21,f.deciderLength+1)}))} style={smBtn(false)}>+</button>
+                          <span style={{fontSize:'12px',color:'rgba(255,255,255,0.3)'}}>Punkte</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
