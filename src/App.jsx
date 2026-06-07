@@ -404,6 +404,7 @@ export default function TrainingsApp() {
   const [showTrainingHistory, setShowTrainingHistory]       = useState(false);
   const [showAchievements, setShowAchievements]             = useState(false);
   const [stayLoggedIn, setStayLoggedIn]                     = useState(false);
+  const [registerIsParent, setRegisterIsParent]             = useState(false);
   // Mannschaft form states
   const [teamForm, setTeamForm]                             = useState({name:'', trainerUids:[], childIds:[]});
   const [editingTeam, setEditingTeam]                       = useState(null);
@@ -862,7 +863,7 @@ export default function TrainingsApp() {
     if (!loginName.trim()) { setError('Bitte Name eingeben!'); return; }
     try {
       const cred = await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
-      const profile = { uid:cred.user.uid, email:loginEmail, name:loginName, role:'pending', linkedChildId:null };
+      const profile = { uid:cred.user.uid, email:loginEmail, name:loginName, role:'pending', linkedChildId:null, isParent: registerIsParent };
       await setDoc(doc(db,'users',cred.user.uid), profile);
       const snap = await getDoc(doc(db,'ttc','users'));
       await setDoc(doc(db,'ttc','users'), { ...(snap.exists()?snap.data():{}), [cred.user.uid]:profile });
@@ -1319,7 +1320,16 @@ export default function TrainingsApp() {
           ))}
         </div>
         <form onSubmit={authMode==='login'?handleLogin:handleRegister} style={{display:'flex',flexDirection:'column',gap:'12px'}}>
-          {authMode==='register'&&<input placeholder="Dein Name" value={loginName} onChange={e=>setLoginName(e.target.value)} required style={{...s.input,flex:'none'}}/>}
+          {authMode==='register'&&(
+            <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+              <input placeholder="Dein Name / Das meines Kindes" value={loginName} onChange={e=>setLoginName(e.target.value)} required style={{...s.input,flex:'none'}}/>
+              <label style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',fontSize:'14px',color:'#555',userSelect:'none',padding:'4px 0'}}>
+                <input type="checkbox" checked={registerIsParent} onChange={e=>setRegisterIsParent(e.target.checked)}
+                  style={{width:'16px',height:'16px',cursor:'pointer',accentColor:'#358941'}}/>
+                Ich bin ein Elternteil
+              </label>
+            </div>
+          )}
           <input type="email" placeholder="E-Mail" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} required style={{...s.input,flex:'none'}}/>
           <input type="password" placeholder="Passwort (min. 6 Zeichen)" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} required style={{...s.input,flex:'none'}}/>
           {authMode==='login'&&(
@@ -2562,9 +2572,21 @@ export default function TrainingsApp() {
               return (
                 <div key={u.uid} style={{padding:'12px 16px',background:u.role==='pending'?'#fff5f5':'#f8f9fa',borderRadius:'8px',border:u.role==='pending'?'2px solid #fca5a5':'1px solid #ddd'}}>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'8px'}}>
-                    <div>
-                      <p style={{margin:'0 0 2px',fontWeight:'600',color:'#333'}}>{u.name||u.email}</p>
-                      <p style={{margin:0,fontSize:'12px',color:'#999'}}>{u.email}</p>
+                    <div style={{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+                      <div>
+                        <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',marginBottom:'2px'}}>
+                          <p style={{margin:0,fontWeight:'700',color:'#333',fontSize:'15px'}}>{u.name||u.email}</p>
+                          {u.isParent&&<span style={{fontSize:'11px',background:'#dbeafe',color:'#1d4ed8',padding:'2px 8px',borderRadius:'10px',fontWeight:'700'}}>👨‍👧 Elternteil</span>}
+                          {u.isParent===false&&u.role==='pending'&&<span style={{fontSize:'11px',background:'#fef9c3',color:'#92400e',padding:'2px 8px',borderRadius:'10px',fontWeight:'700'}}>🧒 Kein Elternteil</span>}
+                        </div>
+                        <p style={{margin:0,fontSize:'12px',color:'#999'}}>{u.email}</p>
+                      </div>
+                      {u.role==='pending'&&(
+                        <button onClick={()=>saveUserRoles(u.uid,['eltern'])}
+                          style={{padding:'10px 20px',background:'#16a34a',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'15px',whiteSpace:'nowrap',boxShadow:'0 2px 8px rgba(22,163,74,0.4)'}}>
+                          ✓ Freischalten
+                        </button>
+                      )}
                     </div>
                     <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
                       {/* Rollen als Toggle-Buttons – Mehrfachauswahl möglich */}
@@ -2597,9 +2619,6 @@ export default function TrainingsApp() {
                           );
                         })}
                         {u.role==='pending'&&<span style={{fontSize:'11px',fontWeight:'700',color:'#dc2626',background:'#fee2e2',padding:'2px 8px',borderRadius:'20px'}}>⏳ Wartend</span>}
-                        {u.role==='pending'&&(
-                          <button onClick={()=>saveUserRoles(u.uid,['eltern'])} style={{padding:'3px 9px',background:'#358941',color:'white',border:'none',borderRadius:'20px',cursor:'pointer',fontWeight:'600',fontSize:'11px'}}>✓ Freischalten</button>
-                        )}
                       </div>
                       {/* Kind zuordnen bei Eltern/Jugendlichen */}
                       {(()=>{
