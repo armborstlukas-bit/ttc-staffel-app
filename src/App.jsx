@@ -114,6 +114,177 @@ function KonkurrenzForm({ konk, helpers, childList, tournamentDates, subgroups }
   );
 }
 
+// ── Archiv-Turnier-Dialog (OUTSIDE component to prevent focus loss) ──────────
+const RESULT_FIELDS_EINZEL = [
+  {field:'p1',  label:'🥇 Einzel 1. Platz'},
+  {field:'p2',  label:'🥈 Einzel 2. Platz'},
+  {field:'p3a', label:'🥉 Einzel 3. Platz (A)'},
+  {field:'p3b', label:'🥉 Einzel 3. Platz (B)'},
+];
+const RESULT_FIELDS_DOPPEL = [
+  {field:'dp1',  label:'🥇 Doppel 1. Platz'},
+  {field:'dp2',  label:'🥈 Doppel 2. Platz'},
+  {field:'dp3a', label:'🥉 Doppel 3. Platz (A)'},
+  {field:'dp3b', label:'🥉 Doppel 3. Platz (B)'},
+];
+
+function ArchiveTournDialog({ tournament, onClose, onConfirm }) {
+  const [results, setResults] = React.useState(() => {
+    const r = {};
+    (tournament?.konkurrenzen||[]).forEach(k => {
+      r[k.id] = { p1:'', p2:'', p3a:'', p3b:'', dp1:'', dp2:'', dp3a:'', dp3b:'' };
+    });
+    return r;
+  });
+  if (!tournament) return null;
+  const setResult = (kid, field, val) => setResults(prev => ({...prev, [kid]: {...(prev[kid]||{}), [field]: val}}));
+  const konkurrenzen = tournament.konkurrenzen || [];
+  return (
+    <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px',overflowY:'auto'}}>
+      <div style={{background:'white',borderRadius:'16px',padding:'28px',maxWidth:'540px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)',maxHeight:'90vh',overflowY:'auto'}}>
+        <h3 style={{margin:'0 0 4px',color:'#92400e',fontSize:'20px'}}>🏆 Turnier archivieren</h3>
+        <p style={{margin:'0 0 20px',color:'#666',fontSize:'13px'}}>{tournament.name} — Ergebnisse eintragen (optional)</p>
+        {konkurrenzen.length===0
+          ? <p style={{color:'#999',fontSize:'13px',marginBottom:'20px'}}>Keine Konkurrenzen vorhanden.</p>
+          : <div style={{display:'grid',gap:'16px',marginBottom:'20px'}}>
+            {konkurrenzen.map(konk => {
+              const r = results[konk.id] || {};
+              const konkDate = konk.date ? new Date(konk.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}) : null;
+              return (
+                <div key={konk.id} style={{padding:'14px',background:'#fffbeb',borderRadius:'10px',border:'1px solid #fde68a'}}>
+                  <p style={{margin:'0 0 12px',fontWeight:'700',color:'#92400e',fontSize:'14px'}}>
+                    {konk.name||'(Unbenannte Konkurrenz)'}
+                    {konkDate&&<span style={{fontSize:'12px',fontWeight:'400',color:'#b45309',marginLeft:'8px'}}>{konkDate} · {konk.time} Uhr</span>}
+                  </p>
+                  <p style={{margin:'0 0 6px',fontSize:'12px',fontWeight:'600',color:'#b45309',textTransform:'uppercase',letterSpacing:'0.4px'}}>Einzel</p>
+                  <div style={{display:'grid',gap:'6px',marginBottom:'10px'}}>
+                    {RESULT_FIELDS_EINZEL.map(({field,label}) => (
+                      <div key={field} style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                        <span style={{fontSize:'13px',color:'#555',minWidth:'170px'}}>{label}</span>
+                        <input value={r[field]||''} onChange={e=>setResult(konk.id,field,e.target.value)}
+                          placeholder="Name oder leer lassen"
+                          style={{flex:1,padding:'6px 10px',border:'1px solid #fde68a',borderRadius:'7px',fontSize:'13px'}}/>
+                      </div>
+                    ))}
+                  </div>
+                  <p style={{margin:'0 0 6px',fontSize:'12px',fontWeight:'600',color:'#b45309',textTransform:'uppercase',letterSpacing:'0.4px'}}>Doppel</p>
+                  <div style={{display:'grid',gap:'6px'}}>
+                    {RESULT_FIELDS_DOPPEL.map(({field,label}) => (
+                      <div key={field} style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                        <span style={{fontSize:'13px',color:'#555',minWidth:'170px'}}>{label}</span>
+                        <input value={r[field]||''} onChange={e=>setResult(konk.id,field,e.target.value)}
+                          placeholder="Name oder leer lassen"
+                          style={{flex:1,padding:'6px 10px',border:'1px solid #fde68a',borderRadius:'7px',fontSize:'13px'}}/>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        }
+        <div style={{display:'grid',gap:'8px'}}>
+          <button onClick={()=>onConfirm(results)}
+            style={{padding:'12px',background:'#374151',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px'}}>
+            📦 Ins Archiv verschieben
+          </button>
+          <button onClick={onClose}
+            style={{padding:'12px',background:'#f3f4f6',color:'#333',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
+            Abbrechen
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Archiv-Turnier-Bearbeiten-Dialog (OUTSIDE component) ─────────────────────
+function ArchiveTournEditDialog({ tournament, onClose, onSave }) {
+  const [form, setForm] = React.useState(() => JSON.parse(JSON.stringify(tournament)));
+  if (!tournament) return null;
+  const setResult = (kid, field, val) =>
+    setForm(prev => ({...prev, results: {...(prev.results||{}), [kid]: {...((prev.results||{})[kid]||{}), [field]: val}}}));
+  const konkurrenzen = form.konkurrenzen || [];
+  return (
+    <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px',overflowY:'auto'}}>
+      <div style={{background:'white',borderRadius:'16px',padding:'28px',maxWidth:'540px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)',maxHeight:'90vh',overflowY:'auto'}}>
+        <h3 style={{margin:'0 0 16px',color:'#92400e',fontSize:'20px'}}>✏️ Turnier bearbeiten</h3>
+        <div style={{display:'grid',gap:'10px',marginBottom:'16px'}}>
+          <div>
+            <label style={{fontSize:'12px',fontWeight:'600',color:'#555',display:'block',marginBottom:'3px'}}>Name</label>
+            <input value={form.name||''} onChange={e=>setForm(f=>({...f,name:e.target.value}))}
+              style={{width:'100%',padding:'8px 12px',border:'1px solid #ddd',borderRadius:'8px',fontSize:'14px',boxSizing:'border-box'}}/>
+          </div>
+          <div>
+            <label style={{fontSize:'12px',fontWeight:'600',color:'#555',display:'block',marginBottom:'3px'}}>Ort</label>
+            <input value={form.location||''} onChange={e=>setForm(f=>({...f,location:e.target.value}))}
+              style={{width:'100%',padding:'8px 12px',border:'1px solid #ddd',borderRadius:'8px',fontSize:'14px',boxSizing:'border-box'}}/>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+            <div>
+              <label style={{fontSize:'12px',fontWeight:'600',color:'#555',display:'block',marginBottom:'3px'}}>Von</label>
+              <input type="date" value={form.dateFrom||''} onChange={e=>setForm(f=>({...f,dateFrom:e.target.value}))}
+                style={{width:'100%',padding:'8px 12px',border:'1px solid #ddd',borderRadius:'8px',fontSize:'14px',boxSizing:'border-box'}}/>
+            </div>
+            <div>
+              <label style={{fontSize:'12px',fontWeight:'600',color:'#555',display:'block',marginBottom:'3px'}}>Bis</label>
+              <input type="date" value={form.dateTo||''} onChange={e=>setForm(f=>({...f,dateTo:e.target.value}))}
+                style={{width:'100%',padding:'8px 12px',border:'1px solid #ddd',borderRadius:'8px',fontSize:'14px',boxSizing:'border-box'}}/>
+            </div>
+          </div>
+        </div>
+        {konkurrenzen.length>0 && (
+          <div style={{marginBottom:'16px'}}>
+            <p style={{margin:'0 0 10px',fontSize:'13px',fontWeight:'700',color:'#92400e'}}>Ergebnisse bearbeiten:</p>
+            <div style={{display:'grid',gap:'12px'}}>
+              {konkurrenzen.map(konk => {
+                const r = (form.results||{})[konk.id] || {};
+                return (
+                  <div key={konk.id} style={{padding:'12px',background:'#fffbeb',borderRadius:'10px',border:'1px solid #fde68a'}}>
+                    <p style={{margin:'0 0 10px',fontWeight:'700',color:'#92400e',fontSize:'13px'}}>{konk.name||'(Konkurrenz)'}</p>
+                    <p style={{margin:'0 0 5px',fontSize:'11px',fontWeight:'700',color:'#b45309',textTransform:'uppercase'}}>Einzel</p>
+                    <div style={{display:'grid',gap:'5px',marginBottom:'8px'}}>
+                      {RESULT_FIELDS_EINZEL.map(({field,label})=>(
+                        <div key={field} style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                          <span style={{fontSize:'12px',color:'#555',minWidth:'160px'}}>{label}</span>
+                          <input value={r[field]||''} onChange={e=>setResult(konk.id,field,e.target.value)}
+                            placeholder="leer lassen"
+                            style={{flex:1,padding:'5px 8px',border:'1px solid #fde68a',borderRadius:'6px',fontSize:'13px'}}/>
+                        </div>
+                      ))}
+                    </div>
+                    <p style={{margin:'0 0 5px',fontSize:'11px',fontWeight:'700',color:'#b45309',textTransform:'uppercase'}}>Doppel</p>
+                    <div style={{display:'grid',gap:'5px'}}>
+                      {RESULT_FIELDS_DOPPEL.map(({field,label})=>(
+                        <div key={field} style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                          <span style={{fontSize:'12px',color:'#555',minWidth:'160px'}}>{label}</span>
+                          <input value={r[field]||''} onChange={e=>setResult(konk.id,field,e.target.value)}
+                            placeholder="leer lassen"
+                            style={{flex:1,padding:'5px 8px',border:'1px solid #fde68a',borderRadius:'6px',fontSize:'13px'}}/>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        <div style={{display:'flex',gap:'8px'}}>
+          <button onClick={()=>onSave(form)}
+            style={{flex:1,padding:'12px',background:'#374151',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
+            💾 Speichern
+          </button>
+          <button onClick={onClose}
+            style={{padding:'12px 20px',background:'#f3f4f6',color:'#333',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
+            Abbrechen
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TrainingsApp() {
   const [user, setUser]               = useState(null);
   const [userRole, setUserRole]       = useState(null);
@@ -157,9 +328,10 @@ export default function TrainingsApp() {
   const [archivedSessions, setArchivedSessions]       = useState({});
   const [archivedTournaments, setArchivedTournaments] = useState({});
   const [archiveTab, setArchiveTab]                   = useState('sessions');
-  const [archiveTournDialog, setArchiveTournDialog]   = useState(null);
+  const [archiveTournDialog, setArchiveTournDialog]         = useState(null); // tournament object or null
   const [editingArchivedSession, setEditingArchivedSession] = useState(null);
   const [editArchivedForm, setEditArchivedForm]             = useState({});
+  const [editingArchivedTourn, setEditingArchivedTourn]     = useState(null); // tournament object or null
 
   const [authMode, setAuthMode]           = useState('login');
   const [loginEmail, setLoginEmail]       = useState('');
@@ -474,18 +646,19 @@ export default function TrainingsApp() {
     return new Date().toISOString().split('T')[0] >= dayAfter.toISOString().split('T')[0];
   };
 
-  const openArchiveTournDialog = (t) => {
-    const results = {};
-    (t.konkurrenzen||[]).forEach(k => { results[k.id] = { p1:'', p2:'', p3a:'', p3b:'' }; });
-    setArchiveTournDialog({ tournament: t, results });
+  const openArchiveTournDialog = (t) => setArchiveTournDialog(t);
+
+  const confirmArchiveTournament = (results) => {
+    const t = archiveTournDialog;
+    const archivedAt = new Date().toISOString();
+    saveArchivedTournaments({ ...archivedTournaments, [t.id]: { ...t, archivedAt, results } });
+    const u = { ...tournaments }; delete u[t.id]; saveTournaments(u);
+    setArchiveTournDialog(null);
   };
 
-  const confirmArchiveTournament = () => {
-    const { tournament, results } = archiveTournDialog;
-    const archivedAt = new Date().toISOString();
-    saveArchivedTournaments({ ...archivedTournaments, [tournament.id]: { ...tournament, archivedAt, results } });
-    const u = { ...tournaments }; delete u[tournament.id]; saveTournaments(u);
-    setArchiveTournDialog(null);
+  const saveArchivedTournEdit = (form) => {
+    saveArchivedTournaments({ ...archivedTournaments, [form.id]: form });
+    setEditingArchivedTourn(null);
   };
 
   const restoreTournament = (t) => {
@@ -514,7 +687,19 @@ export default function TrainingsApp() {
   };
 
   const saveArchivedSessionEdit = () => {
-    saveArchivedSessions({ ...archivedSessions, [editArchivedForm.id]: { ...editArchivedForm } });
+    const { editAttendance, ...sessionData } = editArchivedForm;
+    // Update children attendance in Firestore
+    if (editAttendance && sessionData.date) {
+      const updatedChildren = { ...children };
+      Object.entries(editAttendance).forEach(([childId, status]) => {
+        if (updatedChildren[childId]) {
+          updatedChildren[childId] = { ...updatedChildren[childId], attendance: { ...(updatedChildren[childId].attendance||{}), [sessionData.date]: status || undefined } };
+          if (!status) delete updatedChildren[childId].attendance[sessionData.date];
+        }
+      });
+      saveChildren(updatedChildren);
+    }
+    saveArchivedSessions({ ...archivedSessions, [sessionData.id]: sessionData });
     setEditingArchivedSession(null);
   };
 
@@ -727,65 +912,6 @@ export default function TrainingsApp() {
               🗑️ Alle {deleteDialog.blockSize} Einheiten der Reihe löschen
             </button>
             <button onClick={()=>setDeleteDialog(null)}
-              style={{padding:'12px',background:'#f3f4f6',color:'#333',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
-              Abbrechen
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // ── TURNIER-ARCHIV-DIALOG ────────────────────────────────────
-  const ArchiveTournDialog = () => {
-    if (!archiveTournDialog) return null;
-    const { tournament, results } = archiveTournDialog;
-    const konkurrenzen = tournament.konkurrenzen || [];
-    const setResult = (kid, field, val) =>
-      setArchiveTournDialog({ ...archiveTournDialog, results: { ...results, [kid]: { ...(results[kid]||{}), [field]: val } } });
-    return (
-      <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px',overflowY:'auto'}}>
-        <div style={{background:'white',borderRadius:'16px',padding:'28px',maxWidth:'480px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)',maxHeight:'90vh',overflowY:'auto'}}>
-          <h3 style={{margin:'0 0 4px',color:'#92400e',fontSize:'20px'}}>🏆 Turnier archivieren</h3>
-          <p style={{margin:'0 0 20px',color:'#666',fontSize:'13px'}}>{tournament.name} — Ergebnisse eintragen (optional)</p>
-          {konkurrenzen.length===0
-            ? <p style={{color:'#999',fontSize:'13px',marginBottom:'20px'}}>Keine Konkurrenzen vorhanden.</p>
-            : <div style={{display:'grid',gap:'16px',marginBottom:'20px'}}>
-              {konkurrenzen.map(konk => {
-                const r = results[konk.id] || {};
-                const konkDate = konk.date ? new Date(konk.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}) : null;
-                return (
-                  <div key={konk.id} style={{padding:'14px',background:'#fffbeb',borderRadius:'10px',border:'1px solid #fde68a'}}>
-                    <p style={{margin:'0 0 10px',fontWeight:'700',color:'#92400e',fontSize:'14px'}}>
-                      {konk.name||'(Unbenannte Konkurrenz)'}
-                      {konkDate&&<span style={{fontSize:'12px',fontWeight:'400',color:'#b45309',marginLeft:'8px'}}>{konkDate} · {konk.time} Uhr</span>}
-                    </p>
-                    <div style={{display:'grid',gap:'8px'}}>
-                      {[
-                        {field:'p1',  label:'🥇 1. Platz',    placeholder:'Name oder leer lassen'},
-                        {field:'p2',  label:'🥈 2. Platz',    placeholder:'Name oder leer lassen'},
-                        {field:'p3a', label:'🥉 3. Platz (A)', placeholder:'Name oder leer lassen'},
-                        {field:'p3b', label:'🥉 3. Platz (B)', placeholder:'Name oder leer lassen'},
-                      ].map(({field,label,placeholder}) => (
-                        <div key={field} style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                          <span style={{fontSize:'13px',fontWeight:'600',color:'#555',minWidth:'130px'}}>{label}</span>
-                          <input value={r[field]||''} onChange={e=>setResult(konk.id,field,e.target.value)}
-                            placeholder={placeholder}
-                            style={{flex:1,padding:'7px 10px',border:'1px solid #fde68a',borderRadius:'7px',fontSize:'13px'}}/>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          }
-          <div style={{display:'grid',gap:'8px'}}>
-            <button onClick={confirmArchiveTournament}
-              style={{padding:'12px',background:'#374151',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px'}}>
-              <Archive size={16}/> Ins Archiv verschieben
-            </button>
-            <button onClick={()=>setArchiveTournDialog(null)}
               style={{padding:'12px',background:'#f3f4f6',color:'#333',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
               Abbrechen
             </button>
@@ -1010,7 +1136,7 @@ export default function TrainingsApp() {
 
     return (
       <div style={s.page()}><div style={s.wrap}>
-        <ArchiveTournDialog/>
+        {archiveTournDialog && <ArchiveTournDialog tournament={archiveTournDialog} onClose={()=>setArchiveTournDialog(null)} onConfirm={confirmArchiveTournament}/>}
         <Header/>
 
         {/* Neues Turnier */}
@@ -2020,10 +2146,18 @@ export default function TrainingsApp() {
 
   // ── ARCHIV VIEW ──────────────────────────────────────────────────────────
   if (view === 'archiv') {
-    const sortedArchivedSessions = Object.values(archivedSessions).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    const sortedArchivedSessions    = Object.values(archivedSessions).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     const sortedArchivedTournaments = Object.values(archivedTournaments).sort((a,b)=>(b.dateFrom||b.date||'').localeCompare(a.dateFrom||a.date||''));
+    // Attendance status config
+    const attCfg = {
+      present:          { label:'Anwesend',     color:'#16a34a', bg:'#dcfce7', symbol:'✅' },
+      absent_unexcused: { label:'Unentschuldigt',color:'#6b7280',bg:'#f3f4f6', symbol:'–'  },
+      absent_excused:   { label:'Entschuldigt', color:'#d97706', bg:'#fef3c7', symbol:'⏰' },
+    };
 
     return (
+      <>
+      {editingArchivedTourn && <ArchiveTournEditDialog tournament={editingArchivedTourn} onClose={()=>setEditingArchivedTourn(null)} onSave={saveArchivedTournEdit}/>}
       <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#1a3a2a 0%,#2d5a3d 100%)'}}>
         {/* Header */}
         <div style={{background:'rgba(0,0,0,0.3)',backdropFilter:'blur(10px)',padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
@@ -2031,7 +2165,7 @@ export default function TrainingsApp() {
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'700',flex:1}}>📦 Archiv</h1>
         </div>
 
-        <div style={{padding:'20px',maxWidth:'800px',margin:'0 auto'}}>
+        <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
           {/* Tabs */}
           <div style={{display:'flex',gap:'8px',marginBottom:'20px'}}>
             {[['sessions','🏋️ Archiv Training'],['tournaments','🏆 Archiv Turniere']].map(([key,label])=>(
@@ -2046,7 +2180,7 @@ export default function TrainingsApp() {
 
           {/* ── TRAINING TAB ── */}
           {archiveTab==='sessions' && (
-            <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+            <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
               {sortedArchivedSessions.length===0 && (
                 <div style={{background:'rgba(255,255,255,0.1)',borderRadius:'12px',padding:'30px',textAlign:'center',color:'rgba(255,255,255,0.7)'}}>
                   Noch keine archivierten Trainingseinheiten.
@@ -2054,92 +2188,122 @@ export default function TrainingsApp() {
               )}
               {sortedArchivedSessions.map(session=>{
                 const stats = getSessionAttendanceStats(session);
-                const isEditing = editingArchivedSession === session.id;
+                const totalPresent = stats.reduce((s,st)=>s+st.present,0);
+                const totalKids    = stats.reduce((s,st)=>s+st.total,0);
+                const totalPct     = totalKids>0 ? Math.round((totalPresent/totalKids)*100) : 0;
+                const isEditing    = editingArchivedSession === session.id;
+
+                // All children for this session's subgroups
+                const sessionKids  = (session.subgroupIds||[]).flatMap(sid=>getChildrenForSubgroup(sid));
+
                 return (
-                  <div key={session.id} style={{background:'white',borderRadius:'14px',padding:'16px',boxShadow:'0 2px 8px rgba(0,0,0,0.15)'}}>
-                    <div style={{display:'flex',alignItems:'flex-start',gap:'10px',marginBottom:'10px'}}>
-                      <div style={{flex:1}}>
-                        <div style={{fontWeight:'700',fontSize:'16px',color:'#1a3a2a'}}>
-                          {session.date ? new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}) : 'Datum unbekannt'}
-                          {session.time && <span style={{marginLeft:'8px',color:'#666',fontSize:'14px'}}>{session.time} Uhr</span>}
+                  <div key={session.id} style={{background:'white',borderRadius:'12px',boxShadow:'0 1px 4px rgba(0,0,0,0.12)'}}>
+                    {/* ── Slim card (always visible) ── */}
+                    <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 14px',flexWrap:'wrap'}}>
+                      {/* Date */}
+                      <div style={{minWidth:'160px'}}>
+                        <div style={{fontWeight:'700',fontSize:'14px',color:'#1a3a2a'}}>
+                          {session.date ? new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'}) : '–'}
                         </div>
-                        {session.trainerName && <div style={{fontSize:'13px',color:'#555',marginTop:'2px'}}>👤 {session.trainerName}</div>}
-                        {session.info && <div style={{fontSize:'13px',color:'#666',marginTop:'2px',fontStyle:'italic'}}>{session.info}</div>}
-                        {/* Subgroups */}
-                        {session.subgroupIds && session.subgroupIds.length>0 && (
-                          <div style={{display:'flex',gap:'4px',flexWrap:'wrap',marginTop:'6px'}}>
-                            {session.subgroupIds.map(sid=>{
-                              const sg = subgroups[sid];
-                              return sg ? <span key={sid} style={{background:sg.color||'#ddd',color:'white',fontSize:'11px',padding:'2px 8px',borderRadius:'20px',fontWeight:'600'}}>{sg.name}</span> : null;
-                            })}
-                          </div>
-                        )}
+                        <div style={{fontSize:'12px',color:'#888'}}>{session.time||''} Uhr{session.trainer||session.trainerName ? ` · ${session.trainer||session.trainerName}` : ''}</div>
                       </div>
-                      <div style={{display:'flex',gap:'6px'}}>
+                      {/* Subgroup badges */}
+                      <div style={{display:'flex',gap:'4px',flexWrap:'wrap',flex:1}}>
+                        {(session.subgroupIds||[]).map(sid=>{
+                          const sg=subgroups[sid];
+                          return sg ? <span key={sid} style={{background:sg.color||'#ddd',color:'white',fontSize:'11px',padding:'2px 7px',borderRadius:'20px',fontWeight:'600'}}>{sg.name}</span> : null;
+                        })}
+                      </div>
+                      {/* Attendance % */}
+                      <div style={{textAlign:'right',minWidth:'70px'}}>
+                        <span style={{fontSize:'15px',fontWeight:'700',color:totalPct>=75?'#16a34a':totalPct>=50?'#d97706':'#dc2626'}}>{totalPct}%</span>
+                        <div style={{fontSize:'11px',color:'#888'}}>{totalPresent}/{totalKids} da</div>
+                      </div>
+                      {/* Buttons */}
+                      <div style={{display:'flex',gap:'5px',flexShrink:0}}>
                         <button onClick={()=>restoreSession(session)}
-                          style={{padding:'6px 12px',background:'#16a34a',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontSize:'12px',fontWeight:'600'}}>
+                          style={{padding:'5px 10px',background:'#16a34a',color:'white',border:'none',borderRadius:'7px',cursor:'pointer',fontSize:'12px',fontWeight:'600',whiteSpace:'nowrap'}}>
                           ↩ Reaktivieren
                         </button>
                         <button onClick={()=>{
+                          if (isEditing) { setEditingArchivedSession(null); return; }
+                          // Build attendance snapshot from children
+                          const att = {};
+                          sessionKids.forEach(c => { att[c.id] = (children[c.id]?.attendance||{})[session.date] || ''; });
+                          setEditArchivedForm({ ...session, trainerName: session.trainerName||session.trainer||'', editAttendance: att });
                           setEditingArchivedSession(session.id);
-                          setEditArchivedForm({trainerName:session.trainerName||'',time:session.time||'',info:session.info||''});
                         }}
-                          style={{padding:'6px 12px',background:'#3b82f6',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontSize:'12px',fontWeight:'600'}}>
-                          ✏️ Bearbeiten
+                          style={{padding:'5px 10px',background:isEditing?'#6b7280':'#3b82f6',color:'white',border:'none',borderRadius:'7px',cursor:'pointer',fontSize:'12px',fontWeight:'600'}}>
+                          {isEditing ? '✕ Schließen' : '✏️ Bearbeiten'}
                         </button>
                       </div>
                     </div>
 
-                    {/* Edit form */}
+                    {/* ── Edit form (expanded) ── */}
                     {isEditing && (
-                      <div style={{background:'#f0f9ff',borderRadius:'10px',padding:'12px',marginBottom:'10px',border:'1px solid #bfdbfe'}}>
-                        <p style={{margin:'0 0 8px',fontWeight:'600',fontSize:'13px',color:'#1e40af'}}>Trainingseinheit bearbeiten:</p>
-                        <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'8px'}}>
+                      <div style={{borderTop:'1px solid #e5e7eb',padding:'16px',background:'#f8fafc'}}>
+                        {/* Meta fields */}
+                        <div style={{display:'flex',gap:'10px',flexWrap:'wrap',marginBottom:'16px'}}>
                           <div>
-                            <label style={{fontSize:'12px',color:'#555',display:'block',marginBottom:'2px'}}>Trainer</label>
-                            <input value={editArchivedForm.trainerName} onChange={e=>setEditArchivedForm(f=>({...f,trainerName:e.target.value}))}
-                              style={{padding:'6px 10px',border:'1px solid #ddd',borderRadius:'6px',fontSize:'13px',width:'160px'}}/>
+                            <label style={{fontSize:'12px',fontWeight:'600',color:'#374151',display:'block',marginBottom:'3px'}}>Trainer</label>
+                            <input value={editArchivedForm.trainerName||''} onChange={e=>setEditArchivedForm(f=>({...f,trainerName:e.target.value}))}
+                              style={{padding:'7px 10px',border:'1px solid #d1d5db',borderRadius:'7px',fontSize:'13px',width:'160px'}}/>
                           </div>
                           <div>
-                            <label style={{fontSize:'12px',color:'#555',display:'block',marginBottom:'2px'}}>Uhrzeit</label>
-                            <input type="time" value={editArchivedForm.time} onChange={e=>setEditArchivedForm(f=>({...f,time:e.target.value}))}
-                              style={{padding:'6px 10px',border:'1px solid #ddd',borderRadius:'6px',fontSize:'13px'}}/>
+                            <label style={{fontSize:'12px',fontWeight:'600',color:'#374151',display:'block',marginBottom:'3px'}}>Uhrzeit</label>
+                            <input type="time" value={editArchivedForm.time||''} onChange={e=>setEditArchivedForm(f=>({...f,time:e.target.value}))}
+                              style={{padding:'7px 10px',border:'1px solid #d1d5db',borderRadius:'7px',fontSize:'13px'}}/>
                           </div>
-                          <div style={{flex:1,minWidth:'160px'}}>
-                            <label style={{fontSize:'12px',color:'#555',display:'block',marginBottom:'2px'}}>Info / Notiz</label>
-                            <input value={editArchivedForm.info} onChange={e=>setEditArchivedForm(f=>({...f,info:e.target.value}))}
-                              style={{padding:'6px 10px',border:'1px solid #ddd',borderRadius:'6px',fontSize:'13px',width:'100%',boxSizing:'border-box'}}/>
+                          <div style={{flex:1,minWidth:'180px'}}>
+                            <label style={{fontSize:'12px',fontWeight:'600',color:'#374151',display:'block',marginBottom:'3px'}}>Notiz</label>
+                            <input value={editArchivedForm.info||''} onChange={e=>setEditArchivedForm(f=>({...f,info:e.target.value}))}
+                              style={{padding:'7px 10px',border:'1px solid #d1d5db',borderRadius:'7px',fontSize:'13px',width:'100%',boxSizing:'border-box'}}/>
                           </div>
                         </div>
+
+                        {/* Per-child attendance */}
+                        {sessionKids.length>0 && (
+                          <div style={{marginBottom:'14px'}}>
+                            <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>Anwesenheit ({sessionKids.length} Kinder)</p>
+                            <div style={{display:'grid',gap:'5px'}}>
+                              {sessionKids.sort((a,b)=>a.name.localeCompare(b.name,'de')).map(child=>{
+                                const cur = (editArchivedForm.editAttendance||{})[child.id] || '';
+                                const sg  = subgroups[child.subgroupId];
+                                return (
+                                  <div key={child.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',borderRadius:'8px',background:'white',border:'1px solid #e5e7eb'}}>
+                                    <div>
+                                      <span style={{fontWeight:'600',fontSize:'13px',color:'#111'}}>{child.name}</span>
+                                      {sg&&<span style={{fontSize:'11px',color:'#888',marginLeft:'5px'}}>{sg.name}</span>}
+                                    </div>
+                                    <div style={{display:'flex',gap:'5px'}}>
+                                      {[
+                                        {k:'present',         icon:'✅', title:'Anwesend',      active:'#16a34a', border:'#16a34a'},
+                                        {k:'absent_unexcused',icon:'–',  title:'Unentschuldigt', active:'#6b7280', border:'#9ca3af'},
+                                        {k:'absent_excused',  icon:'⏰', title:'Entschuldigt',   active:'#d97706', border:'#d97706'},
+                                      ].map(({k,icon,title,active,border})=>(
+                                        <button key={k} title={title}
+                                          onClick={()=>setEditArchivedForm(f=>({...f,editAttendance:{...(f.editAttendance||{}),[child.id]:k}}))}
+                                          style={{width:'34px',height:'34px',border:`2px solid ${cur===k?active:border}`,background:cur===k?active:'white',color:cur===k?'white':active,borderRadius:'6px',cursor:'pointer',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:'700'}}>
+                                          {icon}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
                         <div style={{display:'flex',gap:'8px'}}>
                           <button onClick={saveArchivedSessionEdit}
-                            style={{padding:'6px 14px',background:'#1d4ed8',color:'white',border:'none',borderRadius:'6px',cursor:'pointer',fontSize:'13px',fontWeight:'600'}}>
+                            style={{padding:'9px 18px',background:'#1d4ed8',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontSize:'13px',fontWeight:'700'}}>
                             💾 Speichern
                           </button>
                           <button onClick={()=>setEditingArchivedSession(null)}
-                            style={{padding:'6px 14px',background:'#e5e7eb',color:'#374151',border:'none',borderRadius:'6px',cursor:'pointer',fontSize:'13px'}}>
+                            style={{padding:'9px 14px',background:'#e5e7eb',color:'#374151',border:'none',borderRadius:'8px',cursor:'pointer',fontSize:'13px'}}>
                             Abbrechen
                           </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Attendance stats per subgroup */}
-                    {stats.length>0 && (
-                      <div style={{borderTop:'1px solid #eee',paddingTop:'10px'}}>
-                        <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'600',color:'#888',textTransform:'uppercase',letterSpacing:'0.5px'}}>Anwesenheit</p>
-                        <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-                          {stats.map(st=>(
-                            <div key={st.subgroupId} style={{background:'#f9fafb',borderRadius:'8px',padding:'8px 12px',minWidth:'120px'}}>
-                              <div style={{fontSize:'12px',fontWeight:'700',color:st.color||'#333',marginBottom:'4px'}}>{st.name}</div>
-                              <div style={{fontSize:'12px',color:'#555'}}>
-                                ✅ {st.present} &nbsp;⏰ {st.excused} &nbsp;❌ {st.unexcused}
-                              </div>
-                              <div style={{fontSize:'11px',color:'#888',marginTop:'2px'}}>
-                                {st.total} Kinder · {st.percent}% anwesend
-                              </div>
-                            </div>
-                          ))}
                         </div>
                       </div>
                     )}
@@ -2169,10 +2333,16 @@ export default function TrainingsApp() {
                         <div style={{fontSize:'13px',color:'#78350f',marginTop:'2px'}}>📅 {dateStr}</div>
                         {t.location && <div style={{fontSize:'13px',color:'#78350f',marginTop:'2px'}}>📍 {t.location}</div>}
                       </div>
-                      <button onClick={()=>restoreTournament(t)}
-                        style={{padding:'6px 12px',background:'#d97706',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontSize:'12px',fontWeight:'600',whiteSpace:'nowrap'}}>
-                        ↩ Reaktivieren
-                      </button>
+                      <div style={{display:'flex',gap:'6px',flexShrink:0}}>
+                        <button onClick={()=>setEditingArchivedTourn(t)}
+                          style={{padding:'6px 12px',background:'#3b82f6',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontSize:'12px',fontWeight:'600',whiteSpace:'nowrap'}}>
+                          ✏️ Bearbeiten
+                        </button>
+                        <button onClick={()=>restoreTournament(t)}
+                          style={{padding:'6px 12px',background:'#d97706',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontSize:'12px',fontWeight:'600',whiteSpace:'nowrap'}}>
+                          ↩ Reaktivieren
+                        </button>
+                      </div>
                     </div>
 
                     {/* Results per Konkurrenz */}
@@ -2182,20 +2352,27 @@ export default function TrainingsApp() {
                         <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
                           {t.konkurrenzen.map(k=>{
                             const r = t.results && t.results[k.id];
+                            const hasEinzel = r && (r.p1||r.p2||r.p3a||r.p3b);
+                            const hasDoppel = r && (r.dp1||r.dp2||r.dp3a||r.dp3b);
+                            const hasAny    = hasEinzel || hasDoppel;
                             return (
-                              <div key={k.id} style={{background:'white',borderRadius:'10px',padding:'10px 14px',minWidth:'160px',border:'1px solid #fde68a'}}>
+                              <div key={k.id} style={{background:'white',borderRadius:'10px',padding:'10px 14px',minWidth:'180px',border:'1px solid #fde68a'}}>
                                 <div style={{fontWeight:'700',fontSize:'13px',color:'#92400e',marginBottom:'6px'}}>{k.name||'Konkurrenz'}</div>
-                                {r ? (
-                                  <div style={{display:'flex',flexDirection:'column',gap:'3px',fontSize:'13px'}}>
-                                    {r.p1 && <div>🥇 {r.p1}</div>}
-                                    {r.p2 && <div>🥈 {r.p2}</div>}
+                                {!hasAny
+                                  ? <div style={{color:'#aaa',fontSize:'12px',fontStyle:'italic'}}>Kein Sieger in dieser Konkurrenz</div>
+                                  : <div style={{display:'flex',flexDirection:'column',gap:'2px',fontSize:'12px'}}>
+                                    {hasEinzel && <p style={{margin:'0 0 4px',fontSize:'11px',fontWeight:'700',color:'#b45309',textTransform:'uppercase'}}>Einzel</p>}
+                                    {r.p1  && <div>🥇 {r.p1}</div>}
+                                    {r.p2  && <div>🥈 {r.p2}</div>}
                                     {r.p3a && <div>🥉 {r.p3a}</div>}
                                     {r.p3b && <div>🥉 {r.p3b}</div>}
-                                    {!r.p1&&!r.p2&&!r.p3a&&!r.p3b && <div style={{color:'#aaa',fontStyle:'italic'}}>Keine Ergebnisse</div>}
+                                    {hasDoppel && <p style={{margin:'4px 0 4px',fontSize:'11px',fontWeight:'700',color:'#b45309',textTransform:'uppercase'}}>Doppel</p>}
+                                    {r.dp1  && <div>🥇 {r.dp1}</div>}
+                                    {r.dp2  && <div>🥈 {r.dp2}</div>}
+                                    {r.dp3a && <div>🥉 {r.dp3a}</div>}
+                                    {r.dp3b && <div>🥉 {r.dp3b}</div>}
                                   </div>
-                                ) : (
-                                  <div style={{color:'#aaa',fontSize:'12px',fontStyle:'italic'}}>Keine Ergebnisse</div>
-                                )}
+                                }
                               </div>
                             );
                           })}
@@ -2209,6 +2386,7 @@ export default function TrainingsApp() {
           )}
         </div>
       </div>
+      </>
     );
   }
 }
