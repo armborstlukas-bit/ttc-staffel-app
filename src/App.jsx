@@ -374,6 +374,9 @@ export default function TrainingsApp() {
   const [pwConfirm, setPwConfirm]               = useState('');
   const [pwError, setPwError]                   = useState('');
   const [pwSuccess, setPwSuccess]               = useState(false); // {sessionId, repeatId, blockSize}
+  const [adminRoleDialog, setAdminRoleDialog]   = useState(null); // { uid, newRoles } | null
+  const [adminRolePw, setAdminRolePw]           = useState('');
+  const [adminRoleError, setAdminRoleError]     = useState('');
 
   const [newTournament, setNewTournament]         = useState(emptyTournament);
   const [editingTournament, setEditingTournament] = useState(null);
@@ -2202,9 +2205,57 @@ export default function TrainingsApp() {
   if (view==='admin') {
     const allChildrenList=Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
     const pendingCount=Object.values(allUsers).filter(u=>u.role==='pending').length;
+
+    const confirmAdminRole = async () => {
+      if (!adminRolePw.trim()) { setAdminRoleError('Bitte Passwort eingeben.'); return; }
+      try {
+        const credential = EmailAuthProvider.credential(user.email, adminRolePw);
+        await reauthenticateWithCredential(user, credential);
+        await saveUserRoles(adminRoleDialog.uid, adminRoleDialog.newRoles);
+        setAdminRoleDialog(null);
+        setAdminRolePw('');
+        setAdminRoleError('');
+      } catch {
+        setAdminRoleError('Falsches Passwort. Bitte erneut versuchen.');
+      }
+    };
+
     return (
       <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
         <Header/>
+
+        {/* Admin-Rollen-Bestätigung */}
+        {adminRoleDialog&&(
+          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px'}}>
+            <div style={{background:'white',borderRadius:'16px',padding:'28px',maxWidth:'380px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
+              <div style={{fontSize:'36px',textAlign:'center',marginBottom:'12px'}}>🛡️</div>
+              <h3 style={{margin:'0 0 8px',color:'#7c3aed',fontSize:'18px',textAlign:'center'}}>Admin-Rolle vergeben</h3>
+              <p style={{margin:'0 0 16px',color:'#666',fontSize:'14px',textAlign:'center'}}>
+                Bitte bestätige mit deinem eigenen Admin-Passwort, um die Admin-Rolle zu vergeben.
+              </p>
+              {adminRoleError&&<p style={{color:'#dc2626',fontSize:'13px',marginBottom:'12px',padding:'8px',background:'#fee2e2',borderRadius:'6px'}}>{adminRoleError}</p>}
+              <input
+                type="password"
+                placeholder="Dein Admin-Passwort"
+                value={adminRolePw}
+                onChange={e=>{setAdminRolePw(e.target.value);setAdminRoleError('');}}
+                onKeyDown={e=>e.key==='Enter'&&confirmAdminRole()}
+                autoFocus
+                style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box',marginBottom:'14px',borderColor:'#7c3aed',borderWidth:'2px'}}
+              />
+              <div style={{display:'grid',gap:'8px'}}>
+                <button onClick={confirmAdminRole}
+                  style={{padding:'12px',background:'#7c3aed',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
+                  🛡️ Bestätigen & Admin-Rolle vergeben
+                </button>
+                <button onClick={()=>{setAdminRoleDialog(null);setAdminRolePw('');setAdminRoleError('');}}
+                  style={{padding:'12px',background:'#f3f4f6',color:'#333',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Passwort-Bestätigungs-Dialog */}
         {resetDialog&&(
@@ -2274,9 +2325,16 @@ export default function TrainingsApp() {
                               } else {
                                 next = [...cur, key];
                               }
-                              saveUserRoles(u.uid, next);
+                              // Admin-Rolle erfordert Passwort-Bestätigung
+                              if (key === 'admin' && !active) {
+                                setAdminRoleDialog({ uid: u.uid, newRoles: next });
+                                setAdminRolePw('');
+                                setAdminRoleError('');
+                              } else {
+                                saveUserRoles(u.uid, next);
+                              }
                             }} style={{padding:'3px 9px',borderRadius:'20px',border:`2px solid ${cfg.color}`,background:active?cfg.color:cfg.bg,color:active?'white':cfg.color,cursor:'pointer',fontWeight:'600',fontSize:'11px'}}>
-                              {cfg.label}
+                              {key==='admin'&&!active?'🔒 ':''}{cfg.label}
                             </button>
                           );
                         })}
