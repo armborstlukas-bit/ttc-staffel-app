@@ -650,6 +650,21 @@ export default function TrainingsApp() {
   };
 
   const canEdit = () => ['admin','trainer'].includes(userRole);
+
+  // Groups this user may access: admins see all, trainers only their assigned groups
+  const getMyGroupIds = () => {
+    if (userRole === 'admin') return FIXED_GROUPS.map(g=>g.id);
+    if (userRole === 'trainer') {
+      const assigned = userProfile?.groupIds || [];
+      return assigned.length > 0 ? assigned : FIXED_GROUPS.map(g=>g.id); // fallback: all (legacy)
+    }
+    return [];
+  };
+  const canAccessGroup = (groupId) => getMyGroupIds().includes(groupId);
+  // can a session be seen? at least one subgroup must belong to an accessible group
+  const canAccessSession = (sess) =>
+    (sess.subgroupIds||[]).some(sid => canAccessGroup(subgroups[sid]?.groupId));
+
   const getSubgroupsForGroup = gid => Object.values(subgroups).filter(s=>s.groupId===gid);
   const getChildrenForSubgroup = sid => Object.values(children).filter(c=>c.subgroupId===sid).sort((a,b)=>a.name.localeCompare(b.name,'de'));
   const getMyChild = () => userProfile?.linkedChildId ? children[userProfile.linkedChildId]||null : null;
@@ -1071,6 +1086,13 @@ export default function TrainingsApp() {
     setAllUsers(updated);
   };
 
+  const saveUserGroupIds = async (uid, groupIds) => {
+    const updated = { ...allUsers, [uid]: { ...allUsers[uid], groupIds } };
+    await setDoc(doc(db,'ttc','users'), updated);
+    await setDoc(doc(db,'users',uid), { ...allUsers[uid], groupIds });
+    setAllUsers(updated);
+  };
+
   const linkChildToUser = async (uid, childId) => {
     const updated={...allUsers,[uid]:{...allUsers[uid],linkedChildId:childId||null}};
     await setDoc(doc(db,'ttc','users'),updated);
@@ -1291,8 +1313,8 @@ export default function TrainingsApp() {
 
   // ── TRAININGSPLAN ────────────────────────────────────────────
   if (view==='trainingsplan') {
-    const upcoming=getAllUpcomingSessions();
-    const allSubs=Object.values(subgroups).sort((a,b)=>{
+    const upcoming=getAllUpcomingSessions().filter(s=>canAccessSession(s));
+    const allSubs=Object.values(subgroups).filter(s=>canAccessGroup(s.groupId)).sort((a,b)=>{
       const ga=FIXED_GROUPS.findIndex(g=>g.id===a.groupId), gb=FIXED_GROUPS.findIndex(g=>g.id===b.groupId);
       return ga-gb || a.name.localeCompare(b.name,'de');
     });
@@ -1467,7 +1489,7 @@ export default function TrainingsApp() {
   if (view==='turniere') {
     const upcoming = getUpcomingTournaments();
     const allChildrenSorted = Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
-    const jugendSubs = Object.values(subgroups).filter(sg=>sg.groupId==='jugend').sort((a,b)=>a.name.localeCompare(b.name,'de'));
+    const jugendSubs = Object.values(subgroups).filter(sg=>sg.groupId==='jugend'&&canAccessGroup('jugend')).sort((a,b)=>a.name.localeCompare(b.name,'de'));
     const jugendSubIds = new Set(jugendSubs.map(sg=>sg.id));
     const jugendChildren = allChildrenSorted.filter(c => jugendSubIds.has(c.subgroupId));
     const filteredChildren = tournGroupFilter
@@ -1905,8 +1927,8 @@ export default function TrainingsApp() {
               </div>
             )}
 
-            {/* Errungenschaften */}
-            {(()=>{
+            {/* Errungenschaften – nur für Jugendgruppe */}
+            {grp?.id === 'jugend' && (()=>{
               const ach = getAchievements(myChild.id);
               const ttrUnlocked = ach.ttrUnlocked || [];
               const currentMonth = new Date().toISOString().slice(0,7);
@@ -2172,6 +2194,23 @@ export default function TrainingsApp() {
                     </div>
                   </div>
                   {linkedChild&&<p style={{margin:'6px 0 0',fontSize:'12px',color:'#358941'}}>👶 Verknüpft mit: <strong>{linkedChild.name}</strong></p>}
+                  {u.role==='trainer'&&(
+                    <div style={{marginTop:'8px',display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                      <span style={{fontSize:'12px',fontWeight:'600',color:'#555'}}>Gruppen:</span>
+                      {FIXED_GROUPS.map(g=>{
+                        const assigned=(u.groupIds||[]).includes(g.id);
+                        return (
+                          <button key={g.id} onClick={()=>{
+                            const cur=u.groupIds||[];
+                            saveUserGroupIds(u.uid, assigned?cur.filter(x=>x!==g.id):[...cur,g.id]);
+                          }} style={{padding:'3px 10px',borderRadius:'20px',border:`2px solid ${g.color}`,background:assigned?g.color:'white',color:assigned?'white':g.color,cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>
+                            {g.emoji} {g.name}
+                          </button>
+                        );
+                      })}
+                      {(u.groupIds||[]).length===0&&<span style={{fontSize:'11px',color:'#dc2626',fontStyle:'italic'}}>⚠️ Keine Gruppe zugewiesen</span>}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -2213,7 +2252,7 @@ export default function TrainingsApp() {
         const todayStr = new Date().toISOString().split('T')[0];
         const in6 = new Date(); in6.setDate(in6.getDate()+6);
         const in6Str = in6.toISOString().split('T')[0];
-        const allSess = getAllUpcomingSessions(); // includes last 7 days
+        const allSess = getAllUpcomingSessions().filter(s=>canAccessSession(s)); // includes last 7 days
         const pastSess    = canEdit() ? allSess.filter(s=>s.date<todayStr).sort((a,b)=>b.date.localeCompare(a.date)) : [];
         const upcomingSess = allSess.filter(s=>s.date>=todayStr&&s.date<=in6Str);
         if (!pastSess.length && !upcomingSess.length) return null;
@@ -2331,7 +2370,7 @@ export default function TrainingsApp() {
         );
       })()}
       <div style={{display:'grid',gap:'14px'}}>
-        {FIXED_GROUPS.map(group=>{
+        {FIXED_GROUPS.filter(group=>canAccessGroup(group.id)).map(group=>{
           const subs=getSubgroupsForGroup(group.id);
           const totalKids=subs.reduce((sum,sub)=>sum+getChildrenForSubgroup(sub.id).length,0);
           return (
@@ -2690,8 +2729,8 @@ export default function TrainingsApp() {
             </div>
           </div>
 
-          {/* ── Errungenschaften (für Trainer/Admin) ── */}
-          {(()=>{
+          {/* ── Errungenschaften (für Trainer/Admin) – nur Jugendgruppe ── */}
+          {grp?.id === 'jugend' && (()=>{
             const ach = getAchievements(child.id);
             const ttrUnlocked = ach.ttrUnlocked || [];
             const currentMonth = new Date().toISOString().slice(0,7);
@@ -2922,12 +2961,12 @@ export default function TrainingsApp() {
 
   // ── ERRUNGENSCHAFTEN VIEW (Trainer/Admin) ────────────────────────────────
   if (view === 'achievements') {
-    const allKids = Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
-    const jugendSubs = Object.values(subgroups).filter(sg=>sg.groupId==='jugend');
+    // Achievements only for Jugendgruppe children, filtered by trainer's access
+    const jugendSubs = Object.values(subgroups).filter(sg=>sg.groupId==='jugend'&&canAccessGroup('jugend'));
     const jugendSubIds = new Set(jugendSubs.map(sg=>sg.id));
-    const jugendKids = allKids.filter(c=>jugendSubIds.has(c.subgroupId) || Object.values(subgroups).some(sg=>sg.id===c.subgroupId));
-    // All kids with a subgroup
-    const kidsWithSub = allKids.filter(c => subgroups[c.subgroupId]);
+    const kidsWithSub = Object.values(children)
+      .filter(c => jugendSubIds.has(c.subgroupId))
+      .sort((a,b)=>a.name.localeCompare(b.name,'de'));
 
     const AchCounter = ({label, val, onInc, onDec}) => (
       <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
@@ -3044,8 +3083,8 @@ export default function TrainingsApp() {
 
   // ── BENACHRICHTIGUNGEN VIEW (Trainer/Admin) ─────────────────────────────
   if (view === 'notifications' && canEdit()) {
-    const allKids = Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
-    const allSubs = Object.values(subgroups).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+    const allKids = Object.values(children).filter(c=>canAccessGroup(subgroups[c.subgroupId]?.groupId)).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+    const allSubs = Object.values(subgroups).filter(s=>canAccessGroup(s.groupId)).sort((a,b)=>a.name.localeCompare(b.name,'de'));
 
     const sendTrainerNotif = () => {
       if (!notifComposeTitle.trim() || !notifComposeText.trim()) { alert('Bitte Titel und Text eingeben!'); return; }
@@ -3268,7 +3307,7 @@ export default function TrainingsApp() {
 
   // ── ARCHIV VIEW ──────────────────────────────────────────────────────────
   if (view === 'archiv') {
-    const sortedArchivedSessions    = Object.values(archivedSessions).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    const sortedArchivedSessions    = Object.values(archivedSessions).filter(s=>canAccessSession(s)).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     const sortedArchivedTournaments = Object.values(archivedTournaments).sort((a,b)=>(b.dateFrom||b.date||'').localeCompare(a.dateFrom||a.date||''));
     // Attendance status config
     const attCfg = {
