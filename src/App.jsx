@@ -217,6 +217,8 @@ export default function TrainingsApp() {
   };
 
   // Sessions für eine Untergruppe (zukünftig)
+  const getSevenDaysAgo = () => { const d=new Date(); d.setDate(d.getDate()-7); return d.toISOString().split('T')[0]; };
+
   const getUpcomingSessionsForSubgroup = (subgroupId) => {
     const today = new Date().toISOString().split('T')[0];
     return Object.values(sessions)
@@ -225,8 +227,8 @@ export default function TrainingsApp() {
   };
 
   const getAllUpcomingSessions = () => {
-    const today = new Date().toISOString().split('T')[0];
-    return Object.values(sessions).filter(s=>s.date>=today).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+    const cutoff = getSevenDaysAgo();
+    return Object.values(sessions).filter(s=>s.date>=cutoff).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
   };
 
   // Prüfen ob Eltern/Jugendliche das Kind für ein Datum abgemeldet/angemeldet haben
@@ -425,9 +427,9 @@ export default function TrainingsApp() {
   };
 
   const getUpcomingTournaments = () => {
-    const today = new Date().toISOString().split('T')[0];
+    const cutoff = getSevenDaysAgo();
     return Object.values(tournaments)
-      .filter(t => (t.dateTo||t.dateFrom||t.date||'') >= today)
+      .filter(t => (t.dateTo||t.dateFrom||t.date||'') >= cutoff)
       .sort((a,b) => (a.dateFrom||a.date||'').localeCompare(b.dateFrom||b.date||''));
   };
 
@@ -896,9 +898,10 @@ export default function TrainingsApp() {
                 const coming=Object.values(responses).filter(r=>r==='coming').length;
                 const missing=Object.values(responses).filter(r=>r==='missing').length;
                 const blockSize=session.repeatId?(repeatBlocks[session.repeatId]||[]).length:0;
+                const sessionIsPast = session.date < new Date().toISOString().split('T')[0];
 
                 return (
-                  <div key={session.id} style={{padding:'14px',borderRadius:'10px',border:'1px solid #ddd',background:'white'}}>
+                  <div key={session.id} style={{padding:'14px',borderRadius:'10px',border:`1px solid ${sessionIsPast?'#fca5a5':'#ddd'}`,background:sessionIsPast?'#fff5f5':'white'}}>
                     {isEditing ? (
                       /* Bearbeitungsformular */
                       <div>
@@ -935,6 +938,7 @@ export default function TrainingsApp() {
                               return <span key={sub.id} style={{fontSize:'12px',fontWeight:'700',color:grp?.color,background:grp?.bg||'#f3f4f6',padding:'2px 8px',borderRadius:'20px',border:`1px solid ${grp?.color}`}}>{grp?.emoji} {sub.name}</span>;
                             })}
                             {session.repeatId&&<span style={{fontSize:'11px',color:'#0369a1',background:'#e0f2fe',padding:'2px 8px',borderRadius:'20px'}}><RefreshCw size={10} style={{display:'inline'}}/> Block ({blockSize}x)</span>}
+                            {sessionIsPast&&<span style={{fontSize:'11px',fontWeight:'700',color:'white',background:'#dc2626',padding:'2px 8px',borderRadius:'20px'}}>Vergangen</span>}
                           </div>
                           <p style={{margin:'0 0 2px',fontWeight:'600',color:'#333'}}>
                             {new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'})} · {session.time} Uhr
@@ -1071,9 +1075,11 @@ export default function TrainingsApp() {
                 const missing = allParticipants.filter(c=>(t.responses||{})[c.id]==='missing');
                 const noAnswer = allParticipants.filter(c=>!(t.responses||{})[c.id]);
                 const tDates = getDatesInRange(t.dateFrom||t.date, t.dateTo||t.dateFrom||t.date);
+                const todayStr2 = new Date().toISOString().split('T')[0];
+                const tournIsPast = (t.dateTo||t.dateFrom||t.date||'') < todayStr2;
 
                 return (
-                  <div key={t.id} style={{borderRadius:'10px',border:'2px solid #fde68a',background:'#fffbeb',overflow:'hidden'}}>
+                  <div key={t.id} style={{borderRadius:'10px',border:`2px solid ${tournIsPast?'#fca5a5':'#fde68a'}`,background:tournIsPast?'#fff5f5':'#fffbeb',overflow:'hidden'}}>
                     {isEditing ? (
                       <div style={{padding:'16px'}}>
                         <h4 style={{margin:'0 0 12px',color:'#b45309'}}>Turnier bearbeiten</h4>
@@ -1117,7 +1123,10 @@ export default function TrainingsApp() {
                       <div>
                         <div style={{padding:'14px 16px',borderBottom:'1px solid #fde68a',display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'8px'}}>
                           <div>
-                            <h3 style={{margin:'0 0 4px',color:'#92400e',fontSize:'18px'}}>🏆 {t.name}</h3>
+                            <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',marginBottom:'4px'}}>
+                              <h3 style={{margin:0,color:tournIsPast?'#991b1b':'#92400e',fontSize:'18px'}}>🏆 {t.name}</h3>
+                              {tournIsPast&&<span style={{background:'#dc2626',color:'white',fontSize:'11px',fontWeight:'700',padding:'2px 8px',borderRadius:'20px'}}>Vergangen</span>}
+                            </div>
                             <p style={{margin:'0 0 2px',fontWeight:'600',color:'#333',fontSize:'14px'}}>{formatDateRange(t)}</p>
                             {t.location&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'#666'}}>📍 {t.location}</p>}
                             <p style={{margin:0,fontSize:'13px',color:'#999'}}>{(t.konkurrenzen||[]).length} Konkurrenzen · {allParticipantIds.length} Teilnehmer</p>
