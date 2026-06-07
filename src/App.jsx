@@ -398,6 +398,8 @@ export default function TrainingsApp() {
   const [notifComposeTitle, setNotifComposeTitle]           = useState('');
   const [notifTab, setNotifTab]                             = useState('inbox'); // 'inbox' | 'trash'
   const [notifTrainerTab, setNotifTrainerTab]               = useState('sent'); // 'sent' | 'trash'
+  const [showTrainingHistory, setShowTrainingHistory]       = useState(false);
+  const [showAchievements, setShowAchievements]             = useState(false);
 
   const [authMode, setAuthMode]           = useState('login');
   const [loginEmail, setLoginEmail]       = useState('');
@@ -1816,17 +1818,55 @@ export default function TrainingsApp() {
     const stats=myChild?getAttendanceStats(myChild.id,myChild.subgroupId):null;
     const mySessions=myChild&&sub ? getUpcomingSessionsForSubgroup(myChild.subgroupId) : [];
 
+    // Build a lookup: date → session info (for group name in history)
+    const dateToSession = {};
+    Object.values(sessions||{}).forEach(sess=>{
+      if(sess.date) dateToSession[sess.date] = sess;
+    });
+
     return (
       <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
         <AchievementPopup data={achievementPopup} onClose={()=>setAchievementPopup(null)}/>
         <Header/>
+
+        {/* ── Kind-Info (kompakt) ── */}
+        {myChild && (
+          <div style={{...s.card,padding:'12px 16px'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'8px'}}>
+              <div>
+                <span style={{fontWeight:'700',fontSize:'17px',color:grp?.color||'#358941'}}>{myChild.name}</span>
+                <span style={{marginLeft:'8px',fontSize:'13px',color:'#666'}}>{grp?.emoji} {grp?.name} · {sub?.name}</span>
+              </div>
+              <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                {[{label:'Gesamt',value:stats.total,color:'#555',bg:'#f3f4f6'},
+                  {label:'Anwesend',value:stats.present,color:'#16a34a',bg:'#dcfce7'},
+                  {label:'Unentsch.',value:stats.unexcused,color:'#6b7280',bg:'#f3f4f6'},
+                  {label:'Entsch.',value:stats.excused,color:'#d97706',bg:'#fef3c7'},
+                ].map(({label,value,color,bg})=>(
+                  <div key={label} style={{background:bg,borderRadius:'6px',padding:'4px 10px',textAlign:'center',minWidth:'54px'}}>
+                    <p style={{margin:0,fontSize:'15px',fontWeight:'700',color}}>{value}</p>
+                    <p style={{margin:0,fontSize:'10px',color}}>{label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{marginTop:'10px'}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:'4px'}}>
+                <span style={{fontSize:'12px',fontWeight:'600',color:'#555'}}>Anwesenheitsquote</span>
+                <span style={{fontSize:'12px',fontWeight:'700',color:stats.percent>=80?'#16a34a':stats.percent>=60?'#d97706':'#dc2626'}}>{stats.percent}%</span>
+              </div>
+              <div style={{background:'#f3f4f6',borderRadius:'99px',height:'8px',overflow:'hidden'}}>
+                <div style={{width:`${stats.percent}%`,height:'100%',background:stats.percent>=80?'#16a34a':stats.percent>=60?'#d97706':'#dc2626',borderRadius:'99px'}}/>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Benachrichtigungen ── */}
         {myChild && (()=>{
           const { active, trashed } = getCleanedNotifications(myChild.id);
           const showTrash = notifTab === 'trash';
           const items = showTrash ? trashed : active;
-          // always show the card (even if empty)
           return (
             <div style={{...s.card, borderLeft:'4px solid #059669', padding:'16px 20px'}}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px',flexWrap:'wrap',gap:'8px'}}>
@@ -1841,7 +1881,7 @@ export default function TrainingsApp() {
                 </div>
               </div>
               {items.length === 0
-                ? <p style={{color:'#9ca3af',fontSize:'13px',margin:0,textAlign:'center',padding:'8px 0'}}>{showTrash?'Papierkorb ist leer.':'Keine neuen Benachrichtigungen.'}</p>
+                ? <p style={{color:'#9ca3af',fontSize:'13px',margin:0,textAlign:'center',padding:'8px 0'}}>{showTrash?'Papierkorb ist leer.':'Keine Nachrichten.'}</p>
                 : <div style={{display:'grid',gap:'8px'}}>
                     {items.map(n=>{
                       const typeColors = {
@@ -1883,30 +1923,93 @@ export default function TrainingsApp() {
         {!myChild
           ? <div style={{...s.card,textAlign:'center',padding:'40px'}}><p style={{fontSize:'18px',color:'#666'}}>Dein Account ist noch keinem Kind zugeordnet.</p><p style={{color:'#999',fontSize:'14px'}}>Bitte wende dich an den Trainer oder Admin.</p></div>
           : <>
+
+            {/* Kommende Trainings */}
+            {mySessions.length>0&&(
+              <div style={{...s.card,borderLeft:'5px solid #358941',borderTop:'2px solid #bbf7d0'}}>
+                <h3 style={{margin:'0 0 16px',color:'#358941',display:'flex',alignItems:'center',gap:'8px'}}><Calendar size={18}/> Kommende 10 Trainings</h3>
+                <div style={{display:'grid',gap:'10px'}}>
+                  {mySessions.slice(0,10).map(session=>{
+                    const childId=myChild.id;
+                    const myResponse=(session.responses||{})[childId];
+                    // group name for this session
+                    const sessSubIds = session.subgroupIds||[];
+                    const sessGrpNames = [...new Set(sessSubIds.map(sid=>{
+                      const sg=subgroups[sid]; const fg=sg?FIXED_GROUPS.find(g=>g.id===sg.groupId):null;
+                      return fg?`${fg.emoji} ${fg.name}`:null;
+                    }).filter(Boolean))];
+                    return (
+                      <div key={session.id} style={{padding:'14px',borderRadius:'10px',border:'1px solid #ddd',background:myResponse==='coming'?'#f0fdf4':myResponse==='missing'?'#fef2f2':'white'}}>
+                        <div style={{marginBottom:'10px'}}>
+                          <p style={{margin:'0 0 2px',fontWeight:'700',color:'#333',fontSize:'15px'}}>
+                            {new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})} · {session.time} Uhr
+                          </p>
+                          {sessGrpNames.length>0&&<p style={{margin:'0 0 2px',fontSize:'12px',color:'#888'}}>📂 {sessGrpNames.join(', ')}</p>}
+                          {session.trainer&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'#555'}}>👤 Trainer: {session.trainer}</p>}
+                          {session.info&&<div style={{display:'flex',alignItems:'flex-start',gap:'6px',marginTop:'6px',padding:'8px',background:'#f0f9ff',borderRadius:'6px'}}><Info size={14} color="#0369a1" style={{marginTop:'2px',flexShrink:0}}/><p style={{margin:0,fontSize:'13px',color:'#0369a1'}}>{session.info}</p></div>}
+                        </div>
+                        <div style={{display:'flex',gap:'8px'}}>
+                          <button onClick={()=>respondToSession(session.id,'coming')}
+                            style={{flex:1,padding:'10px',border:`2px solid #16a34a`,background:myResponse==='coming'?'#16a34a':'white',color:myResponse==='coming'?'white':'#16a34a',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>
+                            <Check size={18}/> Ich komme
+                          </button>
+                          <button onClick={()=>respondToSession(session.id,'missing')}
+                            style={{flex:1,padding:'10px',border:`2px solid #dc2626`,background:myResponse==='missing'?'#dc2626':'white',color:myResponse==='missing'?'white':'#dc2626',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>
+                            <X size={18}/> Ich fehle
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Trainings-Verlauf (einklappbar) */}
             <div style={s.card}>
-              <h2 style={{margin:'0 0 4px',color:grp?.color||'#358941',fontSize:'22px'}}>{myChild.name}</h2>
-              <p style={{margin:'0 0 20px',color:'#666',fontSize:'13px'}}>{grp?.emoji} {grp?.name} · {sub?.name}</p>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'10px',marginBottom:'20px'}}>
-                {[{label:'Trainings',value:stats.total,color:'#333',bg:'#f8f9fa'},
-                  {label:'Anwesend',value:stats.present,color:'#16a34a',bg:'#dcfce7'},
-                  {label:'Unentschuldigt',value:stats.unexcused,color:'#6b7280',bg:'#f3f4f6'},
-                  {label:'Entschuldigt',value:stats.excused,color:'#d97706',bg:'#fef3c7'},
-                ].map(({label,value,color,bg})=>(
-                  <div key={label} style={{background:bg,borderRadius:'8px',padding:'12px',textAlign:'center'}}>
-                    <p style={{margin:0,fontSize:'24px',fontWeight:'700',color}}>{value}</p>
-                    <p style={{margin:0,fontSize:'11px',color}}>{label}</p>
-                  </div>
-                ))}
-              </div>
-              <div style={{marginBottom:'8px'}}>
-                <div style={{display:'flex',justifyContent:'space-between',marginBottom:'6px'}}>
-                  <span style={{fontSize:'14px',fontWeight:'600'}}>Anwesenheitsquote</span>
-                  <span style={{fontSize:'14px',fontWeight:'700',color:stats.percent>=80?'#16a34a':stats.percent>=60?'#d97706':'#dc2626'}}>{stats.percent}%</span>
+              <button onClick={()=>setShowTrainingHistory(v=>!v)}
+                style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',background:'none',border:'none',cursor:'pointer',padding:0,margin:0}}>
+                <h3 style={{margin:0,color:'#333',display:'flex',alignItems:'center',gap:'8px'}}>📋 Trainings-Verlauf
+                  {dates.length>0&&<span style={{fontSize:'12px',fontWeight:'500',color:'#888',fontFamily:'sans-serif'}}>({dates.length} Einträge)</span>}
+                </h3>
+                <span style={{fontSize:'18px',color:'#6b7280',transform:showTrainingHistory?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s',lineHeight:1}}>▾</span>
+              </button>
+              {showTrainingHistory&&(
+                <div style={{display:'grid',gap:'8px',marginTop:'14px'}}>
+                  {dates.length===0
+                    ? <p style={{color:'#999',textAlign:'center',padding:'20px'}}>Noch keine Trainings erfasst.</p>
+                    : dates.map(date=>{
+                      const status=(myChild.attendance||{})[date];
+                      const cfg=STATUS_CONFIG[status];
+                      // find session for this date to get group name
+                      const sess = dateToSession[date];
+                      const sessSubIds = sess?.subgroupIds||[];
+                      const grpNames = [...new Set(sessSubIds.map(sid=>{
+                        const sg=subgroups[sid]; const fg=sg?FIXED_GROUPS.find(g=>g.id===sg.groupId):null;
+                        return fg?`${fg.emoji} ${fg.name}`:null;
+                      }).filter(Boolean))];
+                      return (
+                        <div key={date} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:cfg?.bg||'#f9fafb',borderRadius:'8px',border:'1px solid #eee',gap:'8px',flexWrap:'wrap'}}>
+                          <div>
+                            <span style={{fontSize:'14px',color:'#333',fontWeight:'500'}}>
+                              {new Date(date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}
+                            </span>
+                            {grpNames.length>0&&<span style={{display:'block',fontSize:'11px',color:'#888',marginTop:'1px'}}>📂 {grpNames.join(', ')}</span>}
+                          </div>
+                          <div style={{display:'flex',gap:'8px',alignItems:'center',flexShrink:0}}>
+                            <span style={{fontSize:'13px',fontWeight:'600',color:cfg?.color||'#999',background:'white',padding:'4px 10px',borderRadius:'20px',border:`1px solid ${cfg?.color||'#ddd'}`}}>
+                              {cfg?.symbol||'–'} {cfg?.label||'Nicht erfasst'}
+                            </span>
+                            {status==='absent_unexcused'&&(
+                              <button onClick={()=>excuseMyChild(date)} style={s.btn('#d97706',undefined,true)}><Clock size={14}/> Entschuldigen</button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  }
                 </div>
-                <div style={{background:'#f3f4f6',borderRadius:'99px',height:'12px',overflow:'hidden'}}>
-                  <div style={{width:`${stats.percent}%`,height:'100%',background:stats.percent>=80?'#16a34a':stats.percent>=60?'#d97706':'#dc2626',borderRadius:'99px'}}/>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Kommende Turniere */}
@@ -1920,7 +2023,6 @@ export default function TrainingsApp() {
                     {myTournaments.map(t=>{
                       const childId = myChild.id;
                       const myResponse = (t.responses||{})[childId];
-                      // Nur Konkurrenzen in denen das Kind eingetragen ist
                       const myKonkurrenzen = (t.konkurrenzen||[]).filter(k=>(k.participantIds||[]).includes(childId));
                       return (
                         <div key={t.id} style={{borderRadius:'10px',border:`2px solid ${myResponse==='coming'?'#16a34a':myResponse==='missing'?'#dc2626':'#fde68a'}`,background:myResponse==='coming'?'#f0fdf4':myResponse==='missing'?'#fef2f2':'#fffbeb',overflow:'hidden'}}>
@@ -1937,7 +2039,6 @@ export default function TrainingsApp() {
                             </p>
                             {t.location&&<p style={{margin:0,fontSize:'13px',color:'#b45309'}}>📍 {t.location}</p>}
                           </div>
-                          {/* Meine Konkurrenzen */}
                           {myKonkurrenzen.length>0&&(
                             <div style={{padding:'10px 14px',borderBottom:'1px solid #fde68a',display:'grid',gap:'6px'}}>
                               {myKonkurrenzen.map(konk=>{
@@ -1972,41 +2073,7 @@ export default function TrainingsApp() {
               );
             })()}
 
-            {/* Kommende Trainings */}
-            {mySessions.length>0&&(
-              <div style={{...s.card,borderLeft:'5px solid #358941',borderTop:'2px solid #bbf7d0'}}>
-                <h3 style={{margin:'0 0 16px',color:'#358941',display:'flex',alignItems:'center',gap:'8px'}}><Calendar size={18}/> Kommende 10 Trainings</h3>
-                <div style={{display:'grid',gap:'10px'}}>
-                  {mySessions.slice(0,10).map(session=>{
-                    const childId=myChild.id;
-                    const myResponse=(session.responses||{})[childId];
-                    return (
-                      <div key={session.id} style={{padding:'14px',borderRadius:'10px',border:'1px solid #ddd',background:myResponse==='coming'?'#f0fdf4':myResponse==='missing'?'#fef2f2':'white'}}>
-                        <div style={{marginBottom:'10px'}}>
-                          <p style={{margin:'0 0 2px',fontWeight:'700',color:'#333',fontSize:'15px'}}>
-                            {new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})} · {session.time} Uhr
-                          </p>
-                          {session.trainer&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'#555'}}>👤 Trainer: {session.trainer}</p>}
-                          {session.info&&<div style={{display:'flex',alignItems:'flex-start',gap:'6px',marginTop:'6px',padding:'8px',background:'#f0f9ff',borderRadius:'6px'}}><Info size={14} color="#0369a1" style={{marginTop:'2px',flexShrink:0}}/><p style={{margin:0,fontSize:'13px',color:'#0369a1'}}>{session.info}</p></div>}
-                        </div>
-                        <div style={{display:'flex',gap:'8px'}}>
-                          <button onClick={()=>respondToSession(session.id,'coming')}
-                            style={{flex:1,padding:'10px',border:`2px solid #16a34a`,background:myResponse==='coming'?'#16a34a':'white',color:myResponse==='coming'?'white':'#16a34a',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>
-                            <Check size={18}/> Ich komme
-                          </button>
-                          <button onClick={()=>respondToSession(session.id,'missing')}
-                            style={{flex:1,padding:'10px',border:`2px solid #dc2626`,background:myResponse==='missing'?'#dc2626':'white',color:myResponse==='missing'?'white':'#dc2626',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>
-                            <X size={18}/> Ich fehle
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Errungenschaften – nur für Jugendgruppe */}
+            {/* Errungenschaften – nur für Jugendgruppe (einklappbar) */}
             {grp?.id === 'jugend' && (()=>{
               const ach = getAchievements(myChild.id);
               const ttrUnlocked = ach.ttrUnlocked || [];
@@ -2018,7 +2085,6 @@ export default function TrainingsApp() {
               const streak = getLongestStreak(myChild.id);
               const tournParts = getTournamentParticipations(myChild.id);
 
-              // shared helpers
               const Sec = ({title,children:ch,mb=true}) => (
                 <div style={{marginBottom:mb?'18px':0}}>
                   <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.5px',borderBottom:'1px solid #f3f4f6',paddingBottom:'4px'}}>{title}</p>
@@ -2041,8 +2107,13 @@ export default function TrainingsApp() {
 
               return (
                 <div style={s.card}>
-                  <h3 style={{margin:'0 0 16px',color:'#333',display:'flex',alignItems:'center',gap:'8px'}}>🏅 Errungenschaften</h3>
+                  <button onClick={()=>setShowAchievements(v=>!v)}
+                    style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',background:'none',border:'none',cursor:'pointer',padding:0,margin:'0 0 '+(showAchievements?'16px':'0')}}>
+                    <h3 style={{margin:0,color:'#333',display:'flex',alignItems:'center',gap:'8px'}}>🏅 Errungenschaften</h3>
+                    <span style={{fontSize:'18px',color:'#6b7280',transform:showAchievements?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s',lineHeight:1}}>▾</span>
+                  </button>
 
+                  {showAchievements&&<>
                   {/* ── TTR ── */}
                   <Sec title="🏓 TTR Meilensteine">
                     {TTR_MILESTONES.map((val,i)=>{
@@ -2060,7 +2131,6 @@ export default function TrainingsApp() {
                     })}
                   </Sec>
 
-                  {/* ── Training Meilensteine (auto) ── */}
                   <Sec title="📅 Trainings-Meilensteine">
                     {[10,25,50,100,200].map(m=>{
                       const has = totalTrainings>=m;
@@ -2068,7 +2138,6 @@ export default function TrainingsApp() {
                         has={has} activeBg="#f0fdf4" activeBorder="#16a34a" activeTextColor="#15803d"
                         onClick={()=>setAchievementPopup({icon:'🏋️',title:`${m} Trainings`,desc:`Du hast insgesamt ${m} Trainingseinheiten absolviert! Aktuell: ${totalTrainings} Trainings.`})}/>;
                     })}
-                    {/* Longest streak */}
                     {[5,10,20,30,50].map(m=>{
                       const has = streak>=m;
                       return <Tile key={`str${m}`} icon="🔥" label={`${m}× Serie`} sub={has?'✓':`${streak}/${m}`}
@@ -2077,7 +2146,6 @@ export default function TrainingsApp() {
                     })}
                   </Sec>
 
-                  {/* ── Turnier-Teilnahmen (auto) ── */}
                   <Sec title="🏆 Turnier-Teilnahmen">
                     {[1,5,10,20].map(m=>{
                       const has = tournParts>=m;
@@ -2087,7 +2155,6 @@ export default function TrainingsApp() {
                     })}
                   </Sec>
 
-                  {/* ── Turnierergebnisse Einzel ── */}
                   <Sec title="🥊 Turnierergebnisse Einzel">
                     {[
                       {icon:'🥇',label:'1. Platz',field:'einzel1',desc:ACHIEVEMENT_DESCRIPTIONS.einzel1},
@@ -2101,7 +2168,6 @@ export default function TrainingsApp() {
                     })}
                   </Sec>
 
-                  {/* ── Turnierergebnisse Doppel ── */}
                   <Sec title="🤝 Turnierergebnisse Doppel">
                     {[
                       {icon:'🥇',label:'1. Platz',field:'doppel1',desc:ACHIEVEMENT_DESCRIPTIONS.doppel1},
@@ -2115,7 +2181,6 @@ export default function TrainingsApp() {
                     })}
                   </Sec>
 
-                  {/* ── Mannschaft & Auszeichnungen ── */}
                   <Sec title="🏅 Mannschaft & Auszeichnungen">
                     {[
                       {icon:'🏆',label:'Meisterschaft',field:'team',desc:ACHIEVEMENT_DESCRIPTIONS.team},
@@ -2123,14 +2188,13 @@ export default function TrainingsApp() {
                     ].map(({icon,label,field,desc})=>{
                       const count=ach[field]||0;
                       return <Tile key={field} icon={icon} label={label} sub={count>0?`×${count}`:undefined}
-                        has={count>0} activeBg={field==='spielerDesMonats'?'#fffbeb':'#fffbeb'}
+                        has={count>0} activeBg="#fffbeb"
                         activeBorder={field==='spielerDesMonats'?'#fcd34d':'#fde68a'}
-                        activeTextColor={field==='spielerDesMonats'?'#b45309':'#b45309'}
+                        activeTextColor="#b45309"
                         onClick={()=>openCount(icon,label,desc,count)}/>;
                     })}
                   </Sec>
 
-                  {/* ── Anwesenheit aktueller Monat ── */}
                   <Sec title={`📆 Anwesenheit ${monthName}`}>
                     {(()=>{
                       const attCfgMap = {
@@ -2151,7 +2215,6 @@ export default function TrainingsApp() {
                     })()}
                   </Sec>
 
-                  {/* ── Anwesenheit Gesamtmonate ── */}
                   <Sec title="📊 Anwesenheits-Monate (Gesamt)" mb={false}>
                     {[
                       {icon:'🥇',label:'Gold-Monate',count:cumul.gold,color:'#b45309',bg:'#fef3c7',border:'#fde68a',desc:ACHIEVEMENT_DESCRIPTIONS.attendanceGold},
@@ -2163,38 +2226,10 @@ export default function TrainingsApp() {
                         onClick={()=>openCount(icon,label,desc,count)}/>
                     ))}
                   </Sec>
+                  </>}
                 </div>
               );
             })()}
-
-            {/* Verlauf */}
-            <div style={s.card}>
-              <h3 style={{margin:'0 0 12px',color:'#333'}}>📋 Trainings-Verlauf</h3>
-              <div style={{display:'grid',gap:'8px'}}>
-                {dates.length===0
-                  ? <p style={{color:'#999',textAlign:'center',padding:'20px'}}>Noch keine Trainings erfasst.</p>
-                  : dates.map(date=>{
-                    const status=(myChild.attendance||{})[date];
-                    const cfg=STATUS_CONFIG[status];
-                    return (
-                      <div key={date} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 16px',background:cfg?.bg||'#f9fafb',borderRadius:'8px',border:'1px solid #eee'}}>
-                        <span style={{fontSize:'14px',color:'#333'}}>
-                          {new Date(date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}
-                        </span>
-                        <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
-                          <span style={{fontSize:'13px',fontWeight:'600',color:cfg?.color||'#999',background:'white',padding:'4px 10px',borderRadius:'20px',border:`1px solid ${cfg?.color||'#ddd'}`}}>
-                            {cfg?.symbol||'–'} {cfg?.label||'Nicht erfasst'}
-                          </span>
-                          {status==='absent_unexcused'&&(
-                            <button onClick={()=>excuseMyChild(date)} style={s.btn('#d97706',undefined,true)}><Clock size={14}/> Entschuldigen</button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                }
-              </div>
-            </div>
           </>
         }
       </div></div>
