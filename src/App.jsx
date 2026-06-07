@@ -394,6 +394,7 @@ export default function TrainingsApp() {
   const [notifComposeText, setNotifComposeText]             = useState('');
   const [notifComposeTitle, setNotifComposeTitle]           = useState('');
   const [notifTab, setNotifTab]                             = useState('inbox'); // 'inbox' | 'trash'
+  const [notifTrainerTab, setNotifTrainerTab]               = useState('sent'); // 'sent' | 'trash'
 
   const [authMode, setAuthMode]           = useState('login');
   const [loginEmail, setLoginEmail]       = useState('');
@@ -431,49 +432,80 @@ export default function TrainingsApp() {
 
   // ── Auto-Notifications ──────────────────────────────────────
   useEffect(() => {
-    if (!canEdit() && !['eltern','jugendlich'].includes(userRole)) return;
     if (Object.keys(children).length === 0) return;
-    const today = new Date().toISOString().split('T')[0];
+    if (Object.keys(notifications).length === 0 && Object.keys(sessions).length === 0 && Object.keys(tournaments).length === 0) return;
     const now = new Date();
+    const updatedNotifs = { ...notifications };
+    let changed = false;
 
-    // 1. Turnier-Erinnerung: 7 Tage vorher, wenn keine Antwort
+    // Helper: create if not exists (dedup by key)
+    const maybeCreate = (childId, type, title, message, key) => {
+      const exists = Object.values(updatedNotifs).some(n => n.key === key && !n.trashedAt);
+      if (exists) return;
+      const id = 'notif_' + Date.now() + '_' + Math.random().toString(36).slice(2,6) + '_' + childId;
+      updatedNotifs[id] = { id, childId, type, title, message, createdAt: now.toISOString(), trashedAt: null, key, batchId: null, trainerTrashedAt: null };
+      changed = true;
+    };
+
+    // Helper: auto-trash by key when response exists
+    const maybeAutoTrash = (key) => {
+      Object.values(updatedNotifs).forEach(n => {
+        if (n.key === key && !n.trashedAt) {
+          updatedNotifs[n.id] = { ...n, trashedAt: now.toISOString() };
+          changed = true;
+        }
+      });
+    };
+
+    // 1. Turnier-Erinnerung: ≤168 Stunden (7 Tage) vorher
     Object.values(tournaments).forEach(t => {
       const startDate = t.dateFrom || t.date || '';
       if (!startDate) return;
-      const tournDay = new Date(startDate + 'T12:00:00');
-      const daysUntil = Math.round((tournDay - now) / 86400000);
-      if (daysUntil < 0 || daysUntil > 7) return;
+      // Use first Konkurrenz time or default noon
+      const firstTime = (t.konkurrenzen||[])[0]?.time || '12:00';
+      const tournStart = new Date(`${startDate}T${firstTime}:00`);
+      const hoursUntil = (tournStart - now) / 3600000;
       (t.konkurrenzen||[]).forEach(konk => {
         (konk.participantIds||[]).forEach(childId => {
-          const resp = (t.responses||{})[childId];
-          if (resp) return; // already answered
-          const key = `tourn_reminder_${t.id}_${childId}`;
           const child = children[childId]; if (!child) return;
-          createNotification(childId, 'tournament_reminder',
-            `⚠️ Turnieranmeldung ausstehend`,
-            `Das Turnier „${t.name}" beginnt ${daysUntil === 0 ? 'heute' : `in ${daysUntil} Tag${daysUntil===1?'':'en'}`}. Bitte Antwort für „${konk.name}" eintragen!`,
-            key
-          );
+          const resp = (t.responses||{})[childId];
+          const key = `tourn_reminder_${t.id}_${childId}`;
+          if (resp) {
+            // Has answer → auto-trash reminder
+            maybeAutoTrash(key);
+          } else if (hoursUntil >= 0 && hoursUntil <= 168) {
+            const hoursText = hoursUntil < 24
+              ? `in ${Math.round(hoursUntil)} Stunde${Math.round(hoursUntil)===1?'':'n'}`
+              : `in ${Math.round(hoursUntil/24)} Tag${Math.round(hoursUntil/24)===1?'':'en'}`;
+            maybeCreate(childId, 'tournament_reminder',
+              `⚠️ Turnieranmeldung ausstehend`,
+              `Das Turnier „${t.name}" beginnt ${hoursUntil < 1 ? 'gleich' : hoursText}. Bitte Antwort für „${konk.name}" eintragen!`,
+              key
+            );
+          }
         });
       });
     });
 
-    // 2. Training-Erinnerung: 1 Tag vorher, wenn keine Antwort
+    // 2. Training-Erinnerung: ≤24 Stunden vorher
     Object.values(sessions).forEach(sess => {
-      const sessDay = new Date(sess.date + 'T12:00:00');
-      const daysUntil = Math.round((sessDay - now) / 86400000);
-      if (daysUntil !== 1) return;
+      const sessStart = new Date(`${sess.date}T${sess.time||'12:00'}:00`);
+      const hoursUntil = (sessStart - now) / 3600000;
       (sess.subgroupIds||[]).forEach(subgroupId => {
         getChildrenForSubgroup(subgroupId).forEach(child => {
           const resp = (sess.responses||{})[child.id];
-          if (resp) return;
           const key = `training_reminder_${sess.id}_${child.id}`;
-          const dateStr = new Date(sess.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'});
-          createNotification(child.id, 'training_reminder',
-            `📅 Training morgen`,
-            `Das Training am ${dateStr} um ${sess.time} Uhr steht an. Bitte An- oder Abmeldung eintragen!`,
-            key
-          );
+          if (resp) {
+            maybeAutoTrash(key);
+          } else if (hoursUntil >= 0 && hoursUntil <= 24) {
+            const dateStr = new Date(sess.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'});
+            const hoursText = hoursUntil < 1 ? 'gleich' : `in ${Math.round(hoursUntil)} Stunde${Math.round(hoursUntil)===1?'':'n'}`;
+            maybeCreate(child.id, 'training_reminder',
+              `📅 Training ${hoursUntil < 2 ? 'gleich' : 'bald'}`,
+              `Das Training am ${dateStr} um ${sess.time} Uhr beginnt ${hoursText}. Bitte An- oder Abmeldung eintragen!`,
+              key
+            );
+          }
         });
       });
     });
@@ -489,15 +521,17 @@ export default function TrainingsApp() {
       });
       if (unexcusedNoReply.length >= 3) {
         const key = `unexcused_${child.id}_${unexcusedNoReply.length}`;
-        createNotification(child.id, 'unexcused_absences',
+        maybeCreate(child.id, 'unexcused_absences',
           `❗ Fehlzeiten ohne Rückmeldung`,
           `${child.name} hat ${unexcusedNoReply.length} mal unentschuldigt gefehlt, ohne Rückmeldung. Bitte tragt euch rechtzeitig aus, wenn ihr nicht kommen könnt!`,
           key
         );
       }
     });
+
+    if (changed) saveNotifications(updatedNotifs);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessions, tournaments, children, archivedSessions]);
+  }, [sessions, tournaments, children, archivedSessions, notifications]);
 
   // Scroll to tournament when navigating from home → Turnierwelt
   useEffect(() => {
@@ -519,31 +553,52 @@ export default function TrainingsApp() {
   // ── Notification Helpers ─────────────────────────────────────
   const createNotification = (childId, type, title, message, key=null) => {
     const now = new Date().toISOString();
-    // Dedup: if key already exists as active notif → skip
     if (key) {
       const exists = Object.values(notifications).some(n => n.key===key && !n.trashedAt);
       if (exists) return;
     }
     const id = 'notif_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
-    const notif = { id, childId, type, title, message, createdAt: now, trashedAt: null, key };
+    const notif = { id, childId, type, title, message, createdAt: now, trashedAt: null, key, batchId: null, trainerTrashedAt: null };
     saveNotifications({ ...notifications, [id]: notif });
   };
 
+  // Child-side trash (only affects child's inbox)
   const trashNotification = (id) => {
     const n = notifications[id]; if (!n) return;
     saveNotifications({ ...notifications, [id]: { ...n, trashedAt: new Date().toISOString() } });
   };
-
   const restoreNotification = (id) => {
     const n = notifications[id]; if (!n) return;
     saveNotifications({ ...notifications, [id]: { ...n, trashedAt: null } });
   };
-
   const deleteNotificationPermanently = (id) => {
     const u = { ...notifications }; delete u[id]; saveNotifications(u);
   };
 
-  // Cleanup expired notifications (called lazily on read)
+  // Trainer-side trash: moves entire batchId to trainer trash, does NOT touch child's trashedAt
+  const trainerTrashBatch = (batchId) => {
+    const now = new Date().toISOString();
+    const u = { ...notifications };
+    Object.values(u).forEach(n => {
+      if (n.batchId === batchId && !n.trainerTrashedAt)
+        u[n.id] = { ...n, trainerTrashedAt: now };
+    });
+    saveNotifications(u);
+  };
+  const trainerRestoreBatch = (batchId) => {
+    const u = { ...notifications };
+    Object.values(u).forEach(n => {
+      if (n.batchId === batchId) u[n.id] = { ...n, trainerTrashedAt: null };
+    });
+    saveNotifications(u);
+  };
+  const trainerDeleteBatch = (batchId) => {
+    const u = { ...notifications };
+    Object.keys(u).forEach(id => { if (u[id].batchId === batchId) delete u[id]; });
+    saveNotifications(u);
+  };
+
+  // Cleanup expired notifications (called lazily on read for child view)
   const getCleanedNotifications = (childId) => {
     const now = new Date();
     const toDelete = [];
@@ -551,15 +606,13 @@ export default function TrainingsApp() {
     const trashed = [];
     Object.values(notifications).forEach(n => {
       if (n.childId !== childId) return;
-      const created = new Date(n.createdAt);
-      const daysSinceCreated = (now - created) / 86400000;
+      const daysSinceCreated = (now - new Date(n.createdAt)) / 86400000;
       if (n.trashedAt) {
-        const trashDate = new Date(n.trashedAt);
-        const daysTrashed = (now - trashDate) / 86400000;
-        if (daysTrashed >= 7) { toDelete.push(n.id); }
+        const daysTrashed = (now - new Date(n.trashedAt)) / 86400000;
+        if (daysTrashed >= 7) toDelete.push(n.id);
         else trashed.push(n);
       } else {
-        if (daysSinceCreated >= 14) { toDelete.push(n.id); }
+        if (daysSinceCreated >= 14) toDelete.push(n.id);
         else active.push(n);
       }
     });
@@ -2960,11 +3013,27 @@ export default function TrainingsApp() {
       } else {
         targets = [notifComposeTarget];
       }
+      if (targets.length === 0) { alert('Keine Empfänger gefunden.'); return; }
       const now = new Date().toISOString();
+      const batchId = 'batch_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+      // Determine recipient label
+      let recipientLabel = 'Alle Kinder';
+      if (notifComposeTarget !== 'all') {
+        if (notifComposeTarget.startsWith('sub_')) {
+          const subId = notifComposeTarget.replace('sub_','');
+          recipientLabel = allSubs.find(s=>s.id===subId)?.name || 'Gruppe';
+          recipientLabel += ` (${targets.length} Kinder)`;
+        } else {
+          const c = children[notifComposeTarget];
+          recipientLabel = c?.name || 'Kind';
+        }
+      } else {
+        recipientLabel = `Alle Kinder (${targets.length})`;
+      }
       const updated = { ...notifications };
       targets.forEach(childId => {
         const id = 'notif_' + Date.now() + '_' + Math.random().toString(36).slice(2,6) + '_' + childId;
-        updated[id] = { id, childId, type:'trainer_message', title:notifComposeTitle.trim(), message:notifComposeText.trim(), createdAt:now, trashedAt:null, key:null };
+        updated[id] = { id, childId, type:'trainer_message', title:notifComposeTitle.trim(), message:notifComposeText.trim(), createdAt:now, trashedAt:null, key:null, batchId, trainerTrashedAt:null, recipientLabel };
       });
       saveNotifications(updated);
       setNotifComposeTitle('');
@@ -2972,14 +3041,38 @@ export default function TrainingsApp() {
       alert(`✅ Nachricht an ${targets.length} Empfänger gesendet!`);
     };
 
-    // Alle aktiven Notifs gruppiert nach Kind
-    const activeByChild = {};
-    Object.values(notifications).filter(n=>!n.trashedAt).forEach(n => {
-      if (!activeByChild[n.childId]) activeByChild[n.childId] = [];
-      activeByChild[n.childId].push(n);
+    // Trainer-side: group trainer_message by batchId, show each batch once
+    const now2 = new Date();
+    const trainerMessages = Object.values(notifications).filter(n=>n.type==='trainer_message');
+
+    // Auto-delete trainer trash after 7 days
+    const trainerToDelete = trainerMessages.filter(n => n.trainerTrashedAt && (now2 - new Date(n.trainerTrashedAt))/86400000 >= 7);
+    if (trainerToDelete.length > 0) {
+      const u = { ...notifications };
+      trainerToDelete.forEach(n => delete u[n.id]);
+      saveNotifications(u);
+    }
+
+    // Group by batchId → one entry per batch
+    const batchMap = {};
+    trainerMessages.filter(n=>!trainerToDelete.some(d=>d.id===n.id)).forEach(n => {
+      const bid = n.batchId || n.id; // fallback for old notifs without batchId
+      if (!batchMap[bid]) batchMap[bid] = { batchId: bid, title: n.title, message: n.message, createdAt: n.createdAt, trainerTrashedAt: n.trainerTrashedAt, recipientLabel: n.recipientLabel || '?', count: 0 };
+      batchMap[bid].count++;
+      // If any in batch is not trainer-trashed, batch is "active"
+      if (!n.trainerTrashedAt) batchMap[bid].trainerTrashedAt = null;
     });
-    const totalActive = Object.values(notifications).filter(n=>!n.trashedAt).length;
-    const totalTrashed = Object.values(notifications).filter(n=>!!n.trashedAt).length;
+    const sentBatches = Object.values(batchMap).filter(b=>!b.trainerTrashedAt).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+    const trashedBatches = Object.values(batchMap).filter(b=>!!b.trainerTrashedAt).sort((a,b)=>b.trainerTrashedAt.localeCompare(a.trainerTrashedAt));
+
+    // Active auto-notifications (non-trainer-message) by child
+    const autoNotifsByChild = {};
+    Object.values(notifications).filter(n=>n.type!=='trainer_message'&&!n.trashedAt).forEach(n=>{
+      if (!autoNotifsByChild[n.childId]) autoNotifsByChild[n.childId] = [];
+      autoNotifsByChild[n.childId].push(n);
+    });
+
+    const typeLabels = {achievement:'🏅',tournament_reminder:'🏆',training_reminder:'📅',unexcused_absences:'❗',trainer_message:'💬'};
 
     return (
       <div style={s.page()}><div style={s.wrap}>
@@ -3021,42 +3114,75 @@ export default function TrainingsApp() {
           </div>
         </div>
 
-        {/* Übersicht gesendeter Nachrichten */}
+        {/* Gesendete Nachrichten + eigener Papierkorb */}
         <div style={s.card}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'14px',flexWrap:'wrap',gap:'8px'}}>
-            <h3 style={{margin:0,color:'#333',display:'flex',alignItems:'center',gap:'8px'}}><Bell size={18}/> Übersicht</h3>
-            <div style={{display:'flex',gap:'8px',fontSize:'12px',color:'#6b7280'}}>
-              <span style={{background:'#dcfce7',color:'#16a34a',padding:'3px 10px',borderRadius:'20px',fontWeight:'600'}}>Aktiv: {totalActive}</span>
-              <span style={{background:'#f3f4f6',color:'#6b7280',padding:'3px 10px',borderRadius:'20px',fontWeight:'600'}}>Papierkorb: {totalTrashed}</span>
+            <h3 style={{margin:0,color:'#333',display:'flex',alignItems:'center',gap:'8px'}}><MessageSquare size={18}/> Gesendete Nachrichten</h3>
+            <div style={{display:'flex',gap:'6px'}}>
+              <button onClick={()=>setNotifTrainerTab('sent')} style={{padding:'4px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'600',fontSize:'12px',background:notifTrainerTab==='sent'?'#059669':'#f3f4f6',color:notifTrainerTab==='sent'?'white':'#555'}}>Gesendet {sentBatches.length>0&&`(${sentBatches.length})`}</button>
+              <button onClick={()=>setNotifTrainerTab('trash')} style={{padding:'4px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'600',fontSize:'12px',background:notifTrainerTab==='trash'?'#374151':'#f3f4f6',color:notifTrainerTab==='trash'?'white':'#555'}}>🗑️ Papierkorb {trashedBatches.length>0&&`(${trashedBatches.length})`}</button>
             </div>
           </div>
-          {allKids.filter(c=>activeByChild[c.id]?.length>0).length===0
-            ? <p style={{color:'#9ca3af',textAlign:'center',padding:'20px',margin:0}}>Keine aktiven Benachrichtigungen.</p>
-            : allKids.filter(c=>activeByChild[c.id]?.length>0).map(child=>{
+          {(notifTrainerTab==='sent' ? sentBatches : trashedBatches).length === 0
+            ? <p style={{color:'#9ca3af',textAlign:'center',padding:'20px',margin:0}}>{notifTrainerTab==='sent'?'Noch keine Nachrichten gesendet.':'Papierkorb ist leer.'}</p>
+            : (notifTrainerTab==='sent' ? sentBatches : trashedBatches).map(batch=>{
+                const dateStr = new Date(batch.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+                const isTrash = notifTrainerTab==='trash';
+                return (
+                  <div key={batch.batchId} style={{marginBottom:'10px',border:'1px solid #e5e7eb',borderRadius:'10px',padding:'12px 14px',display:'flex',alignItems:'flex-start',gap:'10px',background:isTrash?'#f9fafb':'white'}}>
+                    <span style={{fontSize:'20px',flexShrink:0}}>💬</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',marginBottom:'3px'}}>
+                        <p style={{margin:0,fontWeight:'700',fontSize:'14px',color:'#1f2937'}}>{batch.title}</p>
+                        <span style={{fontSize:'11px',background:'#f0fdf4',color:'#059669',padding:'1px 7px',borderRadius:'10px',fontWeight:'600'}}>→ {batch.recipientLabel}</span>
+                      </div>
+                      <p style={{margin:'0 0 5px',fontSize:'13px',color:'#374151',lineHeight:'1.4'}}>{batch.message}</p>
+                      <p style={{margin:0,fontSize:'10px',color:'#9ca3af'}}>{dateStr}</p>
+                    </div>
+                    <div style={{display:'flex',gap:'4px',flexShrink:0}}>
+                      {isTrash
+                        ? <>
+                            <button onClick={()=>trainerRestoreBatch(batch.batchId)} title="Wiederherstellen"
+                              style={{padding:'4px 8px',background:'#f0fdf4',border:'none',borderRadius:'6px',cursor:'pointer',color:'#16a34a',fontSize:'12px',fontWeight:'700'}}>↩</button>
+                            <button onClick={()=>trainerDeleteBatch(batch.batchId)} title="Endgültig löschen"
+                              style={{padding:'4px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626'}}><Trash2 size={14}/></button>
+                          </>
+                        : <button onClick={()=>trainerTrashBatch(batch.batchId)} title="In Papierkorb"
+                            style={{padding:'4px',background:'#f3f4f6',border:'none',borderRadius:'6px',cursor:'pointer',color:'#6b7280'}}><Trash2 size={14}/></button>
+                      }
+                    </div>
+                  </div>
+                );
+              })
+          }
+        </div>
+
+        {/* Auto-Benachrichtigungen Übersicht */}
+        <div style={s.card}>
+          <h3 style={{margin:'0 0 14px',color:'#333',display:'flex',alignItems:'center',gap:'8px'}}><Bell size={18}/> Automatische Benachrichtigungen (aktiv)</h3>
+          {allKids.filter(c=>autoNotifsByChild[c.id]?.length>0).length===0
+            ? <p style={{color:'#9ca3af',textAlign:'center',padding:'16px',margin:0}}>Keine aktiven automatischen Benachrichtigungen.</p>
+            : allKids.filter(c=>autoNotifsByChild[c.id]?.length>0).map(child=>{
                 const sub2=subgroups[child.subgroupId];
                 const grp2=FIXED_GROUPS.find(g=>g.id===sub2?.groupId);
-                const notifs=(activeByChild[child.id]||[]).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+                const notifs=(autoNotifsByChild[child.id]||[]).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
                 return (
-                  <div key={child.id} style={{marginBottom:'12px',border:'1px solid #e5e7eb',borderRadius:'10px',overflow:'hidden'}}>
-                    <div style={{background:'#f9fafb',padding:'8px 12px',display:'flex',alignItems:'center',gap:'8px'}}>
-                      <span style={{fontWeight:'700',fontSize:'14px',color:'#1f2937'}}>{child.name}</span>
+                  <div key={child.id} style={{marginBottom:'10px',border:'1px solid #e5e7eb',borderRadius:'10px',overflow:'hidden'}}>
+                    <div style={{background:'#f9fafb',padding:'7px 12px',display:'flex',alignItems:'center',gap:'8px'}}>
+                      <span style={{fontWeight:'700',fontSize:'13px',color:'#1f2937'}}>{child.name}</span>
                       <span style={{fontSize:'11px',color:'#6b7280'}}>{grp2?.emoji} {sub2?.name}</span>
-                      <span style={{marginLeft:'auto',background:'#059669',color:'white',borderRadius:'20px',padding:'2px 8px',fontSize:'11px',fontWeight:'700'}}>{notifs.length}</span>
+                      <span style={{marginLeft:'auto',background:'#f59e0b',color:'white',borderRadius:'20px',padding:'1px 8px',fontSize:'11px',fontWeight:'700'}}>{notifs.length}</span>
                     </div>
-                    <div style={{padding:'8px 12px',display:'grid',gap:'6px'}}>
+                    <div style={{padding:'8px 12px',display:'grid',gap:'5px'}}>
                       {notifs.map(n=>{
-                        const typeLabels={achievement:'🏅',tournament_reminder:'🏆',training_reminder:'📅',unexcused_absences:'❗',trainer_message:'💬'};
                         const dateStr=new Date(n.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
                         return (
-                          <div key={n.id} style={{display:'flex',alignItems:'flex-start',gap:'8px',padding:'8px 10px',background:'white',borderRadius:'8px',border:'1px solid #f3f4f6'}}>
-                            <span style={{fontSize:'16px',flexShrink:0}}>{typeLabels[n.type]||'🔔'}</span>
+                          <div key={n.id} style={{display:'flex',alignItems:'center',gap:'8px',padding:'6px 8px',background:'white',borderRadius:'7px',border:'1px solid #f3f4f6'}}>
+                            <span style={{fontSize:'15px',flexShrink:0}}>{typeLabels[n.type]||'🔔'}</span>
                             <div style={{flex:1,minWidth:0}}>
-                              <p style={{margin:'0 0 2px',fontWeight:'700',fontSize:'13px',color:'#1f2937'}}>{n.title}</p>
-                              <p style={{margin:'0 0 3px',fontSize:'12px',color:'#374151',lineHeight:'1.4'}}>{n.message}</p>
+                              <p style={{margin:'0 0 1px',fontWeight:'700',fontSize:'12px',color:'#1f2937'}}>{n.title}</p>
                               <p style={{margin:0,fontSize:'10px',color:'#9ca3af'}}>{dateStr}</p>
                             </div>
-                            <button onClick={()=>deleteNotificationPermanently(n.id)} title="Löschen"
-                              style={{padding:'3px',background:'none',border:'none',cursor:'pointer',color:'#9ca3af',flexShrink:0}}><X size={14}/></button>
                           </div>
                         );
                       })}
