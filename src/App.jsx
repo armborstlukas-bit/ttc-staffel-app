@@ -3602,41 +3602,6 @@ export default function TrainingsApp() {
           }
         </div>
 
-        {/* Auto-Benachrichtigungen Übersicht */}
-        <div style={s.card}>
-          <h3 style={{margin:'0 0 14px',color:'#333',display:'flex',alignItems:'center',gap:'8px'}}><Bell size={18}/> Automatische Benachrichtigungen (aktiv)</h3>
-          {allKids.filter(c=>autoNotifsByChild[c.id]?.length>0).length===0
-            ? <p style={{color:'#9ca3af',textAlign:'center',padding:'16px',margin:0}}>Keine aktiven automatischen Benachrichtigungen.</p>
-            : allKids.filter(c=>autoNotifsByChild[c.id]?.length>0).map(child=>{
-                const sub2=subgroups[child.subgroupId];
-                const grp2=FIXED_GROUPS.find(g=>g.id===sub2?.groupId);
-                const notifs=(autoNotifsByChild[child.id]||[]).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
-                return (
-                  <div key={child.id} style={{marginBottom:'10px',border:'1px solid #e5e7eb',borderRadius:'10px',overflow:'hidden'}}>
-                    <div style={{background:'#f9fafb',padding:'7px 12px',display:'flex',alignItems:'center',gap:'8px'}}>
-                      <span style={{fontWeight:'700',fontSize:'13px',color:'#1f2937'}}>{child.name}</span>
-                      <span style={{fontSize:'11px',color:'#6b7280'}}>{grp2?.emoji} {sub2?.name}</span>
-                      <span style={{marginLeft:'auto',background:'#f59e0b',color:'white',borderRadius:'20px',padding:'1px 8px',fontSize:'11px',fontWeight:'700'}}>{notifs.length}</span>
-                    </div>
-                    <div style={{padding:'8px 12px',display:'grid',gap:'5px'}}>
-                      {notifs.map(n=>{
-                        const dateStr=new Date(n.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-                        return (
-                          <div key={n.id} style={{display:'flex',alignItems:'center',gap:'8px',padding:'6px 8px',background:'white',borderRadius:'7px',border:'1px solid #f3f4f6'}}>
-                            <span style={{fontSize:'15px',flexShrink:0}}>{typeLabels[n.type]||'🔔'}</span>
-                            <div style={{flex:1,minWidth:0}}>
-                              <p style={{margin:'0 0 1px',fontWeight:'700',fontSize:'12px',color:'#1f2937'}}>{n.title}</p>
-                              <p style={{margin:0,fontSize:'10px',color:'#9ca3af'}}>{dateStr}</p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })
-          }
-        </div>
       </div></div>
     );
   }
