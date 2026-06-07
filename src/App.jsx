@@ -522,8 +522,8 @@ export default function TrainingsApp() {
           const child = children[childId]; if (!child) return;
           const resp = (t.responses||{})[childId];
           const key = `tourn_reminder_${t.id}_${childId}`;
-          if (resp) {
-            // Has answer → auto-trash reminder
+          if (resp || hoursUntil < 0) {
+            // Has answer or tournament started → auto-trash reminder
             maybeAutoTrash(key);
           } else if (hoursUntil >= 0 && hoursUntil <= 168) {
             const hoursText = hoursUntil < 24
@@ -547,7 +547,8 @@ export default function TrainingsApp() {
         getChildrenForSubgroup(subgroupId).forEach(child => {
           const resp = (sess.responses||{})[child.id];
           const key = `training_reminder_${sess.id}_${child.id}`;
-          if (resp) {
+          if (resp || hoursUntil < 0) {
+            // Has answer or training passed → auto-trash reminder
             maybeAutoTrash(key);
           } else if (hoursUntil >= 0 && hoursUntil <= 24) {
             const dateStr = new Date(sess.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'});
