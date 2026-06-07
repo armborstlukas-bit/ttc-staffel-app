@@ -367,6 +367,15 @@ export default function TrainingsApp() {
     return () => unsubs.forEach(u=>u());
   }, [user, userRole]);
 
+  // Scroll to tournament when navigating from home → Turnierwelt
+  useEffect(() => {
+    if (view === 'turniere' && scrollToTournId) {
+      const el = document.getElementById('tourn-' + scrollToTournId);
+      if (el) setTimeout(() => el.scrollIntoView({behavior:'smooth', block:'center'}), 150);
+      setScrollToTournId(null);
+    }
+  }, [view, scrollToTournId]);
+
   const saveSubgroups          = u => { setSubgroups(u);          setDoc(doc(db,'ttc','subgroups'),          u); };
   const saveChildren           = u => { setChildren(u);           setDoc(doc(db,'ttc','children'),           u); };
   const saveSessions           = u => { setSessions(u);           setDoc(doc(db,'ttc','sessions'),           u); };
@@ -1145,15 +1154,6 @@ export default function TrainingsApp() {
       return `${f} – ${t2}`;
     };
 
-    // Scroll to specific tournament if navigated from home
-    React.useEffect(() => {
-      if (scrollToTournId) {
-        const el = document.getElementById('tourn-' + scrollToTournId);
-        if (el) { setTimeout(()=>el.scrollIntoView({behavior:'smooth', block:'center'}), 100); }
-        setScrollToTournId(null);
-      }
-    }, [scrollToTournId]);
-
     return (
       <div style={s.page()}><div style={s.wrap}>
         {archiveTournDialog && <ArchiveTournDialog tournament={archiveTournDialog} onClose={()=>setArchiveTournDialog(null)} onConfirm={confirmArchiveTournament}/>}
@@ -1630,45 +1630,71 @@ export default function TrainingsApp() {
       {archiveTournDialog && <ArchiveTournDialog tournament={archiveTournDialog} onClose={()=>setArchiveTournDialog(null)} onConfirm={confirmArchiveTournament}/>}
       <Header/>
       {(()=>{
-        const today=new Date(), in6=new Date(); in6.setDate(today.getDate()+6);
-        const todayStr=today.toISOString().split('T')[0], in6Str=in6.toISOString().split('T')[0];
-        const week=getAllUpcomingSessions().filter(s=>s.date>=todayStr&&s.date<=in6Str);
-        if (!week.length) return null;
+        const todayStr = new Date().toISOString().split('T')[0];
+        const in6 = new Date(); in6.setDate(in6.getDate()+6);
+        const in6Str = in6.toISOString().split('T')[0];
+        const allSess = getAllUpcomingSessions(); // includes last 7 days
+        const pastSess    = canEdit() ? allSess.filter(s=>s.date<todayStr).sort((a,b)=>b.date.localeCompare(a.date)) : [];
+        const upcomingSess = allSess.filter(s=>s.date>=todayStr&&s.date<=in6Str);
+        if (!pastSess.length && !upcomingSess.length) return null;
+
+        const SessionCard = ({session, isPast}) => {
+          const sessionSubs=(session.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean);
+          const bgNormal = isPast ? '#fff5f5' : '#f0f9ff';
+          const bgHover  = isPast ? '#fee2e2' : '#e0f2fe';
+          const border   = isPast ? '1px solid #fca5a5' : '1px solid #bae6fd';
+          const chevColor= isPast ? '#dc2626' : '#0369a1';
+          // Attendance counts for past sessions
+          const allKids = isPast ? (session.subgroupIds||[]).flatMap(sid=>getChildrenForSubgroup(sid)) : [];
+          const recorded = isPast ? allKids.filter(c=>{const st=(children[c.id]?.attendance||{})[session.date]; return !!st;}).length : 0;
+          const archivable = isPast && isSessionArchivable(session);
+          return (
+            <div key={session.id}
+              onClick={()=>{ setActiveSession(session); setView('sessionAttendance'); }}
+              style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:bgNormal,borderRadius:'8px',border,cursor:'pointer'}}
+              onMouseEnter={e=>e.currentTarget.style.background=bgHover}
+              onMouseLeave={e=>e.currentTarget.style.background=bgNormal}>
+              <div style={{flex:1}}>
+                <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'4px',alignItems:'center'}}>
+                  {sessionSubs.map(sub=>{
+                    const grp=FIXED_GROUPS.find(g=>g.id===sub.groupId);
+                    return <span key={sub.id} style={{fontSize:'12px',fontWeight:'700',color:grp?.color}}>{grp?.emoji} {sub.name}</span>;
+                  })}
+                  {isPast&&<span style={{fontSize:'11px',fontWeight:'700',color:'white',background:'#dc2626',padding:'1px 6px',borderRadius:'20px'}}>Vergangen</span>}
+                  {archivable&&<span style={{fontSize:'11px',fontWeight:'700',color:'white',background:'#374151',padding:'1px 6px',borderRadius:'20px'}}>📦 Archivierbar</span>}
+                </div>
+                <span style={{fontSize:'13px',color:isPast?'#991b1b':'#555'}}>
+                  {new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})} · {session.time} Uhr
+                </span>
+                {session.trainer&&<span style={{fontSize:'12px',color:'#999',marginLeft:'8px'}}>· {session.trainer}</span>}
+                {isPast&&allKids.length>0&&<span style={{fontSize:'12px',color:'#9ca3af',marginLeft:'8px'}}>({recorded}/{allKids.length} erfasst)</span>}
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                {session.info&&<Info size={16} color={chevColor}/>}
+                <ChevronRight size={16} color={chevColor}/>
+              </div>
+            </div>
+          );
+        };
+
         return (
           <div style={s.card}>
-            <h3 style={{margin:'0 0 12px',color:'#0369a1',display:'flex',alignItems:'center',gap:'8px'}}><Calendar size={16}/> Trainings heute & nächste 6 Tage</h3>
-            <div style={{display:'grid',gap:'8px'}}>
-              {week.map(session=>{
-                const sessionSubs=(session.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean);
-                return (
-                  <div key={session.id}
-                    onClick={()=>{
-                      setActiveSession(session);
-                      setView('sessionAttendance');
-                    }}
-                    style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'#f0f9ff',borderRadius:'8px',border:'1px solid #bae6fd',cursor:'pointer'}}
-                    onMouseEnter={e=>e.currentTarget.style.background='#e0f2fe'}
-                    onMouseLeave={e=>e.currentTarget.style.background='#f0f9ff'}>
-                    <div>
-                      <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'4px'}}>
-                        {sessionSubs.map(sub=>{
-                          const grp=FIXED_GROUPS.find(g=>g.id===sub.groupId);
-                          return <span key={sub.id} style={{fontSize:'12px',fontWeight:'700',color:grp?.color}}>{grp?.emoji} {sub.name}</span>;
-                        })}
-                      </div>
-                      <span style={{fontSize:'13px',color:'#555'}}>
-                        {new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})} · {session.time} Uhr
-                      </span>
-                      {session.trainer&&<span style={{fontSize:'12px',color:'#999',marginLeft:'8px'}}>· {session.trainer}</span>}
-                    </div>
-                    <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                      {session.info&&<Info size={16} color="#0369a1"/>}
-                      <ChevronRight size={16} color="#0369a1"/>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            {pastSess.length>0&&(
+              <>
+                <h3 style={{margin:'0 0 10px',color:'#dc2626',display:'flex',alignItems:'center',gap:'8px',fontSize:'15px'}}><Calendar size={15}/> Vergangene Einheiten (letzte 7 Tage)</h3>
+                <div style={{display:'grid',gap:'6px',marginBottom:upcomingSess.length?'16px':0}}>
+                  {pastSess.map(s=><SessionCard key={s.id} session={s} isPast={true}/>)}
+                </div>
+              </>
+            )}
+            {upcomingSess.length>0&&(
+              <>
+                <h3 style={{margin:'0 0 10px',color:'#0369a1',display:'flex',alignItems:'center',gap:'8px',fontSize:'15px'}}><Calendar size={15}/> Trainings heute & nächste 6 Tage</h3>
+                <div style={{display:'grid',gap:'6px'}}>
+                  {upcomingSess.map(s=><SessionCard key={s.id} session={s} isPast={false}/>)}
+                </div>
+              </>
+            )}
           </div>
         );
       })()}
