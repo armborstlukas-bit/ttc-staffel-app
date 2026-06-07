@@ -401,13 +401,9 @@ export default function TrainingsApp() {
   const [showTrainingHistory, setShowTrainingHistory]       = useState(false);
   const [showAchievements, setShowAchievements]             = useState(false);
   const [stayLoggedIn, setStayLoggedIn]                     = useState(false);
-  const [regPushNotif, setRegPushNotif]                     = useState(true);
-  const [regEmailNotif, setRegEmailNotif]                   = useState(false);
-  const [notifComposeResponseType, setNotifComposeResponseType] = useState('none'); // 'none'|'yn'|'ynm'
   const [showParentCompose, setShowParentCompose]           = useState(false);
   const [parentMsgTitle, setParentMsgTitle]                 = useState('');
   const [parentMsgText, setParentMsgText]                   = useState('');
-  const prevNotifIdsRef = React.useRef(null);
 
   const [authMode, setAuthMode]           = useState('login');
   const [loginEmail, setLoginEmail]       = useState('');
@@ -469,25 +465,6 @@ export default function TrainingsApp() {
       window.removeEventListener('touchstart',update);
     };
   }, [user]);
-
-  // ── Browser-Push wenn neue In-App-Benachrichtigung erscheint ─
-  useEffect(() => {
-    if (!user || !['eltern','jugendlich'].includes(userRole)) return;
-    if (!userProfile?.notifPrefs?.push) return;
-    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-    const myChild = Object.values(children).find(c => c.parentUid === user.uid || c.uid === user.uid);
-    if (!myChild) return;
-    const myNotifs = Object.values(notifications).filter(n => n.childId === myChild.id && !n.trashedAt);
-    const currentIds = new Set(myNotifs.map(n => n.id));
-    if (prevNotifIdsRef.current !== null) {
-      myNotifs.forEach(n => {
-        if (!prevNotifIdsRef.current.has(n.id)) {
-          try { new Notification(n.title, { body: n.message, icon: '/favicon.ico', tag: n.id }); } catch {}
-        }
-      });
-    }
-    prevNotifIdsRef.current = currentIds;
-  }, [notifications, user, userRole, userProfile, children]);
 
   useEffect(() => {
     if (!user || !userRole) return;
@@ -829,15 +806,10 @@ export default function TrainingsApp() {
     if (!loginName.trim()) { setError('Bitte Name eingeben!'); return; }
     try {
       const cred = await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
-      const notifPrefs = { push: regPushNotif, email: regEmailNotif };
-      const profile = { uid:cred.user.uid, email:loginEmail, name:loginName, role:'pending', linkedChildId:null, notifPrefs };
+      const profile = { uid:cred.user.uid, email:loginEmail, name:loginName, role:'pending', linkedChildId:null };
       await setDoc(doc(db,'users',cred.user.uid), profile);
       const snap = await getDoc(doc(db,'ttc','users'));
       await setDoc(doc(db,'ttc','users'), { ...(snap.exists()?snap.data():{}), [cred.user.uid]:profile });
-      // Request browser notification permission if opted in
-      if (regPushNotif && typeof Notification !== 'undefined' && Notification.permission === 'default') {
-        try { await Notification.requestPermission(); } catch {}
-      }
       setUserRole('pending'); setUserProfile(profile);
     } catch(err) { setError('Fehler: '+err.message); }
   };
@@ -944,15 +916,6 @@ export default function TrainingsApp() {
     alert('✅ Nachricht an Trainer gesendet!');
   };
 
-  // Kind antwortet auf Trainer-Nachricht (Ja/Nein/Vielleicht)
-  const respondToNotif = (notifId, response) => {
-    const n = notifications[notifId];
-    if (!n) return;
-    const child = getMyChild();
-    if (!child) return;
-    const updated = { ...notifications, [notifId]: { ...n, responses: { ...(n.responses||{}), [child.id]: response } } };
-    saveNotifications(updated);
-  };
 
   const handleResetAllAttendance = async () => {
     setResetError('');
@@ -1309,21 +1272,6 @@ export default function TrainingsApp() {
                 style={{width:'16px',height:'16px',cursor:'pointer',accentColor:'#358941'}}/>
               Eingeloggt bleiben
             </label>
-          )}
-          {authMode==='register'&&(
-            <div style={{background:'#f9fafb',borderRadius:'10px',padding:'12px',display:'flex',flexDirection:'column',gap:'10px',border:'1px solid #e5e7eb'}}>
-              <p style={{margin:0,fontSize:'13px',fontWeight:'600',color:'#374151'}}>🔔 Benachrichtigungseinstellungen</p>
-              <label style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',fontSize:'13px',color:'#555',userSelect:'none'}}>
-                <input type="checkbox" checked={regPushNotif} onChange={e=>setRegPushNotif(e.target.checked)}
-                  style={{width:'15px',height:'15px',cursor:'pointer',accentColor:'#358941'}}/>
-                Browser-Push-Benachrichtigungen aktivieren
-              </label>
-              <label style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',fontSize:'13px',color:'#555',userSelect:'none'}}>
-                <input type="checkbox" checked={regEmailNotif} onChange={e=>setRegEmailNotif(e.target.checked)}
-                  style={{width:'15px',height:'15px',cursor:'pointer',accentColor:'#358941'}}/>
-                E-Mail-Benachrichtigungen aktivieren
-              </label>
-            </div>
           )}
           <button type="submit" style={{padding:'12px',background:'#358941',color:'white',border:'none',borderRadius:'8px',fontSize:'16px',fontWeight:'600',cursor:'pointer'}}>
             {authMode==='login'?'Anmelden':'Registrieren'}
@@ -2029,44 +1977,24 @@ export default function TrainingsApp() {
                       };
                       const cfg = typeColors[n.type] || {bg:'#f9fafb',border:'#e5e7eb',icon:'🔔'};
                       const dateStr = new Date(n.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-                      const myResponse = (n.responses||{})[myChild.id];
                       return (
-                        <div key={n.id} style={{background:cfg.bg,border:`1px solid ${cfg.border}`,borderRadius:'10px',padding:'12px 14px'}}>
-                          <div style={{display:'flex',alignItems:'flex-start',gap:'10px'}}>
-                            <span style={{fontSize:'20px',flexShrink:0,marginTop:'1px'}}>{cfg.icon}</span>
-                            <div style={{flex:1,minWidth:0}}>
-                              <p style={{margin:'0 0 3px',fontWeight:'700',fontSize:'14px',color:'#1f2937'}}>{n.title}</p>
-                              <p style={{margin:'0 0 5px',fontSize:'13px',color:'#374151',lineHeight:'1.4'}}>{n.message}</p>
-                              <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>{dateStr}</p>
-                            </div>
-                            {!showTrash&&<button onClick={()=>trashNotification(n.id)} title="In Papierkorb"
-                              style={{padding:'4px',background:'rgba(0,0,0,0.06)',border:'none',borderRadius:'6px',cursor:'pointer',color:'#6b7280',flexShrink:0}}><X size={16}/></button>}
-                            {showTrash&&<div style={{display:'flex',gap:'4px',flexShrink:0}}>
-                              <button onClick={()=>restoreNotification(n.id)} title="Wiederherstellen"
-                                style={{padding:'4px 8px',background:'#f0fdf4',border:'none',borderRadius:'6px',cursor:'pointer',color:'#16a34a',fontSize:'12px',fontWeight:'600'}}>↩</button>
-                              <button onClick={()=>deleteNotificationPermanently(n.id)} title="Endgültig löschen"
-                                style={{padding:'4px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626'}}><Trash2 size={14}/></button>
-                            </div>}
+                        <div key={n.id} style={{background:cfg.bg,border:`1px solid ${cfg.border}`,borderRadius:'10px',padding:'12px 14px',display:'flex',alignItems:'flex-start',gap:'10px'}}>
+                          <span style={{fontSize:'20px',flexShrink:0,marginTop:'1px'}}>{cfg.icon}</span>
+                          <div style={{flex:1,minWidth:0}}>
+                            <p style={{margin:'0 0 3px',fontWeight:'700',fontSize:'14px',color:'#1f2937'}}>{n.title}</p>
+                            <p style={{margin:'0 0 5px',fontSize:'13px',color:'#374151',lineHeight:'1.4'}}>{n.message}</p>
+                            <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>{dateStr}</p>
                           </div>
-                          {/* Ja/Nein/Vielleicht Antwort-Buttons */}
-                          {!showTrash && n.responseType && n.responseType !== 'none' && (
-                            <div style={{display:'flex',gap:'8px',marginTop:'10px',flexWrap:'wrap'}}>
-                              <button onClick={()=>respondToNotif(n.id,'yes')}
-                                style={{flex:1,padding:'8px',border:`2px solid #16a34a`,background:myResponse==='yes'?'#16a34a':'white',color:myResponse==='yes'?'white':'#16a34a',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>
-                                ✅ Ja
-                              </button>
-                              <button onClick={()=>respondToNotif(n.id,'no')}
-                                style={{flex:1,padding:'8px',border:`2px solid #dc2626`,background:myResponse==='no'?'#dc2626':'white',color:myResponse==='no'?'white':'#dc2626',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>
-                                ❌ Nein
-                              </button>
-                              {n.responseType==='ynm'&&(
-                                <button onClick={()=>respondToNotif(n.id,'maybe')}
-                                  style={{flex:1,padding:'8px',border:`2px solid #d97706`,background:myResponse==='maybe'?'#d97706':'white',color:myResponse==='maybe'?'white':'#d97706',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>
-                                  🤔 Vielleicht
-                                </button>
-                              )}
-                            </div>
-                          )}
+                          {showTrash
+                            ? <div style={{display:'flex',gap:'4px',flexShrink:0}}>
+                                <button onClick={()=>restoreNotification(n.id)} title="Wiederherstellen"
+                                  style={{padding:'4px 8px',background:'#f0fdf4',border:'none',borderRadius:'6px',cursor:'pointer',color:'#16a34a',fontSize:'12px',fontWeight:'600'}}>↩</button>
+                                <button onClick={()=>deleteNotificationPermanently(n.id)} title="Endgültig löschen"
+                                  style={{padding:'4px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626'}}><Trash2 size={14}/></button>
+                              </div>
+                            : <button onClick={()=>trashNotification(n.id)} title="In Papierkorb"
+                                style={{padding:'4px',background:'rgba(0,0,0,0.06)',border:'none',borderRadius:'6px',cursor:'pointer',color:'#6b7280',flexShrink:0}}><X size={16}/></button>
+                          }
                         </div>
                       );
                     })}
@@ -3494,12 +3422,11 @@ export default function TrainingsApp() {
       const updated = { ...notifications };
       targets.forEach(childId => {
         const id = 'notif_' + Date.now() + '_' + Math.random().toString(36).slice(2,6) + '_' + childId;
-        updated[id] = { id, childId, type:'trainer_message', title:notifComposeTitle.trim(), message:notifComposeText.trim(), createdAt:now, trashedAt:null, key:null, batchId, trainerTrashedAt:null, recipientLabel, responseType: notifComposeResponseType, responses:{} };
+        updated[id] = { id, childId, type:'trainer_message', title:notifComposeTitle.trim(), message:notifComposeText.trim(), createdAt:now, trashedAt:null, key:null, batchId, trainerTrashedAt:null, recipientLabel };
       });
       saveNotifications(updated);
       setNotifComposeTitle('');
       setNotifComposeText('');
-      setNotifComposeResponseType('none');
       alert(`✅ Nachricht an ${targets.length} Empfänger gesendet!`);
     };
 
@@ -3545,16 +3472,9 @@ export default function TrainingsApp() {
         createdAt: n.createdAt, isTrashed: isTrashedForMe(n),
         trashedAt: (typeof n.trainerTrashedAt === 'object' && n.trainerTrashedAt) ? n.trainerTrashedAt[uid] : null,
         recipientLabel: n.recipientLabel || '?', count: 0,
-        responseType: n.responseType || 'none', rYes:0, rNo:0, rMaybe:0, rNone:0,
       };
       batchMap[bid].count++;
       if (!isTrashedForMe(n)) batchMap[bid].isTrashed = false;
-      // tally responses
-      const resp = n.responses?.[n.childId];
-      if (resp === 'yes')   batchMap[bid].rYes++;
-      else if (resp === 'no') batchMap[bid].rNo++;
-      else if (resp === 'maybe') batchMap[bid].rMaybe++;
-      else batchMap[bid].rNone++;
     });
     const sentBatches   = Object.values(batchMap).filter(b=>!b.isTrashed).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
     const trashedBatches = Object.values(batchMap).filter(b=>b.isTrashed).sort((a,b)=>(b.trashedAt||'').localeCompare(a.trashedAt||''));
@@ -3606,17 +3526,6 @@ export default function TrainingsApp() {
               <textarea value={notifComposeText} onChange={e=>setNotifComposeText(e.target.value)}
                 placeholder="Nachrichtentext..." rows={3}
                 style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box',resize:'vertical'}}/>
-            </div>
-            <div>
-              <label style={s.label}>Antwort-Optionen</label>
-              <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-                {[['none','Keine Antwort'],['yn','Ja / Nein'],['ynm','Ja / Nein / Vielleicht']].map(([val,label])=>(
-                  <button key={val} onClick={()=>setNotifComposeResponseType(val)} type="button"
-                    style={{padding:'6px 14px',borderRadius:'20px',border:`2px solid ${notifComposeResponseType===val?'#059669':'#e5e7eb'}`,background:notifComposeResponseType===val?'#f0fdf4':'white',color:notifComposeResponseType===val?'#059669':'#555',cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>
-                    {label}
-                  </button>
-                ))}
-              </div>
             </div>
             <button onClick={sendTrainerNotif} style={{...s.btn('#059669'),alignSelf:'flex-start'}}>
               <Send size={16}/> Senden
@@ -3673,14 +3582,6 @@ export default function TrainingsApp() {
                           <span style={{fontSize:'11px',background:'#f0fdf4',color:'#059669',padding:'1px 7px',borderRadius:'10px',fontWeight:'600'}}>→ {batch.recipientLabel}</span>
                         </div>
                         <p style={{margin:'0 0 5px',fontSize:'13px',color:'#374151',lineHeight:'1.4'}}>{batch.message}</p>
-                        {batch.responseType !== 'none' && (
-                          <div style={{display:'flex',gap:'6px',flexWrap:'wrap',margin:'6px 0'}}>
-                            <span style={{fontSize:'11px',background:'#dcfce7',color:'#16a34a',padding:'2px 8px',borderRadius:'10px',fontWeight:'600'}}>✅ Ja: {batch.rYes}</span>
-                            <span style={{fontSize:'11px',background:'#fee2e2',color:'#dc2626',padding:'2px 8px',borderRadius:'10px',fontWeight:'600'}}>❌ Nein: {batch.rNo}</span>
-                            {batch.responseType==='ynm'&&<span style={{fontSize:'11px',background:'#fef3c7',color:'#d97706',padding:'2px 8px',borderRadius:'10px',fontWeight:'600'}}>🤔 Vielleicht: {batch.rMaybe}</span>}
-                            <span style={{fontSize:'11px',background:'#f3f4f6',color:'#6b7280',padding:'2px 8px',borderRadius:'10px',fontWeight:'600'}}>– Keine: {batch.rNone}</span>
-                          </div>
-                        )}
                         <p style={{margin:0,fontSize:'10px',color:'#9ca3af'}}>{dateStr}</p>
                       </div>
                       <div style={{display:'flex',gap:'4px',flexShrink:0}}>
