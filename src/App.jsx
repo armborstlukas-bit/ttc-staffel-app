@@ -1253,30 +1253,65 @@ export default function TrainingsApp() {
   };
 
   const exportSubgroupExcel = (sub) => {
-    const kids=getChildrenForSubgroup(sub.id);
-    const dates=(sub.trainingDates||[]).sort();
-    const grp=FIXED_GROUPS.find(g=>g.id===sub.groupId);
-    const standDatum=new Date().toLocaleDateString('de-DE');
-    let csv=`TTC Grün-Weiß Staffel\n${grp?.name} - ${sub.name}\nExportiert am: ${standDatum}\n\nDatum;Name;Anwesend;Entschuldigt;Unentschuldigt\n`;
-    dates.forEach(date=>{
-      const d=new Date(date+'T12:00:00').toLocaleDateString('de-DE');
-      kids.forEach(child=>{
-        const s=(child.attendance||{})[date];
-        csv+=`${d};${child.name};${s==='present'?1:0};${s==='absent_excused'?1:0};${s==='absent_unexcused'?1:0}\n`;
+    const kids  = getChildrenForSubgroup(sub.id);
+    const dates = (sub.trainingDates||[]).sort();
+    const grp   = FIXED_GROUPS.find(g=>g.id===sub.groupId);
+    const grpName = grp?.name || sub.groupId;
+    const subName = sub.name;
+
+    const WOCHENTAGE = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+    const MONATE     = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+
+    const isoKW = (d) => {
+      const dt = new Date(d.getTime());
+      dt.setHours(0,0,0,0);
+      dt.setDate(dt.getDate()+3-(dt.getDay()+6)%7);
+      const week1 = new Date(dt.getFullYear(),0,4);
+      return 1+Math.round(((dt.getTime()-week1.getTime())/86400000-3+(week1.getDay()+6)%7)/7);
+    };
+
+    const header = [
+      'Gruppe','Untergruppe','Name',
+      'Datum_DE','Datum_ISO',
+      'Wochentag','KW','Monat','Jahr',
+      'Status',
+      'Anwesend','Entschuldigt','Unentschuldigt'
+    ].join(';');
+
+    const rows = [];
+    dates.forEach(dateISO => {
+      const dt  = new Date(dateISO+'T12:00:00');
+      const datDE = dt.toLocaleDateString('de-DE');
+      const wt  = WOCHENTAGE[dt.getDay()];
+      const kw  = isoKW(dt);
+      const mon = MONATE[dt.getMonth()];
+      const yr  = dt.getFullYear();
+      kids.forEach(child => {
+        const att = (child.attendance||{})[dateISO];
+        const statusText =
+          att === 'present'          ? 'Anwesend'       :
+          att === 'absent_excused'   ? 'Entschuldigt'   :
+          att === 'absent_unexcused' ? 'Unentschuldigt' : 'Keine Angabe';
+        rows.push([
+          grpName, subName, child.name,
+          datDE, dateISO,
+          wt, kw, mon, yr,
+          statusText,
+          att==='present'?1:0,
+          att==='absent_excused'?1:0,
+          att==='absent_unexcused'?1:0
+        ].join(';'));
       });
     });
-    csv+=`\nZusammenfassung\nName;Trainings;Anwesend;Entschuldigt;Unentschuldigt;Quote\n`;
-    kids.forEach(child=>{
-      const st=getAttendanceStats(child.id,sub.id);
-      csv+=`${child.name};${st.total};${st.present};${st.excused};${st.unexcused};${st.percent}%\n`;
-    });
-    const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
-    const link=document.createElement('a');
-    link.href=URL.createObjectURL(blob);
-    link.download=`TTC_${grp?.name}_${sub.name}_Stand_${standDatum}.csv`;
+
+    const csv = [header, ...rows].join('\r\n');
+    const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    const fileDate = new Date().toISOString().split('T')[0];
+    link.download = `TTC_${grpName}_${subName}_Pivot_${fileDate}.csv`;
     link.click();
   };
-
   function addSubgroup() {
     if (!newSubgroupName.trim()) return;
     const id='sub_'+Date.now();
