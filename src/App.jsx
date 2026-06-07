@@ -401,6 +401,7 @@ export default function TrainingsApp() {
   const [loginPassword, setLoginPassword] = useState('');
   const [loginName, setLoginName]         = useState('');
   const [error, setError]                 = useState('');
+  const [showRolePicker, setShowRolePicker] = useState(false);
 
   // ── Auth ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -408,8 +409,22 @@ export default function TrainingsApp() {
       if (u) {
         setUser(u);
         const snap = await getDoc(doc(db, 'users', u.uid));
-        if (snap.exists()) { setUserRole(snap.data().role); setUserProfile(snap.data()); }
-      } else { setUser(null); setUserRole(null); setUserProfile(null); }
+        if (snap.exists()) {
+          const data = snap.data();
+          // Backwards compat: roles array or single role string
+          const roles = data.roles && data.roles.length > 0 ? data.roles : [data.role];
+          const profile = { ...data, roles };
+          setUserProfile(profile);
+          const selectableRoles = roles.filter(r => r !== 'pending');
+          if (selectableRoles.length > 1) {
+            // Multiple roles → show picker, pre-set first role so data loads
+            setUserRole(selectableRoles[0]);
+            setShowRolePicker(true);
+          } else {
+            setUserRole(roles[0]);
+          }
+        }
+      } else { setUser(null); setUserRole(null); setUserProfile(null); setShowRolePicker(false); }
       setLoading(false);
     });
   }, []);
@@ -1086,6 +1101,16 @@ export default function TrainingsApp() {
     setAllUsers(updated);
   };
 
+  // Save roles array for a user (admin function)
+  const saveUserRoles = async (uid, roles) => {
+    // Keep legacy `role` field as first role for backwards compat
+    const primaryRole = roles[0] || 'pending';
+    const updated = { ...allUsers, [uid]: { ...allUsers[uid], roles, role: primaryRole } };
+    await setDoc(doc(db,'ttc','users'), updated);
+    await setDoc(doc(db,'users',uid), { ...allUsers[uid], roles, role: primaryRole });
+    setAllUsers(updated);
+  };
+
   const saveUserGroupIds = async (uid, groupIds) => {
     const updated = { ...allUsers, [uid]: { ...allUsers[uid], groupIds } };
     await setDoc(doc(db,'ttc','users'), updated);
@@ -1194,6 +1219,46 @@ export default function TrainingsApp() {
     </div>
   );
 
+  // ── Rollenwahl-Modal (Mehrfachrollen) ───────────────────────
+  if (showRolePicker) {
+    const selectableRoles = (userProfile?.roles || [userRole]).filter(r => r !== 'pending');
+    return (
+      <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#358941 0%,#9cc18f 100%)',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
+        <div style={{background:'white',borderRadius:'20px',padding:'36px',maxWidth:'420px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.25)',textAlign:'center'}}>
+          <div style={{fontSize:'40px',marginBottom:'12px'}}>👤</div>
+          <h2 style={{margin:'0 0 6px',color:'#333',fontSize:'22px'}}>Willkommen, {userProfile?.name}!</h2>
+          <p style={{margin:'0 0 28px',color:'#666',fontSize:'14px'}}>Du hast mehrere Rollen. Mit welcher möchtest du fortfahren?</p>
+          <div style={{display:'grid',gap:'12px'}}>
+            {selectableRoles.map(role => {
+              const rc = ROLE_CONFIG[role] || {};
+              const icons = { admin:'🛡️', trainer:'🏓', eltern:'👨‍👩‍👧', jugendlich:'🧒' };
+              return (
+                <button key={role} onClick={()=>{ setUserRole(role); setShowRolePicker(false); setView('home'); }}
+                  style={{padding:'16px 20px',background:rc.bg||'#f3f4f6',border:`2px solid ${rc.color||'#ddd'}`,borderRadius:'12px',cursor:'pointer',display:'flex',alignItems:'center',gap:'14px',textAlign:'left',transition:'transform 0.1s'}}
+                  onMouseEnter={e=>e.currentTarget.style.transform='scale(1.02)'}
+                  onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
+                  <span style={{fontSize:'28px'}}>{icons[role]||'👤'}</span>
+                  <div>
+                    <p style={{margin:'0 0 2px',fontWeight:'700',fontSize:'16px',color:rc.color||'#333'}}>{rc.label||role}</p>
+                    <p style={{margin:0,fontSize:'12px',color:'#888'}}>
+                      {role==='trainer'&&'Trainingsplanung, Gruppen, Errungenschaften'}
+                      {role==='admin'&&'Vollzugriff auf alle Bereiche'}
+                      {role==='eltern'&&'Übersicht & An-/Abmeldung für dein Kind'}
+                      {role==='jugendlich'&&'Eigene Übersicht, Turniere & Errungenschaften'}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <button onClick={()=>signOut(auth)} style={{marginTop:'20px',background:'none',border:'none',color:'#999',cursor:'pointer',fontSize:'13px',textDecoration:'underline'}}>
+            Abmelden
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (userRole==='pending') return (
     <div style={{...s.page(activeGroup?.color),display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
       <div style={{background:'white',borderRadius:'16px',padding:'40px',maxWidth:'420px',width:'100%',textAlign:'center',boxShadow:'0 10px 40px rgba(0,0,0,0.2)'}}>
@@ -1251,6 +1316,17 @@ export default function TrainingsApp() {
           </div>
           <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
             {view!=='home'&&<button onClick={()=>setView('home')} style={s.btn('#358941')} title="Startseite"><Home size={16}/></button>}
+            {/* Rollenwechsel – nur bei Mehrfachrollen */}
+            {(()=>{
+              const selectableRoles = (userProfile?.roles||[userRole]).filter(r=>r!=='pending');
+              if (selectableRoles.length < 2) return null;
+              return (
+                <button onClick={()=>setShowRolePicker(true)}
+                  style={{...s.btn('#6b7280'),position:'relative'}} title="Rolle wechseln">
+                  👤 Rolle wechseln
+                </button>
+              );
+            })()}
             {userRole==='admin'&&<button onClick={()=>setView('admin')} style={s.btn('#7c3aed')}><Shield size={16}/> Admin</button>}
             {canEdit()&&<button onClick={()=>setView('trainingsplan')} style={s.btn('#0369a1')}><Calendar size={16}/> Trainingsplan</button>}
             {canEdit()&&<button onClick={()=>setView('turniere')} style={s.btn('#b45309')}><Trophy size={16}/> Turniere</button>}
@@ -2182,15 +2258,45 @@ export default function TrainingsApp() {
                       <p style={{margin:0,fontSize:'12px',color:'#999'}}>{u.email}</p>
                     </div>
                     <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
-                      <select value={u.role} onChange={e=>changeUserRole(u.uid,e.target.value)} style={{padding:'6px 10px',border:`2px solid ${rc.color}`,borderRadius:'6px',fontSize:'13px',fontWeight:'600',color:rc.color,background:rc.bg,cursor:'pointer'}}>
-                        {Object.entries(ROLE_CONFIG).map(([key,cfg])=><option key={key} value={key}>{cfg.label}</option>)}
-                      </select>
-                      {['eltern','jugendlich'].includes(u.role)&&(
-                        <select value={u.linkedChildId||''} onChange={e=>linkChildToUser(u.uid,e.target.value||null)} style={{padding:'6px 10px',border:'1px solid #ddd',borderRadius:'6px',fontSize:'13px',cursor:'pointer'}}>
-                          <option value=''>-- Kind zuordnen --</option>
-                          {allChildrenList.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
-                      )}
+                      {/* Rollen als Toggle-Buttons – Mehrfachauswahl möglich */}
+                      <div style={{display:'flex',gap:'5px',flexWrap:'wrap',alignItems:'center'}}>
+                        <span style={{fontSize:'12px',color:'#555',fontWeight:'600',marginRight:'2px'}}>Rollen:</span>
+                        {Object.entries(ROLE_CONFIG).filter(([k])=>k!=='pending').map(([key,cfg])=>{
+                          const userRoles = u.roles && u.roles.length>0 ? u.roles : [u.role];
+                          const active = userRoles.includes(key);
+                          return (
+                            <button key={key} onClick={()=>{
+                              const cur = u.roles && u.roles.length>0 ? u.roles : [u.role];
+                              let next;
+                              if (active) {
+                                next = cur.filter(r=>r!==key);
+                                if (next.length===0) return; // mindestens eine Rolle
+                              } else {
+                                next = [...cur, key];
+                              }
+                              saveUserRoles(u.uid, next);
+                            }} style={{padding:'3px 9px',borderRadius:'20px',border:`2px solid ${cfg.color}`,background:active?cfg.color:cfg.bg,color:active?'white':cfg.color,cursor:'pointer',fontWeight:'600',fontSize:'11px'}}>
+                              {cfg.label}
+                            </button>
+                          );
+                        })}
+                        {u.role==='pending'&&<span style={{fontSize:'11px',fontWeight:'700',color:'#dc2626',background:'#fee2e2',padding:'2px 8px',borderRadius:'20px'}}>⏳ Wartend</span>}
+                        {u.role==='pending'&&(
+                          <button onClick={()=>saveUserRoles(u.uid,['eltern'])} style={{padding:'3px 9px',background:'#358941',color:'white',border:'none',borderRadius:'20px',cursor:'pointer',fontWeight:'600',fontSize:'11px'}}>✓ Freischalten</button>
+                        )}
+                      </div>
+                      {/* Kind zuordnen bei Eltern/Jugendlichen */}
+                      {(()=>{
+                        const userRoles = u.roles && u.roles.length>0 ? u.roles : [u.role];
+                        const needsChild = userRoles.some(r=>['eltern','jugendlich'].includes(r));
+                        if (!needsChild) return null;
+                        return (
+                          <select value={u.linkedChildId||''} onChange={e=>linkChildToUser(u.uid,e.target.value||null)} style={{padding:'6px 10px',border:'1px solid #ddd',borderRadius:'6px',fontSize:'13px',cursor:'pointer'}}>
+                            <option value=''>-- Kind zuordnen --</option>
+                            {allChildrenList.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                          </select>
+                        );
+                      })()}
                     </div>
                   </div>
                   {linkedChild&&<p style={{margin:'6px 0 0',fontSize:'12px',color:'#358941'}}>👶 Verknüpft mit: <strong>{linkedChild.name}</strong></p>}
