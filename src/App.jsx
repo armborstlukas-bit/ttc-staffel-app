@@ -491,24 +491,39 @@ export default function TrainingsApp() {
     let changed = false;
 
     // 0. Cleanup: Veraltete auto-Erinnerungen wegräumen
+    // Gültige Keys = nur zukünftige Sessions/Turniere
+    const validTrainingKeys = new Set();
+    Object.values(sessions).forEach(sess => {
+      const sessStart = new Date(`${sess.date}T${sess.time||'12:00'}:00`);
+      if (sessStart > now) {
+        (sess.subgroupIds||[]).forEach(subgroupId => {
+          getChildrenForSubgroup(subgroupId).forEach(child => {
+            validTrainingKeys.add(`training_reminder_${sess.id}_${child.id}`);
+          });
+        });
+      }
+    });
+    const validTournKeys = new Set();
+    Object.values(tournaments).forEach(t => {
+      const startDate = t.dateFrom || t.date || '';
+      if (!startDate) return;
+      const firstTime = (t.konkurrenzen||[])[0]?.time || '12:00';
+      const tournStart = new Date(`${startDate}T${firstTime}:00`);
+      if (tournStart > now) {
+        (t.konkurrenzen||[]).forEach(konk => {
+          (konk.participantIds||[]).forEach(childId => {
+            validTournKeys.add(`tourn_reminder_${t.id}_${childId}`);
+          });
+        });
+      }
+    });
     Object.values(updatedNotifs).forEach(n => {
       if (n.trashedAt) return;
-      // Training-Erinnerung: älter als 24h → Training ist vorbei
-      if (n.type === 'training_reminder') {
-        const age = (now - new Date(n.createdAt)) / 3600000;
-        if (age > 24) { updatedNotifs[n.id] = { ...n, trashedAt: now.toISOString() }; changed = true; }
+      if (n.type === 'training_reminder' && (!n.key || !validTrainingKeys.has(n.key))) {
+        updatedNotifs[n.id] = { ...n, trashedAt: now.toISOString() }; changed = true;
       }
-      // Turnier-Erinnerung: kein passendes Turnier mehr in der Zukunft
-      if (n.type === 'tournament_reminder' && n.key) {
-        const tournId = n.key.replace(/^tourn_reminder_/, '').replace(/_[^_]*$/, '');
-        const tourn = tournaments[tournId];
-        if (!tourn) { updatedNotifs[n.id] = { ...n, trashedAt: now.toISOString() }; changed = true; return; }
-        const startDate = tourn.dateFrom || tourn.date || '';
-        if (startDate) {
-          const firstTime = (tourn.konkurrenzen||[])[0]?.time || '12:00';
-          const tournStart = new Date(`${startDate}T${firstTime}:00`);
-          if (tournStart < now) { updatedNotifs[n.id] = { ...n, trashedAt: now.toISOString() }; changed = true; }
-        }
+      if (n.type === 'tournament_reminder' && (!n.key || !validTournKeys.has(n.key))) {
+        updatedNotifs[n.id] = { ...n, trashedAt: now.toISOString() }; changed = true;
       }
     });
 
