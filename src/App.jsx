@@ -332,6 +332,7 @@ export default function TrainingsApp() {
   const [editingArchivedSession, setEditingArchivedSession] = useState(null);
   const [editArchivedForm, setEditArchivedForm]             = useState({});
   const [editingArchivedTourn, setEditingArchivedTourn]     = useState(null); // tournament object or null
+  const [scrollToTournId, setScrollToTournId]               = useState(null);
 
   const [authMode, setAuthMode]           = useState('login');
   const [loginEmail, setLoginEmail]       = useState('');
@@ -659,6 +660,16 @@ export default function TrainingsApp() {
   const saveArchivedTournEdit = (form) => {
     saveArchivedTournaments({ ...archivedTournaments, [form.id]: form });
     setEditingArchivedTourn(null);
+  };
+
+  const deleteArchivedSession = (id) => {
+    if (!window.confirm('Eintrag wirklich endgültig aus dem Archiv löschen? Das kann nicht rückgängig gemacht werden.')) return;
+    const u = {...archivedSessions}; delete u[id]; saveArchivedSessions(u);
+  };
+
+  const deleteArchivedTournament = (id) => {
+    if (!window.confirm('Turnier wirklich endgültig aus dem Archiv löschen? Das kann nicht rückgängig gemacht werden.')) return;
+    const u = {...archivedTournaments}; delete u[id]; saveArchivedTournaments(u);
   };
 
   const restoreTournament = (t) => {
@@ -1134,6 +1145,15 @@ export default function TrainingsApp() {
       return `${f} – ${t2}`;
     };
 
+    // Scroll to specific tournament if navigated from home
+    React.useEffect(() => {
+      if (scrollToTournId) {
+        const el = document.getElementById('tourn-' + scrollToTournId);
+        if (el) { setTimeout(()=>el.scrollIntoView({behavior:'smooth', block:'center'}), 100); }
+        setScrollToTournId(null);
+      }
+    }, [scrollToTournId]);
+
     return (
       <div style={s.page()}><div style={s.wrap}>
         {archiveTournDialog && <ArchiveTournDialog tournament={archiveTournDialog} onClose={()=>setArchiveTournDialog(null)} onConfirm={confirmArchiveTournament}/>}
@@ -1203,9 +1223,10 @@ export default function TrainingsApp() {
                 const tDates = getDatesInRange(t.dateFrom||t.date, t.dateTo||t.dateFrom||t.date);
                 const todayStr2 = new Date().toISOString().split('T')[0];
                 const tournIsPast = (t.dateTo||t.dateFrom||t.date||'') < todayStr2;
+                const isHighlighted = scrollToTournId === t.id;
 
                 return (
-                  <div key={t.id} style={{borderRadius:'10px',border:`2px solid ${tournIsPast?'#fca5a5':'#fde68a'}`,background:tournIsPast?'#fff5f5':'#fffbeb',overflow:'hidden'}}>
+                  <div key={t.id} id={`tourn-${t.id}`} style={{borderRadius:'10px',border:`2px solid ${isHighlighted?'#3b82f6':tournIsPast?'#fca5a5':'#fde68a'}`,background:tournIsPast?'#fff5f5':'#fffbeb',overflow:'hidden',boxShadow:isHighlighted?'0 0 0 3px #93c5fd':undefined,transition:'box-shadow 0.3s'}}>
                     {isEditing ? (
                       <div style={{padding:'16px'}}>
                         <h4 style={{margin:'0 0 12px',color:'#b45309'}}>Turnier bearbeiten</h4>
@@ -1606,7 +1627,7 @@ export default function TrainingsApp() {
   // ── STARTSEITE ───────────────────────────────────────────────
   if (view==='home') return (
     <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
-      <ArchiveTournDialog/>
+      {archiveTournDialog && <ArchiveTournDialog tournament={archiveTournDialog} onClose={()=>setArchiveTournDialog(null)} onConfirm={confirmArchiveTournament}/>}
       <Header/>
       {(()=>{
         const today=new Date(), in6=new Date(); in6.setDate(today.getDate()+6);
@@ -1673,7 +1694,7 @@ export default function TrainingsApp() {
                 return (
                   <div key={t.id} style={{padding:'10px 14px',background:'#fffbeb',borderRadius:'8px',border:'1px solid #fde68a'}}>
                     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer'}}
-                      onClick={()=>setView('turniere')}
+                      onClick={()=>{setScrollToTournId(t.id); setView('turniere');}}
                       onMouseEnter={e=>e.currentTarget.style.opacity='0.8'}
                       onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
                       <div>
@@ -2227,7 +2248,6 @@ export default function TrainingsApp() {
                         </button>
                         <button onClick={()=>{
                           if (isEditing) { setEditingArchivedSession(null); return; }
-                          // Build attendance snapshot from children
                           const att = {};
                           sessionKids.forEach(c => { att[c.id] = (children[c.id]?.attendance||{})[session.date] || ''; });
                           setEditArchivedForm({ ...session, trainerName: session.trainerName||session.trainer||'', editAttendance: att });
@@ -2235,6 +2255,10 @@ export default function TrainingsApp() {
                         }}
                           style={{padding:'5px 10px',background:isEditing?'#6b7280':'#3b82f6',color:'white',border:'none',borderRadius:'7px',cursor:'pointer',fontSize:'12px',fontWeight:'600'}}>
                           {isEditing ? '✕ Schließen' : '✏️ Bearbeiten'}
+                        </button>
+                        <button onClick={()=>deleteArchivedSession(session.id)}
+                          style={{padding:'5px 10px',background:'#dc2626',color:'white',border:'none',borderRadius:'7px',cursor:'pointer',fontSize:'12px',fontWeight:'600'}}>
+                          🗑️
                         </button>
                       </div>
                     </div>
@@ -2333,7 +2357,7 @@ export default function TrainingsApp() {
                         <div style={{fontSize:'13px',color:'#78350f',marginTop:'2px'}}>📅 {dateStr}</div>
                         {t.location && <div style={{fontSize:'13px',color:'#78350f',marginTop:'2px'}}>📍 {t.location}</div>}
                       </div>
-                      <div style={{display:'flex',gap:'6px',flexShrink:0}}>
+                      <div style={{display:'flex',gap:'6px',flexShrink:0,flexWrap:'wrap'}}>
                         <button onClick={()=>setEditingArchivedTourn(t)}
                           style={{padding:'6px 12px',background:'#3b82f6',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontSize:'12px',fontWeight:'600',whiteSpace:'nowrap'}}>
                           ✏️ Bearbeiten
@@ -2341,6 +2365,10 @@ export default function TrainingsApp() {
                         <button onClick={()=>restoreTournament(t)}
                           style={{padding:'6px 12px',background:'#d97706',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontSize:'12px',fontWeight:'600',whiteSpace:'nowrap'}}>
                           ↩ Reaktivieren
+                        </button>
+                        <button onClick={()=>deleteArchivedTournament(t.id)}
+                          style={{padding:'6px 12px',background:'#dc2626',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontSize:'12px',fontWeight:'600',whiteSpace:'nowrap'}}>
+                          🗑️ Löschen
                         </button>
                       </div>
                     </div>
