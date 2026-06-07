@@ -1,4 +1,11 @@
 import React, { useState, useEffect } from 'react';
+// Font: Inter via Google Fonts (injected at runtime for no build-step dependency)
+if (typeof document !== 'undefined' && !document.getElementById('inter-font')) {
+  const l = document.createElement('link');
+  l.id = 'inter-font'; l.rel = 'stylesheet';
+  l.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap';
+  document.head.appendChild(l);
+}
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
@@ -1296,7 +1303,7 @@ export default function TrainingsApp() {
   }
 
   const s = {
-    page:  (color=null) => ({minHeight:'100vh', background: view==='turniere' ? 'linear-gradient(135deg, #92400e 0%, #f59e0b 100%)' : 'linear-gradient(135deg, #358941 0%, #9cc18f 100%)', fontFamily:'system-ui,-apple-system,sans-serif'}),
+    page:  (color=null) => ({minHeight:'100vh', background: view==='turniere' ? 'linear-gradient(135deg, #92400e 0%, #f59e0b 100%)' : 'linear-gradient(135deg, #358941 0%, #9cc18f 100%)', fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}),
     wrap:  {maxWidth:'900px',margin:'0 auto',padding:'20px'},
     card:  {background:'white',borderRadius:'12px',padding:'20px',marginBottom:'16px',boxShadow:'0 4px 6px rgba(0,0,0,0.1)'},
     btn:   (bg,col='white',sm=false)=>({padding:sm?'6px 12px':'10px 16px',background:bg,color:col,border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:sm?'13px':'14px',display:'flex',alignItems:'center',gap:'6px',whiteSpace:'nowrap'}),
@@ -1540,13 +1547,18 @@ export default function TrainingsApp() {
     upcoming.forEach(s => { if (s.repeatId) { if (!repeatBlocks[s.repeatId]) repeatBlocks[s.repeatId]=[]; repeatBlocks[s.repeatId].push(s); }});
 
     return (
-      <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
+      <div style={{minHeight:'100vh',background:"linear-gradient(135deg,#0c2d6b 0%,#0369a1 100%)",fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
         <DeleteDialog/>
-        <Header/>
+        {/* Header */}
+        <div style={{background:'rgba(0,0,0,0.3)',backdropFilter:'blur(10px)',padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+          <button onClick={()=>setView('home')} style={s.btn('#0369a1')}><Home size={16}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>📅 Trainingsplan</h1>
+        </div>
+        <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
 
         {/* Neue Einheit */}
-        <div style={s.card}>
-          <h2 style={{margin:'0 0 20px',color:'#0369a1',display:'flex',alignItems:'center',gap:'8px'}}><Plus size={20}/> Neue Trainingseinheit</h2>
+        <div style={{...s.card,border:'1px solid #e0f2fe'}}>
+          <h2 style={{margin:'0 0 20px',color:'#0369a1',display:'flex',alignItems:'center',gap:'8px',fontWeight:'800'}}><Plus size={20}/> Neue Trainingseinheit</h2>
 
           {/* Untergruppen auswählen */}
           <div style={{marginBottom:'16px'}}>
@@ -1687,7 +1699,8 @@ export default function TrainingsApp() {
             </div>
           }
         </div>
-      </div></div>
+        </div>
+      </div>
     );
   }
 
@@ -1731,13 +1744,18 @@ export default function TrainingsApp() {
     };
 
     return (
-      <div style={s.page()}><div style={s.wrap}>
+      <div style={{minHeight:'100vh',background:"linear-gradient(135deg,#6b2d00 0%,#b45309 100%)",fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
         {archiveTournDialog && <ArchiveTournDialog tournament={archiveTournDialog} onClose={()=>setArchiveTournDialog(null)} onConfirm={confirmArchiveTournament}/>}
-        <Header/>
+        {/* Header */}
+        <div style={{background:'rgba(0,0,0,0.3)',backdropFilter:'blur(10px)',padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+          <button onClick={()=>setView('home')} style={s.btn('#b45309')}><Home size={16}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>🏆 Turniere</h1>
+        </div>
+        <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
 
         {/* Neues Turnier */}
-        <div style={s.card}>
-          <h2 style={{margin:'0 0 20px',color:'#b45309',display:'flex',alignItems:'center',gap:'8px'}}><Trophy size={20}/> Neues Turnier anlegen</h2>
+        <div style={{...s.card,border:'1px solid #fde68a'}}>
+          <h2 style={{margin:'0 0 20px',color:'#b45309',display:'flex',alignItems:'center',gap:'8px',fontWeight:'800'}}><Trophy size={20}/> Neues Turnier anlegen</h2>
 
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',marginBottom:'12px'}}>
             <div style={{gridColumn:'1/-1'}}>
@@ -2465,7 +2483,8 @@ export default function TrainingsApp() {
             })()}
           </>
         }
-      </div></div>
+        </div>
+      </div>
     );
   }
 
@@ -2489,8 +2508,14 @@ export default function TrainingsApp() {
     };
 
     return (
-      <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
-        <Header/>
+      <div style={{minHeight:'100vh',background:"linear-gradient(135deg,#1e0a3c 0%,#7c3aed 100%)",fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
+        {/* Header */}
+        <div style={{background:'rgba(0,0,0,0.3)',backdropFilter:'blur(10px)',padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+          <button onClick={()=>setView('home')} style={s.btn('#7c3aed')}><Home size={16}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}><Shield size={20} style={{display:'inline',verticalAlign:'middle',marginRight:'6px'}}/>Administration</h1>
+          {pendingCount>0&&<span style={{background:'#dc2626',color:'white',borderRadius:'20px',padding:'4px 12px',fontWeight:'700',fontSize:'13px'}}>⚠️ {pendingCount} wartend</span>}
+        </div>
+        <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
 
         {/* Admin-Rollen-Bestätigung */}
         {adminRoleDialog&&(
@@ -2804,7 +2829,8 @@ export default function TrainingsApp() {
           </>}
         </div>
 
-      </div></div>
+        </div>
+      </div>
     );
   }
 
@@ -3520,7 +3546,8 @@ export default function TrainingsApp() {
             </div>
           )}
         </div>
-      </div></div>
+        </div>
+      </div>
     );
   }
 
@@ -3543,10 +3570,10 @@ export default function TrainingsApp() {
     );
 
     return (
-      <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#3b0764 0%,#7c3aed 100%)'}}>
+      <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#3b0764 0%,#7c3aed 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
         <div style={{background:'rgba(0,0,0,0.3)',backdropFilter:'blur(10px)',padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
           <button onClick={()=>setView('home')} style={s.btn('#7c3aed')}><Home size={16}/></button>
-          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'700',flex:1}}>🏅 Errungenschaften verwalten</h1>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>🏅 Errungenschaften verwalten</h1>
         </div>
         <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
           {kidsWithSub.length===0
@@ -3754,12 +3781,17 @@ export default function TrainingsApp() {
     const typeLabels = {achievement:'🏅',tournament_reminder:'🏆',training_reminder:'📅',unexcused_absences:'❗',trainer_message:'💬',parent_message:'✉️'};
 
     return (
-      <div style={s.page()}><div style={s.wrap}>
-        <Header back backLabel="Zurück" backAction={()=>setView('home')}/>
+      <div style={{minHeight:'100vh',background:"linear-gradient(135deg,#064e3b 0%,#059669 100%)",fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
+        {/* Header */}
+        <div style={{background:'rgba(0,0,0,0.3)',backdropFilter:'blur(10px)',padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+          <button onClick={()=>setView('home')} style={s.btn('#059669')}><Home size={16}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}><Bell size={20} style={{display:'inline',verticalAlign:'middle',marginRight:'6px'}}/>Benachrichtigungen</h1>
+        </div>
+        <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
 
         {/* Compose */}
-        <div style={s.card}>
-          <h3 style={{margin:'0 0 16px',color:'#059669',display:'flex',alignItems:'center',gap:'8px'}}><Send size={18}/> Nachricht senden</h3>
+        <div style={{...s.card,border:'1px solid #d1fae5'}}>
+          <h3 style={{margin:'0 0 16px',color:'#059669',display:'flex',alignItems:'center',gap:'8px',fontWeight:'800'}}><Send size={18}/> Nachricht senden</h3>
           <div style={{display:'grid',gap:'10px'}}>
             <div>
               <label style={s.label}>Empfänger</label>
@@ -4042,10 +4074,10 @@ export default function TrainingsApp() {
     };
 
     return (
-      <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#0f4c3a 0%,#134e4a 100%)'}}>
+      <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#0f4c3a 0%,#134e4a 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
         <div style={{background:'rgba(0,0,0,0.3)',backdropFilter:'blur(10px)',padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
           <button onClick={()=>setView('home')} style={s.btn('#0f766e')}><Home size={16}/></button>
-          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'700',flex:1}}>⚽ Mannschaftsverwaltung</h1>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>⚽ Mannschaftsverwaltung</h1>
         </div>
 
         {/* Postpone Modal */}
@@ -4197,11 +4229,11 @@ export default function TrainingsApp() {
     return (
       <>
       {editingArchivedTourn && <ArchiveTournEditDialog tournament={editingArchivedTourn} onClose={()=>setEditingArchivedTourn(null)} onSave={saveArchivedTournEdit}/>}
-      <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#1a3a2a 0%,#2d5a3d 100%)'}}>
+      <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#1a3a2a 0%,#2d5a3d 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
         {/* Header */}
         <div style={{background:'rgba(0,0,0,0.3)',backdropFilter:'blur(10px)',padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
           <button onClick={()=>setView('home')} style={s.btn('#358941')}><Home size={16}/></button>
-          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'700',flex:1}}>📦 Archiv</h1>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>📦 Archiv</h1>
         </div>
 
         <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
