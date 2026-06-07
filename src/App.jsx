@@ -1235,7 +1235,17 @@ export default function TrainingsApp() {
             {canEdit()&&<button onClick={()=>setView('archiv')} style={s.btn('#374151')}><Archive size={16}/> Archiv</button>}
             {canEdit()&&<button onClick={()=>setView('achievements')} style={s.btn('#7c3aed')}>🏅 Errungenschaften</button>}
             {canEdit()&&(()=>{
-              const unreadCount = Object.values(notifications).filter(n=>!n.trashedAt).length;
+              const uid = user?.uid || '';
+              // Count unique active batches (trainer_message) not deleted/trashed by this trainer
+              const activeBatchIds = new Set();
+              Object.values(notifications).filter(n=>n.type==='trainer_message').forEach(n=>{
+                const tdb = typeof n.trainerDeletedBy==='object'&&n.trainerDeletedBy ? n.trainerDeletedBy : {};
+                const tta = typeof n.trainerTrashedAt==='object'&&n.trainerTrashedAt ? n.trainerTrashedAt : {};
+                if (!tdb[uid] && !tta[uid]) activeBatchIds.add(n.batchId||n.id);
+              });
+              // Count active auto-notifications (non-trainer-message, not child-trashed) across all children
+              const autoCount = Object.values(notifications).filter(n=>n.type!=='trainer_message'&&!n.trashedAt).length;
+              const unreadCount = activeBatchIds.size + autoCount;
               return (
                 <button onClick={()=>setView('notifications')} style={{...s.btn('#059669'),position:'relative'}} title="Benachrichtigungen">
                   <MessageSquare size={16}/>
