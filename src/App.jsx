@@ -763,6 +763,32 @@ export default function TrainingsApp() {
     return { gold, silver, bronze };
   };
 
+  const getTotalTrainingsAttended = (childId) => {
+    const child = children[childId];
+    if (!child) return 0;
+    return Object.values(child.attendance||{}).filter(s=>s==='present').length;
+  };
+
+  const getLongestStreak = (childId) => {
+    const child = children[childId];
+    if (!child) return 0;
+    const allSess = [...Object.values(sessions), ...Object.values(archivedSessions)]
+      .filter(s => (s.subgroupIds||[]).includes(child.subgroupId))
+      .sort((a,b) => (a.date||'').localeCompare(b.date||''));
+    let max=0, cur=0;
+    allSess.forEach(s => {
+      const st = (child.attendance||{})[s.date];
+      if (st==='present') { cur++; if(cur>max) max=cur; }
+      else if (st) { cur=0; } // only reset on recorded absence
+    });
+    return max;
+  };
+
+  const getTournamentParticipations = (childId) => {
+    const all = [...Object.values(tournaments), ...Object.values(archivedTournaments)];
+    return all.filter(t => getTournamentParticipantIds(t).includes(childId)).length;
+  };
+
   const deleteArchivedSession = (id) => {
     if (!window.confirm('Eintrag wirklich endgültig aus dem Archiv löschen? Das kann nicht rückgängig gemacht werden.')) return;
     const u = {...archivedSessions}; delete u[id]; saveArchivedSessions(u);
@@ -1598,18 +1624,28 @@ export default function TrainingsApp() {
               const currentLevel = getMonthlyAttendanceLevel(myChild.id, currentMonth);
               const cumul = getAttendanceCumulatives(myChild.id);
               const monthName = new Date().toLocaleDateString('de-DE',{month:'long',year:'numeric'});
+              const totalTrainings = getTotalTrainingsAttended(myChild.id);
+              const streak = getLongestStreak(myChild.id);
+              const tournParts = getTournamentParticipations(myChild.id);
 
-              const attLevelCfg = {
-                gold:   {icon:'🥇',color:'#b45309',bg:'#fef3c7',border:'#fde68a',label:'Gold'},
-                silver: {icon:'🥈',color:'#6b7280',bg:'#f3f4f6',border:'#d1d5db',label:'Silber'},
-                bronze: {icon:'🥉',color:'#92400e',bg:'#fef9c3',border:'#fde68a',label:'Bronze'},
-              };
+              // shared helpers
+              const Sec = ({title,children:ch,mb=true}) => (
+                <div style={{marginBottom:mb?'18px':0}}>
+                  <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.5px',borderBottom:'1px solid #f3f4f6',paddingBottom:'4px'}}>{title}</p>
+                  <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>{ch}</div>
+                </div>
+              );
 
-              const openTTR = (val,i,unlocked) => setAchievementPopup({
-                icon: unlocked ? TTR_COLORS[i].bg.startsWith('#0') ? '🎯' : '🏓' : '🔒',
-                title: `${val} TTR`,
-                desc: unlocked ? ACHIEVEMENT_DESCRIPTIONS.ttr(val) : `Noch nicht erreicht. Erreiche einen TTR-Wert von ${val} Punkten!`,
-              });
+              const Tile = ({icon,iconGray='⬜',label,sub,has,bg='#f9fafb',border='#e5e7eb',activeBg,activeBorder,textColor='#9ca3af',activeTextColor='#333',onClick}) => (
+                <button onClick={onClick}
+                  style={{padding:'10px 12px',borderRadius:'10px',border:`2px solid ${has?(activeBorder||border):border}`,background:has?(activeBg||bg):bg,cursor:'pointer',textAlign:'center',minWidth:'76px',maxWidth:'100px',transition:'transform 0.1s'}}
+                  onMouseEnter={e=>e.currentTarget.style.transform='scale(1.06)'}
+                  onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
+                  <div style={{fontSize:'22px'}}>{has?icon:iconGray}</div>
+                  <div style={{fontSize:'11px',fontWeight:'700',color:has?activeTextColor:textColor,marginTop:'2px',lineHeight:'1.2'}}>{label}</div>
+                  {sub&&<div style={{fontSize:'12px',fontWeight:'700',color:has?activeTextColor:textColor}}>{sub}</div>}
+                </button>
+              );
 
               const openCount = (icon,title,desc,count) => setAchievementPopup({icon,title,desc,count});
 
@@ -1617,82 +1653,126 @@ export default function TrainingsApp() {
                 <div style={s.card}>
                   <h3 style={{margin:'0 0 16px',color:'#333',display:'flex',alignItems:'center',gap:'8px'}}>🏅 Errungenschaften</h3>
 
-                  {/* TTR */}
-                  <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>TTR Meilensteine</p>
-                  <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'16px'}}>
+                  {/* ── TTR ── */}
+                  <Sec title="🏓 TTR Meilensteine">
                     {TTR_MILESTONES.map((val,i)=>{
                       const unlocked = ttrUnlocked.includes(val);
                       const col = TTR_COLORS[i];
                       return (
-                        <button key={val} onClick={()=>openTTR(val,i,unlocked)}
-                          style={{padding:'8px 12px',borderRadius:'10px',border:`2px solid ${unlocked?col.bg:'#e5e7eb'}`,background:unlocked?col.bg:'#f3f4f6',color:unlocked?col.text:'#9ca3af',fontWeight:'700',fontSize:'13px',cursor:'pointer',minWidth:'58px',transition:'transform 0.1s'}}
+                        <button key={val}
+                          onClick={()=>setAchievementPopup({icon:unlocked?'🏓':'🔒',title:`${val} TTR`,desc:unlocked?ACHIEVEMENT_DESCRIPTIONS.ttr(val):`Noch nicht erreicht. Erreiche ${val} TTR-Punkte!`})}
+                          style={{padding:'8px 10px',borderRadius:'10px',border:`2px solid ${unlocked?col.bg:'#e5e7eb'}`,background:unlocked?col.bg:'#f3f4f6',color:unlocked?col.text:'#9ca3af',fontWeight:'700',fontSize:'12px',cursor:'pointer',minWidth:'54px',transition:'transform 0.1s'}}
                           onMouseEnter={e=>e.currentTarget.style.transform='scale(1.08)'}
                           onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
-                          {unlocked?'🏓':''} {val}
+                          {unlocked?'🏓 ':''}{val}
                         </button>
                       );
                     })}
-                  </div>
+                  </Sec>
 
-                  {/* Tournament achievements */}
-                  <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>Turnierergebnisse</p>
-                  <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'16px'}}>
+                  {/* ── Training Meilensteine (auto) ── */}
+                  <Sec title="📅 Trainings-Meilensteine">
+                    {[10,25,50,100,200].map(m=>{
+                      const has = totalTrainings>=m;
+                      return <Tile key={m} icon="🏋️" label={`${m} Trainings`} sub={has?`✓`:`${totalTrainings}/${m}`}
+                        has={has} activeBg="#f0fdf4" activeBorder="#16a34a" activeTextColor="#15803d"
+                        onClick={()=>setAchievementPopup({icon:'🏋️',title:`${m} Trainings`,desc:`Du hast insgesamt ${m} Trainingseinheiten absolviert! Aktuell: ${totalTrainings} Trainings.`})}/>;
+                    })}
+                    {/* Longest streak */}
+                    {[5,10,20,30,50].map(m=>{
+                      const has = streak>=m;
+                      return <Tile key={`str${m}`} icon="🔥" label={`${m}× Serie`} sub={has?'✓':`${streak}/${m}`}
+                        has={has} activeBg="#fff7ed" activeBorder="#f97316" activeTextColor="#c2410c"
+                        onClick={()=>setAchievementPopup({icon:'🔥',title:`${m}er Trainingsserie`,desc:`${m} Trainingseinheiten in Folge ohne Fehlzeit! Deine längste Serie: ${streak} Einheiten.`})}/>;
+                    })}
+                  </Sec>
+
+                  {/* ── Turnier-Teilnahmen (auto) ── */}
+                  <Sec title="🏆 Turnier-Teilnahmen">
+                    {[1,5,10,20].map(m=>{
+                      const has = tournParts>=m;
+                      return <Tile key={m} icon="🏆" label={`${m} Turnier${m>1?'e':''}`} sub={has?'✓':`${tournParts}/${m}`}
+                        has={has} activeBg="#fffbeb" activeBorder="#f59e0b" activeTextColor="#92400e"
+                        onClick={()=>setAchievementPopup({icon:'🏆',title:`${m} Turnier${m>1?'e':''}`,desc:`Du hast an ${m} Turnier${m>1?'en':''} teilgenommen! Bisher: ${tournParts}.`})}/>;
+                    })}
+                  </Sec>
+
+                  {/* ── Turnierergebnisse Einzel ── */}
+                  <Sec title="🥊 Turnierergebnisse Einzel">
                     {[
-                      {icon:'🥇',label:'Einzel 1.',field:'einzel1',desc:ACHIEVEMENT_DESCRIPTIONS.einzel1},
-                      {icon:'🥈',label:'Einzel 2.',field:'einzel2',desc:ACHIEVEMENT_DESCRIPTIONS.einzel2},
-                      {icon:'🥉',label:'Einzel 3.',field:'einzel3',desc:ACHIEVEMENT_DESCRIPTIONS.einzel3},
-                      {icon:'🥇',label:'Doppel 1.',field:'doppel1',desc:ACHIEVEMENT_DESCRIPTIONS.doppel1},
-                      {icon:'🥈',label:'Doppel 2.',field:'doppel2',desc:ACHIEVEMENT_DESCRIPTIONS.doppel2},
-                      {icon:'🥉',label:'Doppel 3.',field:'doppel3',desc:ACHIEVEMENT_DESCRIPTIONS.doppel3},
-                      {icon:'🏆',label:'Mannschaft',field:'team',desc:ACHIEVEMENT_DESCRIPTIONS.team},
+                      {icon:'🥇',label:'1. Platz',field:'einzel1',desc:ACHIEVEMENT_DESCRIPTIONS.einzel1},
+                      {icon:'🥈',label:'2. Platz',field:'einzel2',desc:ACHIEVEMENT_DESCRIPTIONS.einzel2},
+                      {icon:'🥉',label:'3. Platz',field:'einzel3',desc:ACHIEVEMENT_DESCRIPTIONS.einzel3},
                     ].map(({icon,label,field,desc})=>{
-                      const count = ach[field]||0;
-                      const has = count>0;
+                      const count=ach[field]||0;
+                      return <Tile key={field} icon={icon} label={label} sub={count>0?`×${count}`:undefined}
+                        has={count>0} activeBg="#fffbeb" activeBorder="#fde68a" activeTextColor="#b45309"
+                        onClick={()=>openCount(icon,label,desc,count)}/>;
+                    })}
+                  </Sec>
+
+                  {/* ── Turnierergebnisse Doppel ── */}
+                  <Sec title="🤝 Turnierergebnisse Doppel">
+                    {[
+                      {icon:'🥇',label:'1. Platz',field:'doppel1',desc:ACHIEVEMENT_DESCRIPTIONS.doppel1},
+                      {icon:'🥈',label:'2. Platz',field:'doppel2',desc:ACHIEVEMENT_DESCRIPTIONS.doppel2},
+                      {icon:'🥉',label:'3. Platz',field:'doppel3',desc:ACHIEVEMENT_DESCRIPTIONS.doppel3},
+                    ].map(({icon,label,field,desc})=>{
+                      const count=ach[field]||0;
+                      return <Tile key={field} icon={icon} label={label} sub={count>0?`×${count}`:undefined}
+                        has={count>0} activeBg="#fffbeb" activeBorder="#fde68a" activeTextColor="#b45309"
+                        onClick={()=>openCount(icon,label,desc,count)}/>;
+                    })}
+                  </Sec>
+
+                  {/* ── Mannschaft & Auszeichnungen ── */}
+                  <Sec title="🏅 Mannschaft & Auszeichnungen">
+                    {[
+                      {icon:'🏆',label:'Meisterschaft',field:'team',desc:ACHIEVEMENT_DESCRIPTIONS.team},
+                      {icon:'⭐',label:'Spieler d. M.',field:'spielerDesMonats',desc:'Du wurdest zum Spieler des Monats gewählt! Eine besondere Auszeichnung vom Trainer.'},
+                    ].map(({icon,label,field,desc})=>{
+                      const count=ach[field]||0;
+                      return <Tile key={field} icon={icon} label={label} sub={count>0?`×${count}`:undefined}
+                        has={count>0} activeBg={field==='spielerDesMonats'?'#fffbeb':'#fffbeb'}
+                        activeBorder={field==='spielerDesMonats'?'#fcd34d':'#fde68a'}
+                        activeTextColor={field==='spielerDesMonats'?'#b45309':'#b45309'}
+                        onClick={()=>openCount(icon,label,desc,count)}/>;
+                    })}
+                  </Sec>
+
+                  {/* ── Anwesenheit aktueller Monat ── */}
+                  <Sec title={`📆 Anwesenheit ${monthName}`}>
+                    {(()=>{
+                      const attCfgMap = {
+                        gold:  {icon:'🥇',color:'#b45309',bg:'#fef3c7',border:'#fde68a',label:'Gold (100%)'},
+                        silver:{icon:'🥈',color:'#6b7280',bg:'#f3f4f6',border:'#d1d5db',label:'Silber (≥90%)'},
+                        bronze:{icon:'🥉',color:'#92400e',bg:'#fef9c3',border:'#fde68a',label:'Bronze (≥80%)'},
+                      };
+                      const cfg = currentLevel ? attCfgMap[currentLevel] : null;
                       return (
-                        <button key={field} onClick={()=>openCount(icon,label,desc,count)}
-                          style={{padding:'10px 14px',borderRadius:'10px',border:`2px solid ${has?'#fde68a':'#e5e7eb'}`,background:has?'#fffbeb':'#f9fafb',cursor:'pointer',textAlign:'center',minWidth:'80px',transition:'transform 0.1s'}}
+                        <button onClick={()=>setAchievementPopup({icon:cfg?cfg.icon:'📅',title:monthName,desc:cfg?ACHIEVEMENT_DESCRIPTIONS[`attendance${cfg.label.split(' ')[0].charAt(0).toUpperCase()+cfg.label.split(' ')[0].slice(1)}`]||cfg.label:'Noch nicht genug Trainings besucht (mind. 80% für Bronze).'})}
+                          style={{padding:'10px 14px',borderRadius:'10px',border:`2px solid ${cfg?cfg.border:'#e5e7eb'}`,background:cfg?cfg.bg:'#f9fafb',cursor:'pointer',textAlign:'center',minWidth:'100px'}}
                           onMouseEnter={e=>e.currentTarget.style.transform='scale(1.05)'}
                           onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
-                          <div style={{fontSize:'22px'}}>{has?icon:'⬜'}</div>
-                          <div style={{fontSize:'11px',fontWeight:'700',color:has?'#92400e':'#9ca3af',marginTop:'2px'}}>{label}</div>
-                          {has&&<div style={{fontSize:'13px',fontWeight:'700',color:'#b45309'}}>×{count}</div>}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Attendance achievement */}
-                  <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>Anwesenheits-Errungenschaften</p>
-                  <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-                    {/* Current month */}
-                    {(()=>{
-                      const cfg = currentLevel ? attLevelCfg[currentLevel] : null;
-                      return (
-                        <button onClick={()=>setAchievementPopup({icon:cfg?cfg.icon:'📅',title:`${monthName}`,desc:cfg?ACHIEVEMENT_DESCRIPTIONS[`attendance${cfg.label}`]:'Noch nicht genug Trainings in diesem Monat besucht (mind. 80% für Bronze).'})}
-                          style={{padding:'10px 14px',borderRadius:'10px',border:`2px solid ${cfg?cfg.border:'#e5e7eb'}`,background:cfg?cfg.bg:'#f9fafb',cursor:'pointer',textAlign:'center',minWidth:'80px'}}>
-                          <div style={{fontSize:'22px'}}>{cfg?cfg.icon:'⬜'}</div>
-                          <div style={{fontSize:'11px',fontWeight:'700',color:cfg?cfg.color:'#9ca3af',marginTop:'2px'}}>Akt. Monat</div>
-                          {cfg&&<div style={{fontSize:'11px',color:cfg.color}}>{cfg.label}</div>}
+                          <div style={{fontSize:'26px'}}>{cfg?cfg.icon:'⬜'}</div>
+                          <div style={{fontSize:'12px',fontWeight:'700',color:cfg?cfg.color:'#9ca3af',marginTop:'2px'}}>{cfg?cfg.label:'Kein Rang'}</div>
                         </button>
                       );
                     })()}
-                    {/* Cumulative gold/silver/bronze months */}
+                  </Sec>
+
+                  {/* ── Anwesenheit Gesamtmonate ── */}
+                  <Sec title="📊 Anwesenheits-Monate (Gesamt)" mb={false}>
                     {[
                       {icon:'🥇',label:'Gold-Monate',count:cumul.gold,color:'#b45309',bg:'#fef3c7',border:'#fde68a',desc:ACHIEVEMENT_DESCRIPTIONS.attendanceGold},
                       {icon:'🥈',label:'Silber-Monate',count:cumul.silver,color:'#6b7280',bg:'#f3f4f6',border:'#d1d5db',desc:ACHIEVEMENT_DESCRIPTIONS.attendanceSilver},
                       {icon:'🥉',label:'Bronze-Monate',count:cumul.bronze,color:'#92400e',bg:'#fef9c3',border:'#fde68a',desc:ACHIEVEMENT_DESCRIPTIONS.attendanceBronze},
-                    ].map(({icon,label,count,color,bg,border,desc})=>{
-                      const has = count>0;
-                      return (
-                        <button key={label} onClick={()=>openCount(icon,label,desc,count)}
-                          style={{padding:'10px 14px',borderRadius:'10px',border:`2px solid ${has?border:'#e5e7eb'}`,background:has?bg:'#f9fafb',cursor:'pointer',textAlign:'center',minWidth:'80px'}}>
-                          <div style={{fontSize:'22px'}}>{has?icon:'⬜'}</div>
-                          <div style={{fontSize:'11px',fontWeight:'700',color:has?color:'#9ca3af',marginTop:'2px'}}>{label}</div>
-                          {has&&<div style={{fontSize:'13px',fontWeight:'700',color}}>{count}×</div>}
-                        </button>
-                      );
-                    })}
-                  </div>
+                    ].map(({icon,label,count,color,bg,border,desc})=>(
+                      <Tile key={label} icon={icon} label={label} sub={count>0?`${count}×`:undefined}
+                        has={count>0} activeBg={bg} activeBorder={border} activeTextColor={color}
+                        onClick={()=>openCount(icon,label,desc,count)}/>
+                    ))}
+                  </Sec>
                 </div>
               );
             })()}
@@ -2483,6 +2563,10 @@ export default function TrainingsApp() {
                       <div>
                         <p style={{margin:'0 0 6px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>Mannschaft</p>
                         <AchCounter label="🏆 Meisterschaft" val={ach.team} onInc={()=>incField('team')} onDec={()=>decField('team')}/>
+                      </div>
+                      <div>
+                        <p style={{margin:'0 0 6px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>Auszeichnungen</p>
+                        <AchCounter label="⭐ Spieler d. Monats" val={ach.spielerDesMonats} onInc={()=>incField('spielerDesMonats')} onDec={()=>decField('spielerDesMonats')}/>
                       </div>
                     </div>
                   </div>
