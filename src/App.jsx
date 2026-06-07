@@ -142,9 +142,9 @@ const ACHIEVEMENT_DESCRIPTIONS = {
   doppel2: '2. Platz im Doppel – Silber für dich und deinen Partner!',
   doppel3: '3. Platz Doppel – gemeinsam aufs Treppchen!',
   team: 'Mannschaftsmeister! Du hast mit deiner Mannschaft eine Meisterschaft gewonnen.',
-  attendanceGold: 'Gold-Monat: Du warst in diesem Monat bei 100% der Trainings anwesend!',
-  attendanceSilver: 'Silber-Monat: Du warst in diesem Monat bei mindestens 90% der Trainings anwesend.',
-  attendanceBronze: 'Bronze-Monat: Du warst in diesem Monat bei mindestens 80% der Trainings anwesend.',
+  attendanceGold: 'Anzahl der Monate, in denen du bei 100% aller Trainings anwesend warst.',
+  attendanceSilver: 'Anzahl der Monate, in denen du bei mindestens 90% aller Trainings anwesend warst.',
+  attendanceBronze: 'Anzahl der Monate, in denen du bei mindestens 80% aller Trainings anwesend warst.',
 };
 
 function AchievementPopup({ data, onClose }) {
