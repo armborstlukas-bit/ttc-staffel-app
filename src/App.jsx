@@ -1747,7 +1747,7 @@ export default function TrainingsApp() {
           const { active, trashed } = getCleanedNotifications(myChild.id);
           const showTrash = notifTab === 'trash';
           const items = showTrash ? trashed : active;
-          if (active.length === 0 && !showTrash) return null;
+          // always show the card (even if empty)
           return (
             <div style={{...s.card, borderLeft:'4px solid #059669', padding:'16px 20px'}}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px',flexWrap:'wrap',gap:'8px'}}>
