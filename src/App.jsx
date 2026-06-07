@@ -1349,50 +1349,71 @@ export default function TrainingsApp() {
   if (loading) return <div style={{...s.page(activeGroup?.color),display:'flex',alignItems:'center',justifyContent:'center'}}><p style={{color:'white',fontSize:'20px'}}>Laden...</p></div>;
 
   if (!user) return (
-    <div style={{...s.page(activeGroup?.color),display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
-      <div style={{background:'white',borderRadius:'16px',padding:'40px',maxWidth:'420px',width:'100%',boxShadow:'0 10px 40px rgba(0,0,0,0.2)'}}>
-        <h1 style={{margin:'0 0 4px',color:'#358941',fontSize:'28px',textAlign:'center'}}>TTC Grün-Weiß Staffel</h1>
-        <p style={{margin:'0 0 28px',color:'#666',textAlign:'center'}}>Vereinsapp</p>
-        {error&&<p style={{color:'red',marginBottom:'16px',fontSize:'13px',textAlign:'center'}}>{error}</p>}
-        <div style={{display:'flex',marginBottom:'20px',borderRadius:'8px',overflow:'hidden',border:'1px solid #ddd'}}>
-          {['login','register'].map(m=>(
-            <button key={m} onClick={()=>{setAuthMode(m);setError('');}} style={{flex:1,padding:'10px',background:authMode===m?'#358941':'white',color:authMode===m?'white':'#666',border:'none',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
-              {m==='login'?'Anmelden':'Registrieren'}
-            </button>
-          ))}
+    <div style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
+      <div style={{width:'100%',maxWidth:'420px'}}>
+        {/* Logo & Titel */}
+        <div style={{textAlign:'center',marginBottom:'36px'}}>
+          <div style={{width:'72px',height:'72px',borderRadius:'20px',background:'linear-gradient(135deg,#15803d,#4ade80)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'36px',margin:'0 auto 16px',boxShadow:'0 8px 32px rgba(74,222,128,0.3)'}}>🏓</div>
+          <h1 style={{margin:'0 0 4px',color:'white',fontSize:'26px',fontWeight:'900',letterSpacing:'-0.5px'}}>TTC Grün-Weiß Staffel</h1>
+          <p style={{margin:0,color:'rgba(74,222,128,0.55)',fontSize:'13px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'1px'}}>Vereinsapp</p>
         </div>
-        <form onSubmit={authMode==='login'?handleLogin:handleRegister} style={{display:'flex',flexDirection:'column',gap:'12px'}}>
-          {authMode==='register'&&(
-            <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
-              <input placeholder="Dein Name / Das meines Kindes" value={loginName} onChange={e=>setLoginName(e.target.value)} required style={{...s.input,flex:'none'}}/>
-              <label style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',fontSize:'14px',color:'#555',userSelect:'none',padding:'4px 0'}}>
-                <input type="checkbox" checked={registerIsParent} onChange={e=>setRegisterIsParent(e.target.checked)}
-                  style={{width:'16px',height:'16px',cursor:'pointer',accentColor:'#358941'}}/>
-                Ich bin ein Elternteil
+
+        {/* Card */}
+        <div style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(74,222,128,0.15)',borderRadius:'24px',padding:'32px',backdropFilter:'blur(10px)',boxShadow:'0 32px 80px rgba(0,0,0,0.5)'}}>
+          {/* Tab-Switcher */}
+          <div style={{display:'flex',marginBottom:'28px',background:'rgba(255,255,255,0.05)',borderRadius:'12px',padding:'4px',gap:'4px'}}>
+            {['login','register'].map(m=>(
+              <button key={m} onClick={()=>{setAuthMode(m);setError('');}}
+                style={{flex:1,padding:'10px',background:authMode===m?'linear-gradient(135deg,#15803d,#16a34a)':'transparent',color:authMode===m?'white':'rgba(255,255,255,0.4)',border:'none',cursor:'pointer',fontWeight:'700',fontSize:'14px',borderRadius:'9px',transition:'all 0.15s',boxShadow:authMode===m?'0 4px 12px rgba(22,163,74,0.35)':'none'}}>
+                {m==='login'?'Anmelden':'Registrieren'}
+              </button>
+            ))}
+          </div>
+
+          {error&&<div style={{marginBottom:'16px',padding:'12px 14px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'12px',fontSize:'13px',color:'#fca5a5',fontWeight:'600',textAlign:'center'}}>{error}</div>}
+
+          <form onSubmit={authMode==='login'?handleLogin:handleRegister} style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+            {authMode==='register'&&(
+              <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
+                <input placeholder="Dein Name / Das meines Kindes" value={loginName} onChange={e=>setLoginName(e.target.value)} required
+                  style={{padding:'12px 16px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'12px',color:'white',fontSize:'15px',outline:'none',width:'100%',boxSizing:'border-box'}}/>
+                <label style={{display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',fontSize:'14px',color:'rgba(255,255,255,0.6)',userSelect:'none',padding:'8px 12px',background:'rgba(74,222,128,0.05)',border:'1px solid rgba(74,222,128,0.12)',borderRadius:'10px'}}>
+                  <input type="checkbox" checked={registerIsParent} onChange={e=>setRegisterIsParent(e.target.checked)}
+                    style={{width:'18px',height:'18px',cursor:'pointer',accentColor:'#4ade80',flexShrink:0}}/>
+                  <span>Ich bin ein Elternteil</span>
+                </label>
+              </div>
+            )}
+            <input type="email" placeholder="E-Mail" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} required
+              style={{padding:'12px 16px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'12px',color:'white',fontSize:'15px',outline:'none',width:'100%',boxSizing:'border-box'}}/>
+            <input type="password" placeholder="Passwort (min. 6 Zeichen)" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} required
+              style={{padding:'12px 16px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'12px',color:'white',fontSize:'15px',outline:'none',width:'100%',boxSizing:'border-box'}}/>
+            {authMode==='login'&&(
+              <label style={{display:'flex',alignItems:'center',gap:'9px',cursor:'pointer',fontSize:'14px',color:'rgba(255,255,255,0.5)',userSelect:'none',paddingLeft:'2px'}}>
+                <input type="checkbox" checked={stayLoggedIn} onChange={e=>setStayLoggedIn(e.target.checked)}
+                  style={{width:'16px',height:'16px',cursor:'pointer',accentColor:'#4ade80'}}/>
+                Eingeloggt bleiben
               </label>
+            )}
+            <button type="submit"
+              style={{marginTop:'4px',padding:'14px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'12px',fontSize:'16px',fontWeight:'800',cursor:'pointer',boxShadow:'0 4px 20px rgba(22,163,74,0.4)',letterSpacing:'-0.2px'}}>
+              {authMode==='login'?'Anmelden →':'Registrieren →'}
+            </button>
+          </form>
+
+          {authMode==='register'&&(
+            <div style={{marginTop:'16px',padding:'12px 14px',background:'rgba(74,222,128,0.06)',border:'1px solid rgba(74,222,128,0.15)',borderRadius:'12px',fontSize:'13px',color:'rgba(74,222,128,0.7)',lineHeight:'1.5'}}>
+              Nach der Registrierung wird dein Account von einem Admin freigeschaltet.
             </div>
           )}
-          <input type="email" placeholder="E-Mail" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} required style={{...s.input,flex:'none'}}/>
-          <input type="password" placeholder="Passwort (min. 6 Zeichen)" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} required style={{...s.input,flex:'none'}}/>
           {authMode==='login'&&(
-            <label style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',fontSize:'14px',color:'#555',userSelect:'none'}}>
-              <input type="checkbox" checked={stayLoggedIn} onChange={e=>setStayLoggedIn(e.target.checked)}
-                style={{width:'16px',height:'16px',cursor:'pointer',accentColor:'#358941'}}/>
-              Eingeloggt bleiben
-            </label>
+            <div style={{marginTop:'14px',textAlign:'center'}}>
+              <button onClick={handleForgotPassword} style={{background:'none',border:'none',color:'rgba(74,222,128,0.5)',cursor:'pointer',fontSize:'13px',fontWeight:'600'}}>
+                Passwort vergessen?
+              </button>
+            </div>
           )}
-          <button type="submit" style={{padding:'12px',background:'#358941',color:'white',border:'none',borderRadius:'8px',fontSize:'16px',fontWeight:'600',cursor:'pointer'}}>
-            {authMode==='login'?'Anmelden':'Registrieren'}
-          </button>
-        </form>
-        {authMode==='register'&&<div style={{marginTop:'16px',padding:'12px',background:'#f0fdf4',borderRadius:'8px',fontSize:'13px',color:'#358941'}}>Nach der Registrierung wird dein Account von einem Admin freigeschaltet.</div>}
-        {authMode==='login'&&(
-          <div style={{marginTop:'12px',textAlign:'center'}}>
-            <button onClick={handleForgotPassword} style={{background:'none',border:'none',color:'#358941',cursor:'pointer',fontSize:'13px',textDecoration:'underline'}}>
-              Passwort vergessen?
-            </button>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
@@ -1400,52 +1421,75 @@ export default function TrainingsApp() {
   // ── Rollenwahl-Modal (Mehrfachrollen) ───────────────────────
   if (showRolePicker) {
     const selectableRoles = (userProfile?.roles || [userRole]).filter(r => r !== 'pending');
+    const roleAccents = {
+      admin:      {icon:'🛡️', accent:'rgba(196,181,253,0.9)', accentBg:'rgba(196,181,253,0.1)', accentBorder:'rgba(196,181,253,0.3)', desc:'Vollzugriff auf alle Bereiche'},
+      trainer:    {icon:'🏓', accent:'rgba(134,239,172,0.9)', accentBg:'rgba(134,239,172,0.1)', accentBorder:'rgba(134,239,172,0.3)', desc:'Trainingsplanung, Gruppen & Turniere'},
+      eltern:     {icon:'👨‍👩‍👧', accent:'rgba(253,230,138,0.9)', accentBg:'rgba(253,230,138,0.08)', accentBorder:'rgba(253,230,138,0.25)', desc:'Übersicht & An-/Abmeldung für dein Kind'},
+      jugendlich: {icon:'🧒', accent:'rgba(110,231,183,0.9)', accentBg:'rgba(110,231,183,0.08)', accentBorder:'rgba(110,231,183,0.25)', desc:'Eigene Übersicht, Turniere & Errungenschaften'},
+    };
     return (
-      <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#358941 0%,#9cc18f 100%)',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
-        <div style={{background:'white',borderRadius:'20px',padding:'36px',maxWidth:'420px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.25)',textAlign:'center'}}>
-          <div style={{fontSize:'40px',marginBottom:'12px'}}>👤</div>
-          <h2 style={{margin:'0 0 6px',color:'#333',fontSize:'22px'}}>Willkommen, {userProfile?.name}!</h2>
-          <p style={{margin:'0 0 28px',color:'#666',fontSize:'14px'}}>Du hast mehrere Rollen. Mit welcher möchtest du fortfahren?</p>
-          <div style={{display:'grid',gap:'12px'}}>
-            {selectableRoles.map(role => {
-              const rc = ROLE_CONFIG[role] || {};
-              const icons = { admin:'🛡️', trainer:'🏓', eltern:'👨‍👩‍👧', jugendlich:'🧒' };
-              return (
-                <button key={role} onClick={()=>{ setUserRole(role); setShowRolePicker(false); setView('home'); }}
-                  style={{padding:'16px 20px',background:rc.bg||'#f3f4f6',border:`2px solid ${rc.color||'#ddd'}`,borderRadius:'12px',cursor:'pointer',display:'flex',alignItems:'center',gap:'14px',textAlign:'left',transition:'transform 0.1s'}}
-                  onMouseEnter={e=>e.currentTarget.style.transform='scale(1.02)'}
-                  onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
-                  <span style={{fontSize:'28px'}}>{icons[role]||'👤'}</span>
-                  <div>
-                    <p style={{margin:'0 0 2px',fontWeight:'700',fontSize:'16px',color:rc.color||'#333'}}>{rc.label||role}</p>
-                    <p style={{margin:0,fontSize:'12px',color:'#888'}}>
-                      {role==='trainer'&&'Trainingsplanung, Gruppen, Errungenschaften'}
-                      {role==='admin'&&'Vollzugriff auf alle Bereiche'}
-                      {role==='eltern'&&'Übersicht & An-/Abmeldung für dein Kind'}
-                      {role==='jugendlich'&&'Eigene Übersicht, Turniere & Errungenschaften'}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
+      <div style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
+        <div style={{width:'100%',maxWidth:'420px'}}>
+          {/* Logo */}
+          <div style={{textAlign:'center',marginBottom:'32px'}}>
+            <div style={{width:'64px',height:'64px',borderRadius:'18px',background:'linear-gradient(135deg,#15803d,#4ade80)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'30px',margin:'0 auto 14px',boxShadow:'0 8px 28px rgba(74,222,128,0.28)'}}>🏓</div>
+            <p style={{margin:'0 0 4px',color:'rgba(74,222,128,0.55)',fontSize:'11px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1.5px'}}>TTC Grün-Weiß Staffel</p>
+            <h2 style={{margin:0,color:'white',fontSize:'22px',fontWeight:'800',letterSpacing:'-0.3px'}}>Willkommen, {(userProfile?.name||'').split(' ')[0]}!</h2>
           </div>
-          <button onClick={()=>signOut(auth)} style={{marginTop:'20px',background:'none',border:'none',color:'#999',cursor:'pointer',fontSize:'13px',textDecoration:'underline'}}>
-            Abmelden
-          </button>
+
+          {/* Card */}
+          <div style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(74,222,128,0.15)',borderRadius:'24px',padding:'28px',boxShadow:'0 32px 80px rgba(0,0,0,0.5)'}}>
+            <p style={{margin:'0 0 20px',color:'rgba(255,255,255,0.4)',fontSize:'14px',textAlign:'center',fontWeight:'500'}}>Mit welcher Rolle möchtest du fortfahren?</p>
+            <div style={{display:'grid',gap:'10px'}}>
+              {selectableRoles.map(role => {
+                const ra = roleAccents[role] || {icon:'👤',accent:'rgba(255,255,255,0.7)',accentBg:'rgba(255,255,255,0.05)',accentBorder:'rgba(255,255,255,0.15)',desc:''};
+                return (
+                  <button key={role} onClick={()=>{ setUserRole(role); setShowRolePicker(false); setView('home'); }}
+                    style={{padding:'16px 18px',background:ra.accentBg,border:`1px solid ${ra.accentBorder}`,borderRadius:'14px',cursor:'pointer',display:'flex',alignItems:'center',gap:'14px',textAlign:'left',transition:'all 0.12s',width:'100%'}}
+                    onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow=`0 8px 24px rgba(0,0,0,0.3)`;}}
+                    onMouseLeave={e=>{e.currentTarget.style.transform='translateY(0)';e.currentTarget.style.boxShadow='none';}}>
+                    <div style={{width:'48px',height:'48px',borderRadius:'13px',background:`rgba(0,0,0,0.2)`,border:`1px solid ${ra.accentBorder}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'24px',flexShrink:0}}>{ra.icon}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <p style={{margin:'0 0 3px',fontWeight:'800',fontSize:'16px',color:ra.accent}}>{ROLE_CONFIG[role]?.label||role}</p>
+                      <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)',lineHeight:'1.4'}}>{ra.desc}</p>
+                    </div>
+                    <span style={{color:ra.accentBorder,fontSize:'18px',flexShrink:0}}>›</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{marginTop:'20px',paddingTop:'16px',borderTop:'1px solid rgba(255,255,255,0.06)',textAlign:'center'}}>
+              <button onClick={()=>signOut(auth)} style={{background:'none',border:'none',color:'rgba(255,255,255,0.25)',cursor:'pointer',fontSize:'13px',fontWeight:'600'}}>
+                Abmelden
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
   if (userRole==='pending') return (
-    <div style={{...s.page(activeGroup?.color),display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
-      <div style={{background:'white',borderRadius:'16px',padding:'40px',maxWidth:'420px',width:'100%',textAlign:'center',boxShadow:'0 10px 40px rgba(0,0,0,0.2)'}}>
-        <div style={{fontSize:'48px',marginBottom:'16px'}}>⏳</div>
-        <h2 style={{margin:'0 0 12px',color:'#333'}}>Account wird freigeschaltet</h2>
-        <p style={{margin:'0 0 24px',color:'#666',fontSize:'15px'}}>Hallo <strong>{userProfile?.name}</strong>!<br/>Ein Admin schaltet deinen Account bald frei.</p>
-        <div style={{display:'flex',gap:'12px',justifyContent:'center'}}>
-          <button onClick={()=>window.location.reload()} style={s.btn('#358941')}>🔄 Neu laden</button>
-          <button onClick={()=>signOut(auth)} style={s.btn('#ef4444')}><LogOut size={16}/> Abmelden</button>
+    <div style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
+      <div style={{width:'100%',maxWidth:'400px',textAlign:'center'}}>
+        <div style={{width:'80px',height:'80px',borderRadius:'22px',background:'linear-gradient(135deg,#15803d,#4ade80)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'38px',margin:'0 auto 20px',boxShadow:'0 8px 32px rgba(74,222,128,0.3)'}}>⏳</div>
+        <h2 style={{margin:'0 0 10px',color:'white',fontSize:'24px',fontWeight:'800',letterSpacing:'-0.3px'}}>Account wird freigeschaltet</h2>
+        <p style={{margin:'0 0 32px',color:'rgba(255,255,255,0.45)',fontSize:'15px',lineHeight:'1.6'}}>
+          Hallo <strong style={{color:'#4ade80'}}>{userProfile?.name}</strong>!<br/>Ein Admin schaltet deinen Account bald frei.
+        </p>
+        <div style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(74,222,128,0.15)',borderRadius:'20px',padding:'24px',marginBottom:'20px'}}>
+          <p style={{margin:'0 0 6px',color:'rgba(74,222,128,0.6)',fontSize:'12px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px'}}>Registriert als</p>
+          <p style={{margin:0,color:'white',fontSize:'16px',fontWeight:'700'}}>{userProfile?.email}</p>
+        </div>
+        <div style={{display:'flex',gap:'10px',justifyContent:'center'}}>
+          <button onClick={()=>window.location.reload()}
+            style={{padding:'12px 22px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'700',fontSize:'14px',boxShadow:'0 4px 16px rgba(22,163,74,0.35)'}}>
+            🔄 Neu laden
+          </button>
+          <button onClick={()=>signOut(auth)}
+            style={{padding:'12px 22px',background:'rgba(220,38,38,0.12)',color:'#fca5a5',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'12px',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',gap:'6px'}}>
+            <LogOut size={16}/> Abmelden
+          </button>
         </div>
       </div>
     </div>
