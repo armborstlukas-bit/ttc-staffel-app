@@ -2391,6 +2391,155 @@ export default function TrainingsApp() {
             </div>
           </div>
 
+          {/* ── Errungenschaften (für Trainer/Admin) ── */}
+          {(()=>{
+            const ach = getAchievements(child.id);
+            const ttrUnlocked = ach.ttrUnlocked || [];
+            const currentMonth = new Date().toISOString().slice(0,7);
+            const currentLevel = getMonthlyAttendanceLevel(child.id, currentMonth);
+            const cumul = getAttendanceCumulatives(child.id);
+            const totalTrainings = getTotalTrainingsAttended(child.id);
+            const streak = getLongestStreak(child.id);
+            const tournParts = getTournamentParticipations(child.id);
+
+            const Sec = ({title, children: ch}) => (
+              <div style={{marginBottom:'14px'}}>
+                <p style={{margin:'0 0 6px',fontSize:'11px',fontWeight:'700',color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.5px'}}>{title}</p>
+                <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>{ch}</div>
+              </div>
+            );
+
+            const SmTile = ({icon,iconGray='⬜',label,sub,has,activeBg,activeBorder,activeTextColor='#333',onClick}) => (
+              <button onClick={onClick}
+                style={{padding:'7px 10px',borderRadius:'8px',border:`2px solid ${has?(activeBorder||'#e5e7eb'):'#e5e7eb'}`,background:has?(activeBg||'#f9fafb'):'#f9fafb',cursor:'pointer',textAlign:'center',minWidth:'64px',transition:'transform 0.1s'}}
+                onMouseEnter={e=>e.currentTarget.style.transform='scale(1.07)'}
+                onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
+                <div style={{fontSize:'18px'}}>{has?icon:iconGray}</div>
+                <div style={{fontSize:'10px',fontWeight:'700',color:has?activeTextColor:'#9ca3af',marginTop:'2px',lineHeight:'1.2'}}>{label}</div>
+                {sub&&<div style={{fontSize:'11px',fontWeight:'700',color:has?activeTextColor:'#9ca3af'}}>{sub}</div>}
+              </button>
+            );
+
+            const openP = (icon,title,desc,count) => setAchievementPopup({icon,title,desc,count});
+
+            return (
+              <div style={{marginBottom:'24px',padding:'14px',background:'#f8f9fa',borderRadius:'12px',border:'1px solid #e5e7eb'}}>
+                <h4 style={{margin:'0 0 12px',color:'#374151',fontSize:'14px',display:'flex',alignItems:'center',gap:'6px'}}>🏅 Errungenschaften</h4>
+
+                {/* TTR */}
+                <Sec title="TTR Meilensteine">
+                  {TTR_MILESTONES.map((val,i)=>{
+                    const unlocked = ttrUnlocked.includes(val);
+                    const col = TTR_COLORS[i];
+                    return (
+                      <button key={val}
+                        onClick={()=>openP('🏓',`${val} TTR`,unlocked?ACHIEVEMENT_DESCRIPTIONS.ttr(val):`Noch nicht erreicht. Ziel: ${val} TTR-Punkte.`)}
+                        style={{padding:'6px 9px',borderRadius:'8px',border:`2px solid ${unlocked?col.bg:'#e5e7eb'}`,background:unlocked?col.bg:'#f3f4f6',color:unlocked?col.text:'#9ca3af',fontWeight:'700',fontSize:'11px',cursor:'pointer',minWidth:'48px',transition:'transform 0.1s'}}
+                        onMouseEnter={e=>e.currentTarget.style.transform='scale(1.08)'}
+                        onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
+                        {unlocked?'🏓 ':''}{val}
+                      </button>
+                    );
+                  })}
+                </Sec>
+
+                {/* Trainings-Meilensteine */}
+                <Sec title="Trainings-Meilensteine">
+                  {[10,25,50,100,200].map(m=>{
+                    const has=totalTrainings>=m;
+                    return <SmTile key={m} icon="🏋️" label={`${m}×`} sub={has?'✓':`${totalTrainings}/${m}`}
+                      has={has} activeBg="#f0fdf4" activeBorder="#16a34a" activeTextColor="#15803d"
+                      onClick={()=>openP('🏋️',`${m} Trainings`,`Insgesamt ${m} Trainingseinheiten absolviert. Aktuell: ${totalTrainings}.`)}/>;
+                  })}
+                  {[5,10,20,30,50].map(m=>{
+                    const has=streak>=m;
+                    return <SmTile key={`s${m}`} icon="🔥" label={`${m}er Serie`} sub={has?'✓':`${streak}/${m}`}
+                      has={has} activeBg="#fff7ed" activeBorder="#f97316" activeTextColor="#c2410c"
+                      onClick={()=>openP('🔥',`${m}er Trainingsserie`,`${m} Trainings in Folge. Längste Serie: ${streak}.`)}/>;
+                  })}
+                </Sec>
+
+                {/* Turnier-Teilnahmen */}
+                <Sec title="Turnier-Teilnahmen">
+                  {[1,5,10,20].map(m=>{
+                    const has=tournParts>=m;
+                    return <SmTile key={m} icon="🏆" label={`${m}×`} sub={has?'✓':`${tournParts}/${m}`}
+                      has={has} activeBg="#fffbeb" activeBorder="#f59e0b" activeTextColor="#92400e"
+                      onClick={()=>openP('🏆',`${m} Turnier${m>1?'e':''}`,`An ${m} Turnier${m>1?'en':''} teilgenommen. Bisher: ${tournParts}.`)}/>;
+                  })}
+                </Sec>
+
+                {/* Turnierergebnisse */}
+                <Sec title="Turnierergebnisse Einzel">
+                  {[
+                    {icon:'🥇',label:'1.',field:'einzel1',desc:ACHIEVEMENT_DESCRIPTIONS.einzel1},
+                    {icon:'🥈',label:'2.',field:'einzel2',desc:ACHIEVEMENT_DESCRIPTIONS.einzel2},
+                    {icon:'🥉',label:'3.',field:'einzel3',desc:ACHIEVEMENT_DESCRIPTIONS.einzel3},
+                  ].map(({icon,label,field,desc})=>{
+                    const count=ach[field]||0;
+                    return <SmTile key={field} icon={icon} label={label} sub={count>0?`×${count}`:undefined}
+                      has={count>0} activeBg="#fffbeb" activeBorder="#fde68a" activeTextColor="#b45309"
+                      onClick={()=>openP(icon,label,desc,count)}/>;
+                  })}
+                </Sec>
+
+                <Sec title="Turnierergebnisse Doppel">
+                  {[
+                    {icon:'🥇',label:'1.',field:'doppel1',desc:ACHIEVEMENT_DESCRIPTIONS.doppel1},
+                    {icon:'🥈',label:'2.',field:'doppel2',desc:ACHIEVEMENT_DESCRIPTIONS.doppel2},
+                    {icon:'🥉',label:'3.',field:'doppel3',desc:ACHIEVEMENT_DESCRIPTIONS.doppel3},
+                  ].map(({icon,label,field,desc})=>{
+                    const count=ach[field]||0;
+                    return <SmTile key={field} icon={icon} label={label} sub={count>0?`×${count}`:undefined}
+                      has={count>0} activeBg="#fffbeb" activeBorder="#fde68a" activeTextColor="#b45309"
+                      onClick={()=>openP(icon,label,desc,count)}/>;
+                  })}
+                </Sec>
+
+                <Sec title="Mannschaft & Auszeichnungen">
+                  {[
+                    {icon:'🏆',label:'Meisterschaft',field:'team',desc:ACHIEVEMENT_DESCRIPTIONS.team},
+                    {icon:'⭐',label:'Spieler d.M.',field:'spielerDesMonats',desc:'Zum Spieler des Monats gewählt.'},
+                  ].map(({icon,label,field,desc})=>{
+                    const count=ach[field]||0;
+                    return <SmTile key={field} icon={icon} label={label} sub={count>0?`×${count}`:undefined}
+                      has={count>0} activeBg="#fffbeb" activeBorder="#fcd34d" activeTextColor="#b45309"
+                      onClick={()=>openP(icon,label,desc,count)}/>;
+                  })}
+                </Sec>
+
+                {/* Anwesenheits-Monate */}
+                <Sec title={`Akt. Monat (${new Date().toLocaleDateString('de-DE',{month:'long'})})`}>
+                  {(()=>{
+                    const attCfgMap = {
+                      gold:  {icon:'🥇',color:'#b45309',bg:'#fef3c7',border:'#fde68a',label:'Gold (100%)'},
+                      silver:{icon:'🥈',color:'#6b7280',bg:'#f3f4f6',border:'#d1d5db',label:'Silber (≥90%)'},
+                      bronze:{icon:'🥉',color:'#92400e',bg:'#fef9c3',border:'#fde68a',label:'Bronze (≥80%)'},
+                    };
+                    const cfg = currentLevel ? attCfgMap[currentLevel] : null;
+                    return (
+                      <SmTile icon={cfg?cfg.icon:'📅'} label={cfg?cfg.label:'Kein Rang'} has={!!cfg}
+                        activeBg={cfg?.bg} activeBorder={cfg?.border} activeTextColor={cfg?.color||'#9ca3af'}
+                        onClick={()=>openP(cfg?cfg.icon:'📅','Akt. Monat',cfg?cfg.label:'Noch kein Rang diesen Monat.')}/>
+                    );
+                  })()}
+                </Sec>
+
+                <Sec title="Anwesenheits-Monate (Gesamt)">
+                  {[
+                    {icon:'🥇',label:'Gold',count:cumul.gold,bg:'#fef3c7',border:'#fde68a',color:'#b45309',desc:ACHIEVEMENT_DESCRIPTIONS.attendanceGold},
+                    {icon:'🥈',label:'Silber',count:cumul.silver,bg:'#f3f4f6',border:'#d1d5db',color:'#6b7280',desc:ACHIEVEMENT_DESCRIPTIONS.attendanceSilver},
+                    {icon:'🥉',label:'Bronze',count:cumul.bronze,bg:'#fef9c3',border:'#fde68a',color:'#92400e',desc:ACHIEVEMENT_DESCRIPTIONS.attendanceBronze},
+                  ].map(({icon,label,count,bg,border,color,desc})=>(
+                    <SmTile key={label} icon={icon} label={label} sub={count>0?`${count}×`:undefined}
+                      has={count>0} activeBg={bg} activeBorder={border} activeTextColor={color}
+                      onClick={()=>openP(icon,`${label}-Monate`,desc,count)}/>
+                  ))}
+                </Sec>
+              </div>
+            );
+          })()}
+
           {/* Trainings-Verlauf mit bearbeitbarer Anwesenheit */}
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px'}}>
             <h3 style={{margin:0,color:'#333'}}>Trainings-Verlauf</h3>
