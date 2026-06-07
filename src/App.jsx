@@ -397,9 +397,17 @@ export default function TrainingsApp() {
   const [notifComposeText, setNotifComposeText]             = useState('');
   const [notifComposeTitle, setNotifComposeTitle]           = useState('');
   const [notifTab, setNotifTab]                             = useState('inbox'); // 'inbox' | 'trash'
-  const [notifTrainerTab, setNotifTrainerTab]               = useState('sent'); // 'sent' | 'trash'
+  const [notifTrainerTab, setNotifTrainerTab]               = useState('sent'); // 'sent' | 'trash' | 'inbox'
   const [showTrainingHistory, setShowTrainingHistory]       = useState(false);
   const [showAchievements, setShowAchievements]             = useState(false);
+  const [stayLoggedIn, setStayLoggedIn]                     = useState(false);
+  const [regPushNotif, setRegPushNotif]                     = useState(true);
+  const [regEmailNotif, setRegEmailNotif]                   = useState(false);
+  const [notifComposeResponseType, setNotifComposeResponseType] = useState('none'); // 'none'|'yn'|'ynm'
+  const [showParentCompose, setShowParentCompose]           = useState(false);
+  const [parentMsgTitle, setParentMsgTitle]                 = useState('');
+  const [parentMsgText, setParentMsgText]                   = useState('');
+  const prevNotifIdsRef = React.useRef(null);
 
   const [authMode, setAuthMode]           = useState('login');
   const [loginEmail, setLoginEmail]       = useState('');
@@ -412,6 +420,16 @@ export default function TrainingsApp() {
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
       if (u) {
+        // Check inactivity logout (only if not "stay logged in")
+        const stayIn = localStorage.getItem(`ttc_stayLoggedIn_${u.uid}`) === '1';
+        if (!stayIn) {
+          const last = parseInt(localStorage.getItem(`ttc_lastActivity_${u.uid}`) || '0');
+          if (last && Date.now() - last > 86400000) {
+            await signOut(auth);
+            setLoading(false);
+            return;
+          }
+        }
         setUser(u);
         const snap = await getDoc(doc(db, 'users', u.uid));
         if (snap.exists()) {
@@ -422,7 +440,6 @@ export default function TrainingsApp() {
           setUserProfile(profile);
           const selectableRoles = roles.filter(r => r !== 'pending');
           if (selectableRoles.length > 1) {
-            // Multiple roles → show picker, pre-set first role so data loads
             setUserRole(selectableRoles[0]);
             setShowRolePicker(true);
           } else {
@@ -433,6 +450,44 @@ export default function TrainingsApp() {
       setLoading(false);
     });
   }, []);
+
+  // ── Aktivitäts-Tracking (Auto-Logout nach 24h Inaktivität) ───
+  useEffect(() => {
+    if (!user) return;
+    const stayIn = localStorage.getItem(`ttc_stayLoggedIn_${user.uid}`) === '1';
+    if (stayIn) return;
+    const update = () => localStorage.setItem(`ttc_lastActivity_${user.uid}`, Date.now().toString());
+    update();
+    window.addEventListener('mousemove', update, { passive: true });
+    window.addEventListener('keydown',   update, { passive: true });
+    window.addEventListener('click',     update, { passive: true });
+    window.addEventListener('touchstart',update, { passive: true });
+    return () => {
+      window.removeEventListener('mousemove', update);
+      window.removeEventListener('keydown',   update);
+      window.removeEventListener('click',     update);
+      window.removeEventListener('touchstart',update);
+    };
+  }, [user]);
+
+  // ── Browser-Push wenn neue In-App-Benachrichtigung erscheint ─
+  useEffect(() => {
+    if (!user || !['eltern','jugendlich'].includes(userRole)) return;
+    if (!userProfile?.notifPrefs?.push) return;
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    const myChild = Object.values(children).find(c => c.parentUid === user.uid || c.uid === user.uid);
+    if (!myChild) return;
+    const myNotifs = Object.values(notifications).filter(n => n.childId === myChild.id && !n.trashedAt);
+    const currentIds = new Set(myNotifs.map(n => n.id));
+    if (prevNotifIdsRef.current !== null) {
+      myNotifs.forEach(n => {
+        if (!prevNotifIdsRef.current.has(n.id)) {
+          try { new Notification(n.title, { body: n.message, icon: '/favicon.ico', tag: n.id }); } catch {}
+        }
+      });
+    }
+    prevNotifIdsRef.current = currentIds;
+  }, [notifications, user, userRole, userProfile, children]);
 
   useEffect(() => {
     if (!user || !userRole) return;
@@ -727,7 +782,17 @@ export default function TrainingsApp() {
   // ── Auth Handler ─────────────────────────────────────────────
   const handleLogin = async (e) => {
     e.preventDefault(); setError('');
-    try { await signInWithEmailAndPassword(auth, loginEmail, loginPassword); }
+    try {
+      const cred = await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+      const uid = cred.user.uid;
+      if (stayLoggedIn) {
+        localStorage.setItem(`ttc_stayLoggedIn_${uid}`, '1');
+        localStorage.removeItem(`ttc_lastActivity_${uid}`);
+      } else {
+        localStorage.removeItem(`ttc_stayLoggedIn_${uid}`);
+        localStorage.setItem(`ttc_lastActivity_${uid}`, Date.now().toString());
+      }
+    }
     catch { setError('Login fehlgeschlagen!'); }
   };
 
@@ -764,10 +829,15 @@ export default function TrainingsApp() {
     if (!loginName.trim()) { setError('Bitte Name eingeben!'); return; }
     try {
       const cred = await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
-      const profile = { uid:cred.user.uid, email:loginEmail, name:loginName, role:'pending', linkedChildId:null };
+      const notifPrefs = { push: regPushNotif, email: regEmailNotif };
+      const profile = { uid:cred.user.uid, email:loginEmail, name:loginName, role:'pending', linkedChildId:null, notifPrefs };
       await setDoc(doc(db,'users',cred.user.uid), profile);
       const snap = await getDoc(doc(db,'ttc','users'));
       await setDoc(doc(db,'ttc','users'), { ...(snap.exists()?snap.data():{}), [cred.user.uid]:profile });
+      // Request browser notification permission if opted in
+      if (regPushNotif && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+        try { await Notification.requestPermission(); } catch {}
+      }
       setUserRole('pending'); setUserProfile(profile);
     } catch(err) { setError('Fehler: '+err.message); }
   };
@@ -857,6 +927,31 @@ export default function TrainingsApp() {
     const child=getMyChild();
     if (!child) return;
     saveChildren({...children,[child.id]:{...child,attendance:{...(child.attendance||{}),[date]:'absent_excused'}}});
+  };
+
+  // Eltern/Jugendliche → Trainer Nachricht schicken
+  const sendParentMessage = () => {
+    if (!parentMsgTitle.trim() || !parentMsgText.trim()) { alert('Bitte Betreff und Text eingeben!'); return; }
+    const child = getMyChild();
+    const sub2 = child ? subgroups[child.subgroupId] : null;
+    const grpId = sub2?.groupId;
+    if (!grpId) { alert('Keine Gruppe gefunden.'); return; }
+    const id = 'notif_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+    const now = new Date().toISOString();
+    const msg = { id, type:'parent_message', childId: null, toGroupId: grpId, fromChildId: child.id, fromName: child.name, title: parentMsgTitle.trim(), message: parentMsgText.trim(), createdAt: now, trashedAt: null };
+    saveNotifications({ ...notifications, [id]: msg });
+    setParentMsgTitle(''); setParentMsgText(''); setShowParentCompose(false);
+    alert('✅ Nachricht an Trainer gesendet!');
+  };
+
+  // Kind antwortet auf Trainer-Nachricht (Ja/Nein/Vielleicht)
+  const respondToNotif = (notifId, response) => {
+    const n = notifications[notifId];
+    if (!n) return;
+    const child = getMyChild();
+    if (!child) return;
+    const updated = { ...notifications, [notifId]: { ...n, responses: { ...(n.responses||{}), [child.id]: response } } };
+    saveNotifications(updated);
   };
 
   const handleResetAllAttendance = async () => {
@@ -1208,6 +1303,28 @@ export default function TrainingsApp() {
           {authMode==='register'&&<input placeholder="Dein Name" value={loginName} onChange={e=>setLoginName(e.target.value)} required style={{...s.input,flex:'none'}}/>}
           <input type="email" placeholder="E-Mail" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} required style={{...s.input,flex:'none'}}/>
           <input type="password" placeholder="Passwort (min. 6 Zeichen)" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} required style={{...s.input,flex:'none'}}/>
+          {authMode==='login'&&(
+            <label style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',fontSize:'14px',color:'#555',userSelect:'none'}}>
+              <input type="checkbox" checked={stayLoggedIn} onChange={e=>setStayLoggedIn(e.target.checked)}
+                style={{width:'16px',height:'16px',cursor:'pointer',accentColor:'#358941'}}/>
+              Eingeloggt bleiben
+            </label>
+          )}
+          {authMode==='register'&&(
+            <div style={{background:'#f9fafb',borderRadius:'10px',padding:'12px',display:'flex',flexDirection:'column',gap:'10px',border:'1px solid #e5e7eb'}}>
+              <p style={{margin:0,fontSize:'13px',fontWeight:'600',color:'#374151'}}>🔔 Benachrichtigungseinstellungen</p>
+              <label style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',fontSize:'13px',color:'#555',userSelect:'none'}}>
+                <input type="checkbox" checked={regPushNotif} onChange={e=>setRegPushNotif(e.target.checked)}
+                  style={{width:'15px',height:'15px',cursor:'pointer',accentColor:'#358941'}}/>
+                Browser-Push-Benachrichtigungen aktivieren
+              </label>
+              <label style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',fontSize:'13px',color:'#555',userSelect:'none'}}>
+                <input type="checkbox" checked={regEmailNotif} onChange={e=>setRegEmailNotif(e.target.checked)}
+                  style={{width:'15px',height:'15px',cursor:'pointer',accentColor:'#358941'}}/>
+                E-Mail-Benachrichtigungen aktivieren
+              </label>
+            </div>
+          )}
           <button type="submit" style={{padding:'12px',background:'#358941',color:'white',border:'none',borderRadius:'8px',fontSize:'16px',fontWeight:'600',cursor:'pointer'}}>
             {authMode==='login'?'Anmelden':'Registrieren'}
           </button>
@@ -1875,11 +1992,30 @@ export default function TrainingsApp() {
                   <h3 style={{margin:0,color:'#065f46',fontSize:'16px'}}>Benachrichtigungen</h3>
                   {active.length>0&&<span style={{background:'#059669',color:'white',borderRadius:'50%',width:'20px',height:'20px',fontSize:'11px',fontWeight:'700',display:'flex',alignItems:'center',justifyContent:'center'}}>{active.length}</span>}
                 </div>
-                <div style={{display:'flex',gap:'6px'}}>
+                <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
                   <button onClick={()=>setNotifTab('inbox')} style={{padding:'4px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'600',fontSize:'12px',background:notifTab==='inbox'?'#059669':'#f3f4f6',color:notifTab==='inbox'?'white':'#555'}}>Posteingang</button>
                   <button onClick={()=>setNotifTab('trash')} style={{padding:'4px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'600',fontSize:'12px',background:notifTab==='trash'?'#374151':'#f3f4f6',color:notifTab==='trash'?'white':'#555'}}>🗑️ Papierkorb {trashed.length>0&&`(${trashed.length})`}</button>
+                  <button onClick={()=>setShowParentCompose(v=>!v)} style={{padding:'4px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'600',fontSize:'12px',background:showParentCompose?'#7c3aed':'#f3f4f6',color:showParentCompose?'white':'#555'}}>✉️ Schreiben</button>
                 </div>
               </div>
+
+              {/* Compose: Eltern → Trainer */}
+              {showParentCompose&&(
+                <div style={{background:'#faf5ff',borderRadius:'10px',padding:'12px',marginBottom:'12px',border:'1px solid #ddd8fe',display:'grid',gap:'8px'}}>
+                  <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'#7c3aed'}}>✉️ Nachricht an Trainer schreiben</p>
+                  <input value={parentMsgTitle} onChange={e=>setParentMsgTitle(e.target.value)}
+                    placeholder="Betreff" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box',fontSize:'13px'}}/>
+                  <textarea value={parentMsgText} onChange={e=>setParentMsgText(e.target.value)}
+                    placeholder="Ihre Nachricht..." rows={3}
+                    style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box',resize:'vertical',fontSize:'13px'}}/>
+                  <div style={{display:'flex',gap:'8px'}}>
+                    <button onClick={sendParentMessage} style={{...s.btn('#7c3aed'),flex:1}}><Send size={14}/> Senden</button>
+                    <button onClick={()=>{setShowParentCompose(false);setParentMsgTitle('');setParentMsgText('');}}
+                      style={{...s.btn('#6b7280'),flex:1}}>Abbrechen</button>
+                  </div>
+                </div>
+              )}
+
               {items.length === 0
                 ? <p style={{color:'#9ca3af',fontSize:'13px',margin:0,textAlign:'center',padding:'8px 0'}}>{showTrash?'Papierkorb ist leer.':'Keine Nachrichten.'}</p>
                 : <div style={{display:'grid',gap:'8px'}}>
@@ -1893,24 +2029,44 @@ export default function TrainingsApp() {
                       };
                       const cfg = typeColors[n.type] || {bg:'#f9fafb',border:'#e5e7eb',icon:'🔔'};
                       const dateStr = new Date(n.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+                      const myResponse = (n.responses||{})[myChild.id];
                       return (
-                        <div key={n.id} style={{background:cfg.bg,border:`1px solid ${cfg.border}`,borderRadius:'10px',padding:'12px 14px',display:'flex',alignItems:'flex-start',gap:'10px'}}>
-                          <span style={{fontSize:'20px',flexShrink:0,marginTop:'1px'}}>{cfg.icon}</span>
-                          <div style={{flex:1,minWidth:0}}>
-                            <p style={{margin:'0 0 3px',fontWeight:'700',fontSize:'14px',color:'#1f2937'}}>{n.title}</p>
-                            <p style={{margin:'0 0 5px',fontSize:'13px',color:'#374151',lineHeight:'1.4'}}>{n.message}</p>
-                            <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>{dateStr}</p>
+                        <div key={n.id} style={{background:cfg.bg,border:`1px solid ${cfg.border}`,borderRadius:'10px',padding:'12px 14px'}}>
+                          <div style={{display:'flex',alignItems:'flex-start',gap:'10px'}}>
+                            <span style={{fontSize:'20px',flexShrink:0,marginTop:'1px'}}>{cfg.icon}</span>
+                            <div style={{flex:1,minWidth:0}}>
+                              <p style={{margin:'0 0 3px',fontWeight:'700',fontSize:'14px',color:'#1f2937'}}>{n.title}</p>
+                              <p style={{margin:'0 0 5px',fontSize:'13px',color:'#374151',lineHeight:'1.4'}}>{n.message}</p>
+                              <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>{dateStr}</p>
+                            </div>
+                            {!showTrash&&<button onClick={()=>trashNotification(n.id)} title="In Papierkorb"
+                              style={{padding:'4px',background:'rgba(0,0,0,0.06)',border:'none',borderRadius:'6px',cursor:'pointer',color:'#6b7280',flexShrink:0}}><X size={16}/></button>}
+                            {showTrash&&<div style={{display:'flex',gap:'4px',flexShrink:0}}>
+                              <button onClick={()=>restoreNotification(n.id)} title="Wiederherstellen"
+                                style={{padding:'4px 8px',background:'#f0fdf4',border:'none',borderRadius:'6px',cursor:'pointer',color:'#16a34a',fontSize:'12px',fontWeight:'600'}}>↩</button>
+                              <button onClick={()=>deleteNotificationPermanently(n.id)} title="Endgültig löschen"
+                                style={{padding:'4px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626'}}><Trash2 size={14}/></button>
+                            </div>}
                           </div>
-                          {showTrash
-                            ? <div style={{display:'flex',gap:'4px',flexShrink:0}}>
-                                <button onClick={()=>restoreNotification(n.id)} title="Wiederherstellen"
-                                  style={{padding:'4px 8px',background:'#f0fdf4',border:'none',borderRadius:'6px',cursor:'pointer',color:'#16a34a',fontSize:'12px',fontWeight:'600'}}>↩</button>
-                                <button onClick={()=>deleteNotificationPermanently(n.id)} title="Endgültig löschen"
-                                  style={{padding:'4px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626'}}><Trash2 size={14}/></button>
-                              </div>
-                            : <button onClick={()=>trashNotification(n.id)} title="In Papierkorb"
-                                style={{padding:'4px',background:'rgba(0,0,0,0.06)',border:'none',borderRadius:'6px',cursor:'pointer',color:'#6b7280',flexShrink:0}}><X size={16}/></button>
-                          }
+                          {/* Ja/Nein/Vielleicht Antwort-Buttons */}
+                          {!showTrash && n.responseType && n.responseType !== 'none' && (
+                            <div style={{display:'flex',gap:'8px',marginTop:'10px',flexWrap:'wrap'}}>
+                              <button onClick={()=>respondToNotif(n.id,'yes')}
+                                style={{flex:1,padding:'8px',border:`2px solid #16a34a`,background:myResponse==='yes'?'#16a34a':'white',color:myResponse==='yes'?'white':'#16a34a',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>
+                                ✅ Ja
+                              </button>
+                              <button onClick={()=>respondToNotif(n.id,'no')}
+                                style={{flex:1,padding:'8px',border:`2px solid #dc2626`,background:myResponse==='no'?'#dc2626':'white',color:myResponse==='no'?'white':'#dc2626',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>
+                                ❌ Nein
+                              </button>
+                              {n.responseType==='ynm'&&(
+                                <button onClick={()=>respondToNotif(n.id,'maybe')}
+                                  style={{flex:1,padding:'8px',border:`2px solid #d97706`,background:myResponse==='maybe'?'#d97706':'white',color:myResponse==='maybe'?'white':'#d97706',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>
+                                  🤔 Vielleicht
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -3338,11 +3494,12 @@ export default function TrainingsApp() {
       const updated = { ...notifications };
       targets.forEach(childId => {
         const id = 'notif_' + Date.now() + '_' + Math.random().toString(36).slice(2,6) + '_' + childId;
-        updated[id] = { id, childId, type:'trainer_message', title:notifComposeTitle.trim(), message:notifComposeText.trim(), createdAt:now, trashedAt:null, key:null, batchId, trainerTrashedAt:null, recipientLabel };
+        updated[id] = { id, childId, type:'trainer_message', title:notifComposeTitle.trim(), message:notifComposeText.trim(), createdAt:now, trashedAt:null, key:null, batchId, trainerTrashedAt:null, recipientLabel, responseType: notifComposeResponseType, responses:{} };
       });
       saveNotifications(updated);
       setNotifComposeTitle('');
       setNotifComposeText('');
+      setNotifComposeResponseType('none');
       alert(`✅ Nachricht an ${targets.length} Empfänger gesendet!`);
     };
 
@@ -3388,21 +3545,33 @@ export default function TrainingsApp() {
         createdAt: n.createdAt, isTrashed: isTrashedForMe(n),
         trashedAt: (typeof n.trainerTrashedAt === 'object' && n.trainerTrashedAt) ? n.trainerTrashedAt[uid] : null,
         recipientLabel: n.recipientLabel || '?', count: 0,
+        responseType: n.responseType || 'none', rYes:0, rNo:0, rMaybe:0, rNone:0,
       };
       batchMap[bid].count++;
       if (!isTrashedForMe(n)) batchMap[bid].isTrashed = false;
+      // tally responses
+      const resp = n.responses?.[n.childId];
+      if (resp === 'yes')   batchMap[bid].rYes++;
+      else if (resp === 'no') batchMap[bid].rNo++;
+      else if (resp === 'maybe') batchMap[bid].rMaybe++;
+      else batchMap[bid].rNone++;
     });
     const sentBatches   = Object.values(batchMap).filter(b=>!b.isTrashed).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
     const trashedBatches = Object.values(batchMap).filter(b=>b.isTrashed).sort((a,b)=>(b.trashedAt||'').localeCompare(a.trashedAt||''));
 
+    // Parent messages (type: 'parent_message') for trainers who can access the group
+    const parentMessages = Object.values(notifications)
+      .filter(n => n.type === 'parent_message' && canAccessGroup(n.toGroupId) && !n.trashedAt)
+      .sort((a,b) => b.createdAt.localeCompare(a.createdAt));
+
     // Active auto-notifications (non-trainer-message) by child
     const autoNotifsByChild = {};
-    Object.values(notifications).filter(n=>n.type!=='trainer_message'&&!n.trashedAt).forEach(n=>{
+    Object.values(notifications).filter(n=>n.type!=='trainer_message'&&n.type!=='parent_message'&&!n.trashedAt).forEach(n=>{
       if (!autoNotifsByChild[n.childId]) autoNotifsByChild[n.childId] = [];
       autoNotifsByChild[n.childId].push(n);
     });
 
-    const typeLabels = {achievement:'🏅',tournament_reminder:'🏆',training_reminder:'📅',unexcused_absences:'❗',trainer_message:'💬'};
+    const typeLabels = {achievement:'🏅',tournament_reminder:'🏆',training_reminder:'📅',unexcused_absences:'❗',trainer_message:'💬',parent_message:'✉️'};
 
     return (
       <div style={s.page()}><div style={s.wrap}>
@@ -3438,6 +3607,17 @@ export default function TrainingsApp() {
                 placeholder="Nachrichtentext..." rows={3}
                 style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box',resize:'vertical'}}/>
             </div>
+            <div>
+              <label style={s.label}>Antwort-Optionen</label>
+              <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                {[['none','Keine Antwort'],['yn','Ja / Nein'],['ynm','Ja / Nein / Vielleicht']].map(([val,label])=>(
+                  <button key={val} onClick={()=>setNotifComposeResponseType(val)} type="button"
+                    style={{padding:'6px 14px',borderRadius:'20px',border:`2px solid ${notifComposeResponseType===val?'#059669':'#e5e7eb'}`,background:notifComposeResponseType===val?'#f0fdf4':'white',color:notifComposeResponseType===val?'#059669':'#555',cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <button onClick={sendTrainerNotif} style={{...s.btn('#059669'),alignSelf:'flex-start'}}>
               <Send size={16}/> Senden
             </button>
@@ -3447,43 +3627,77 @@ export default function TrainingsApp() {
         {/* Gesendete Nachrichten + eigener Papierkorb */}
         <div style={s.card}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'14px',flexWrap:'wrap',gap:'8px'}}>
-            <h3 style={{margin:0,color:'#333',display:'flex',alignItems:'center',gap:'8px'}}><MessageSquare size={18}/> Gesendete Nachrichten</h3>
-            <div style={{display:'flex',gap:'6px'}}>
+            <h3 style={{margin:0,color:'#333',display:'flex',alignItems:'center',gap:'8px'}}><MessageSquare size={18}/> Nachrichten</h3>
+            <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
               <button onClick={()=>setNotifTrainerTab('sent')} style={{padding:'4px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'600',fontSize:'12px',background:notifTrainerTab==='sent'?'#059669':'#f3f4f6',color:notifTrainerTab==='sent'?'white':'#555'}}>Gesendet {sentBatches.length>0&&`(${sentBatches.length})`}</button>
+              <button onClick={()=>setNotifTrainerTab('inbox')} style={{padding:'4px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'600',fontSize:'12px',background:notifTrainerTab==='inbox'?'#7c3aed':'#f3f4f6',color:notifTrainerTab==='inbox'?'white':'#555'}}>✉️ Von Eltern {parentMessages.length>0&&`(${parentMessages.length})`}</button>
               <button onClick={()=>setNotifTrainerTab('trash')} style={{padding:'4px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'600',fontSize:'12px',background:notifTrainerTab==='trash'?'#374151':'#f3f4f6',color:notifTrainerTab==='trash'?'white':'#555'}}>🗑️ Papierkorb {trashedBatches.length>0&&`(${trashedBatches.length})`}</button>
             </div>
           </div>
-          {(notifTrainerTab==='sent' ? sentBatches : trashedBatches).length === 0
-            ? <p style={{color:'#9ca3af',textAlign:'center',padding:'20px',margin:0}}>{notifTrainerTab==='sent'?'Noch keine Nachrichten gesendet.':'Papierkorb ist leer.'}</p>
-            : (notifTrainerTab==='sent' ? sentBatches : trashedBatches).map(batch=>{
-                const dateStr = new Date(batch.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-                const isTrash = notifTrainerTab==='trash';
-                return (
-                  <div key={batch.batchId} style={{marginBottom:'10px',border:'1px solid #e5e7eb',borderRadius:'10px',padding:'12px 14px',display:'flex',alignItems:'flex-start',gap:'10px',background:isTrash?'#f9fafb':'white'}}>
-                    <span style={{fontSize:'20px',flexShrink:0}}>💬</span>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',marginBottom:'3px'}}>
-                        <p style={{margin:0,fontWeight:'700',fontSize:'14px',color:'#1f2937'}}>{batch.title}</p>
-                        <span style={{fontSize:'11px',background:'#f0fdf4',color:'#059669',padding:'1px 7px',borderRadius:'10px',fontWeight:'600'}}>→ {batch.recipientLabel}</span>
+          {notifTrainerTab === 'inbox'
+            ? parentMessages.length === 0
+              ? <p style={{color:'#9ca3af',textAlign:'center',padding:'20px',margin:0}}>Keine Nachrichten von Eltern/Jugendlichen.</p>
+              : parentMessages.map(msg => {
+                  const dateStr = new Date(msg.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+                  const grpInfo = FIXED_GROUPS.find(g=>g.id===msg.toGroupId);
+                  return (
+                    <div key={msg.id} style={{marginBottom:'10px',border:'1px solid #ddd8fe',borderRadius:'10px',padding:'12px 14px',background:'#faf5ff'}}>
+                      <div style={{display:'flex',alignItems:'flex-start',gap:'10px'}}>
+                        <span style={{fontSize:'20px',flexShrink:0}}>✉️</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',marginBottom:'3px'}}>
+                            <p style={{margin:0,fontWeight:'700',fontSize:'14px',color:'#1f2937'}}>{msg.title}</p>
+                            <span style={{fontSize:'11px',background:'#ede9fe',color:'#7c3aed',padding:'1px 7px',borderRadius:'10px',fontWeight:'600'}}>👤 {msg.fromName}</span>
+                            {grpInfo&&<span style={{fontSize:'11px',color:'#888'}}>{grpInfo.emoji} {grpInfo.name}</span>}
+                          </div>
+                          <p style={{margin:'0 0 5px',fontSize:'13px',color:'#374151',lineHeight:'1.4'}}>{msg.message}</p>
+                          <p style={{margin:0,fontSize:'10px',color:'#9ca3af'}}>{dateStr}</p>
+                        </div>
+                        <button onClick={()=>{ const u={...notifications}; u[msg.id]={...msg,trashedAt:new Date().toISOString()}; saveNotifications(u); }}
+                          title="Löschen" style={{padding:'4px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626',flexShrink:0}}><Trash2 size={14}/></button>
                       </div>
-                      <p style={{margin:'0 0 5px',fontSize:'13px',color:'#374151',lineHeight:'1.4'}}>{batch.message}</p>
-                      <p style={{margin:0,fontSize:'10px',color:'#9ca3af'}}>{dateStr}</p>
                     </div>
-                    <div style={{display:'flex',gap:'4px',flexShrink:0}}>
-                      {isTrash
-                        ? <>
-                            <button onClick={()=>trainerRestoreBatch(batch.batchId)} title="Wiederherstellen"
-                              style={{padding:'4px 8px',background:'#f0fdf4',border:'none',borderRadius:'6px',cursor:'pointer',color:'#16a34a',fontSize:'12px',fontWeight:'700'}}>↩</button>
-                            <button onClick={()=>trainerDeleteBatch(batch.batchId)} title="Endgültig löschen"
-                              style={{padding:'4px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626'}}><Trash2 size={14}/></button>
-                          </>
-                        : <button onClick={()=>trainerTrashBatch(batch.batchId)} title="In Papierkorb"
-                            style={{padding:'4px',background:'#f3f4f6',border:'none',borderRadius:'6px',cursor:'pointer',color:'#6b7280'}}><Trash2 size={14}/></button>
-                      }
+                  );
+                })
+            : (notifTrainerTab==='sent' ? sentBatches : trashedBatches).length === 0
+              ? <p style={{color:'#9ca3af',textAlign:'center',padding:'20px',margin:0}}>{notifTrainerTab==='sent'?'Noch keine Nachrichten gesendet.':'Papierkorb ist leer.'}</p>
+              : (notifTrainerTab==='sent' ? sentBatches : trashedBatches).map(batch=>{
+                  const dateStr = new Date(batch.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+                  const isTrash = notifTrainerTab==='trash';
+                  return (
+                    <div key={batch.batchId} style={{marginBottom:'10px',border:'1px solid #e5e7eb',borderRadius:'10px',padding:'12px 14px',display:'flex',alignItems:'flex-start',gap:'10px',background:isTrash?'#f9fafb':'white'}}>
+                      <span style={{fontSize:'20px',flexShrink:0}}>💬</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',marginBottom:'3px'}}>
+                          <p style={{margin:0,fontWeight:'700',fontSize:'14px',color:'#1f2937'}}>{batch.title}</p>
+                          <span style={{fontSize:'11px',background:'#f0fdf4',color:'#059669',padding:'1px 7px',borderRadius:'10px',fontWeight:'600'}}>→ {batch.recipientLabel}</span>
+                        </div>
+                        <p style={{margin:'0 0 5px',fontSize:'13px',color:'#374151',lineHeight:'1.4'}}>{batch.message}</p>
+                        {batch.responseType !== 'none' && (
+                          <div style={{display:'flex',gap:'6px',flexWrap:'wrap',margin:'6px 0'}}>
+                            <span style={{fontSize:'11px',background:'#dcfce7',color:'#16a34a',padding:'2px 8px',borderRadius:'10px',fontWeight:'600'}}>✅ Ja: {batch.rYes}</span>
+                            <span style={{fontSize:'11px',background:'#fee2e2',color:'#dc2626',padding:'2px 8px',borderRadius:'10px',fontWeight:'600'}}>❌ Nein: {batch.rNo}</span>
+                            {batch.responseType==='ynm'&&<span style={{fontSize:'11px',background:'#fef3c7',color:'#d97706',padding:'2px 8px',borderRadius:'10px',fontWeight:'600'}}>🤔 Vielleicht: {batch.rMaybe}</span>}
+                            <span style={{fontSize:'11px',background:'#f3f4f6',color:'#6b7280',padding:'2px 8px',borderRadius:'10px',fontWeight:'600'}}>– Keine: {batch.rNone}</span>
+                          </div>
+                        )}
+                        <p style={{margin:0,fontSize:'10px',color:'#9ca3af'}}>{dateStr}</p>
+                      </div>
+                      <div style={{display:'flex',gap:'4px',flexShrink:0}}>
+                        {isTrash
+                          ? <>
+                              <button onClick={()=>trainerRestoreBatch(batch.batchId)} title="Wiederherstellen"
+                                style={{padding:'4px 8px',background:'#f0fdf4',border:'none',borderRadius:'6px',cursor:'pointer',color:'#16a34a',fontSize:'12px',fontWeight:'700'}}>↩</button>
+                              <button onClick={()=>trainerDeleteBatch(batch.batchId)} title="Endgültig löschen"
+                                style={{padding:'4px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626'}}><Trash2 size={14}/></button>
+                            </>
+                          : <button onClick={()=>trainerTrashBatch(batch.batchId)} title="In Papierkorb"
+                              style={{padding:'4px',background:'#f3f4f6',border:'none',borderRadius:'6px',cursor:'pointer',color:'#6b7280'}}><Trash2 size={14}/></button>
+                        }
+                      </div>
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })
           }
         </div>
 
