@@ -490,6 +490,28 @@ export default function TrainingsApp() {
     const updatedNotifs = { ...notifications };
     let changed = false;
 
+    // 0. Cleanup: Veraltete auto-Erinnerungen wegräumen
+    Object.values(updatedNotifs).forEach(n => {
+      if (n.trashedAt) return;
+      // Training-Erinnerung: älter als 24h → Training ist vorbei
+      if (n.type === 'training_reminder') {
+        const age = (now - new Date(n.createdAt)) / 3600000;
+        if (age > 24) { updatedNotifs[n.id] = { ...n, trashedAt: now.toISOString() }; changed = true; }
+      }
+      // Turnier-Erinnerung: kein passendes Turnier mehr in der Zukunft
+      if (n.type === 'tournament_reminder' && n.key) {
+        const tournId = n.key.replace(/^tourn_reminder_/, '').replace(/_[^_]*$/, '');
+        const tourn = tournaments[tournId];
+        if (!tourn) { updatedNotifs[n.id] = { ...n, trashedAt: now.toISOString() }; changed = true; return; }
+        const startDate = tourn.dateFrom || tourn.date || '';
+        if (startDate) {
+          const firstTime = (tourn.konkurrenzen||[])[0]?.time || '12:00';
+          const tournStart = new Date(`${startDate}T${firstTime}:00`);
+          if (tournStart < now) { updatedNotifs[n.id] = { ...n, trashedAt: now.toISOString() }; changed = true; }
+        }
+      }
+    });
+
     // Helper: create if not exists (dedup by key)
     const maybeCreate = (childId, type, title, message, key) => {
       const exists = Object.values(updatedNotifs).some(n => n.key === key && !n.trashedAt);
