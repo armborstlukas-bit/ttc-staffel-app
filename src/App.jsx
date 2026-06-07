@@ -2869,132 +2869,185 @@ export default function TrainingsApp() {
     );
   }
 
-  // ── STARTSEITE ───────────────────────────────────────────────
+  // ── STARTSEITE (Trainer/Admin Dashboard) ───────────────────────────────
+  if (view==='home' && canEdit()) {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const in6 = new Date(); in6.setDate(in6.getDate()+6);
+    const in6Str = in6.toISOString().split('T')[0];
+    const allSess = getAllUpcomingSessions().filter(s=>canAccessSession(s));
+    const pastSess = allSess.filter(s=>s.date<todayStr).sort((a,b)=>b.date.localeCompare(a.date));
+    const upcomingSess = allSess.filter(s=>s.date>=todayStr&&s.date<=in6Str);
+    const in3m=new Date(); in3m.setMonth(in3m.getMonth()+3);
+    const in3mStr=in3m.toISOString().split('T')[0];
+    const tourneys=getUpcomingTournaments().filter(t=>(t.dateFrom||t.date||'')<=in3mStr);
+    const unreadCount = Object.values(notifications).filter(n=>
+      n.type==='parent_message'&&!n.trashedAt&&canAccessGroup(n.toGroupId)
+    ).length;
+    const hour = new Date().getHours();
+    const greeting = hour<12 ? 'Guten Morgen' : hour<18 ? 'Guten Tag' : 'Guten Abend';
+    const dateLabel = new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    const quickLinks = [
+      {label:'Trainingsplan', icon:'📅', color:'#7dd3fc', bg:'rgba(3,105,161,0.15)',  border:'rgba(3,105,161,0.35)',  action:()=>setView('trainingsplan')},
+      {label:'Turniere',      icon:'🏆', color:'#fcd34d', bg:'rgba(180,83,9,0.15)',   border:'rgba(180,83,9,0.35)',   action:()=>setView('turniere')},
+      {label:'Nachrichten',   icon:'💬', color:'#6ee7b7', bg:'rgba(5,150,105,0.15)',  border:'rgba(5,150,105,0.35)',  action:()=>setView('notifications'), badge: unreadCount},
+      {label:'Archiv',        icon:'📦', color:'#d1d5db', bg:'rgba(55,65,81,0.15)',   border:'rgba(55,65,81,0.35)',   action:()=>setView('archiv')},
+      {label:'Errungenschaften',icon:'🏅',color:'#c4b5fd',bg:'rgba(124,58,237,0.15)',border:'rgba(124,58,237,0.35)', action:()=>setView('achievements')},
+      ...(appSettings.mannschaftEnabled?[{label:'Mannschaft',icon:'⚽',color:'#5eead4',bg:'rgba(15,118,110,0.15)',border:'rgba(15,118,110,0.35)',action:()=>setView('mannschaft')}]:[]),
+      ...(userRole==='admin'?[{label:'Admin',icon:'🛡️',color:'#c4b5fd',bg:'rgba(124,58,237,0.2)',border:'rgba(124,58,237,0.5)',action:()=>setView('admin')}]:[]),
+    ];
+    const groups = FIXED_GROUPS.filter(g=>canAccessGroup(g.id));
+    const groupGradients = {jugend:'linear-gradient(135deg,#052e16 0%,#14532d 100%)',hobby:'linear-gradient(135deg,#0c1a3a 0%,#1e3a6e 100%)'};
+    const groupBorders   = {jugend:'rgba(22,163,74,0.4)', hobby:'rgba(37,99,235,0.4)'};
+    return (
+      <div style={{minHeight:'100vh',background:'linear-gradient(160deg,#080f09 0%,#0d1f12 50%,#0a1520 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
+        {archiveTournDialog && <ArchiveTournDialog tournament={archiveTournDialog} onClose={()=>setArchiveTournDialog(null)} onConfirm={confirmArchiveTournament}/>}
+        <Header/>
+        <div style={{maxWidth:'980px',margin:'0 auto',padding:'0 16px 48px'}}>
+
+          {/* Hero */}
+          <div style={{padding:'24px 0 22px',borderBottom:'1px solid rgba(255,255,255,0.07)',marginBottom:'22px'}}>
+            <p style={{margin:'0 0 4px',color:'rgba(255,255,255,0.38)',fontSize:'12px',letterSpacing:'1px',textTransform:'uppercase',fontWeight:'600'}}>{dateLabel}</p>
+            <h1 style={{margin:'0 0 5px',color:'white',fontSize:'30px',fontWeight:'800',letterSpacing:'-0.5px'}}>{greeting}, {(userProfile?.name||'').split(' ')[0]||'Trainer'} 👋</h1>
+            <span style={{fontSize:'13px',color:'rgba(255,255,255,0.38)',fontWeight:'500'}}>TTC Grün-Weiß Staffel · {userRole==='admin'?'Administrator':'Trainer'}</span>
+          </div>
+
+          {/* Schnellzugriff */}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))',gap:'8px',marginBottom:'26px'}}>
+            {quickLinks.map((ql,i)=>(
+              <button key={i} onClick={ql.action} style={{position:'relative',padding:'14px 8px',background:ql.bg,border:`1px solid ${ql.border}`,borderRadius:'14px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:'7px',transition:'all 0.15s',textAlign:'center'}}>
+                <span style={{fontSize:'22px',lineHeight:1}}>{ql.icon}</span>
+                <span style={{fontSize:'11px',fontWeight:'700',color:ql.color,lineHeight:'1.3'}}>{ql.label}</span>
+                {ql.badge>0&&<span style={{position:'absolute',top:'7px',right:'7px',background:'#dc2626',color:'white',borderRadius:'50%',width:'17px',height:'17px',fontSize:'10px',fontWeight:'800',display:'flex',alignItems:'center',justifyContent:'center'}}>{ql.badge}</span>}
+              </button>
+            ))}
+          </div>
+
+          {/* 2-Spalten: Training + Turniere */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'14px',marginBottom:'22px'}}>
+
+            {/* Training */}
+            <div style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.09)',borderRadius:'16px',overflow:'hidden'}}>
+              <div style={{padding:'13px 16px',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                <span style={{fontWeight:'700',color:'white',fontSize:'13px',letterSpacing:'-0.2px'}}>📅 Training diese Woche</span>
+                <button onClick={()=>setView('trainingsplan')} style={{background:'rgba(3,105,161,0.25)',border:'1px solid rgba(3,105,161,0.4)',color:'#7dd3fc',borderRadius:'7px',padding:'3px 9px',fontSize:'11px',cursor:'pointer',fontWeight:'700'}}>Alle →</button>
+              </div>
+              <div style={{padding:'8px 10px',display:'flex',flexDirection:'column',gap:'5px',maxHeight:'270px',overflowY:'auto'}}>
+                {pastSess.length===0&&upcomingSess.length===0
+                  ? <p style={{color:'rgba(255,255,255,0.25)',fontSize:'12px',textAlign:'center',padding:'24px 0',margin:0}}>Keine Einheiten diese Woche.</p>
+                  : <>
+                    {pastSess.map(session=>{
+                      const sessionSubs=(session.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean);
+                      const allKids=(session.subgroupIds||[]).flatMap(sid=>getChildrenForSubgroup(sid));
+                      const recorded=allKids.filter(c=>!!(children[c.id]?.attendance||{})[session.date]).length;
+                      const archivable=isSessionArchivable(session);
+                      return (
+                        <div key={session.id} onClick={()=>{setActiveSession(session);setView('sessionAttendance');}}
+                          style={{display:'flex',alignItems:'center',gap:'8px',padding:'7px 9px',background:'rgba(220,38,38,0.09)',border:'1px solid rgba(220,38,38,0.22)',borderRadius:'9px',cursor:'pointer'}}>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{display:'flex',gap:'4px',flexWrap:'wrap',marginBottom:'2px',alignItems:'center'}}>
+                              {sessionSubs.map(sub=>{const g=FIXED_GROUPS.find(x=>x.id===sub.groupId);return <span key={sub.id} style={{fontSize:'10px',fontWeight:'700',color:g?.color||'#aaa'}}>{g?.emoji} {sub.name}</span>;})}
+                              {archivable&&<span style={{fontSize:'9px',background:'rgba(55,65,81,0.7)',color:'#9ca3af',padding:'1px 5px',borderRadius:'6px'}}>📦</span>}
+                            </div>
+                            <span style={{fontSize:'11px',color:'rgba(255,255,255,0.5)'}}>{new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})} · {session.time} Uhr
+                            {allKids.length>0&&<span style={{color:'rgba(255,255,255,0.28)',marginLeft:'5px'}}>({recorded}/{allKids.length})</span>}</span>
+                          </div>
+                          <ChevronRight size={13} color="rgba(220,38,38,0.6)"/>
+                        </div>
+                      );
+                    })}
+                    {upcomingSess.map(session=>{
+                      const sessionSubs=(session.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean);
+                      const isToday=session.date===todayStr;
+                      return (
+                        <div key={session.id} onClick={()=>{setActiveSession(session);setView('sessionAttendance');}}
+                          style={{display:'flex',alignItems:'center',gap:'8px',padding:'7px 9px',background:isToday?'rgba(3,105,161,0.18)':'rgba(255,255,255,0.03)',border:`1px solid ${isToday?'rgba(3,105,161,0.4)':'rgba(255,255,255,0.07)'}`,borderRadius:'9px',cursor:'pointer'}}>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{display:'flex',gap:'4px',flexWrap:'wrap',marginBottom:'2px',alignItems:'center'}}>
+                              {sessionSubs.map(sub=>{const g=FIXED_GROUPS.find(x=>x.id===sub.groupId);return <span key={sub.id} style={{fontSize:'10px',fontWeight:'700',color:g?.color||'#aaa'}}>{g?.emoji} {sub.name}</span>;})}
+                              {isToday&&<span style={{fontSize:'9px',background:'rgba(3,105,161,0.45)',color:'#7dd3fc',padding:'1px 6px',borderRadius:'6px',fontWeight:'700'}}>Heute</span>}
+                            </div>
+                            <span style={{fontSize:'11px',color:'rgba(255,255,255,0.5)'}}>{new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})} · {session.time} Uhr</span>
+                          </div>
+                          <ChevronRight size={13} color="rgba(255,255,255,0.25)"/>
+                        </div>
+                      );
+                    })}
+                  </>
+                }
+              </div>
+            </div>
+
+            {/* Turniere */}
+            <div style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.09)',borderRadius:'16px',overflow:'hidden'}}>
+              <div style={{padding:'13px 16px',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                <span style={{fontWeight:'700',color:'white',fontSize:'13px',letterSpacing:'-0.2px'}}>🏆 Kommende Turniere</span>
+                <button onClick={()=>setView('turniere')} style={{background:'rgba(180,83,9,0.25)',border:'1px solid rgba(180,83,9,0.4)',color:'#fcd34d',borderRadius:'7px',padding:'3px 9px',fontSize:'11px',cursor:'pointer',fontWeight:'700'}}>Alle →</button>
+              </div>
+              <div style={{padding:'8px 10px',display:'flex',flexDirection:'column',gap:'5px',maxHeight:'270px',overflowY:'auto'}}>
+                {tourneys.length===0
+                  ? <p style={{color:'rgba(255,255,255,0.25)',fontSize:'12px',textAlign:'center',padding:'24px 0',margin:0}}>Kein Turnier in den nächsten 3 Monaten.</p>
+                  : tourneys.map(t=>{
+                    const from=t.dateFrom||t.date||''; const to=t.dateTo||from;
+                    const dl2=to!==from
+                      ? new Date(from+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+' – '+new Date(to+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})
+                      : new Date(from+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
+                    const total=getTournamentParticipantIds(t).length;
+                    const coming=Object.values(t.responses||{}).filter(r=>r==='coming').length;
+                    const missing=Object.values(t.responses||{}).filter(r=>r==='missing').length;
+                    const canArchive=isTournamentArchivable(t);
+                    return (
+                      <div key={t.id} style={{padding:'7px 9px',background:'rgba(180,83,9,0.1)',border:'1px solid rgba(180,83,9,0.22)',borderRadius:'9px'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer'}} onClick={()=>{setScrollToTournId(t.id);setView('turniere');}}>
+                          <div style={{flex:1,minWidth:0}}>
+                            <p style={{margin:'0 0 1px',fontWeight:'700',color:'#fcd34d',fontSize:'12px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.name}</p>
+                            <span style={{fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>{dl2}{t.location?' · '+t.location:''}</span>
+                          </div>
+                          <div style={{display:'flex',gap:'5px',fontSize:'11px',fontWeight:'700',flexShrink:0}}>
+                            <span style={{color:'#4ade80'}}>✓{coming}</span>
+                            <span style={{color:'#f87171'}}>✗{missing}</span>
+                            <span style={{color:'rgba(255,255,255,0.28)'}}>–{total-coming-missing}</span>
+                          </div>
+                        </div>
+                        {canArchive&&<button onClick={e=>{e.stopPropagation();openArchiveTournDialog(t);}} style={{marginTop:'5px',width:'100%',padding:'3px',background:'rgba(55,65,81,0.5)',border:'1px solid rgba(255,255,255,0.08)',color:'rgba(255,255,255,0.5)',borderRadius:'6px',cursor:'pointer',fontSize:'11px',fontWeight:'600'}}>📦 Archivieren</button>}
+                      </div>
+                    );
+                  })
+                }
+              </div>
+            </div>
+          </div>
+
+          {/* Gruppen */}
+          <p style={{color:'rgba(255,255,255,0.35)',fontSize:'11px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1.2px',margin:'0 0 10px'}}>Meine Gruppen</p>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:'12px'}}>
+            {groups.map(group=>{
+              const subs=getSubgroupsForGroup(group.id);
+              const totalKids=subs.reduce((sum,sub)=>sum+getChildrenForSubgroup(sub.id).length,0);
+              return (
+                <div key={group.id} onClick={()=>{setActiveGroup(group);setView('group');}}
+                  style={{background:groupGradients[group.id]||'linear-gradient(135deg,#1a1a2e,#333)',borderRadius:'18px',padding:'22px',cursor:'pointer',border:`1px solid ${groupBorders[group.id]||'rgba(255,255,255,0.1)'}`,position:'relative',overflow:'hidden',transition:'transform 0.15s,box-shadow 0.15s'}}
+                  onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-3px)';e.currentTarget.style.boxShadow='0 12px 40px rgba(0,0,0,0.4)'}}
+                  onMouseLeave={e=>{e.currentTarget.style.transform='translateY(0)';e.currentTarget.style.boxShadow='none'}}>
+                  <div style={{position:'absolute',top:'-15px',right:'-10px',fontSize:'90px',opacity:0.07,lineHeight:1,userSelect:'none',pointerEvents:'none'}}>{group.emoji}</div>
+                  <p style={{margin:'0 0 8px',fontSize:'32px',lineHeight:1}}>{group.emoji}</p>
+                  <h2 style={{margin:'0 0 4px',color:'white',fontSize:'20px',fontWeight:'800',letterSpacing:'-0.3px'}}>{group.name}</h2>
+                  <p style={{margin:0,color:'rgba(255,255,255,0.5)',fontSize:'13px',fontWeight:'500'}}>{subs.length} {subs.length===1?'Gruppe':'Gruppen'} · {totalKids} {totalKids===1?'Kind':'Kinder'}</p>
+                  <ChevronRight size={16} color="rgba(255,255,255,0.3)" style={{position:'absolute',bottom:'22px',right:'18px'}}/>
+                </div>
+              );
+            })}
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
+  // ── STARTSEITE (Eltern/Jugendlich) ─────────────────────────────
   if (view==='home') return (
     <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
       {archiveTournDialog && <ArchiveTournDialog tournament={archiveTournDialog} onClose={()=>setArchiveTournDialog(null)} onConfirm={confirmArchiveTournament}/>}
       <Header/>
-      {(()=>{
-        const todayStr = new Date().toISOString().split('T')[0];
-        const in6 = new Date(); in6.setDate(in6.getDate()+6);
-        const in6Str = in6.toISOString().split('T')[0];
-        const allSess = getAllUpcomingSessions().filter(s=>canAccessSession(s)); // includes last 7 days
-        const pastSess    = canEdit() ? allSess.filter(s=>s.date<todayStr).sort((a,b)=>b.date.localeCompare(a.date)) : [];
-        const upcomingSess = allSess.filter(s=>s.date>=todayStr&&s.date<=in6Str);
-        if (!pastSess.length && !upcomingSess.length) return null;
-
-        const SessionCard = ({session, isPast}) => {
-          const sessionSubs=(session.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean);
-          const bgNormal = isPast ? '#fff5f5' : '#f0f9ff';
-          const bgHover  = isPast ? '#fee2e2' : '#e0f2fe';
-          const border   = isPast ? '1px solid #fca5a5' : '1px solid #bae6fd';
-          const chevColor= isPast ? '#dc2626' : '#0369a1';
-          // Attendance counts for past sessions
-          const allKids = isPast ? (session.subgroupIds||[]).flatMap(sid=>getChildrenForSubgroup(sid)) : [];
-          const recorded = isPast ? allKids.filter(c=>{const st=(children[c.id]?.attendance||{})[session.date]; return !!st;}).length : 0;
-          const archivable = isPast && isSessionArchivable(session);
-          return (
-            <div key={session.id}
-              onClick={()=>{ setActiveSession(session); setView('sessionAttendance'); }}
-              style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:bgNormal,borderRadius:'8px',border,cursor:'pointer'}}
-              onMouseEnter={e=>e.currentTarget.style.background=bgHover}
-              onMouseLeave={e=>e.currentTarget.style.background=bgNormal}>
-              <div style={{flex:1}}>
-                <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'4px',alignItems:'center'}}>
-                  {sessionSubs.map(sub=>{
-                    const grp=FIXED_GROUPS.find(g=>g.id===sub.groupId);
-                    return <span key={sub.id} style={{fontSize:'12px',fontWeight:'700',color:grp?.color}}>{grp?.emoji} {sub.name}</span>;
-                  })}
-                  {isPast&&<span style={{fontSize:'11px',fontWeight:'700',color:'white',background:'#dc2626',padding:'1px 6px',borderRadius:'20px'}}>Vergangen</span>}
-                  {archivable&&<span style={{fontSize:'11px',fontWeight:'700',color:'white',background:'#374151',padding:'1px 6px',borderRadius:'20px'}}>📦 Archivierbar</span>}
-                </div>
-                <span style={{fontSize:'13px',color:isPast?'#991b1b':'#555'}}>
-                  {new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})} · {session.time} Uhr
-                </span>
-                {session.trainer&&<span style={{fontSize:'12px',color:'#999',marginLeft:'8px'}}>· {session.trainer}</span>}
-                {isPast&&allKids.length>0&&<span style={{fontSize:'12px',color:'#9ca3af',marginLeft:'8px'}}>({recorded}/{allKids.length} erfasst)</span>}
-              </div>
-              <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                {session.info&&<Info size={16} color={chevColor}/>}
-                <ChevronRight size={16} color={chevColor}/>
-              </div>
-            </div>
-          );
-        };
-
-        return (
-          <div style={s.card}>
-            {pastSess.length>0&&(
-              <>
-                <h3 style={{margin:'0 0 10px',color:'#dc2626',display:'flex',alignItems:'center',gap:'8px',fontSize:'15px'}}><Calendar size={15}/> Vergangene Einheiten (letzte 7 Tage)</h3>
-                <div style={{display:'grid',gap:'6px',marginBottom:upcomingSess.length?'16px':0}}>
-                  {pastSess.map(s=><SessionCard key={s.id} session={s} isPast={true}/>)}
-                </div>
-              </>
-            )}
-            {upcomingSess.length>0&&(
-              <>
-                <h3 style={{margin:'0 0 10px',color:'#0369a1',display:'flex',alignItems:'center',gap:'8px',fontSize:'15px'}}><Calendar size={15}/> Trainings heute & nächste 6 Tage</h3>
-                <div style={{display:'grid',gap:'6px'}}>
-                  {upcomingSess.map(s=><SessionCard key={s.id} session={s} isPast={false}/>)}
-                </div>
-              </>
-            )}
-          </div>
-        );
-      })()}
-      {canEdit()&&(()=>{
-        const todayStr=new Date().toISOString().split('T')[0];
-        const in3m=new Date(); in3m.setMonth(in3m.getMonth()+3);
-        const in3mStr=in3m.toISOString().split('T')[0];
-        const tourneys=getUpcomingTournaments().filter(t=>(t.dateFrom||t.date||'')<=in3mStr);
-        if (!tourneys.length) return null;
-        return (
-          <div style={{...s.card,borderLeft:'5px solid #f59e0b',borderTop:'2px solid #fde68a'}}>
-            <h3 style={{margin:'0 0 12px',color:'#b45309',display:'flex',alignItems:'center',gap:'8px'}}><Trophy size={16}/> Turniere – nächste 3 Monate</h3>
-            <div style={{display:'grid',gap:'8px'}}>
-              {tourneys.map(t=>{
-                const from=t.dateFrom||t.date||''; const to=t.dateTo||from;
-                const dateLabel=to!==from
-                  ? `${new Date(from+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})} – ${new Date(to+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}`
-                  : new Date(from+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'});
-                const total=getTournamentParticipantIds(t).length;
-                const coming=Object.values(t.responses||{}).filter(r=>r==='coming').length;
-                const missing=Object.values(t.responses||{}).filter(r=>r==='missing').length;
-                const canArchive = isTournamentArchivable(t);
-                return (
-                  <div key={t.id} style={{padding:'10px 14px',background:'#fffbeb',borderRadius:'8px',border:'1px solid #fde68a'}}>
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer'}}
-                      onClick={()=>{setScrollToTournId(t.id); setView('turniere');}}
-                      onMouseEnter={e=>e.currentTarget.style.opacity='0.8'}
-                      onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
-                      <div>
-                        <p style={{margin:'0 0 2px',fontWeight:'700',color:'#92400e',fontSize:'14px'}}>🏆 {t.name}</p>
-                        <span style={{fontSize:'12px',color:'#555'}}>{dateLabel}</span>
-                        {t.location&&<span style={{fontSize:'12px',color:'#999',marginLeft:'8px'}}>· 📍 {t.location}</span>}
-                      </div>
-                      <div style={{display:'flex',alignItems:'center',gap:'10px',flexShrink:0}}>
-                        <span style={{fontSize:'12px',color:'#16a34a',fontWeight:'600'}}>✓ {coming}</span>
-                        <span style={{fontSize:'12px',color:'#dc2626',fontWeight:'600'}}>✗ {missing}</span>
-                        <span style={{fontSize:'12px',color:'#9ca3af'}}>– {total-coming-missing}</span>
-                        <ChevronRight size={15} color="#b45309"/>
-                      </div>
-                    </div>
-                    {canArchive&&(
-                      <div style={{marginTop:'8px',paddingTop:'8px',borderTop:'1px solid #fde68a'}}>
-                        <button onClick={e=>{e.stopPropagation();openArchiveTournDialog(t);}}
-                          style={{...s.btn('#374151',undefined,true),width:'100%',justifyContent:'center'}}>
-                          <Archive size={14}/> Turnier archivieren
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
       <div style={{display:'grid',gap:'14px'}}>
         {FIXED_GROUPS.filter(group=>canAccessGroup(group.id)).map(group=>{
           const subs=getSubgroupsForGroup(group.id);
