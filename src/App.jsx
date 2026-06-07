@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
-import { Check, X, Plus, Trash2, Download, ChevronDown, LogOut, ArrowLeft, Clock, BarChart2, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save, Trophy, Home, Archive } from 'lucide-react';
+import { Check, X, Plus, Trash2, Download, ChevronDown, LogOut, ArrowLeft, Clock, BarChart2, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save, Trophy, Home, Archive, MessageSquare, Bell, Send } from 'lucide-react';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCrx34HEgaHnRE187Cja4JNAtbexvrA6Vg",
@@ -389,6 +389,11 @@ export default function TrainingsApp() {
   const [editingArchivedTourn, setEditingArchivedTourn]     = useState(null); // tournament object or null
   const [scrollToTournId, setScrollToTournId]               = useState(null);
   const [achievementPopup, setAchievementPopup]             = useState(null);
+  const [notifications, setNotifications]                   = useState({});
+  const [notifComposeTarget, setNotifComposeTarget]         = useState('all'); // 'all' | subgroupId | childId
+  const [notifComposeText, setNotifComposeText]             = useState('');
+  const [notifComposeTitle, setNotifComposeTitle]           = useState('');
+  const [notifTab, setNotifTab]                             = useState('inbox'); // 'inbox' | 'trash'
 
   const [authMode, setAuthMode]           = useState('login');
   const [loginEmail, setLoginEmail]       = useState('');
@@ -417,11 +422,82 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','tournaments'),        s => setTournaments(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','archivedSessions'),   s => setArchivedSessions(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','archivedTournaments'),s => setArchivedTournaments(s.exists()?s.data():{})),
+      onSnapshot(doc(db,'ttc','notifications'),      s => setNotifications(s.exists()?s.data():{})),
     ];
     if (userRole==='admin')
       unsubs.push(onSnapshot(doc(db,'ttc','users'), s => setAllUsers(s.exists()?s.data():{})));
     return () => unsubs.forEach(u=>u());
   }, [user, userRole]);
+
+  // ── Auto-Notifications ──────────────────────────────────────
+  useEffect(() => {
+    if (!canEdit() && !['eltern','jugendlich'].includes(userRole)) return;
+    if (Object.keys(children).length === 0) return;
+    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+
+    // 1. Turnier-Erinnerung: 7 Tage vorher, wenn keine Antwort
+    Object.values(tournaments).forEach(t => {
+      const startDate = t.dateFrom || t.date || '';
+      if (!startDate) return;
+      const tournDay = new Date(startDate + 'T12:00:00');
+      const daysUntil = Math.round((tournDay - now) / 86400000);
+      if (daysUntil < 0 || daysUntil > 7) return;
+      (t.konkurrenzen||[]).forEach(konk => {
+        (konk.participantIds||[]).forEach(childId => {
+          const resp = (t.responses||{})[childId];
+          if (resp) return; // already answered
+          const key = `tourn_reminder_${t.id}_${childId}`;
+          const child = children[childId]; if (!child) return;
+          createNotification(childId, 'tournament_reminder',
+            `⚠️ Turnieranmeldung ausstehend`,
+            `Das Turnier „${t.name}" beginnt ${daysUntil === 0 ? 'heute' : `in ${daysUntil} Tag${daysUntil===1?'':'en'}`}. Bitte Antwort für „${konk.name}" eintragen!`,
+            key
+          );
+        });
+      });
+    });
+
+    // 2. Training-Erinnerung: 1 Tag vorher, wenn keine Antwort
+    Object.values(sessions).forEach(sess => {
+      const sessDay = new Date(sess.date + 'T12:00:00');
+      const daysUntil = Math.round((sessDay - now) / 86400000);
+      if (daysUntil !== 1) return;
+      (sess.subgroupIds||[]).forEach(subgroupId => {
+        getChildrenForSubgroup(subgroupId).forEach(child => {
+          const resp = (sess.responses||{})[child.id];
+          if (resp) return;
+          const key = `training_reminder_${sess.id}_${child.id}`;
+          const dateStr = new Date(sess.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'});
+          createNotification(child.id, 'training_reminder',
+            `📅 Training morgen`,
+            `Das Training am ${dateStr} um ${sess.time} Uhr steht an. Bitte An- oder Abmeldung eintragen!`,
+            key
+          );
+        });
+      });
+    });
+
+    // 3. 3× unentschuldigt ohne Eltern-Rückmeldung
+    Object.values(children).forEach(child => {
+      const allSess = [...Object.values(sessions), ...Object.values(archivedSessions)]
+        .filter(s => (s.subgroupIds||[]).includes(child.subgroupId));
+      const unexcusedNoReply = allSess.filter(s => {
+        const att = (child.attendance||{})[s.date];
+        const resp = (s.responses||{})[child.id];
+        return att === 'absent_unexcused' && !resp;
+      });
+      if (unexcusedNoReply.length >= 3) {
+        const key = `unexcused_${child.id}_${unexcusedNoReply.length}`;
+        createNotification(child.id, 'unexcused_absences',
+          `❗ Fehlzeiten ohne Rückmeldung`,
+          `${child.name} hat ${unexcusedNoReply.length} mal unentschuldigt gefehlt, ohne Rückmeldung. Bitte tragt euch rechtzeitig aus, wenn ihr nicht kommen könnt!`,
+          key
+        );
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessions, tournaments, children, archivedSessions]);
 
   // Scroll to tournament when navigating from home → Turnierwelt
   useEffect(() => {
@@ -438,6 +514,62 @@ export default function TrainingsApp() {
   const saveTournaments        = u => { setTournaments(u);        setDoc(doc(db,'ttc','tournaments'),        u); };
   const saveArchivedSessions   = u => { setArchivedSessions(u);   setDoc(doc(db,'ttc','archivedSessions'),   u); };
   const saveArchivedTournaments= u => { setArchivedTournaments(u);setDoc(doc(db,'ttc','archivedTournaments'),u); };
+  const saveNotifications      = u => { setNotifications(u);      setDoc(doc(db,'ttc','notifications'),      u); };
+
+  // ── Notification Helpers ─────────────────────────────────────
+  const createNotification = (childId, type, title, message, key=null) => {
+    const now = new Date().toISOString();
+    // Dedup: if key already exists as active notif → skip
+    if (key) {
+      const exists = Object.values(notifications).some(n => n.key===key && !n.trashedAt);
+      if (exists) return;
+    }
+    const id = 'notif_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+    const notif = { id, childId, type, title, message, createdAt: now, trashedAt: null, key };
+    saveNotifications({ ...notifications, [id]: notif });
+  };
+
+  const trashNotification = (id) => {
+    const n = notifications[id]; if (!n) return;
+    saveNotifications({ ...notifications, [id]: { ...n, trashedAt: new Date().toISOString() } });
+  };
+
+  const restoreNotification = (id) => {
+    const n = notifications[id]; if (!n) return;
+    saveNotifications({ ...notifications, [id]: { ...n, trashedAt: null } });
+  };
+
+  const deleteNotificationPermanently = (id) => {
+    const u = { ...notifications }; delete u[id]; saveNotifications(u);
+  };
+
+  // Cleanup expired notifications (called lazily on read)
+  const getCleanedNotifications = (childId) => {
+    const now = new Date();
+    const toDelete = [];
+    const active = [];
+    const trashed = [];
+    Object.values(notifications).forEach(n => {
+      if (n.childId !== childId) return;
+      const created = new Date(n.createdAt);
+      const daysSinceCreated = (now - created) / 86400000;
+      if (n.trashedAt) {
+        const trashDate = new Date(n.trashedAt);
+        const daysTrashed = (now - trashDate) / 86400000;
+        if (daysTrashed >= 7) { toDelete.push(n.id); }
+        else trashed.push(n);
+      } else {
+        if (daysSinceCreated >= 14) { toDelete.push(n.id); }
+        else active.push(n);
+      }
+    });
+    if (toDelete.length > 0) {
+      const u = { ...notifications };
+      toDelete.forEach(id => delete u[id]);
+      saveNotifications(u);
+    }
+    return { active: active.sort((a,b)=>b.createdAt.localeCompare(a.createdAt)), trashed: trashed.sort((a,b)=>b.trashedAt.localeCompare(a.trashedAt)) };
+  };
 
   const canEdit = () => ['admin','trainer'].includes(userRole);
   const getSubgroupsForGroup = gid => Object.values(subgroups).filter(s=>s.groupId===gid);
@@ -1024,6 +1156,15 @@ export default function TrainingsApp() {
             {canEdit()&&<button onClick={()=>setView('turniere')} style={s.btn('#b45309')}><Trophy size={16}/> Turniere</button>}
             {canEdit()&&<button onClick={()=>setView('archiv')} style={s.btn('#374151')}><Archive size={16}/> Archiv</button>}
             {canEdit()&&<button onClick={()=>setView('achievements')} style={s.btn('#7c3aed')}>🏅 Errungenschaften</button>}
+            {canEdit()&&(()=>{
+              const unreadCount = Object.values(notifications).filter(n=>!n.trashedAt).length;
+              return (
+                <button onClick={()=>setView('notifications')} style={{...s.btn('#059669'),position:'relative'}} title="Benachrichtigungen">
+                  <MessageSquare size={16}/>
+                  {unreadCount>0&&<span style={{position:'absolute',top:'-6px',right:'-6px',background:'#dc2626',color:'white',borderRadius:'50%',width:'18px',height:'18px',fontSize:'10px',fontWeight:'700',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>{unreadCount>9?'9+':unreadCount}</span>}
+                </button>
+              );
+            })()}
             <button onClick={()=>signOut(auth)} style={s.btn('#ef4444')}><LogOut size={16}/></button>
           </div>
         </div>
@@ -1490,6 +1631,66 @@ export default function TrainingsApp() {
       <div style={s.page(activeGroup?.color)}><div style={s.wrap}>
         <AchievementPopup data={achievementPopup} onClose={()=>setAchievementPopup(null)}/>
         <Header/>
+
+        {/* ── Benachrichtigungen ── */}
+        {myChild && (()=>{
+          const { active, trashed } = getCleanedNotifications(myChild.id);
+          const showTrash = notifTab === 'trash';
+          const items = showTrash ? trashed : active;
+          if (active.length === 0 && !showTrash) return null;
+          return (
+            <div style={{...s.card, borderLeft:'4px solid #059669', padding:'16px 20px'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px',flexWrap:'wrap',gap:'8px'}}>
+                <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                  <Bell size={18} color="#059669"/>
+                  <h3 style={{margin:0,color:'#065f46',fontSize:'16px'}}>Benachrichtigungen</h3>
+                  {active.length>0&&<span style={{background:'#059669',color:'white',borderRadius:'50%',width:'20px',height:'20px',fontSize:'11px',fontWeight:'700',display:'flex',alignItems:'center',justifyContent:'center'}}>{active.length}</span>}
+                </div>
+                <div style={{display:'flex',gap:'6px'}}>
+                  <button onClick={()=>setNotifTab('inbox')} style={{padding:'4px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'600',fontSize:'12px',background:notifTab==='inbox'?'#059669':'#f3f4f6',color:notifTab==='inbox'?'white':'#555'}}>Posteingang</button>
+                  <button onClick={()=>setNotifTab('trash')} style={{padding:'4px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'600',fontSize:'12px',background:notifTab==='trash'?'#374151':'#f3f4f6',color:notifTab==='trash'?'white':'#555'}}>🗑️ Papierkorb {trashed.length>0&&`(${trashed.length})`}</button>
+                </div>
+              </div>
+              {items.length === 0
+                ? <p style={{color:'#9ca3af',fontSize:'13px',margin:0,textAlign:'center',padding:'8px 0'}}>{showTrash?'Papierkorb ist leer.':'Keine neuen Benachrichtigungen.'}</p>
+                : <div style={{display:'grid',gap:'8px'}}>
+                    {items.map(n=>{
+                      const typeColors = {
+                        achievement: {bg:'#f0fdf4',border:'#16a34a',icon:'🏅'},
+                        tournament_reminder: {bg:'#fffbeb',border:'#f59e0b',icon:'🏆'},
+                        training_reminder: {bg:'#eff6ff',border:'#3b82f6',icon:'📅'},
+                        unexcused_absences: {bg:'#fef2f2',border:'#ef4444',icon:'❗'},
+                        trainer_message: {bg:'#faf5ff',border:'#8b5cf6',icon:'💬'},
+                      };
+                      const cfg = typeColors[n.type] || {bg:'#f9fafb',border:'#e5e7eb',icon:'🔔'};
+                      const dateStr = new Date(n.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+                      return (
+                        <div key={n.id} style={{background:cfg.bg,border:`1px solid ${cfg.border}`,borderRadius:'10px',padding:'12px 14px',display:'flex',alignItems:'flex-start',gap:'10px'}}>
+                          <span style={{fontSize:'20px',flexShrink:0,marginTop:'1px'}}>{cfg.icon}</span>
+                          <div style={{flex:1,minWidth:0}}>
+                            <p style={{margin:'0 0 3px',fontWeight:'700',fontSize:'14px',color:'#1f2937'}}>{n.title}</p>
+                            <p style={{margin:'0 0 5px',fontSize:'13px',color:'#374151',lineHeight:'1.4'}}>{n.message}</p>
+                            <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>{dateStr}</p>
+                          </div>
+                          {showTrash
+                            ? <div style={{display:'flex',gap:'4px',flexShrink:0}}>
+                                <button onClick={()=>restoreNotification(n.id)} title="Wiederherstellen"
+                                  style={{padding:'4px 8px',background:'#f0fdf4',border:'none',borderRadius:'6px',cursor:'pointer',color:'#16a34a',fontSize:'12px',fontWeight:'600'}}>↩</button>
+                                <button onClick={()=>deleteNotificationPermanently(n.id)} title="Endgültig löschen"
+                                  style={{padding:'4px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626'}}><Trash2 size={14}/></button>
+                              </div>
+                            : <button onClick={()=>trashNotification(n.id)} title="In Papierkorb"
+                                style={{padding:'4px',background:'rgba(0,0,0,0.06)',border:'none',borderRadius:'6px',cursor:'pointer',color:'#6b7280',flexShrink:0}}><X size={16}/></button>
+                          }
+                        </div>
+                      );
+                    })}
+                  </div>
+              }
+            </div>
+          );
+        })()}
+
         {!myChild
           ? <div style={{...s.card,textAlign:'center',padding:'40px'}}><p style={{fontSize:'18px',color:'#666'}}>Dein Account ist noch keinem Kind zugeordnet.</p><p style={{color:'#999',fontSize:'14px'}}>Bitte wende dich an den Trainer oder Admin.</p></div>
           : <>
@@ -2655,10 +2856,25 @@ export default function TrainingsApp() {
                 const ttrUnlocked = ach.ttrUnlocked || [];
 
                 const toggleTTR = (val) => {
-                  const next = ttrUnlocked.includes(val) ? ttrUnlocked.filter(v=>v!==val) : [...ttrUnlocked, val];
+                  const wasUnlocked = ttrUnlocked.includes(val);
+                  const next = wasUnlocked ? ttrUnlocked.filter(v=>v!==val) : [...ttrUnlocked, val];
                   saveChildAchievements(child.id, {...ach, ttrUnlocked: next});
+                  if (!wasUnlocked) {
+                    createNotification(child.id, 'achievement', '🏓 TTR-Meilenstein erreicht!',
+                      `Glückwunsch ${child.name}! Du hast einen TTR-Wert von ${val} erreicht. ${ACHIEVEMENT_DESCRIPTIONS.ttr(val)}`);
+                  }
                 };
-                const incField = (field) => saveChildAchievements(child.id, {...ach, [field]: (ach[field]||0)+1});
+                const ACH_LABELS = {
+                  einzel1:'🥇 1. Platz Einzel', einzel2:'🥈 2. Platz Einzel', einzel3:'🥉 3. Platz Einzel',
+                  doppel1:'🥇 1. Platz Doppel', doppel2:'🥈 2. Platz Doppel', doppel3:'🥉 3. Platz Doppel',
+                  team:'🏆 Mannschaftsmeister', spielerDesMonats:'⭐ Spieler des Monats',
+                };
+                const incField = (field) => {
+                  saveChildAchievements(child.id, {...ach, [field]: (ach[field]||0)+1});
+                  const label = ACH_LABELS[field] || field;
+                  createNotification(child.id, 'achievement', `${label}`,
+                    `Glückwunsch ${child.name}! Du hast eine neue Errungenschaft erhalten: ${label}. Weiter so! 🎉`);
+                };
                 const decField = (field) => saveChildAchievements(child.id, {...ach, [field]: Math.max(0,(ach[field]||0)-1)});
 
                 return (
@@ -2725,6 +2941,132 @@ export default function TrainingsApp() {
           }
         </div>
       </div>
+    );
+  }
+
+  // ── BENACHRICHTIGUNGEN VIEW (Trainer/Admin) ─────────────────────────────
+  if (view === 'notifications' && canEdit()) {
+    const allKids = Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+    const allSubs = Object.values(subgroups).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+
+    const sendTrainerNotif = () => {
+      if (!notifComposeTitle.trim() || !notifComposeText.trim()) { alert('Bitte Titel und Text eingeben!'); return; }
+      let targets = [];
+      if (notifComposeTarget === 'all') {
+        targets = allKids.map(c=>c.id);
+      } else if (notifComposeTarget.startsWith('sub_')) {
+        const subId = notifComposeTarget.replace('sub_','');
+        targets = allKids.filter(c=>c.subgroupId===subId).map(c=>c.id);
+      } else {
+        targets = [notifComposeTarget];
+      }
+      const now = new Date().toISOString();
+      const updated = { ...notifications };
+      targets.forEach(childId => {
+        const id = 'notif_' + Date.now() + '_' + Math.random().toString(36).slice(2,6) + '_' + childId;
+        updated[id] = { id, childId, type:'trainer_message', title:notifComposeTitle.trim(), message:notifComposeText.trim(), createdAt:now, trashedAt:null, key:null };
+      });
+      saveNotifications(updated);
+      setNotifComposeTitle('');
+      setNotifComposeText('');
+      alert(`✅ Nachricht an ${targets.length} Empfänger gesendet!`);
+    };
+
+    // Alle aktiven Notifs gruppiert nach Kind
+    const activeByChild = {};
+    Object.values(notifications).filter(n=>!n.trashedAt).forEach(n => {
+      if (!activeByChild[n.childId]) activeByChild[n.childId] = [];
+      activeByChild[n.childId].push(n);
+    });
+    const totalActive = Object.values(notifications).filter(n=>!n.trashedAt).length;
+    const totalTrashed = Object.values(notifications).filter(n=>!!n.trashedAt).length;
+
+    return (
+      <div style={s.page()}><div style={s.wrap}>
+        <Header back backLabel="Zurück" backAction={()=>setView('home')}/>
+
+        {/* Compose */}
+        <div style={s.card}>
+          <h3 style={{margin:'0 0 16px',color:'#059669',display:'flex',alignItems:'center',gap:'8px'}}><Send size={18}/> Nachricht senden</h3>
+          <div style={{display:'grid',gap:'10px'}}>
+            <div>
+              <label style={s.label}>Empfänger</label>
+              <select value={notifComposeTarget} onChange={e=>setNotifComposeTarget(e.target.value)}
+                style={{...s.input,flex:'none',width:'100%'}}>
+                <option value="all">📢 Alle Kinder</option>
+                {allSubs.map(sub=>{
+                  const grp=FIXED_GROUPS.find(g=>g.id===sub.groupId);
+                  return <option key={sub.id} value={`sub_${sub.id}`}>{grp?.emoji} {sub.name} (Gruppe)</option>;
+                })}
+                {allKids.map(child=>{
+                  const sub2=subgroups[child.subgroupId];
+                  return <option key={child.id} value={child.id}>👤 {child.name} ({sub2?.name||'?'})</option>;
+                })}
+              </select>
+            </div>
+            <div>
+              <label style={s.label}>Titel</label>
+              <input value={notifComposeTitle} onChange={e=>setNotifComposeTitle(e.target.value)}
+                placeholder="z.B. Training fällt aus" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/>
+            </div>
+            <div>
+              <label style={s.label}>Nachricht</label>
+              <textarea value={notifComposeText} onChange={e=>setNotifComposeText(e.target.value)}
+                placeholder="Nachrichtentext..." rows={3}
+                style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box',resize:'vertical'}}/>
+            </div>
+            <button onClick={sendTrainerNotif} style={{...s.btn('#059669'),alignSelf:'flex-start'}}>
+              <Send size={16}/> Senden
+            </button>
+          </div>
+        </div>
+
+        {/* Übersicht gesendeter Nachrichten */}
+        <div style={s.card}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'14px',flexWrap:'wrap',gap:'8px'}}>
+            <h3 style={{margin:0,color:'#333',display:'flex',alignItems:'center',gap:'8px'}}><Bell size={18}/> Übersicht</h3>
+            <div style={{display:'flex',gap:'8px',fontSize:'12px',color:'#6b7280'}}>
+              <span style={{background:'#dcfce7',color:'#16a34a',padding:'3px 10px',borderRadius:'20px',fontWeight:'600'}}>Aktiv: {totalActive}</span>
+              <span style={{background:'#f3f4f6',color:'#6b7280',padding:'3px 10px',borderRadius:'20px',fontWeight:'600'}}>Papierkorb: {totalTrashed}</span>
+            </div>
+          </div>
+          {allKids.filter(c=>activeByChild[c.id]?.length>0).length===0
+            ? <p style={{color:'#9ca3af',textAlign:'center',padding:'20px',margin:0}}>Keine aktiven Benachrichtigungen.</p>
+            : allKids.filter(c=>activeByChild[c.id]?.length>0).map(child=>{
+                const sub2=subgroups[child.subgroupId];
+                const grp2=FIXED_GROUPS.find(g=>g.id===sub2?.groupId);
+                const notifs=(activeByChild[child.id]||[]).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+                return (
+                  <div key={child.id} style={{marginBottom:'12px',border:'1px solid #e5e7eb',borderRadius:'10px',overflow:'hidden'}}>
+                    <div style={{background:'#f9fafb',padding:'8px 12px',display:'flex',alignItems:'center',gap:'8px'}}>
+                      <span style={{fontWeight:'700',fontSize:'14px',color:'#1f2937'}}>{child.name}</span>
+                      <span style={{fontSize:'11px',color:'#6b7280'}}>{grp2?.emoji} {sub2?.name}</span>
+                      <span style={{marginLeft:'auto',background:'#059669',color:'white',borderRadius:'20px',padding:'2px 8px',fontSize:'11px',fontWeight:'700'}}>{notifs.length}</span>
+                    </div>
+                    <div style={{padding:'8px 12px',display:'grid',gap:'6px'}}>
+                      {notifs.map(n=>{
+                        const typeLabels={achievement:'🏅',tournament_reminder:'🏆',training_reminder:'📅',unexcused_absences:'❗',trainer_message:'💬'};
+                        const dateStr=new Date(n.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+                        return (
+                          <div key={n.id} style={{display:'flex',alignItems:'flex-start',gap:'8px',padding:'8px 10px',background:'white',borderRadius:'8px',border:'1px solid #f3f4f6'}}>
+                            <span style={{fontSize:'16px',flexShrink:0}}>{typeLabels[n.type]||'🔔'}</span>
+                            <div style={{flex:1,minWidth:0}}>
+                              <p style={{margin:'0 0 2px',fontWeight:'700',fontSize:'13px',color:'#1f2937'}}>{n.title}</p>
+                              <p style={{margin:'0 0 3px',fontSize:'12px',color:'#374151',lineHeight:'1.4'}}>{n.message}</p>
+                              <p style={{margin:0,fontSize:'10px',color:'#9ca3af'}}>{dateStr}</p>
+                            </div>
+                            <button onClick={()=>deleteNotificationPermanently(n.id)} title="Löschen"
+                              style={{padding:'3px',background:'none',border:'none',cursor:'pointer',color:'#9ca3af',flexShrink:0}}><X size={14}/></button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })
+          }
+        </div>
+      </div></div>
     );
   }
 
