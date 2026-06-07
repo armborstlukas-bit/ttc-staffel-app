@@ -2249,7 +2249,7 @@ export default function TrainingsApp() {
                   </Sec>
 
                   <Sec title="📅 Trainings-Meilensteine">
-                    {[10,25,50,100,200].map(m=>{
+                    {[10,25,50,100,200,500,1000].map(m=>{
                       const has = totalTrainings>=m;
                       return <Tile key={m} icon="🏋️" label={`${m} Trainings`} sub={has?`✓`:`${totalTrainings}/${m}`}
                         has={has} activeBg="#f0fdf4" activeBorder="#16a34a" activeTextColor="#15803d"
@@ -3119,7 +3119,7 @@ export default function TrainingsApp() {
 
                 {/* Trainings-Meilensteine */}
                 <Sec title="Trainings-Meilensteine">
-                  {[10,25,50,100,200].map(m=>{
+                  {[10,25,50,100,200,500,1000].map(m=>{
                     const has=totalTrainings>=m;
                     return <SmTile key={m} icon="🏋️" label={`${m}×`} sub={has?'✓':`${totalTrainings}/${m}`}
                       has={has} activeBg="#f0fdf4" activeBorder="#16a34a" activeTextColor="#15803d"
