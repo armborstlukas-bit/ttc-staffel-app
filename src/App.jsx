@@ -395,6 +395,7 @@ export default function TrainingsApp() {
   const [notifications, setNotifications]                   = useState({});
   const [teams, setTeams]                                   = useState({});
   const [matchdays, setMatchdays]                           = useState({});
+  const [appSettings, setAppSettings]                       = useState({mannschaftEnabled: true});
   const [notifComposeTarget, setNotifComposeTarget]         = useState('all'); // 'all' | subgroupId | childId
   const [notifComposeText, setNotifComposeText]             = useState('');
   const [notifComposeTitle, setNotifComposeTitle]           = useState('');
@@ -489,6 +490,7 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','notifications'),      s => setNotifications(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','teams'),              s => setTeams(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','matchdays'),          s => setMatchdays(s.exists()?s.data():{})),
+      onSnapshot(doc(db,'ttc','appSettings'),        s => setAppSettings(s.exists()?{mannschaftEnabled:true,...s.data()}:{mannschaftEnabled:true})),
     ];
     if (userRole==='admin')
       unsubs.push(onSnapshot(doc(db,'ttc','users'), s => setAllUsers(s.exists()?s.data():{})));
@@ -654,6 +656,7 @@ export default function TrainingsApp() {
   const saveNotifications      = u => { setNotifications(u);      setDoc(doc(db,'ttc','notifications'),      u); };
   const saveTeams              = u => { setTeams(u);              setDoc(doc(db,'ttc','teams'),              u); };
   const saveMatchdays          = u => { setMatchdays(u);          setDoc(doc(db,'ttc','matchdays'),          u); };
+  const saveAppSettings        = u => { setAppSettings(u);        setDoc(doc(db,'ttc','appSettings'),        u); };
 
   // ── Notification Helpers ─────────────────────────────────────
   const createNotification = (childId, type, title, message, key=null) => {
@@ -1455,7 +1458,7 @@ export default function TrainingsApp() {
             {canEdit()&&<button onClick={()=>setView('turniere')} style={s.btn('#b45309')}><Trophy size={16}/> Turniere</button>}
             {canEdit()&&<button onClick={()=>setView('archiv')} style={s.btn('#374151')}><Archive size={16}/> Archiv</button>}
             {canEdit()&&<button onClick={()=>setView('achievements')} style={s.btn('#7c3aed')}>🏅 Errungenschaften</button>}
-            {canEdit()&&<button onClick={()=>setView('mannschaft')} style={s.btn('#0f766e')}>⚽ Mannschaft</button>}
+            {canEdit()&&appSettings.mannschaftEnabled&&<button onClick={()=>setView('mannschaft')} style={s.btn('#0f766e')}>⚽ Mannschaft</button>}
             {canEdit()&&(()=>{
               // Badge = nur eingehende Eltern-Nachrichten für zugängliche Gruppen
               const unreadCount = Object.values(notifications).filter(n =>
@@ -2145,7 +2148,7 @@ export default function TrainingsApp() {
             </div>
 
             {/* Mannschaftsspiele */}
-            {(()=>{
+            {appSettings.mannschaftEnabled&&(()=>{
               const myTeam = Object.values(teams).find(t=>(t.childIds||[]).includes(myChild.id));
               const today = new Date().toISOString().split('T')[0];
               const upcomingMds = myTeam
@@ -2680,7 +2683,26 @@ export default function TrainingsApp() {
 
         {/* ── Mannschaften verwalten ── */}
         <div style={s.card}>
-          <h3 style={{margin:'0 0 16px',color:'#0f766e',display:'flex',alignItems:'center',gap:'8px'}}>⚽ Mannschaften verwalten</h3>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px',flexWrap:'wrap',gap:'10px'}}>
+            <h3 style={{margin:0,color:'#0f766e',display:'flex',alignItems:'center',gap:'8px'}}>⚽ Mannschaften verwalten</h3>
+            <button
+              onClick={()=>saveAppSettings({...appSettings,mannschaftEnabled:!appSettings.mannschaftEnabled})}
+              style={{display:'flex',alignItems:'center',gap:'8px',padding:'8px 16px',borderRadius:'10px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:'13px',
+                background:appSettings.mannschaftEnabled?'#ccfbf1':'#fee2e2',
+                color:appSettings.mannschaftEnabled?'#0f766e':'#dc2626',
+                transition:'all 0.2s'}}>
+              <span style={{width:'32px',height:'18px',borderRadius:'9px',background:appSettings.mannschaftEnabled?'#0f766e':'#dc2626',display:'inline-flex',alignItems:'center',padding:'2px',transition:'all 0.2s',position:'relative'}}>
+                <span style={{width:'14px',height:'14px',borderRadius:'50%',background:'white',display:'block',position:'absolute',transition:'all 0.2s',left:appSettings.mannschaftEnabled?'16px':'2px'}}/>
+              </span>
+              {appSettings.mannschaftEnabled ? 'Funktion aktiv' : 'Funktion deaktiviert'}
+            </button>
+          </div>
+          {!appSettings.mannschaftEnabled&&(
+            <div style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:'10px',padding:'16px',textAlign:'center',color:'#dc2626',fontSize:'13px',fontWeight:'600'}}>
+              🚫 Die Mannschaftsfunktion ist deaktiviert. Für alle Nutzer ausgeblendet.
+            </div>
+          )}
+          {appSettings.mannschaftEnabled&&<>
 
           {/* Neue Mannschaft anlegen / bearbeiten */}
           {(()=>{
@@ -2760,6 +2782,7 @@ export default function TrainingsApp() {
                 );
               })
           }
+          </>}
         </div>
 
       </div></div>
@@ -3861,7 +3884,7 @@ export default function TrainingsApp() {
   }
 
   // ── MANNSCHAFT VIEW (Trainer/Admin) ─────────────────────────────────────
-  if (view === 'mannschaft' && canEdit()) {
+  if (view === 'mannschaft' && canEdit() && appSettings.mannschaftEnabled) {
     const myTeams = userRole==='admin'
       ? Object.values(teams)
       : Object.values(teams).filter(t=>(t.trainerUids||[]).includes(user?.uid));
