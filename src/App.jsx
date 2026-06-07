@@ -1925,10 +1925,11 @@ export default function TrainingsApp() {
           : <>
 
             {/* Kommende Trainings */}
-            {mySessions.length>0&&(
-              <div style={{...s.card,borderLeft:'5px solid #358941',borderTop:'2px solid #bbf7d0'}}>
-                <h3 style={{margin:'0 0 16px',color:'#358941',display:'flex',alignItems:'center',gap:'8px'}}><Calendar size={18}/> Kommende 10 Trainings</h3>
-                <div style={{display:'grid',gap:'10px'}}>
+            <div style={{...s.card,borderLeft:'5px solid #358941',borderTop:'2px solid #bbf7d0'}}>
+              <h3 style={{margin:'0 0 16px',color:'#358941',display:'flex',alignItems:'center',gap:'8px'}}><Calendar size={18}/> Kommende 10 Trainings</h3>
+              {mySessions.length===0
+                ? <p style={{color:'#9ca3af',fontSize:'13px',margin:0,textAlign:'center',padding:'8px 0'}}>Kein Training in den nächsten 7 Tagen.</p>
+                : <div style={{display:'grid',gap:'10px'}}>
                   {mySessions.slice(0,10).map(session=>{
                     const childId=myChild.id;
                     const myResponse=(session.responses||{})[childId];
@@ -1962,8 +1963,8 @@ export default function TrainingsApp() {
                     );
                   })}
                 </div>
-              </div>
-            )}
+              }
+            </div>
 
             {/* Trainings-Verlauf (einklappbar) */}
             <div style={s.card}>
@@ -2015,11 +2016,12 @@ export default function TrainingsApp() {
             {/* Kommende Turniere */}
             {(()=>{
               const myTournaments = getMyUpcomingTournaments();
-              if (!myTournaments.length) return null;
               return (
                 <div style={{...s.card,borderLeft:'5px solid #f59e0b',borderTop:'2px solid #fde68a'}}>
                   <h3 style={{margin:'0 0 16px',color:'#b45309',display:'flex',alignItems:'center',gap:'8px'}}><Trophy size={18}/> Kommende Turniere</h3>
-                  <div style={{display:'grid',gap:'12px'}}>
+                  {myTournaments.length===0
+                    ? <p style={{color:'#9ca3af',fontSize:'13px',margin:0,textAlign:'center',padding:'8px 0'}}>Kein Turnier in den nächsten 3 Monaten.</p>
+                    : <div style={{display:'grid',gap:'12px'}}>
                     {myTournaments.map(t=>{
                       const childId = myChild.id;
                       const myResponse = (t.responses||{})[childId];
@@ -2068,7 +2070,7 @@ export default function TrainingsApp() {
                         </div>
                       );
                     })}
-                  </div>
+                  </div>}
                 </div>
               );
             })()}
