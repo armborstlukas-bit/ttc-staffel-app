@@ -443,7 +443,7 @@ export default function TrainingsApp() {
       const exists = Object.values(updatedNotifs).some(n => n.key === key && !n.trashedAt);
       if (exists) return;
       const id = 'notif_' + Date.now() + '_' + Math.random().toString(36).slice(2,6) + '_' + childId;
-      updatedNotifs[id] = { id, childId, type, title, message, createdAt: now.toISOString(), trashedAt: null, key, batchId: null, trainerTrashedAt: null };
+      updatedNotifs[id] = { id, childId, type, title, message, createdAt: now.toISOString(), trashedAt: null, key, batchId: null, trainerTrashedAt: {}, trainerDeletedBy: {} };
       changed = true;
     };
 
@@ -558,7 +558,7 @@ export default function TrainingsApp() {
       if (exists) return;
     }
     const id = 'notif_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
-    const notif = { id, childId, type, title, message, createdAt: now, trashedAt: null, key, batchId: null, trainerTrashedAt: null };
+    const notif = { id, childId, type, title, message, createdAt: now, trashedAt: null, key, batchId: null, trainerTrashedAt: {}, trainerDeletedBy: {} };
     saveNotifications({ ...notifications, [id]: notif });
   };
 
@@ -575,26 +575,51 @@ export default function TrainingsApp() {
     const u = { ...notifications }; delete u[id]; saveNotifications(u);
   };
 
-  // Trainer-side trash: moves entire batchId to trainer trash, does NOT touch child's trashedAt
+  // Trainer-side trash: per-user uid maps, does NOT touch child's trashedAt
+  // trainerTrashedAt: { [uid]: isoString }
+  // trainerDeletedBy: { [uid]: true }
   const trainerTrashBatch = (batchId) => {
+    if (!user?.uid) return;
     const now = new Date().toISOString();
     const u = { ...notifications };
     Object.values(u).forEach(n => {
-      if (n.batchId === batchId && !n.trainerTrashedAt)
-        u[n.id] = { ...n, trainerTrashedAt: now };
+      if (n.batchId !== batchId) return;
+      const tta = typeof n.trainerTrashedAt === 'object' && n.trainerTrashedAt ? { ...n.trainerTrashedAt } : {};
+      const tdb = typeof n.trainerDeletedBy === 'object' && n.trainerDeletedBy ? { ...n.trainerDeletedBy } : {};
+      if (!tdb[user.uid] && !tta[user.uid])
+        u[n.id] = { ...n, trainerTrashedAt: { ...tta, [user.uid]: now }, trainerDeletedBy: tdb };
     });
     saveNotifications(u);
   };
   const trainerRestoreBatch = (batchId) => {
+    if (!user?.uid) return;
     const u = { ...notifications };
     Object.values(u).forEach(n => {
-      if (n.batchId === batchId) u[n.id] = { ...n, trainerTrashedAt: null };
+      if (n.batchId !== batchId) return;
+      const tta = typeof n.trainerTrashedAt === 'object' && n.trainerTrashedAt ? { ...n.trainerTrashedAt } : {};
+      delete tta[user.uid];
+      u[n.id] = { ...n, trainerTrashedAt: tta };
     });
     saveNotifications(u);
   };
   const trainerDeleteBatch = (batchId) => {
+    if (!user?.uid) return;
     const u = { ...notifications };
-    Object.keys(u).forEach(id => { if (u[id].batchId === batchId) delete u[id]; });
+    Object.values(u).forEach(n => {
+      if (n.batchId !== batchId) return;
+      const tdb = typeof n.trainerDeletedBy === 'object' && n.trainerDeletedBy ? { ...n.trainerDeletedBy } : {};
+      const tta = typeof n.trainerTrashedAt === 'object' && n.trainerTrashedAt ? { ...n.trainerTrashedAt } : {};
+      delete tta[user.uid];
+      u[n.id] = { ...n, trainerDeletedBy: { ...tdb, [user.uid]: true }, trainerTrashedAt: tta };
+    });
+    saveNotifications(u);
+  };
+
+  // Admin: delete ALL trainer_message notifications (cleanup old stuck messages)
+  const adminDeleteAllTrainerMessages = () => {
+    if (!window.confirm('Alle manuell gesendeten Nachrichten (trainer_message) aus allen Accounts löschen? Automatische Benachrichtigungen bleiben erhalten.')) return;
+    const u = {};
+    Object.values(notifications).forEach(n => { if (n.type !== 'trainer_message') u[n.id] = n; });
     saveNotifications(u);
   };
 
@@ -2150,9 +2175,19 @@ export default function TrainingsApp() {
           <p style={{margin:'0 0 16px',color:'#666',fontSize:'14px'}}>
             Diese Aktion löscht <strong>alle Anwesenheitsdaten</strong> aller Kinder sowie alle geplanten Trainingseinheiten. Die Kinder selbst bleiben erhalten.
           </p>
-          <button onClick={()=>setResetDialog(true)} style={{...s.btn('#dc2626'),width:'100%',justifyContent:'center'}}>
-            🗑️ Alle Anwesenheitsdaten zurücksetzen
-          </button>
+          <div style={{display:'grid',gap:'10px'}}>
+            <button onClick={()=>setResetDialog(true)} style={{...s.btn('#dc2626'),width:'100%',justifyContent:'center'}}>
+              🗑️ Alle Anwesenheitsdaten zurücksetzen
+            </button>
+            <div style={{borderTop:'1px solid #fca5a5',paddingTop:'10px'}}>
+              <p style={{margin:'0 0 10px',color:'#666',fontSize:'14px'}}>
+                Löscht alle <strong>manuell gesendeten Trainer-Nachrichten</strong> aus allen Accounts. Automatische Benachrichtigungen (Training, Turnier, Fehlzeiten) bleiben erhalten.
+              </p>
+              <button onClick={adminDeleteAllTrainerMessages} style={{...s.btn('#b45309','white'),width:'100%',justifyContent:'center',background:'#fef3c7',color:'#92400e',border:'2px solid #d97706'}}>
+                🔔 Alle Trainer-Nachrichten löschen
+              </button>
+            </div>
+          </div>
         </div>
 
       </div></div>
@@ -3041,29 +3076,54 @@ export default function TrainingsApp() {
       alert(`✅ Nachricht an ${targets.length} Empfänger gesendet!`);
     };
 
-    // Trainer-side: group trainer_message by batchId, show each batch once
+    // Trainer-side: per-uid batch inbox — each trainer sees their own view
+    const uid = user?.uid || '';
     const now2 = new Date();
-    const trainerMessages = Object.values(notifications).filter(n=>n.type==='trainer_message');
+    const trainerMessages = Object.values(notifications).filter(n => n.type === 'trainer_message');
 
-    // Auto-delete trainer trash after 7 days
-    const trainerToDelete = trainerMessages.filter(n => n.trainerTrashedAt && (now2 - new Date(n.trainerTrashedAt))/86400000 >= 7);
-    if (trainerToDelete.length > 0) {
+    // Auto-promote trainer trash → deleted after 7 days (per-uid)
+    const autoTrainerDelete = trainerMessages.filter(n => {
+      const tta = typeof n.trainerTrashedAt === 'object' && n.trainerTrashedAt ? n.trainerTrashedAt : {};
+      return tta[uid] && (now2 - new Date(tta[uid])) / 86400000 >= 7;
+    });
+    if (autoTrainerDelete.length > 0) {
       const u = { ...notifications };
-      trainerToDelete.forEach(n => delete u[n.id]);
+      autoTrainerDelete.forEach(n => {
+        const tdb = typeof n.trainerDeletedBy === 'object' && n.trainerDeletedBy ? { ...n.trainerDeletedBy } : {};
+        const tta = typeof n.trainerTrashedAt === 'object' && n.trainerTrashedAt ? { ...n.trainerTrashedAt } : {};
+        delete tta[uid];
+        u[n.id] = { ...n, trainerDeletedBy: { ...tdb, [uid]: true }, trainerTrashedAt: tta };
+      });
       saveNotifications(u);
     }
 
-    // Group by batchId → one entry per batch
+    // Helper: is this notification visible (not deleted) for current user?
+    const notDeletedForMe = (n) => {
+      const tdb = typeof n.trainerDeletedBy === 'object' && n.trainerDeletedBy ? n.trainerDeletedBy : {};
+      return !tdb[uid];
+    };
+    const isTrashedForMe = (n) => {
+      const tta = typeof n.trainerTrashedAt === 'object' && n.trainerTrashedAt ? n.trainerTrashedAt : {};
+      // backwards compat: old string value
+      if (typeof n.trainerTrashedAt === 'string' && n.trainerTrashedAt) return true;
+      return !!tta[uid];
+    };
+
+    // Group by batchId → one entry per batch, filter per current user
     const batchMap = {};
-    trainerMessages.filter(n=>!trainerToDelete.some(d=>d.id===n.id)).forEach(n => {
-      const bid = n.batchId || n.id; // fallback for old notifs without batchId
-      if (!batchMap[bid]) batchMap[bid] = { batchId: bid, title: n.title, message: n.message, createdAt: n.createdAt, trainerTrashedAt: n.trainerTrashedAt, recipientLabel: n.recipientLabel || '?', count: 0 };
+    trainerMessages.filter(n => notDeletedForMe(n) && !autoTrainerDelete.some(d=>d.id===n.id)).forEach(n => {
+      const bid = n.batchId || n.id;
+      if (!batchMap[bid]) batchMap[bid] = {
+        batchId: bid, title: n.title, message: n.message,
+        createdAt: n.createdAt, isTrashed: isTrashedForMe(n),
+        trashedAt: (typeof n.trainerTrashedAt === 'object' && n.trainerTrashedAt) ? n.trainerTrashedAt[uid] : null,
+        recipientLabel: n.recipientLabel || '?', count: 0,
+      };
       batchMap[bid].count++;
-      // If any in batch is not trainer-trashed, batch is "active"
-      if (!n.trainerTrashedAt) batchMap[bid].trainerTrashedAt = null;
+      if (!isTrashedForMe(n)) batchMap[bid].isTrashed = false;
     });
-    const sentBatches = Object.values(batchMap).filter(b=>!b.trainerTrashedAt).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
-    const trashedBatches = Object.values(batchMap).filter(b=>!!b.trainerTrashedAt).sort((a,b)=>b.trainerTrashedAt.localeCompare(a.trainerTrashedAt));
+    const sentBatches   = Object.values(batchMap).filter(b=>!b.isTrashed).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+    const trashedBatches = Object.values(batchMap).filter(b=>b.isTrashed).sort((a,b)=>(b.trashedAt||'').localeCompare(a.trashedAt||''));
 
     // Active auto-notifications (non-trainer-message) by child
     const autoNotifsByChild = {};
