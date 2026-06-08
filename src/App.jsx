@@ -541,6 +541,7 @@ export default function TrainingsApp() {
   const [ptMatchEditing, setPtMatchEditing]                         = useState(null);
   const [ptMatchDraft, setPtMatchDraft]                             = useState(null);
   const [ptArchiveExpanded, setPtArchiveExpanded]                     = useState({});
+  const [ptDetailModal, setPtDetailModal]                           = useState(null);
   const [editingMd, setEditingMd]                           = useState(null);
   const [mdResultForm, setMdResultForm]                     = useState(null); // {id, result}
   const [postponeForm, setPostponeForm]                     = useState(null); // {matchdayId, reason, options:[{date,time}]}
@@ -3297,50 +3298,112 @@ export default function TrainingsApp() {
                 );
               })()}
 
+        {/* PT Detail Modal */}
+        {ptDetailModal&&(()=>{
+          const mpt=ptDetailModal;
+          const mPlayers=mpt.players||[];
+          const mMatches=mpt.matches||[];
+          const isArchived=!!mpt.archivedAt;
+          const placeEmojiM=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
+          const mStats=mPlayers.map((_,i)=>({idx:i,wins:0,losses:0,setsWon:0,setsLost:0}));
+          mMatches.forEach(m=>{if(!m.result)return;const{sets1,sets2}=m.result;mStats[m.p1Idx].setsWon+=sets1;mStats[m.p1Idx].setsLost+=sets2;mStats[m.p2Idx].setsWon+=sets2;mStats[m.p2Idx].setsLost+=sets1;if(sets1>sets2){mStats[m.p1Idx].wins++;mStats[m.p2Idx].losses++;}else{mStats[m.p2Idx].wins++;mStats[m.p1Idx].losses++;}});
+          const mStandings=(mpt.finalStandings||(()=>[...mStats].sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:(b.setsWon-b.setsLost)-(a.setsWon-a.setsLost)).map((s,place)=>({place:place+1,childId:mPlayers[s.idx]?.childId,name:mPlayers[s.idx]?.name||'?',wins:s.wins,losses:s.losses,setsWon:s.setsWon,setsLost:s.setsLost})))());
+          const numRoundsM=mPlayers.length%2===0?mPlayers.length-1:mPlayers.length;
+          const roundsM=Array.from({length:numRoundsM},(_,i)=>i+1);
+          return(
+            <div onClick={()=>setPtDetailModal(null)} style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',zIndex:9000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+              <div onClick={e=>e.stopPropagation()} style={{background:'linear-gradient(170deg,#021a0a 0%,#042d12 100%)',borderRadius:'24px 24px 0 0',width:'100%',maxWidth:'520px',maxHeight:'85vh',overflowY:'auto',padding:'20px 16px 36px',border:'1px solid rgba(167,139,250,0.2)',borderBottom:'none'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px'}}>
+                  <div>
+                    <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                      <span style={{fontSize:'16px'}}>🎯</span>
+                      <span style={{fontWeight:'800',color:'white',fontSize:'17px'}}>{mPlayers.length}er Gruppe</span>
+                      <span style={{fontSize:'11px',fontWeight:'700',padding:'2px 8px',borderRadius:'10px',color:isArchived?'#4ade80':'#fde68a',background:isArchived?'rgba(74,222,128,0.1)':'rgba(253,230,138,0.08)',border:`1px solid ${isArchived?'rgba(74,222,128,0.25)':'rgba(253,230,138,0.25)'}`}}>{isArchived?'✓ Abgeschlossen':'● Laufend'}</span>
+                    </div>
+                    <p style={{margin:'3px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{new Date(mpt.archivedAt||mpt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}</p>
+                  </div>
+                  <button onClick={()=>setPtDetailModal(null)} style={{width:'32px',height:'32px',borderRadius:'8px',background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.12)',color:'rgba(255,255,255,0.7)',cursor:'pointer',fontSize:'18px',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>×</button>
+                </div>
+                <p style={{margin:'0 0 8px',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.5)',textTransform:'uppercase',letterSpacing:'2px'}}>Tabelle</p>
+                <div style={{display:'grid',gap:'4px',marginBottom:'20px'}}>
+                  {mStandings.map(s=>(
+                    <div key={s.childId||s.name} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',background:'rgba(255,255,255,0.04)',borderRadius:'10px',border:'1px solid rgba(255,255,255,0.06)'}}>
+                      <span style={{fontSize:'18px',flexShrink:0}}>{placeEmojiM[s.place-1]||(s.place+'.')}</span>
+                      <div style={{flex:1}}>
+                        <p style={{margin:0,fontWeight:'800',color:'white',fontSize:'13px'}}>{s.name}</p>
+                        <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{s.wins}S {s.losses}N · Sätze {s.setsWon}:{s.setsLost}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p style={{margin:'0 0 8px',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.5)',textTransform:'uppercase',letterSpacing:'2px'}}>Spielplan</p>
+                {roundsM.map(round=>(
+                  <div key={round} style={{marginBottom:'12px'}}>
+                    <p style={{margin:'0 0 5px',fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'1px'}}>Runde {round}</p>
+                    <div style={{display:'grid',gap:'3px'}}>
+                      {mMatches.filter(m=>m.round===round).map((m,mi)=>{
+                        const p1=mPlayers[m.p1Idx];const p2=mPlayers[m.p2Idx];const res=m.result;
+                        return(<div key={mi} style={{display:'flex',alignItems:'center',gap:'8px',padding:'6px 10px',background:'rgba(255,255,255,0.03)',borderRadius:'7px'}}>
+                          <span style={{flex:1,fontSize:'12px',color:res&&res.sets1>res.sets2?'white':'rgba(255,255,255,0.45)',fontWeight:res&&res.sets1>res.sets2?'700':'400',textAlign:'right'}}>{p1?.name||'?'}</span>
+                          <span style={{fontSize:'13px',fontWeight:'800',color:res?'#a78bfa':'rgba(255,255,255,0.2)',minWidth:'34px',textAlign:'center',flexShrink:0}}>{res?`${res.sets1}:${res.sets2}`:'–:–'}</span>
+                          <span style={{flex:1,fontSize:'12px',color:res&&res.sets2>res.sets1?'white':'rgba(255,255,255,0.45)',fontWeight:res&&res.sets2>res.sets1?'700':'400'}}>{p2?.name||'?'}</span>
+                        </div>);
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
         {/* PT-Ergebnisse im Eltern/Jugend-Profil */}
         {myChild&&(()=>{
           const placeEmojiPD=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
           const myPTs=[
             ...Object.values(archivedPracticeTournaments),
-            ...Object.values(practiceTournaments).filter(pt=>pt.paused),
+            ...Object.values(practiceTournaments).filter(pt=>pt.players&&pt.players.some(p=>p.childId===myChild.id)),
           ].filter(pt=>pt.players&&pt.players.some(p=>p.childId===myChild.id))
            .sort((a,b)=>(b.archivedAt||b.createdAt||'').localeCompare(a.archivedAt||a.createdAt||''));
           if(myPTs.length===0) return null;
           return (
             <div style={{padding:'0 0 16px'}}>
               <span style={{display:'block',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.45)',textTransform:'uppercase',letterSpacing:'2px',margin:'0 16px 10px'}}>Trainingswettkämpfe</span>
-              <div style={{margin:'0 16px',background:'rgba(167,139,250,0.05)',border:'1px solid rgba(167,139,250,0.15)',borderRadius:'16px',padding:'12px 14px',display:'grid',gap:'8px'}}>
+              <div style={{margin:'0 16px',display:'grid',gap:'6px'}}>
                 {myPTs.map(pt=>{
-                  const isPaused=!!pt.paused;
+                  const isArc=!!pt.archivedAt;
+                  // Compute my current standing
+                  const myIdx=pt.players.findIndex(p=>p.childId===myChild.id);
+                  const stats=pt.players.map((_,i)=>({idx:i,wins:0,losses:0,setsWon:0,setsLost:0}));
+                  pt.matches.forEach(m=>{if(!m.result)return;const{sets1,sets2}=m.result;stats[m.p1Idx].setsWon+=sets1;stats[m.p1Idx].setsLost+=sets2;stats[m.p2Idx].setsWon+=sets2;stats[m.p2Idx].setsLost+=sets1;if(sets1>sets2)stats[m.p1Idx].wins++;else stats[m.p2Idx].wins++;});
                   let myEntry=null;
                   if(pt.finalStandings){myEntry=pt.finalStandings.find(s=>s.childId===myChild.id);}
-                  else if(isPaused){
-                    const s4=pt.players.map((_,i)=>({idx:i,wins:0,losses:0,setsWon:0,setsLost:0}));
-                    pt.matches.forEach(m=>{if(!m.result)return;const{sets1,sets2}=m.result;s4[m.p1Idx].setsWon+=sets1;s4[m.p1Idx].setsLost+=sets2;s4[m.p2Idx].setsWon+=sets2;s4[m.p2Idx].setsLost+=sets1;if(sets1>sets2)s4[m.p1Idx].wins++;else s4[m.p2Idx].wins++;});
-                    const srt4=[...s4].sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:(b.setsWon-b.setsLost)-(a.setsWon-a.setsLost));
-                    const mi4=pt.players.findIndex(p=>p.childId===myChild.id);
-                    const mr4=srt4.findIndex(s=>s.idx===mi4);
-                    const ms4=s4[mi4]||{wins:0,setsWon:0,setsLost:0};
-                    const mc4=pt.matches.filter(m=>m.result&&(m.p1Idx===mi4||m.p2Idx===mi4)).length;
-                    myEntry={place:mr4+1,wins:ms4.wins,losses:mc4-ms4.wins,setsWon:ms4.setsWon,setsLost:ms4.setsLost,paused:true};
+                  else{
+                    const srt=[...stats].sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:(b.setsWon-b.setsLost)-(a.setsWon-a.setsLost));
+                    const myRank=srt.findIndex(s=>s.idx===myIdx);
+                    const ms=stats[myIdx]||{wins:0,setsWon:0,setsLost:0};
+                    const mc=pt.matches.filter(m=>m.result&&(m.p1Idx===myIdx||m.p2Idx===myIdx)).length;
+                    myEntry={place:myRank+1,wins:ms.wins,losses:mc-ms.wins,setsWon:ms.setsWon,setsLost:ms.setsLost};
                   }
-                  if(!myEntry) return null;
-                  const opps=pt.players.filter(p=>p.childId!==myChild.id).map(p=>p.name);
+                  const done=pt.matches.filter(m=>m.result).length;
+                  const total=pt.matches.length;
                   const dateStr=new Date(pt.archivedAt||pt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
-                  const groupSize=pt.players?pt.players.length:4;
                   return(
-                    <div key={pt.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',background:'rgba(255,255,255,0.04)',borderRadius:'10px',border:'1px solid rgba(167,139,250,0.1)'}}>
-                      <span style={{fontSize:'20px',flexShrink:0}}>{myEntry.paused?'⏸':(placeEmojiPD[myEntry.place-1]||(myEntry.place+'.'))}</span>
+                    <div key={pt.id} onClick={()=>setPtDetailModal(pt)}
+                      style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',background:'rgba(255,255,255,0.04)',borderRadius:'12px',border:`1px solid ${isArc?'rgba(74,222,128,0.12)':'rgba(167,139,250,0.12)'}`,cursor:'pointer'}}
+                      onTouchStart={e=>e.currentTarget.style.background='rgba(167,139,250,0.1)'}
+                      onTouchEnd={e=>e.currentTarget.style.background='rgba(255,255,255,0.04)'}>
+                      <span style={{fontSize:'20px',flexShrink:0}}>{isArc?(placeEmojiPD[myEntry?.place-1]||(myEntry?.place+'.')):'🎯'}</span>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:'flex',alignItems:'center',gap:'5px',flexWrap:'wrap',marginBottom:'2px'}}>
-                          {myEntry.paused
-                            ?<span style={{fontWeight:'800',color:'#fbbf24',fontSize:'13px'}}>Pausiert</span>
-                            :<span style={{fontWeight:'800',color:'white',fontSize:'13px'}}>Platz {myEntry.place}</span>}
-                          <span style={{fontSize:'10px',color:'rgba(167,139,250,0.6)',fontWeight:'600'}}>{groupSize}er Gruppe</span>
-                          <span style={{fontSize:'10px',color:'rgba(255,255,255,0.3)'}}>{dateStr}</span>
+                          {isArc
+                            ?<span style={{fontWeight:'800',color:'white',fontSize:'13px'}}>Platz {myEntry?.place}</span>
+                            :<span style={{fontWeight:'800',color:'#fde68a',fontSize:'13px'}}>Laufend {done}/{total}</span>}
+                          <span style={{fontSize:'10px',color:'rgba(167,139,250,0.6)',fontWeight:'600'}}>{pt.players.length}er Gruppe</span>
+                          <span style={{fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>{dateStr}</span>
                         </div>
-                        <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>vs. {opps.join(', ')} · {myEntry.wins}S {myEntry.losses}N · Sätze {myEntry.setsWon}:{myEntry.setsLost}</p>
+                        {myEntry&&<p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{myEntry.wins}S {myEntry.losses}N · Sätze {myEntry.setsWon}:{myEntry.setsLost}</p>}
                       </div>
+                      <span style={{fontSize:'14px',color:'rgba(167,139,250,0.3)',flexShrink:0}}>›</span>
                     </div>
                   );
                 })}
@@ -4057,45 +4120,110 @@ export default function TrainingsApp() {
 
           {/* Trainingswettkämpfe im Kind-Profil */}
           {(()=>{
-            const placeEmojiCH=['🥇','🥈','🥉','4️⃣'];
+            const placeEmojiCH=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
             const childPTs=[
-            ...Object.values(archivedPracticeTournaments),
-            ...Object.values(practiceTournaments).filter(pt=>pt.paused&&pt.players&&pt.players.some(p=>p.childId===child.id)),
-          ].filter(pt=>pt.players&&pt.players.some(p=>p.childId===child.id))
-           .sort((a,b)=>(b.archivedAt||b.createdAt||'').localeCompare(a.archivedAt||a.createdAt||''));
+              ...Object.values(archivedPracticeTournaments),
+              ...Object.values(practiceTournaments).filter(pt=>pt.players&&pt.players.some(p=>p.childId===child.id)),
+            ].filter(pt=>pt.players&&pt.players.some(p=>p.childId===child.id))
+             .sort((a,b)=>(b.archivedAt||b.createdAt||'').localeCompare(a.archivedAt||a.createdAt||''));
             if(childPTs.length===0) return null;
-            return (<div style={{marginBottom:'20px'}}>
-              <h3 style={{margin:'0 0 12px',color:'white',fontSize:'16px',fontWeight:'800'}}>🎮 Trainingswettkämpfe</h3>
-              <div style={{display:'grid',gap:'7px'}}>
-                {childPTs.map(pt=>{
-                  let fs3=(pt.finalStandings||[]).find(s=>s.childId===child.id);
-                  if(!fs3&&pt.paused){
-                    // Compute current standings for paused PT
-                    const stats5=pt.players.map((_,i)=>({idx:i,wins:0,losses:0,setsWon:0,setsLost:0}));
-                    pt.matches.forEach(m=>{if(!m.result)return;const{sets1,sets2}=m.result;stats5[m.p1Idx].setsWon+=sets1;stats5[m.p1Idx].setsLost+=sets2;stats5[m.p2Idx].setsWon+=sets2;stats5[m.p2Idx].setsLost+=sets1;if(sets1>sets2)stats5[m.p1Idx].wins++;else stats5[m.p2Idx].wins++;});
-                    const sorted5=[...stats5].sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:(b.setsWon-b.setsLost)-(a.setsWon-a.setsLost));
-                    const mi5=pt.players.findIndex(p=>p.childId===child.id);
-                    const mr5=sorted5.findIndex(s=>s.idx===mi5);
-                    const ms5=stats5[mi5]||{wins:0,setsWon:0,setsLost:0};
-                    const mc5=pt.matches.filter(m=>m.result&&(m.p1Idx===mi5||m.p2Idx===mi5)).length;
-                    fs3={place:mr5+1,wins:ms5.wins,losses:mc5-ms5.wins,setsWon:ms5.setsWon,setsLost:ms5.setsLost,paused:true};
-                  }
-                  if(!fs3) return null;
-                  const opps=pt.players.filter(p=>p.childId!==child.id).map(p=>p.name);
-                  return(<div key={pt.id} style={{display:'flex',alignItems:'center',gap:'12px',padding:'11px 14px',background:'rgba(167,139,250,0.06)',border:'1px solid rgba(167,139,250,0.15)',borderRadius:'12px'}}>
-                    <span style={{fontSize:'22px',flexShrink:0}}>{fs3.paused?'⏸':(placeEmojiCH[fs3.place-1]||String(fs3.place)+'.')}</span>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'2px',flexWrap:'wrap'}}>
-                        <span style={{fontWeight:'800',color:'white',fontSize:'14px'}}>Platz {fs3.place}</span>
-                        <span style={{fontSize:'11px',color:'rgba(167,139,250,0.7)',fontWeight:'600'}}>{pt.players?pt.players.length+'er Gruppe':'4er Gruppe'}</span>
-                        <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{new Date(pt.archivedAt||pt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}</span>
+            return (<>
+              {ptDetailModal&&(()=>{
+                const mpt=ptDetailModal;
+                const mPlayers=mpt.players||[];
+                const mMatches=mpt.matches||[];
+                const isArchived=!!mpt.archivedAt;
+                const placeEmojiM=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
+                const mStats=mPlayers.map((_,i)=>({idx:i,wins:0,losses:0,setsWon:0,setsLost:0}));
+                mMatches.forEach(m=>{if(!m.result)return;const{sets1,sets2}=m.result;mStats[m.p1Idx].setsWon+=sets1;mStats[m.p1Idx].setsLost+=sets2;mStats[m.p2Idx].setsWon+=sets2;mStats[m.p2Idx].setsLost+=sets1;if(sets1>sets2){mStats[m.p1Idx].wins++;mStats[m.p2Idx].losses++;}else{mStats[m.p2Idx].wins++;mStats[m.p1Idx].losses++;}});
+                const mStandings=(mpt.finalStandings||(()=>[...mStats].sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:(b.setsWon-b.setsLost)-(a.setsWon-a.setsLost)).map((s,place)=>({place:place+1,childId:mPlayers[s.idx]?.childId,name:mPlayers[s.idx]?.name||'?',wins:s.wins,losses:s.losses,setsWon:s.setsWon,setsLost:s.setsLost})))());
+                const numRoundsM=mPlayers.length%2===0?mPlayers.length-1:mPlayers.length;
+                const roundsM=Array.from({length:numRoundsM},(_,i)=>i+1);
+                return(
+                  <div onClick={()=>setPtDetailModal(null)} style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',zIndex:9000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+                    <div onClick={e=>e.stopPropagation()} style={{background:'linear-gradient(170deg,#021a0a 0%,#042d12 100%)',borderRadius:'24px 24px 0 0',width:'100%',maxWidth:'520px',maxHeight:'85vh',overflowY:'auto',padding:'20px 16px 36px',border:'1px solid rgba(167,139,250,0.2)',borderBottom:'none'}}>
+                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px'}}>
+                        <div>
+                          <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                            <span style={{fontSize:'16px'}}>🎯</span>
+                            <span style={{fontWeight:'800',color:'white',fontSize:'17px'}}>{mPlayers.length}er Gruppe</span>
+                            <span style={{fontSize:'11px',fontWeight:'700',padding:'2px 8px',borderRadius:'10px',color:isArchived?'#4ade80':'#fde68a',background:isArchived?'rgba(74,222,128,0.1)':'rgba(253,230,138,0.08)',border:`1px solid ${isArchived?'rgba(74,222,128,0.25)':'rgba(253,230,138,0.25)'}`}}>{isArchived?'✓ Abgeschlossen':'● Laufend'}</span>
+                          </div>
+                          <p style={{margin:'3px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{new Date(mpt.archivedAt||mpt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}</p>
+                        </div>
+                        <button onClick={()=>setPtDetailModal(null)} style={{width:'32px',height:'32px',borderRadius:'8px',background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.12)',color:'rgba(255,255,255,0.7)',cursor:'pointer',fontSize:'18px',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>×</button>
                       </div>
-                      <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>vs. {opps.join(', ')} · {fs3.wins}S {fs3.losses}N · Sätze {fs3.setsWon}:{fs3.setsLost}</p>
+                      <p style={{margin:'0 0 8px',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.5)',textTransform:'uppercase',letterSpacing:'2px'}}>Tabelle</p>
+                      <div style={{display:'grid',gap:'4px',marginBottom:'20px'}}>
+                        {mStandings.map(s=>(
+                          <div key={s.childId||s.name} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',background:'rgba(255,255,255,0.04)',borderRadius:'10px',border:'1px solid rgba(255,255,255,0.06)'}}>
+                            <span style={{fontSize:'18px',flexShrink:0}}>{placeEmojiM[s.place-1]||(s.place+'.')}</span>
+                            <div style={{flex:1}}>
+                              <p style={{margin:0,fontWeight:'800',color:'white',fontSize:'13px'}}>{s.name}</p>
+                              <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{s.wins}S {s.losses}N · Sätze {s.setsWon}:{s.setsLost}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <p style={{margin:'0 0 8px',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.5)',textTransform:'uppercase',letterSpacing:'2px'}}>Spielplan</p>
+                      {roundsM.map(round=>(
+                        <div key={round} style={{marginBottom:'12px'}}>
+                          <p style={{margin:'0 0 5px',fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'1px'}}>Runde {round}</p>
+                          <div style={{display:'grid',gap:'3px'}}>
+                            {mMatches.filter(m=>m.round===round).map((m,mi)=>{
+                              const p1=mPlayers[m.p1Idx];const p2=mPlayers[m.p2Idx];const res=m.result;
+                              return(<div key={mi} style={{display:'flex',alignItems:'center',gap:'8px',padding:'6px 10px',background:'rgba(255,255,255,0.03)',borderRadius:'7px'}}>
+                                <span style={{flex:1,fontSize:'12px',color:res&&res.sets1>res.sets2?'white':'rgba(255,255,255,0.45)',fontWeight:res&&res.sets1>res.sets2?'700':'400',textAlign:'right'}}>{p1?.name||'?'}</span>
+                                <span style={{fontSize:'13px',fontWeight:'800',color:res?'#a78bfa':'rgba(255,255,255,0.2)',minWidth:'34px',textAlign:'center',flexShrink:0}}>{res?`${res.sets1}:${res.sets2}`:'–:–'}</span>
+                                <span style={{flex:1,fontSize:'12px',color:res&&res.sets2>res.sets1?'white':'rgba(255,255,255,0.45)',fontWeight:res&&res.sets2>res.sets1?'700':'400'}}>{p2?.name||'?'}</span>
+                              </div>);
+                            })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </div>);
-                })}
+                  </div>
+                );
+              })()}
+              <div style={{marginBottom:'20px'}}>
+                <h3 style={{margin:'0 0 12px',color:'white',fontSize:'16px',fontWeight:'800'}}>🎮 Trainingswettkämpfe</h3>
+                <div style={{display:'grid',gap:'7px'}}>
+                  {childPTs.map(pt=>{
+                    const isArc=!!pt.archivedAt;
+                    const myIdx=pt.players.findIndex(p=>p.childId===child.id);
+                    const stats=pt.players.map((_,i)=>({idx:i,wins:0,losses:0,setsWon:0,setsLost:0}));
+                    pt.matches.forEach(m=>{if(!m.result)return;const{sets1,sets2}=m.result;stats[m.p1Idx].setsWon+=sets1;stats[m.p1Idx].setsLost+=sets2;stats[m.p2Idx].setsWon+=sets2;stats[m.p2Idx].setsLost+=sets1;if(sets1>sets2)stats[m.p1Idx].wins++;else stats[m.p2Idx].wins++;});
+                    let fs3=null;
+                    if(pt.finalStandings){fs3=pt.finalStandings.find(s=>s.childId===child.id);}
+                    else{
+                      const srt=[...stats].sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:(b.setsWon-b.setsLost)-(a.setsWon-a.setsLost));
+                      const myRank=srt.findIndex(s=>s.idx===myIdx);
+                      const ms=stats[myIdx]||{wins:0,setsWon:0,setsLost:0};
+                      const mc=pt.matches.filter(m=>m.result&&(m.p1Idx===myIdx||m.p2Idx===myIdx)).length;
+                      fs3={place:myRank+1,wins:ms.wins,losses:mc-ms.wins,setsWon:ms.setsWon,setsLost:ms.setsLost};
+                    }
+                    const done=pt.matches.filter(m=>m.result).length;
+                    const total=pt.matches.length;
+                    const opps=pt.players.filter(p=>p.childId!==child.id).map(p=>p.name);
+                    return(<div key={pt.id} onClick={()=>setPtDetailModal(pt)}
+                      style={{display:'flex',alignItems:'center',gap:'12px',padding:'11px 14px',background:isArc?'rgba(167,139,250,0.06)':'rgba(253,230,138,0.04)',border:`1px solid ${isArc?'rgba(167,139,250,0.15)':'rgba(253,230,138,0.15)'}`,borderRadius:'12px',cursor:'pointer'}}>
+                      <span style={{fontSize:'22px',flexShrink:0}}>{isArc?(placeEmojiCH[fs3?.place-1]||String(fs3?.place)+'.'):'🎯'}</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'2px',flexWrap:'wrap'}}>
+                          {isArc
+                            ?<span style={{fontWeight:'800',color:'white',fontSize:'14px'}}>Platz {fs3?.place}</span>
+                            :<span style={{fontWeight:'800',color:'#fde68a',fontSize:'14px'}}>Laufend {done}/{total}</span>}
+                          <span style={{fontSize:'11px',color:isArc?'rgba(167,139,250,0.7)':'rgba(253,230,138,0.6)',fontWeight:'600'}}>{pt.players?pt.players.length+'er Gruppe':'4er Gruppe'}</span>
+                          <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{new Date(pt.archivedAt||pt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}</span>
+                        </div>
+                        {fs3&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>vs. {opps.join(', ')} · {fs3.wins}S {fs3.losses}N</p>}
+                      </div>
+                      <span style={{fontSize:'16px',color:'rgba(255,255,255,0.2)',flexShrink:0}}>›</span>
+                    </div>);
+                  })}
+                </div>
               </div>
-            </div>);
+            </>);
           })()}
 
           {/* Manuell hinzufügen */}
@@ -5052,7 +5180,7 @@ export default function TrainingsApp() {
             const sevenDaysAgo = new Date(Date.now()-7*24*60*60*1000).toISOString();
             const toAutoArchive = allPTList.filter(pt=>{
               const done=pt.matches.every(m=>m.result);
-              return done && !pt.paused && pt.createdAt < sevenDaysAgo;
+              return done && pt.createdAt < sevenDaysAgo;
             });
             if(toAutoArchive.length>0){
               toAutoArchive.forEach(pt=>{
@@ -5078,7 +5206,7 @@ export default function TrainingsApp() {
             const recentDonePTs = allPTList.filter(pt=>{
               const done=pt.matches.every(m=>m.result);
               const sevenDaysAgo2=new Date(Date.now()-7*24*60*60*1000).toISOString();
-              return done && !pt.paused && pt.createdAt >= sevenDaysAgo2;
+              return done && pt.createdAt >= sevenDaysAgo2;
             });
             const deletePT = (e, ptId) => {
               e.stopPropagation();
@@ -5100,8 +5228,8 @@ export default function TrainingsApp() {
                         <div style={{display:'flex',alignItems:'center',gap:'7px',marginBottom:'4px',flexWrap:'wrap'}}>
                           <span style={{fontSize:'16px'}}>🎯</span>
                           <span style={{fontWeight:'800',color:'white',fontSize:'15px'}}>{pt.players?pt.players.length+'er Gruppe':'4er Gruppe'}</span>
-                          <span style={{fontSize:'10px',fontWeight:'700',color:allDone2?'#4ade80':pt.paused?'#fbbf24':'#fde68a',background:allDone2?'rgba(74,222,128,0.12)':pt.paused?'rgba(251,191,36,0.12)':'rgba(253,230,138,0.1)',padding:'2px 7px',borderRadius:'10px',border:`1px solid ${allDone2?'rgba(74,222,128,0.25)':pt.paused?'rgba(251,191,36,0.3)':'rgba(253,230,138,0.25)'}`}}>
-                            {allDone2?'✓ Abgeschlossen':pt.paused?'⏸ Pausiert':'● Laufend'}
+                          <span style={{fontSize:'10px',fontWeight:'700',color:allDone2?'#4ade80':'#fde68a',background:allDone2?'rgba(74,222,128,0.12)':'rgba(253,230,138,0.1)',padding:'2px 7px',borderRadius:'10px',border:`1px solid ${allDone2?'rgba(74,222,128,0.25)':'rgba(253,230,138,0.25)'}`}}>
+                            {allDone2?'✓ Abgeschlossen':'● Laufend'}
                           </span>
                         </div>
                         <p style={{margin:'0 0 6px',fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>
@@ -5110,13 +5238,6 @@ export default function TrainingsApp() {
                       </div>
                       <div style={{display:'flex',alignItems:'center',gap:'6px',flexShrink:0}}>
                         <span style={{fontSize:'12px',fontWeight:'700',color:'rgba(167,139,250,0.6)'}}>{done}/{total}</span>
-                        {!allDone2&&(
-                          <button onClick={(e)=>{e.stopPropagation();const upd={...practiceTournaments,[pt.id]:{...pt,paused:!pt.paused}};savePracticeTournaments(upd);}}
-                            style={{width:'28px',height:'28px',borderRadius:'7px',background:pt.paused?'rgba(251,191,36,0.15)':'rgba(167,139,250,0.1)',border:`1px solid ${pt.paused?'rgba(251,191,36,0.3)':'rgba(167,139,250,0.2)'}`,color:pt.paused?'#fbbf24':'rgba(167,139,250,0.6)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}
-                            title={pt.paused?'Fortsetzen':'Pausieren'}>
-                            <span style={{fontSize:'11px',lineHeight:1}}>{pt.paused?'▶':'⏸'}</span>
-                          </button>
-                        )}
                         <button onClick={(e)=>deletePT(e,pt.id)}
                           style={{width:'28px',height:'28px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}
                           title="Wettkampf löschen">
@@ -5230,11 +5351,6 @@ export default function TrainingsApp() {
       savePracticeTournaments({...practiceTournaments, [pt.id]: {...pt, matches:updMatches}});
     };
 
-    const pauseTournament = () => {
-      const newPaused = !pt.paused;
-      savePracticeTournaments({...practiceTournaments, [pt.id]: {...pt, paused:newPaused}});
-    };
-
     const archiveTournament = () => {
       const finalStandings = standings.map((s,place) => ({
         place:place+1, childId:players[s.idx].childId, name:players[s.idx].name, seed:players[s.idx].seed,
@@ -5317,10 +5433,7 @@ export default function TrainingsApp() {
               </h2>
             </div>
             <div style={{display:'flex',gap:'6px',flexShrink:0}}>
-              <button onClick={pauseTournament} style={{height:'34px',padding:'0 12px',borderRadius:'8px',background:pt.paused?'rgba(251,191,36,0.15)':'rgba(167,139,250,0.08)',border:`1px solid ${pt.paused?'rgba(251,191,36,0.3)':'rgba(167,139,250,0.2)'}`,color:pt.paused?'#fbbf24':'rgba(167,139,250,0.6)',cursor:'pointer',display:'flex',alignItems:'center',gap:'5px',fontWeight:'700',fontSize:'12px'}}>
-                <span style={{fontSize:'13px'}}>{pt.paused?'▶':'⏸'}</span>
-                <span>{pt.paused?'Fortsetzen':'Pausieren'}</span>
-              </button>
+              
               <button onClick={deleteActiveTournament} style={{width:'34px',height:'34px',borderRadius:'8px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <Trash2 size={14}/>
               </button>
@@ -5809,21 +5922,48 @@ export default function TrainingsApp() {
                         <span style={{fontSize:'18px',color:'rgba(167,139,250,0.5)',transform:expanded?'rotate(90deg)':'rotate(0deg)',transition:'transform 0.2s',flexShrink:0,lineHeight:1}}>›</span>
                       </div>
                       {expanded && (
-                        <div style={{borderTop:'1px solid rgba(167,139,250,0.12)',padding:'12px 14px',display:'grid',gap:'5px'}}>
-                          <div style={{display:'flex',gap:'10px',marginBottom:'8px',flexWrap:'wrap'}}>
+                        <div style={{borderTop:'1px solid rgba(167,139,250,0.12)',padding:'12px 14px'}}>
+                          <div style={{display:'flex',gap:'10px',marginBottom:'10px',flexWrap:'wrap'}}>
                             <span style={{fontSize:'11px',color:'rgba(167,139,250,0.6)'}}>{new Date(pt.archivedAt||pt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
                             <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>von {pt.createdBy}</span>
                             <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{pt.settings.winSets} Gewinnsätze</span>
                           </div>
-                          {fs2.map(s=>(
-                            <div key={s.childId} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',background:'rgba(255,255,255,0.04)',borderRadius:'10px',border:'1px solid rgba(255,255,255,0.07)'}}>
-                              <span style={{fontSize:'20px',flexShrink:0}}>{placeEmoji[s.place-1]||`${s.place}.`}</span>
-                              <div style={{flex:1}}>
-                                <p style={{margin:0,fontWeight:'800',color:'white',fontSize:'14px'}}>{s.name}</p>
-                                <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{s.wins}S {s.losses}N · Sätze {s.setsWon}:{s.setsLost}{pt.settings.trackSetScores?` · Punkte ${s.ptsWon}:${s.ptsLost}`:''}</p>
+                          <p style={{margin:'0 0 6px',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.45)',textTransform:'uppercase',letterSpacing:'1.5px'}}>Tabelle</p>
+                          <div style={{display:'grid',gap:'4px',marginBottom:'14px'}}>
+                            {fs2.map(s=>(
+                              <div key={s.childId} style={{display:'flex',alignItems:'center',gap:'10px',padding:'7px 12px',background:'rgba(255,255,255,0.04)',borderRadius:'9px',border:'1px solid rgba(255,255,255,0.07)'}}>
+                                <span style={{fontSize:'18px',flexShrink:0}}>{placeEmoji[s.place-1]||`${s.place}.`}</span>
+                                <div style={{flex:1}}>
+                                  <p style={{margin:0,fontWeight:'800',color:'white',fontSize:'13px'}}>{s.name}</p>
+                                  <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{s.wins}S {s.losses}N · Sätze {s.setsWon}:{s.setsLost}{pt.settings.trackSetScores?` · Punkte ${s.ptsWon}:${s.ptsLost}`:''}</p>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
+                          {(()=>{
+                            const ptPlayers=pt.players||[];
+                            const ptMatches=pt.matches||[];
+                            const numRoundsA=ptPlayers.length%2===0?ptPlayers.length-1:ptPlayers.length;
+                            const roundsA=Array.from({length:numRoundsA},(_,i)=>i+1);
+                            return(<>
+                              <p style={{margin:'0 0 6px',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.45)',textTransform:'uppercase',letterSpacing:'1.5px'}}>Spielplan</p>
+                              {roundsA.map(round=>(
+                                <div key={round} style={{marginBottom:'8px'}}>
+                                  <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.25)',textTransform:'uppercase',letterSpacing:'1px'}}>Runde {round}</p>
+                                  <div style={{display:'grid',gap:'3px'}}>
+                                    {ptMatches.filter(m=>m.round===round).map((m,mi)=>{
+                                      const p1=ptPlayers[m.p1Idx];const p2=ptPlayers[m.p2Idx];const res=m.result;
+                                      return(<div key={mi} style={{display:'flex',alignItems:'center',gap:'8px',padding:'5px 10px',background:'rgba(255,255,255,0.03)',borderRadius:'7px'}}>
+                                        <span style={{flex:1,fontSize:'11px',color:res&&res.sets1>res.sets2?'white':'rgba(255,255,255,0.4)',fontWeight:res&&res.sets1>res.sets2?'700':'400',textAlign:'right'}}>{p1?.name||'?'}</span>
+                                        <span style={{fontSize:'12px',fontWeight:'800',color:res?'#a78bfa':'rgba(255,255,255,0.15)',minWidth:'30px',textAlign:'center',flexShrink:0}}>{res?`${res.sets1}:${res.sets2}`:'–:–'}</span>
+                                        <span style={{flex:1,fontSize:'11px',color:res&&res.sets2>res.sets1?'white':'rgba(255,255,255,0.4)',fontWeight:res&&res.sets2>res.sets1?'700':'400'}}>{p2?.name||'?'}</span>
+                                      </div>);
+                                    })}
+                                  </div>
+                                </div>
+                              ))}
+                            </>);
+                          })()}
                         </div>
                       )}
                     </div>
