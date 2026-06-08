@@ -105,7 +105,7 @@ const ROLE_CONFIG = {
 
 const WEEKDAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
 
-const emptySession = { subgroupIds: [], date: new Date().toISOString().split('T')[0], time: '17:00', trainer: '', info: '', repeat: false, repeatWeeks: 8 };
+const emptySession = { subgroupIds: [], date: new Date().toISOString().split('T')[0], time: '17:00', trainer: '', info: '', repeat: false, repeatWeeks: 8, isRecurring: false };
 
 const TODAY = new Date().toISOString().split('T')[0];
 const emptyTournament = { name: '', location: '', dateFrom: TODAY, dateTo: TODAY, konkurrenzen: [] };
@@ -498,6 +498,7 @@ export default function TrainingsApp() {
   const [newChildName, setNewChildName]         = useState('');
   const [moveChildId, setMoveChildId]           = useState(null);
   const [newSession, setNewSession]             = useState(emptySession);
+  const [recurringTemplates, setRecurringTemplates] = useState({});
   const [editingSession, setEditingSession]     = useState(null); // session being edited
   const [editForm, setEditForm]                 = useState({});
   const [deleteDialog, setDeleteDialog]         = useState(null);
@@ -642,6 +643,7 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','subgroups'),          s => setSubgroups(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','children'),           s => setChildren(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','sessions'),           s => setSessions(s.exists()?s.data():{})),
+      onSnapshot(doc(db,'ttc','recurringTemplates'),  s => setRecurringTemplates(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','tournaments'),        s => setTournaments(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','archivedSessions'),   s => setArchivedSessions(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','archivedTournaments'),s => setArchivedTournaments(s.exists()?s.data():{})),
@@ -810,6 +812,7 @@ export default function TrainingsApp() {
   const saveSubgroups          = u => { setSubgroups(u);          setDoc(doc(db,'ttc','subgroups'),          u); };
   const saveChildren           = u => { setChildren(u);           setDoc(doc(db,'ttc','children'),           u); };
   const saveSessions           = u => { setSessions(u);           setDoc(doc(db,'ttc','sessions'),           u); };
+  const saveRecurringTemplates = u => { setRecurringTemplates(u); setDoc(doc(db,'ttc','recurringTemplates'),  u); };
   const saveTournaments        = u => { setTournaments(u);        setDoc(doc(db,'ttc','tournaments'),        u); };
   const saveArchivedSessions   = u => { setArchivedSessions(u);   setDoc(doc(db,'ttc','archivedSessions'),   u); };
   const saveArchivedTournaments= u => { setArchivedTournaments(u);setDoc(doc(db,'ttc','archivedTournaments'),u); };
@@ -1035,10 +1038,56 @@ export default function TrainingsApp() {
     } catch(err) { setError('Fehler: '+err.message); }
   };
 
+  // ── Dauereinheiten materialisieren ─────────────────────────────────────
+  const materializeRecurringSessions = (templates, currentSessions) => {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const horizon = new Date(today); horizon.setDate(horizon.getDate() + 28);
+    const updated = {...currentSessions};
+    let changed = false;
+    Object.values(templates).forEach(tmpl => {
+      const start = new Date(today);
+      const diff = (tmpl.dayOfWeek - start.getDay() + 7) % 7;
+      start.setDate(start.getDate() + diff);
+      const cur = new Date(start);
+      while(cur <= horizon) {
+        const dateStr = cur.toISOString().split('T')[0];
+        const exists = Object.values(currentSessions).some(s => s.templateId === tmpl.id && s.date === dateStr);
+        if(!exists) {
+          const id = 'session_rt_' + tmpl.id + '_' + dateStr;
+          updated[id] = { id, subgroupIds: tmpl.subgroupIds, date: dateStr, time: tmpl.time, trainer: tmpl.trainer, info: tmpl.info, templateId: tmpl.id, repeatId: null, responses: {} };
+          changed = true;
+        }
+        cur.setDate(cur.getDate() + 7);
+      }
+    });
+    if(changed) saveSessions(updated);
+  };
+
+  // Run materialization when templates change
+  useEffect(() => {
+    if(Object.keys(recurringTemplates).length > 0) {
+      materializeRecurringSessions(recurringTemplates, sessions);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recurringTemplates]);
+
   // ── Training anlegen ─────────────────────────────────────────
   const createSession = () => {
-    const { subgroupIds, date, time, trainer, info, repeat, repeatWeeks } = newSession;
-    if (!date || !time || subgroupIds.length===0) { alert('Bitte mindestens eine Untergruppe auswählen!'); return; }
+    const { subgroupIds, date, time, trainer, info, repeat, repeatWeeks, isRecurring } = newSession;
+    if (!time || subgroupIds.length===0) { alert('Bitte mindestens eine Untergruppe auswählen!'); return; }
+    if (!isRecurring && !date) { alert('Bitte ein Datum auswählen!'); return; }
+
+    if (isRecurring) {
+      const dayOfWeek = new Date(date+'T12:00:00').getDay();
+      const id = 'rt_' + Date.now();
+      const tmpl = { id, subgroupIds, dayOfWeek, time, trainer, info, startDate: date, createdAt: new Date().toISOString() };
+      const updatedTemplates = { ...recurringTemplates, [id]: tmpl };
+      saveRecurringTemplates(updatedTemplates);
+      materializeRecurringSessions(updatedTemplates, sessions);
+      setNewSession(emptySession);
+      return;
+    }
+
     const updated = { ...sessions };
     const repeatId = repeat ? 'repeat_' + Date.now() : null;
     if (repeat) {
@@ -1060,6 +1109,15 @@ export default function TrainingsApp() {
   const deleteSession = (id) => {
     if (!window.confirm('Diese Trainingseinheit löschen?')) return;
     const u={...sessions}; delete u[id]; saveSessions(u);
+  };
+
+  const deleteRecurringTemplate = (templateId) => {
+    if (!window.confirm('Dauereinheit und alle zukünftigen Termine löschen?')) return;
+    const updTemplates = {...recurringTemplates}; delete updTemplates[templateId];
+    saveRecurringTemplates(updTemplates);
+    const today = new Date().toISOString().split('T')[0];
+    const updSessions = Object.fromEntries(Object.entries(sessions).filter(([,s]) => !(s.templateId===templateId && s.date>=today)));
+    saveSessions(updSessions);
   };
 
   const deleteRepeatBlock = (repeatId) => {
@@ -1843,22 +1901,72 @@ export default function TrainingsApp() {
           </div>
 
           <div style={{marginBottom:'16px',padding:'14px',background:'#f0f9ff',borderRadius:'8px',border:'1px solid #bae6fd'}}>
-            <label style={{display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',marginBottom:newSession.repeat?'12px':0}}>
-              <input type="checkbox" checked={newSession.repeat} onChange={e=>setNewSession({...newSession,repeat:e.target.checked})} style={{width:'18px',height:'18px',cursor:'pointer'}}/>
-              <span style={{fontWeight:'600',color:'#0369a1',fontSize:'14px'}}><RefreshCw size={16} style={{display:'inline',marginRight:'6px'}}/>Wöchentlich wiederholen</span>
+            {/* Dauereinheit */}
+            <label style={{display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',marginBottom:'10px'}}>
+              <input type="checkbox" checked={newSession.isRecurring} onChange={e=>setNewSession({...newSession,isRecurring:e.target.checked,repeat:false})} style={{width:'18px',height:'18px',cursor:'pointer',accentColor:'#15803d'}}/>
+              <span style={{fontWeight:'700',color:'#15803d',fontSize:'14px'}}>∞ Dauereinheit (kein Enddatum)</span>
             </label>
-            {newSession.repeat&&(
-              <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
-                <label style={{...s.label,margin:0}}>Wochen:</label>
-                <input type="number" min="1" max="52" value={newSession.repeatWeeks} onChange={e=>setNewSession({...newSession,repeatWeeks:parseInt(e.target.value)||1})} style={{width:'70px',padding:'6px 10px',border:'1px solid #ddd',borderRadius:'6px',fontSize:'14px'}}/>
-                <span style={{fontSize:'13px',color:'#0369a1'}}>= {newSession.repeatWeeks}x jeden {WEEKDAYS[new Date(newSession.date+'T12:00:00').getDay()]}</span>
+            {newSession.isRecurring&&(
+              <div style={{padding:'10px',background:'#f0fdf4',borderRadius:'6px',border:'1px solid #86efac',marginBottom:'8px'}}>
+                <p style={{margin:'0 0 4px',fontSize:'13px',color:'#15803d',fontWeight:'600'}}>
+                  Wiederholt sich jeden {newSession.date ? WEEKDAYS[new Date(newSession.date+'T12:00:00').getDay()] : '...'} · ab {newSession.date||'Datum wählen'}
+                </p>
+                <p style={{margin:0,fontSize:'12px',color:'#16a34a'}}>Wird automatisch in die geplanten Einheiten eingetragen, bis du sie löschst.</p>
               </div>
             )}
+            {/* Wöchentlich wiederholen */}
+            {!newSession.isRecurring&&(<>
+              <label style={{display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',marginBottom:newSession.repeat?'12px':0}}>
+                <input type="checkbox" checked={newSession.repeat} onChange={e=>setNewSession({...newSession,repeat:e.target.checked})} style={{width:'18px',height:'18px',cursor:'pointer'}}/>
+                <span style={{fontWeight:'600',color:'#0369a1',fontSize:'14px'}}><RefreshCw size={16} style={{display:'inline',marginRight:'6px'}}/>Wöchentlich wiederholen</span>
+              </label>
+              {newSession.repeat&&(
+                <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                  <label style={{...s.label,margin:0}}>Wochen:</label>
+                  <input type="number" min="1" max="52" value={newSession.repeatWeeks} onChange={e=>setNewSession({...newSession,repeatWeeks:parseInt(e.target.value)||1})} style={{width:'70px',padding:'6px 10px',border:'1px solid #ddd',borderRadius:'6px',fontSize:'14px'}}/>
+                  <span style={{fontSize:'13px',color:'#0369a1'}}>= {newSession.repeatWeeks}x jeden {WEEKDAYS[new Date(newSession.date+'T12:00:00').getDay()]}</span>
+                </div>
+              )}
+            </>)}
           </div>
-          <button onClick={createSession} style={s.btn('#0369a1')}>
-            <Calendar size={18}/> {newSession.repeat?`${newSession.repeatWeeks} Einheiten anlegen`:'Einheit anlegen'}
+          <button onClick={createSession} style={s.btn(newSession.isRecurring?'#15803d':'#0369a1')}>
+            <Calendar size={18}/> {newSession.isRecurring?'Dauereinheit anlegen':newSession.repeat?`${newSession.repeatWeeks} Einheiten anlegen`:'Einheit anlegen'}
           </button>
         </div>
+
+        {/* Dauereinheiten */}
+        {Object.values(recurringTemplates).length > 0 && (
+          <div style={s.card}>
+            <h2 style={{margin:'0 0 16px',color:'#15803d',display:'flex',alignItems:'center',gap:'8px'}}>∞ Dauereinheiten</h2>
+            <div style={{display:'grid',gap:'8px'}}>
+              {Object.values(recurringTemplates).map(tmpl => {
+                const tmplSubs = (tmpl.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean);
+                return (
+                  <div key={tmpl.id} style={{padding:'12px 14px',borderRadius:'10px',border:'2px solid #86efac',background:'#f0fdf4',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+                    <span style={{fontSize:'20px'}}>∞</span>
+                    <div style={{flex:1}}>
+                      <div style={{display:'flex',flexWrap:'wrap',gap:'4px',marginBottom:'4px'}}>
+                        {tmplSubs.map(sub=>{
+                          const grp=FIXED_GROUPS.find(g=>g.id===sub.groupId);
+                          return <span key={sub.id} style={{fontSize:'11px',fontWeight:'700',color:grp?.color,background:grp?.bg||'#f3f4f6',padding:'1px 7px',borderRadius:'20px',border:'1px solid '+(grp?.color||'#ccc')}}>{grp?.emoji} {sub.name}</span>;
+                        })}
+                      </div>
+                      <p style={{margin:0,fontWeight:'700',color:'#15803d',fontSize:'14px'}}>
+                        Jeden {WEEKDAYS[tmpl.dayOfWeek]} · {tmpl.time} Uhr
+                        {tmpl.trainer&&<span style={{fontWeight:'400',color:'#555'}}> · 👤 {tmpl.trainer}</span>}
+                      </p>
+                      {tmpl.info&&<p style={{margin:'2px 0 0',fontSize:'12px',color:'#16a34a'}}>{tmpl.info}</p>}
+                    </div>
+                    <button onClick={()=>deleteRecurringTemplate(tmpl.id)}
+                      style={{padding:'5px 10px',background:'#fee2e2',border:'1px solid #fca5a5',borderRadius:'6px',color:'#dc2626',cursor:'pointer',fontWeight:'700',fontSize:'12px',flexShrink:0}}>
+                      Löschen
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Geplante Einheiten */}
         <div style={s.card}>
@@ -1913,6 +2021,7 @@ export default function TrainingsApp() {
                               return <span key={sub.id} style={{fontSize:'12px',fontWeight:'700',color:grp?.color,background:grp?.bg||'#f3f4f6',padding:'2px 8px',borderRadius:'20px',border:`1px solid ${grp?.color}`}}>{grp?.emoji} {sub.name}</span>;
                             })}
                             {session.repeatId&&<span style={{fontSize:'11px',color:'#0369a1',background:'#e0f2fe',padding:'2px 8px',borderRadius:'20px'}}><RefreshCw size={10} style={{display:'inline'}}/> Block ({blockSize}x)</span>}
+                            {session.templateId&&<span style={{fontSize:'11px',color:'#15803d',background:'#dcfce7',padding:'2px 8px',borderRadius:'20px',fontWeight:'700'}}>∞ Dauereinheit</span>}
                             {sessionIsPast&&<span style={{fontSize:'11px',fontWeight:'700',color:'white',background:'#dc2626',padding:'2px 8px',borderRadius:'20px'}}>Vergangen</span>}
                           </div>
                           <p style={{margin:'0 0 2px',fontWeight:'600',color:'#333'}}>

@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Individuelle Nutzerprofile (/users/{uid}) ──────────────────
+    // Jeder eingeloggte User darf sein eigenes Profil lesen & anlegen.
+    // Update: eigenes Profil oder Admin (über ttc/users-Dokument geprüft).
+    match /users/{userId} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
+    // ── App-Daten unter /ttc/* ─────────────────────────────────────
+    // Lesen: alle eingeloggten Nutzer (Trainer, Eltern, Jugendliche)
+    // Schreiben: alle eingeloggten Nutzer
+    //   → Eltern/Jugendliche schreiben z.B. Turnier- & Trainingsanmeldungen
+    //   → Trainer/Admins schreiben alle anderen Daten
+    //   → Schutz vor unbefugtem Zugriff: nur Firebase-Auth-User
+    match /ttc/{document} {
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+  }
+}
