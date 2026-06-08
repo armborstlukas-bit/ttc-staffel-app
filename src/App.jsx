@@ -486,6 +486,7 @@ export default function TrainingsApp() {
   const [resetDialog, setResetDialog]           = useState(false);
   const [resetPassword, setResetPassword]       = useState('');
   const [resetError, setResetError]             = useState('');
+  const [dangerSelections, setDangerSelections]         = useState({});
   const [showProfile, setShowProfile]           = useState(false);
   const [pwCurrent, setPwCurrent]               = useState('');
   const [pwNew, setPwNew]                       = useState('');
@@ -534,11 +535,12 @@ export default function TrainingsApp() {
   const [activePracticeId, setActivePracticeId]                     = useState(null);
   const [ptCreating, setPtCreating]                                 = useState(false);
   const [ptCreateStep, setPtCreateStep]                             = useState(1);
-  const [ptCreateForm, setPtCreateForm]                             = useState({type:'4er_gruppe',winSets:2,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false});
+  const [ptCreateForm, setPtCreateForm]                             = useState({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false});
   const [ptSelectedChildren, setPtSelectedChildren]                 = useState([]);
   const [ptSubgroupFilter, setPtSubgroupFilter]                     = useState('all');
   const [ptMatchEditing, setPtMatchEditing]                         = useState(null);
   const [ptMatchDraft, setPtMatchDraft]                             = useState(null);
+  const [ptArchiveExpanded, setPtArchiveExpanded]                     = useState({});
   const [editingMd, setEditingMd]                           = useState(null);
   const [mdResultForm, setMdResultForm]                     = useState(null); // {id, result}
   const [postponeForm, setPostponeForm]                     = useState(null); // {matchdayId, reason, options:[{date,time}]}
@@ -2385,23 +2387,87 @@ export default function TrainingsApp() {
 
         {/* Gefahrenzone */}
         <div style={{...s.card,border:'2px solid #fca5a5',background:'#fff5f5'}}>
-          <h2 style={{margin:'0 0 8px',color:'#dc2626',fontSize:'18px'}}>⚠️ Gefahrenzone</h2>
-          <p style={{margin:'0 0 16px',color:'#666',fontSize:'14px'}}>
-            Diese Aktion löscht <strong>alle Anwesenheitsdaten</strong> aller Kinder sowie alle geplanten Trainingseinheiten. Die Kinder selbst bleiben erhalten.
-          </p>
-          <div style={{display:'grid',gap:'10px'}}>
-            <button onClick={()=>setResetDialog(true)} style={{...s.btn('#dc2626'),width:'100%',justifyContent:'center'}}>
-              🗑️ Alle Anwesenheitsdaten zurücksetzen
-            </button>
-            <div style={{borderTop:'1px solid #fca5a5',paddingTop:'10px'}}>
-              <p style={{margin:'0 0 10px',color:'#666',fontSize:'14px'}}>
-                Löscht alle <strong>manuell gesendeten Trainer-Nachrichten</strong> aus allen Accounts. Automatische Benachrichtigungen (Training, Turnier, Fehlzeiten) bleiben erhalten.
-              </p>
-              <button onClick={adminDeleteAllTrainerMessages} style={{...s.btn('#b45309','white'),width:'100%',justifyContent:'center',background:'#fef3c7',color:'#92400e',border:'2px solid #d97706'}}>
-                🔔 Alle Trainer-Nachrichten löschen
-              </button>
-            </div>
-          </div>
+          <h2 style={{margin:'0 0 4px',color:'#dc2626',fontSize:'18px'}}>⚠️ Gefahrenzone</h2>
+          <p style={{margin:'0 0 16px',color:'#888',fontSize:'12px'}}>Wähle die Datenbereiche aus, die du löschen möchtest.</p>
+          {(()=>{
+            const cats = [
+              {id:'attendance',  label:'Anwesenheitsdaten',          desc:'Alle Anwesenheiten aller Kinder + Trainingsdaten in Untergruppen', icon:'📋', needsPw:true},
+              {id:'sessions',    label:'Trainingseinheiten (aktiv)',  desc:'Alle geplanten und laufenden Einheiten', icon:'🏋️'},
+              {id:'tournaments', label:'Turniere (aktiv)',            desc:'Alle laufenden Turniere', icon:'🏆'},
+              {id:'practiceT',   label:'Übungswettkämpfe (aktiv)',   desc:'Alle laufenden Übungswettkämpfe', icon:'🎮'},
+              {id:'messages',    label:'Trainer-Nachrichten',         desc:'Alle manuell gesendeten Nachrichten', icon:'💬'},
+              {id:'archSessions',label:'Archiv Training',             desc:'Alle archivierten Trainingseinheiten', icon:'📦'},
+              {id:'archTourneys',label:'Archiv Turniere',             desc:'Alle archivierten Turniere', icon:'📦'},
+              {id:'archPT',      label:'Archiv Übungswettkämpfe',    desc:'Alle archivierten Übungswettkämpfe', icon:'📦'},
+            ];
+            const sel = dangerSelections;
+            const allSel = cats.every(c=>sel[c.id]);
+            const anySel = cats.some(c=>sel[c.id]);
+            const toggle = id => setDangerSelections(p=>({...p,[id]:!p[id]}));
+            const selectAll = () => setDangerSelections(Object.fromEntries(cats.map(c=>[c.id,true])));
+            const selectNone = () => setDangerSelections({});
+            const handleDelete = () => {
+              const selected = cats.filter(c=>sel[c.id]);
+              if(selected.length===0) return;
+              const nonPw = selected.filter(c=>!c.needsPw);
+              const hasPw = selected.some(c=>c.needsPw);
+              const labels = selected.map(c=>c.label).join(', ');
+              if(nonPw.length>0){
+                if(!window.confirm(`Folgende Daten werden unwiderruflich gelöscht:\n\n${nonPw.map(c=>c.label).join('\n')}\n\nFortfahren?`)) return;
+                nonPw.forEach(cat=>{
+                  if(cat.id==='sessions')     saveSessions({});
+                  if(cat.id==='tournaments')  saveTournaments({});
+                  if(cat.id==='practiceT')    savePracticeTournaments({});
+                  if(cat.id==='messages'){
+                    const u={};
+                    Object.values(notifications).forEach(n=>{if(n.type!=='trainer_message')u[n.id]=n;});
+                    saveNotifications(u);
+                  }
+                  if(cat.id==='archSessions')  saveArchivedSessions({});
+                  if(cat.id==='archTourneys')  saveArchivedTournaments({});
+                  if(cat.id==='archPT')        saveArchivedPracticeTournaments({});
+                });
+                setDangerSelections(p=>{const n={...p};nonPw.forEach(c=>{delete n[c.id];});return n;});
+              }
+              if(hasPw){ setResetDialog(true); }
+            };
+            return (
+              <div>
+                <div style={{display:'flex',gap:'8px',marginBottom:'12px'}}>
+                  <button onClick={selectAll} style={{padding:'5px 12px',fontSize:'12px',fontWeight:'700',borderRadius:'7px',border:'1px solid #fca5a5',background:allSel?'#fca5a5':'white',color:allSel?'white':'#dc2626',cursor:'pointer'}}>
+                    Alle auswählen
+                  </button>
+                  <button onClick={selectNone} style={{padding:'5px 12px',fontSize:'12px',fontWeight:'700',borderRadius:'7px',border:'1px solid #e5e7eb',background:'white',color:'#6b7280',cursor:'pointer'}}>
+                    Keine
+                  </button>
+                </div>
+                <div style={{display:'grid',gap:'6px',marginBottom:'16px'}}>
+                  {cats.map(cat=>(
+                    <label key={cat.id} style={{display:'flex',alignItems:'flex-start',gap:'10px',padding:'10px 12px',background:sel[cat.id]?'#fee2e2':'#fafafa',border:`1px solid ${sel[cat.id]?'#fca5a5':'#e5e7eb'}`,borderRadius:'10px',cursor:'pointer',transition:'all 0.1s'}}
+                      onClick={()=>toggle(cat.id)}>
+                      <div style={{width:'18px',height:'18px',borderRadius:'4px',border:`2px solid ${sel[cat.id]?'#dc2626':'#d1d5db'}`,background:sel[cat.id]?'#dc2626':'white',flexShrink:0,marginTop:'1px',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                        {sel[cat.id]&&<span style={{color:'white',fontSize:'12px',lineHeight:1,fontWeight:'900'}}>✓</span>}
+                      </div>
+                      <div style={{flex:1}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'5px'}}>
+                          <span style={{fontSize:'13px'}}>{cat.icon}</span>
+                          <span style={{fontWeight:'700',fontSize:'13px',color:'#1f2937'}}>{cat.label}</span>
+                          {cat.needsPw&&<span style={{fontSize:'10px',background:'#fef3c7',color:'#92400e',padding:'1px 5px',borderRadius:'4px',fontWeight:'600'}}>Passwort</span>}
+                        </div>
+                        <p style={{margin:'2px 0 0',fontSize:'11px',color:'#9ca3af'}}>{cat.desc}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                <button
+                  onClick={handleDelete}
+                  disabled={!anySel}
+                  style={{width:'100%',padding:'12px',background:anySel?'#dc2626':'#e5e7eb',color:anySel?'white':'#9ca3af',border:'none',borderRadius:'10px',cursor:anySel?'pointer':'not-allowed',fontWeight:'700',fontSize:'14px',transition:'all 0.2s'}}>
+                  🗑️ {anySel ? `${cats.filter(c=>sel[c.id]).length} Bereich${cats.filter(c=>sel[c.id]).length!==1?'e':''} löschen` : 'Keine Auswahl'}
+                </button>
+              </div>
+            );
+          })()}
         </div>
 
         {/* ── Mannschaften verwalten ── */}
@@ -3231,6 +3297,57 @@ export default function TrainingsApp() {
                 );
               })()}
 
+        {/* PT-Ergebnisse im Eltern/Jugend-Profil */}
+        {myChild&&(()=>{
+          const placeEmojiPD=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
+          const myPTs=[
+            ...Object.values(archivedPracticeTournaments),
+            ...Object.values(practiceTournaments).filter(pt=>pt.paused),
+          ].filter(pt=>pt.players&&pt.players.some(p=>p.childId===myChild.id))
+           .sort((a,b)=>(b.archivedAt||b.createdAt||'').localeCompare(a.archivedAt||a.createdAt||''));
+          if(myPTs.length===0) return null;
+          return (
+            <div style={{padding:'0 0 16px'}}>
+              <span style={{display:'block',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.45)',textTransform:'uppercase',letterSpacing:'2px',margin:'0 16px 10px'}}>Trainingswettkämpfe</span>
+              <div style={{margin:'0 16px',background:'rgba(167,139,250,0.05)',border:'1px solid rgba(167,139,250,0.15)',borderRadius:'16px',padding:'12px 14px',display:'grid',gap:'8px'}}>
+                {myPTs.map(pt=>{
+                  const isPaused=!!pt.paused;
+                  let myEntry=null;
+                  if(pt.finalStandings){myEntry=pt.finalStandings.find(s=>s.childId===myChild.id);}
+                  else if(isPaused){
+                    const s4=pt.players.map((_,i)=>({idx:i,wins:0,losses:0,setsWon:0,setsLost:0}));
+                    pt.matches.forEach(m=>{if(!m.result)return;const{sets1,sets2}=m.result;s4[m.p1Idx].setsWon+=sets1;s4[m.p1Idx].setsLost+=sets2;s4[m.p2Idx].setsWon+=sets2;s4[m.p2Idx].setsLost+=sets1;if(sets1>sets2)s4[m.p1Idx].wins++;else s4[m.p2Idx].wins++;});
+                    const srt4=[...s4].sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:(b.setsWon-b.setsLost)-(a.setsWon-a.setsLost));
+                    const mi4=pt.players.findIndex(p=>p.childId===myChild.id);
+                    const mr4=srt4.findIndex(s=>s.idx===mi4);
+                    const ms4=s4[mi4]||{wins:0,setsWon:0,setsLost:0};
+                    const mc4=pt.matches.filter(m=>m.result&&(m.p1Idx===mi4||m.p2Idx===mi4)).length;
+                    myEntry={place:mr4+1,wins:ms4.wins,losses:mc4-ms4.wins,setsWon:ms4.setsWon,setsLost:ms4.setsLost,paused:true};
+                  }
+                  if(!myEntry) return null;
+                  const opps=pt.players.filter(p=>p.childId!==myChild.id).map(p=>p.name);
+                  const dateStr=new Date(pt.archivedAt||pt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+                  const groupSize=pt.players?pt.players.length:4;
+                  return(
+                    <div key={pt.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',background:'rgba(255,255,255,0.04)',borderRadius:'10px',border:'1px solid rgba(167,139,250,0.1)'}}>
+                      <span style={{fontSize:'20px',flexShrink:0}}>{myEntry.paused?'⏸':(placeEmojiPD[myEntry.place-1]||(myEntry.place+'.'))}</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'5px',flexWrap:'wrap',marginBottom:'2px'}}>
+                          {myEntry.paused
+                            ?<span style={{fontWeight:'800',color:'#fbbf24',fontSize:'13px'}}>Pausiert</span>
+                            :<span style={{fontWeight:'800',color:'white',fontSize:'13px'}}>Platz {myEntry.place}</span>}
+                          <span style={{fontSize:'10px',color:'rgba(167,139,250,0.6)',fontWeight:'600'}}>{groupSize}er Gruppe</span>
+                          <span style={{fontSize:'10px',color:'rgba(255,255,255,0.3)'}}>{dateStr}</span>
+                        </div>
+                        <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>vs. {opps.join(', ')} · {myEntry.wins}S {myEntry.losses}N · Sätze {myEntry.setsWon}:{myEntry.setsLost}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
               {/* ── Errungenschaften (nur Jugend) ── */}
               {grp?.id === 'jugend' && (()=>{
                 const ach = getAchievements(myChild.id);
@@ -3394,55 +3511,6 @@ export default function TrainingsApp() {
           }
         </div>
 
-        {/* PT-Ergebnisse im Eltern/Jugend-Profil */}
-        {myChild&&(()=>{
-          const placeEmojiPD=['🥇','🥈','🥉','4️⃣'];
-          const sevenDaysAgo3=new Date(Date.now()-7*24*60*60*1000).toISOString();
-          const myPTs=[
-            ...Object.values(archivedPracticeTournaments),
-            ...Object.values(practiceTournaments).filter(pt=>pt.matches&&pt.matches.every(m=>m.result)&&pt.createdAt>=sevenDaysAgo3),
-          ].filter(pt=>pt.players&&pt.players.some(p=>p.childId===myChild.id))
-           .sort((a,b)=>(b.archivedAt||b.createdAt||'').localeCompare(a.archivedAt||a.createdAt||''));
-          if(myPTs.length===0) return null;
-          return (
-            <div style={{padding:'0 0 16px'}}>
-              <span style={{display:'block',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.45)',textTransform:'uppercase',letterSpacing:'2px',margin:'0 16px 10px'}}>Trainingswettkämpfe</span>
-              <div style={{margin:'0 16px',background:'rgba(167,139,250,0.05)',border:'1px solid rgba(167,139,250,0.15)',borderRadius:'16px',padding:'12px 14px',display:'grid',gap:'8px'}}>
-                {myPTs.map(pt=>{
-                  const allDonePD=pt.matches&&pt.matches.every(m=>m.result);
-                  let myEntry=null;
-                  if(pt.finalStandings){myEntry=pt.finalStandings.find(s=>s.childId===myChild.id);}
-                  else if(allDonePD){
-                    const s4=pt.players.map((_,i)=>({idx:i,wins:0,losses:0,setsWon:0,setsLost:0}));
-                    pt.matches.forEach(m=>{if(!m.result)return;const{sets1,sets2}=m.result;s4[m.p1Idx].setsWon+=sets1;s4[m.p1Idx].setsLost+=sets2;s4[m.p2Idx].setsWon+=sets2;s4[m.p2Idx].setsLost+=sets1;if(sets1>sets2)s4[m.p1Idx].wins++;else s4[m.p2Idx].wins++;});
-                    const srt4=[...s4].sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:(b.setsWon-b.setsLost)-(a.setsWon-a.setsLost));
-                    const mi4=pt.players.findIndex(p=>p.childId===myChild.id);
-                    const mr4=srt4.findIndex(s=>s.idx===mi4);
-                    const ms4=s4[mi4]||{wins:0,setsWon:0,setsLost:0};
-                    const mc4=pt.matches.filter(m=>m.result&&(m.p1Idx===mi4||m.p2Idx===mi4)).length;
-                    myEntry={place:mr4+1,wins:ms4.wins,losses:mc4-ms4.wins,setsWon:ms4.setsWon,setsLost:ms4.setsLost};
-                  }
-                  if(!myEntry) return null;
-                  const opps=pt.players.filter(p=>p.childId!==myChild.id).map(p=>p.name);
-                  const dateStr=new Date(pt.archivedAt||pt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
-                  return(
-                    <div key={pt.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',background:'rgba(255,255,255,0.04)',borderRadius:'10px',border:'1px solid rgba(167,139,250,0.1)'}}>
-                      <span style={{fontSize:'20px',flexShrink:0}}>{placeEmojiPD[myEntry.place-1]||(myEntry.place+'.')}</span>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{display:'flex',alignItems:'center',gap:'5px',flexWrap:'wrap',marginBottom:'2px'}}>
-                          <span style={{fontWeight:'800',color:'white',fontSize:'13px'}}>Platz {myEntry.place}</span>
-                          <span style={{fontSize:'10px',color:'rgba(167,139,250,0.6)',fontWeight:'600'}}>4er Gruppe</span>
-                          <span style={{fontSize:'10px',color:'rgba(255,255,255,0.3)'}}>{dateStr}</span>
-                        </div>
-                        <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>vs. {opps.join(', ')} · {myEntry.wins}S {myEntry.losses}N · Sätze {myEntry.setsWon}:{myEntry.setsLost}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
         {isMobile && <MobileBottomNav view={view} navTo={navTo} userRole={userRole} canEdit={canEdit} appSettings={appSettings} unreadCount={0}/>}
       </div>
     );
@@ -3990,21 +4058,36 @@ export default function TrainingsApp() {
           {/* Trainingswettkämpfe im Kind-Profil */}
           {(()=>{
             const placeEmojiCH=['🥇','🥈','🥉','4️⃣'];
-            const childPTs=Object.values(archivedPracticeTournaments).filter(pt=>pt.players&&pt.players.some(p=>p.childId===child.id)).sort((a,b)=>(b.archivedAt||'').localeCompare(a.archivedAt||''));
+            const childPTs=[
+            ...Object.values(archivedPracticeTournaments),
+            ...Object.values(practiceTournaments).filter(pt=>pt.paused&&pt.players&&pt.players.some(p=>p.childId===child.id)),
+          ].filter(pt=>pt.players&&pt.players.some(p=>p.childId===child.id))
+           .sort((a,b)=>(b.archivedAt||b.createdAt||'').localeCompare(a.archivedAt||a.createdAt||''));
             if(childPTs.length===0) return null;
             return (<div style={{marginBottom:'20px'}}>
               <h3 style={{margin:'0 0 12px',color:'white',fontSize:'16px',fontWeight:'800'}}>🎮 Trainingswettkämpfe</h3>
               <div style={{display:'grid',gap:'7px'}}>
                 {childPTs.map(pt=>{
-                  const fs3=(pt.finalStandings||[]).find(s=>s.childId===child.id);
+                  let fs3=(pt.finalStandings||[]).find(s=>s.childId===child.id);
+                  if(!fs3&&pt.paused){
+                    // Compute current standings for paused PT
+                    const stats5=pt.players.map((_,i)=>({idx:i,wins:0,losses:0,setsWon:0,setsLost:0}));
+                    pt.matches.forEach(m=>{if(!m.result)return;const{sets1,sets2}=m.result;stats5[m.p1Idx].setsWon+=sets1;stats5[m.p1Idx].setsLost+=sets2;stats5[m.p2Idx].setsWon+=sets2;stats5[m.p2Idx].setsLost+=sets1;if(sets1>sets2)stats5[m.p1Idx].wins++;else stats5[m.p2Idx].wins++;});
+                    const sorted5=[...stats5].sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:(b.setsWon-b.setsLost)-(a.setsWon-a.setsLost));
+                    const mi5=pt.players.findIndex(p=>p.childId===child.id);
+                    const mr5=sorted5.findIndex(s=>s.idx===mi5);
+                    const ms5=stats5[mi5]||{wins:0,setsWon:0,setsLost:0};
+                    const mc5=pt.matches.filter(m=>m.result&&(m.p1Idx===mi5||m.p2Idx===mi5)).length;
+                    fs3={place:mr5+1,wins:ms5.wins,losses:mc5-ms5.wins,setsWon:ms5.setsWon,setsLost:ms5.setsLost,paused:true};
+                  }
                   if(!fs3) return null;
                   const opps=pt.players.filter(p=>p.childId!==child.id).map(p=>p.name);
                   return(<div key={pt.id} style={{display:'flex',alignItems:'center',gap:'12px',padding:'11px 14px',background:'rgba(167,139,250,0.06)',border:'1px solid rgba(167,139,250,0.15)',borderRadius:'12px'}}>
-                    <span style={{fontSize:'22px',flexShrink:0}}>{placeEmojiCH[fs3.place-1]||String(fs3.place)+'.'}  </span>
+                    <span style={{fontSize:'22px',flexShrink:0}}>{fs3.paused?'⏸':(placeEmojiCH[fs3.place-1]||String(fs3.place)+'.')}</span>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'2px',flexWrap:'wrap'}}>
                         <span style={{fontWeight:'800',color:'white',fontSize:'14px'}}>Platz {fs3.place}</span>
-                        <span style={{fontSize:'11px',color:'rgba(167,139,250,0.7)',fontWeight:'600'}}>4er Gruppe</span>
+                        <span style={{fontSize:'11px',color:'rgba(167,139,250,0.7)',fontWeight:'600'}}>{pt.players?pt.players.length+'er Gruppe':'4er Gruppe'}</span>
                         <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{new Date(pt.archivedAt||pt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}</span>
                       </div>
                       <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>vs. {opps.join(', ')} · {fs3.wins}S {fs3.losses}N · Sätze {fs3.setsWon}:{fs3.setsLost}</p>
@@ -4704,8 +4787,7 @@ export default function TrainingsApp() {
   if (view === 'practiceTournaments') {
     const jugendSubs = Object.values(subgroups).filter(sg => sg.groupId === 'jugend');
     const allPTList = Object.values(practiceTournaments).sort((a,b) => b.createdAt.localeCompare(a.createdAt));
-    const typeInfo = { label:'4er Gruppe', emoji:'🎯', maxPlayers:4, desc:'Rundenturnier · 3 Runden · 4 Spieler' };
-    const maxPlayers = typeInfo.maxPlayers;
+    const maxPlayers = ptCreateForm.groupSize || 4;
 
     const getSeededPlayers = (ids) => ids
       .map(id => {
@@ -4732,14 +4814,24 @@ export default function TrainingsApp() {
         createdBy: userProfile?.name || user?.email || 'Trainer',
         settings: { winSets:ptCreateForm.winSets, setLength:ptCreateForm.setLength, deciderLength:ptCreateForm.deciderCustom?ptCreateForm.deciderLength:ptCreateForm.setLength, trackSetScores:ptCreateForm.trackSetScores },
         players: seeded.map((p,i) => ({...p, seed:i+1})),
-        matches: [
-          {round:1,p1Idx:0,p2Idx:3,result:null},
-          {round:1,p1Idx:1,p2Idx:2,result:null},
-          {round:2,p1Idx:0,p2Idx:2,result:null},
-          {round:2,p1Idx:1,p2Idx:3,result:null},
-          {round:3,p1Idx:0,p2Idx:1,result:null},
-          {round:3,p1Idx:2,p2Idx:3,result:null},
-        ],
+        matches: (()=>{
+          // Round-robin schedule: fix player 0, rotate rest; top 2 seeds always meet in last round
+          const n = seeded.length;
+          const hasBye = n % 2 === 1;
+          const N = hasBye ? n + 1 : n;
+          const circle = Array.from({length: N}, (_, i) => i < n ? i : -1);
+          const rotating = circle.slice(1);
+          const allMatches = [];
+          for (let r = 0; r < N - 1; r++) {
+            const all = [circle[0], ...rotating];
+            for (let j = 0; j < N/2; j++) {
+              const p1 = all[j], p2 = all[N-1-j];
+              if (p1 !== -1 && p2 !== -1) allMatches.push({round:r+1, p1Idx:p1, p2Idx:p2, result:null});
+            }
+            rotating.unshift(rotating.pop());
+          }
+          return allMatches;
+        })(),
         status:'active',
       };
       savePracticeTournaments({...practiceTournaments, [id]: newPT});
@@ -4770,7 +4862,7 @@ export default function TrainingsApp() {
                 style={{padding:'9px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'12px',color:'rgba(255,255,255,0.55)',cursor:'pointer',fontWeight:'700',fontSize:'13px',display:'flex',alignItems:'center',gap:'5px',whiteSpace:'nowrap'}}>
                 <Archive size={14}/> Archiv
               </button>
-              <button onClick={()=>{setPtCreating(true);setPtCreateStep(1);setPtSelectedChildren([]);setPtSubgroupFilter('all');setPtCreateForm({type:'4er_gruppe',winSets:2,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false});}}
+              <button onClick={()=>{setPtCreating(true);setPtCreateStep(1);setPtSelectedChildren([]);setPtSubgroupFilter('all');setPtCreateForm({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false});}}
                 style={{padding:'9px 16px',background:'linear-gradient(135deg,#7c3aed,#6d28d9)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'700',fontSize:'13px',display:'flex',alignItems:'center',gap:'6px',whiteSpace:'nowrap'}}>
                 <Plus size={15}/> Neuer Wettkampf
               </button>
@@ -4797,14 +4889,20 @@ export default function TrainingsApp() {
               {ptCreateStep===1 && (
                 <>
                   <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'rgba(167,139,250,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Wettkampftyp</p>
-                  <div style={{display:'flex',gap:'10px',marginBottom:'22px'}}>
-                    {[{k:'4er_gruppe',emoji:'🎯',label:'4er Gruppe',desc:'Rundenturnier · 3 Runden · 4 Spieler'}].map(t=>(
-                      <div key={t.k} onClick={()=>setPtCreateForm(f=>({...f,type:t.k}))}
-                        style={{flex:1,padding:'16px',borderRadius:'14px',border:`2px solid ${ptCreateForm.type===t.k?'#a78bfa':'rgba(255,255,255,0.1)'}`,background:ptCreateForm.type===t.k?'rgba(167,139,250,0.12)':'rgba(255,255,255,0.03)',cursor:'pointer',textAlign:'center',transition:'all 0.12s'}}>
-                        <div style={{fontSize:'30px',marginBottom:'6px'}}>{t.emoji}</div>
-                        <div style={{fontWeight:'800',color:'white',fontSize:'15px'}}>{t.label}</div>
-                        <div style={{fontSize:'11px',color:'rgba(255,255,255,0.4)',marginTop:'4px'}}>{t.desc}</div>
-                      </div>
+                  <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 14px',background:'rgba(167,139,250,0.06)',border:'1px solid rgba(167,139,250,0.15)',borderRadius:'12px',marginBottom:'22px'}}>
+                    <span style={{fontSize:'22px'}}>🎯</span>
+                    <div style={{flex:1}}>
+                      <p style={{margin:0,fontWeight:'800',color:'white',fontSize:'14px'}}>Rundenturnier</p>
+                      <p style={{margin:'2px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>Jeder spielt gegen jeden · bester vs. zweitbester immer in der letzten Runde</p>
+                    </div>
+                  </div>
+                  <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'rgba(167,139,250,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Gruppengröße</p>
+                  <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'22px'}}>
+                    {[3,4,5,6,7,8,9,10].map(n=>(
+                      <button key={n} onClick={()=>setPtCreateForm(f=>({...f,groupSize:n}))}
+                        style={{...ptBtn(ptCreateForm.groupSize===n),flex:'none',width:'42px',fontSize:'15px'}}>
+                        {n}
+                      </button>
                     ))}
                   </div>
 
@@ -4954,7 +5052,7 @@ export default function TrainingsApp() {
             const sevenDaysAgo = new Date(Date.now()-7*24*60*60*1000).toISOString();
             const toAutoArchive = allPTList.filter(pt=>{
               const done=pt.matches.every(m=>m.result);
-              return done && pt.createdAt < sevenDaysAgo;
+              return done && !pt.paused && pt.createdAt < sevenDaysAgo;
             });
             if(toAutoArchive.length>0){
               toAutoArchive.forEach(pt=>{
@@ -4980,7 +5078,7 @@ export default function TrainingsApp() {
             const recentDonePTs = allPTList.filter(pt=>{
               const done=pt.matches.every(m=>m.result);
               const sevenDaysAgo2=new Date(Date.now()-7*24*60*60*1000).toISOString();
-              return done && pt.createdAt >= sevenDaysAgo2;
+              return done && !pt.paused && pt.createdAt >= sevenDaysAgo2;
             });
             const deletePT = (e, ptId) => {
               e.stopPropagation();
@@ -5001,9 +5099,9 @@ export default function TrainingsApp() {
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:'flex',alignItems:'center',gap:'7px',marginBottom:'4px',flexWrap:'wrap'}}>
                           <span style={{fontSize:'16px'}}>🎯</span>
-                          <span style={{fontWeight:'800',color:'white',fontSize:'15px'}}>4er Gruppe</span>
-                          <span style={{fontSize:'10px',fontWeight:'700',color:allDone2?'#4ade80':'#fde68a',background:allDone2?'rgba(74,222,128,0.12)':'rgba(253,230,138,0.1)',padding:'2px 7px',borderRadius:'10px',border:`1px solid ${allDone2?'rgba(74,222,128,0.25)':'rgba(253,230,138,0.25)'}`}}>
-                            {allDone2?'✓ Abgeschlossen':'● Laufend'}
+                          <span style={{fontWeight:'800',color:'white',fontSize:'15px'}}>{pt.players?pt.players.length+'er Gruppe':'4er Gruppe'}</span>
+                          <span style={{fontSize:'10px',fontWeight:'700',color:allDone2?'#4ade80':pt.paused?'#fbbf24':'#fde68a',background:allDone2?'rgba(74,222,128,0.12)':pt.paused?'rgba(251,191,36,0.12)':'rgba(253,230,138,0.1)',padding:'2px 7px',borderRadius:'10px',border:`1px solid ${allDone2?'rgba(74,222,128,0.25)':pt.paused?'rgba(251,191,36,0.3)':'rgba(253,230,138,0.25)'}`}}>
+                            {allDone2?'✓ Abgeschlossen':pt.paused?'⏸ Pausiert':'● Laufend'}
                           </span>
                         </div>
                         <p style={{margin:'0 0 6px',fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>
@@ -5012,6 +5110,13 @@ export default function TrainingsApp() {
                       </div>
                       <div style={{display:'flex',alignItems:'center',gap:'6px',flexShrink:0}}>
                         <span style={{fontSize:'12px',fontWeight:'700',color:'rgba(167,139,250,0.6)'}}>{done}/{total}</span>
+                        {!allDone2&&(
+                          <button onClick={(e)=>{e.stopPropagation();const upd={...practiceTournaments,[pt.id]:{...pt,paused:!pt.paused}};savePracticeTournaments(upd);}}
+                            style={{width:'28px',height:'28px',borderRadius:'7px',background:pt.paused?'rgba(251,191,36,0.15)':'rgba(167,139,250,0.1)',border:`1px solid ${pt.paused?'rgba(251,191,36,0.3)':'rgba(167,139,250,0.2)'}`,color:pt.paused?'#fbbf24':'rgba(167,139,250,0.6)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}
+                            title={pt.paused?'Fortsetzen':'Pausieren'}>
+                            <span style={{fontSize:'11px',lineHeight:1}}>{pt.paused?'▶':'⏸'}</span>
+                          </button>
+                        )}
                         <button onClick={(e)=>deletePT(e,pt.id)}
                           style={{width:'28px',height:'28px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}
                           title="Wettkampf löschen">
@@ -5082,7 +5187,8 @@ export default function TrainingsApp() {
 
     const { settings, players, matches } = pt;
     const maxSets = settings.winSets * 2 - 1;
-    const rounds = [1,2,3];
+    const numRoundsTotal = players.length % 2 === 0 ? players.length - 1 : players.length;
+    const rounds = Array.from({length:numRoundsTotal}, (_, i) => i+1);
 
     // Calculate standings
     const stats = players.map((_,i) => ({idx:i,wins:0,losses:0,setsWon:0,setsLost:0,ptsWon:0,ptsLost:0}));
@@ -5111,7 +5217,7 @@ export default function TrainingsApp() {
     });
 
     const allDone = matches.every(m=>m.result!==null);
-    const placeEmoji = ['🥇','🥈','🥉','4️⃣'];
+    const placeEmoji = ['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
     const placeColor = ['#fde68a','#e2e8f0','#fdba74','rgba(255,255,255,0.35)'];
 
     const updateMatchResult = (matchIdx, result) => {
@@ -5122,6 +5228,11 @@ export default function TrainingsApp() {
     const deleteResult = (matchIdx) => {
       const updMatches = matches.map((m,i) => i===matchIdx ? {...m,result:null} : m);
       savePracticeTournaments({...practiceTournaments, [pt.id]: {...pt, matches:updMatches}});
+    };
+
+    const pauseTournament = () => {
+      const newPaused = !pt.paused;
+      savePracticeTournaments({...practiceTournaments, [pt.id]: {...pt, paused:newPaused}});
     };
 
     const archiveTournament = () => {
@@ -5206,6 +5317,10 @@ export default function TrainingsApp() {
               </h2>
             </div>
             <div style={{display:'flex',gap:'6px',flexShrink:0}}>
+              <button onClick={pauseTournament} style={{height:'34px',padding:'0 12px',borderRadius:'8px',background:pt.paused?'rgba(251,191,36,0.15)':'rgba(167,139,250,0.08)',border:`1px solid ${pt.paused?'rgba(251,191,36,0.3)':'rgba(167,139,250,0.2)'}`,color:pt.paused?'#fbbf24':'rgba(167,139,250,0.6)',cursor:'pointer',display:'flex',alignItems:'center',gap:'5px',fontWeight:'700',fontSize:'12px'}}>
+                <span style={{fontSize:'13px'}}>{pt.paused?'▶':'⏸'}</span>
+                <span>{pt.paused?'Fortsetzen':'Pausieren'}</span>
+              </button>
               <button onClick={deleteActiveTournament} style={{width:'34px',height:'34px',borderRadius:'8px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <Trash2 size={14}/>
               </button>
@@ -5244,7 +5359,14 @@ export default function TrainingsApp() {
           {/* ── Runden & Partien ────────────────────────────────── */}
           {rounds.map(round=>(
             <div key={round} style={{marginBottom:'20px'}}>
-              <p style={{margin:'0 0 10px',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.45)',textTransform:'uppercase',letterSpacing:'2px'}}>Runde {round}</p>
+              <p style={{margin:'0 0 10px',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.45)',textTransform:'uppercase',letterSpacing:'2px'}}>
+                Runde {round}
+                {players.length % 2 === 1 && (() => {
+                  const playersInRound = new Set(matches.filter(m=>m.round===round).flatMap(m=>[m.p1Idx,m.p2Idx]));
+                  const bye = players.findIndex((_,i) => !playersInRound.has(i));
+                  return bye >= 0 ? <span style={{fontSize:'10px',color:'rgba(251,191,36,0.5)',marginLeft:'8px',fontWeight:'600',textTransform:'none'}}>⏸ Freirunde: {players[bye]?.name}</span> : null;
+                })()}
+              </p>
               <div style={{display:'grid',gap:'8px'}}>
                 {matches.filter(m=>m.round===round).map(match=>{
                   const matchIdx = matches.indexOf(match);
@@ -5659,37 +5781,51 @@ export default function TrainingsApp() {
           {/* ── ÜBUNGSWETTKÄMPFE TAB ── */}
           {archiveTab==='practiceTournaments' && (() => {
             const sortedPTs = Object.values(archivedPracticeTournaments).sort((a,b)=>(b.archivedAt||'').localeCompare(a.archivedAt||''));
-            const placeEmoji = ['🥇','🥈','🥉','4️⃣'];
+            const placeEmoji = ['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
             return (
-              <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+              <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
                 {sortedPTs.length===0 && <div style={{background:'rgba(255,255,255,0.1)',borderRadius:'12px',padding:'30px',textAlign:'center',color:'rgba(255,255,255,0.7)'}}>Noch keine archivierten Übungswettkämpfe.</div>}
                 {sortedPTs.map(pt=>{
                   const fs2 = pt.finalStandings||[];
+                  const expanded = !!ptArchiveExpanded[pt.id];
+                  const groupSize = pt.players ? pt.players.length : 4;
+                  const dateStr = new Date(pt.archivedAt||pt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
                   return (
-                    <div key={pt.id} style={{background:'rgba(167,139,250,0.06)',borderRadius:'16px',padding:'16px',border:'1px solid rgba(167,139,250,0.2)'}}>
-                      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'12px',marginBottom:'12px'}}>
-                        <div>
-                          <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'4px'}}>
-                            <span style={{fontSize:'18px'}}>🎯</span>
-                            <span style={{fontWeight:'800',color:'white',fontSize:'16px'}}>4er Gruppe</span>
-                          </div>
-                          <p style={{margin:0,fontSize:'12px',color:'rgba(167,139,250,0.6)'}}>
-                            {new Date(pt.archivedAt||pt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})} · {pt.createdBy}
-                          </p>
-                          <p style={{margin:'3px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{pt.settings.winSets} Gewinnsätze · {pt.settings.setLength}/{pt.settings.deciderLength}</p>
+                    <div key={pt.id} style={{background:'rgba(167,139,250,0.06)',borderRadius:'14px',border:'1px solid rgba(167,139,250,0.2)',overflow:'hidden'}}>
+                      {/* Collapsed header — always visible */}
+                      <div onClick={()=>setPtArchiveExpanded(prev=>({...prev,[pt.id]:!prev[pt.id]}))}
+                        style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 14px',cursor:'pointer'}}
+                        onMouseEnter={e=>e.currentTarget.style.background='rgba(167,139,250,0.07)'}
+                        onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                        <span style={{fontSize:'13px',color:'rgba(167,139,250,0.5)',flexShrink:0,whiteSpace:'nowrap'}}>{dateStr}</span>
+                        <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',flexShrink:0}}>{groupSize}er</span>
+                        <div style={{flex:1,display:'flex',gap:'5px',flexWrap:'wrap',overflow:'hidden',minWidth:0}}>
+                          {fs2.map((s,i)=>(
+                            <span key={s.childId} style={{fontSize:'12px',color:i===0?'#fde68a':i===1?'#e2e8f0':i===2?'#fdba74':'rgba(255,255,255,0.4)',fontWeight:i<3?'800':'600',whiteSpace:'nowrap'}}>
+                              {i>0&&<span style={{color:'rgba(255,255,255,0.15)',margin:'0 2px'}}>·</span>}{s.name}
+                            </span>
+                          ))}
                         </div>
+                        <span style={{fontSize:'18px',color:'rgba(167,139,250,0.5)',transform:expanded?'rotate(90deg)':'rotate(0deg)',transition:'transform 0.2s',flexShrink:0,lineHeight:1}}>›</span>
                       </div>
-                      <div style={{display:'grid',gap:'5px'}}>
-                        {fs2.map(s=>(
-                          <div key={s.childId} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',background:'rgba(255,255,255,0.04)',borderRadius:'10px',border:'1px solid rgba(255,255,255,0.07)'}}>
-                            <span style={{fontSize:'20px',flexShrink:0}}>{placeEmoji[s.place-1]||`${s.place}.`}</span>
-                            <div style={{flex:1}}>
-                              <p style={{margin:0,fontWeight:'800',color:'white',fontSize:'14px'}}>{s.name}</p>
-                              <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{s.wins}S {s.losses}N · Sätze {s.setsWon}:{s.setsLost}{pt.settings.trackSetScores?` · Punkte ${s.ptsWon}:${s.ptsLost}`:''}</p>
-                            </div>
+                      {expanded && (
+                        <div style={{borderTop:'1px solid rgba(167,139,250,0.12)',padding:'12px 14px',display:'grid',gap:'5px'}}>
+                          <div style={{display:'flex',gap:'10px',marginBottom:'8px',flexWrap:'wrap'}}>
+                            <span style={{fontSize:'11px',color:'rgba(167,139,250,0.6)'}}>{new Date(pt.archivedAt||pt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
+                            <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>von {pt.createdBy}</span>
+                            <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{pt.settings.winSets} Gewinnsätze</span>
                           </div>
-                        ))}
-                      </div>
+                          {fs2.map(s=>(
+                            <div key={s.childId} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',background:'rgba(255,255,255,0.04)',borderRadius:'10px',border:'1px solid rgba(255,255,255,0.07)'}}>
+                              <span style={{fontSize:'20px',flexShrink:0}}>{placeEmoji[s.place-1]||`${s.place}.`}</span>
+                              <div style={{flex:1}}>
+                                <p style={{margin:0,fontWeight:'800',color:'white',fontSize:'14px'}}>{s.name}</p>
+                                <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{s.wins}S {s.losses}N · Sätze {s.setsWon}:{s.setsLost}{pt.settings.trackSetScores?` · Punkte ${s.ptsWon}:${s.ptsLost}`:''}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
