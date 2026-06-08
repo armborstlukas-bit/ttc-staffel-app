@@ -3363,7 +3363,7 @@ export default function TrainingsApp() {
             ...Object.values(archivedPracticeTournaments),
             ...Object.values(practiceTournaments).filter(pt=>pt.players&&pt.players.some(p=>p.childId===myChild.id)),
           ].filter(pt=>pt.players&&pt.players.some(p=>p.childId===myChild.id))
-           .sort((a,b)=>(b.archivedAt||b.createdAt||'').localeCompare(a.archivedAt||a.createdAt||''));
+           .sort((a,b)=>(b.archivedAt||b.createdAt||'').localeCompare(a.archivedAt||a.createdAt||'')).slice(0,10);
           if(myPTs.length===0) return null;
           return (
             <div style={{padding:'0 0 16px'}}>
@@ -4125,7 +4125,7 @@ export default function TrainingsApp() {
               ...Object.values(archivedPracticeTournaments),
               ...Object.values(practiceTournaments).filter(pt=>pt.players&&pt.players.some(p=>p.childId===child.id)),
             ].filter(pt=>pt.players&&pt.players.some(p=>p.childId===child.id))
-             .sort((a,b)=>(b.archivedAt||b.createdAt||'').localeCompare(a.archivedAt||a.createdAt||''));
+             .sort((a,b)=>(b.archivedAt||b.createdAt||'').localeCompare(a.archivedAt||a.createdAt||'')).slice(0,10);
             if(childPTs.length===0) return null;
             return (<>
               {ptDetailModal&&(()=>{
