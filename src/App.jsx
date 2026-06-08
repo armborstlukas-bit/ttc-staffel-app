@@ -1253,10 +1253,15 @@ export default function TrainingsApp() {
 
   // ── Errungenschaften Helpers ─────────────────────────────────
   const getAchievements = (childId) => children[childId]?.achievements || {};
-  const saveChildAchievements = (childId, ach) => {
-    const child = children[childId];
-    if (!child) return;
-    saveChildren({ ...children, [childId]: { ...child, achievements: ach } });
+  const saveChildAchievements = (childId, newAch) => {
+    // Use functional setChildren to always work with the latest state (avoids stale closures)
+    setChildren(prev => {
+      const prevChild = prev[childId];
+      if (!prevChild) return prev;
+      const updated = { ...prev, [childId]: { ...prevChild, achievements: newAch } };
+      setDoc(doc(db,'ttc','children'), updated);
+      return updated;
+    });
   };
 
   const getMonthlyAttendanceLevel = (childId, yearMonth) => {
@@ -1537,7 +1542,7 @@ export default function TrainingsApp() {
                 <label style={{display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',fontSize:'14px',color:'rgba(255,255,255,0.6)',userSelect:'none',padding:'8px 12px',background:'rgba(74,222,128,0.05)',border:'1px solid rgba(74,222,128,0.12)',borderRadius:'10px'}}>
                   <input type="checkbox" checked={registerIsParent} onChange={e=>setRegisterIsParent(e.target.checked)}
                     style={{width:'18px',height:'18px',cursor:'pointer',accentColor:'#4ade80',flexShrink:0}}/>
-                  <span>Ich bin ein Elternteil</span>
+                  <span style={{flexShrink:0,whiteSpace:'nowrap'}}>Ich bin ein Elternteil</span>
                 </label>
               </div>
             )}
@@ -4295,27 +4300,52 @@ export default function TrainingsApp() {
                 const ach = getAchievements(child.id);
                 const ttrUnlocked = ach.ttrUnlocked || [];
 
-                const toggleTTR = (val) => {
-                  const wasUnlocked = ttrUnlocked.includes(val);
-                  const next = wasUnlocked ? ttrUnlocked.filter(v=>v!==val) : [...ttrUnlocked, val];
-                  saveChildAchievements(child.id, {...ach, ttrUnlocked: next});
-                  if (!wasUnlocked) {
-                    createNotification(child.id, 'achievement', '🏓 TTR-Meilenstein erreicht!',
-                      `Glückwunsch ${child.name}! Du hast einen TTR-Wert von ${val} erreicht. ${ACHIEVEMENT_DESCRIPTIONS.ttr(val)}`);
-                  }
-                };
                 const ACH_LABELS = {
                   einzel1:'🥇 1. Platz Einzel', einzel2:'🥈 2. Platz Einzel', einzel3:'🥉 3. Platz Einzel',
                   doppel1:'🥇 1. Platz Doppel', doppel2:'🥈 2. Platz Doppel', doppel3:'🥉 3. Platz Doppel',
                   team:'🏆 Mannschaftsmeister', spielerDesMonats:'⭐ Spieler des Monats',
                 };
+                // All three functions read fresh ach inside setChildren functional update
+                const toggleTTR = (val) => {
+                  setChildren(prev => {
+                    const prevChild = prev[child.id]; if (!prevChild) return prev;
+                    const prevAch = prevChild.achievements || {};
+                    const prevTTR = prevAch.ttrUnlocked || [];
+                    const wasUnlocked = prevTTR.includes(val);
+                    const next = wasUnlocked ? prevTTR.filter(v=>v!==val) : [...prevTTR, val];
+                    const newAch = {...prevAch, ttrUnlocked: next};
+                    const updated = {...prev, [child.id]: {...prevChild, achievements: newAch}};
+                    setDoc(doc(db,'ttc','children'), updated);
+                    return updated;
+                  });
+                  if (!ttrUnlocked.includes(val)) {
+                    createNotification(child.id, 'achievement', '🏓 TTR-Meilenstein erreicht!',
+                      `Glückwunsch ${child.name}! Du hast einen TTR-Wert von ${val} erreicht. ${ACHIEVEMENT_DESCRIPTIONS.ttr(val)}`);
+                  }
+                };
                 const incField = (field) => {
-                  saveChildAchievements(child.id, {...ach, [field]: (ach[field]||0)+1});
+                  setChildren(prev => {
+                    const prevChild = prev[child.id]; if (!prevChild) return prev;
+                    const prevAch = prevChild.achievements || {};
+                    const newAch = {...prevAch, [field]: (prevAch[field]||0)+1};
+                    const updated = {...prev, [child.id]: {...prevChild, achievements: newAch}};
+                    setDoc(doc(db,'ttc','children'), updated);
+                    return updated;
+                  });
                   const label = ACH_LABELS[field] || field;
                   createNotification(child.id, 'achievement', `${label}`,
                     `Glückwunsch ${child.name}! Du hast eine neue Errungenschaft erhalten: ${label}. Weiter so! 🎉`);
                 };
-                const decField = (field) => saveChildAchievements(child.id, {...ach, [field]: Math.max(0,(ach[field]||0)-1)});
+                const decField = (field) => {
+                  setChildren(prev => {
+                    const prevChild = prev[child.id]; if (!prevChild) return prev;
+                    const prevAch = prevChild.achievements || {};
+                    const newAch = {...prevAch, [field]: Math.max(0,(prevAch[field]||0)-1)};
+                    const updated = {...prev, [child.id]: {...prevChild, achievements: newAch}};
+                    setDoc(doc(db,'ttc','children'), updated);
+                    return updated;
+                  });
+                };
 
                 return (
                   <div key={child.id} style={{background:'white',borderRadius:'14px',padding:'16px',boxShadow:'0 2px 8px rgba(0,0,0,0.15)'}}>
