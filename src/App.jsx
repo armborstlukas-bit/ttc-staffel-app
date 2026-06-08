@@ -1515,7 +1515,9 @@ export default function TrainingsApp() {
       <div style={{width:'100%',maxWidth:'420px'}}>
         {/* Logo & Titel */}
         <div style={{textAlign:'center',marginBottom:'36px'}}>
-          <div style={{width:'72px',height:'72px',borderRadius:'20px',background:'linear-gradient(135deg,#15803d,#4ade80)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'36px',margin:'0 auto 16px',boxShadow:'0 8px 32px rgba(74,222,128,0.3)'}}>🏓</div>
+          <div style={{width:'96px',height:'96px',borderRadius:'22px',background:'white',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 20px',boxShadow:'0 8px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.08)',padding:'6px'}}>
+              <img src="/logo.png" alt="TTC Logo" style={{width:'100%',height:'100%',objectFit:'contain'}}/>
+            </div>
           <h1 style={{margin:'0 0 4px',color:'white',fontSize:'26px',fontWeight:'900',letterSpacing:'-0.5px'}}>TTC Grün-Weiß Staffel</h1>
           <p style={{margin:0,color:'rgba(74,222,128,0.55)',fontSize:'13px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'1px'}}>Vereinsapp</p>
         </div>
@@ -1594,7 +1596,9 @@ export default function TrainingsApp() {
         <div style={{width:'100%',maxWidth:'420px'}}>
           {/* Logo */}
           <div style={{textAlign:'center',marginBottom:'32px'}}>
-            <div style={{width:'64px',height:'64px',borderRadius:'18px',background:'linear-gradient(135deg,#15803d,#4ade80)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'30px',margin:'0 auto 14px',boxShadow:'0 8px 28px rgba(74,222,128,0.28)'}}>🏓</div>
+            <div style={{width:'80px',height:'80px',borderRadius:'18px',background:'white',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 14px',boxShadow:'0 8px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.08)',padding:'5px'}}>
+              <img src="/logo.png" alt="TTC Logo" style={{width:'100%',height:'100%',objectFit:'contain'}}/>
+            </div>
             <p style={{margin:'0 0 4px',color:'rgba(74,222,128,0.55)',fontSize:'11px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1.5px'}}>TTC Grün-Weiß Staffel</p>
             <h2 style={{margin:0,color:'white',fontSize:'22px',fontWeight:'800',letterSpacing:'-0.3px'}}>Willkommen, {(userProfile?.name||'').split(' ')[0]}!</h2>
           </div>
@@ -2689,7 +2693,9 @@ export default function TrainingsApp() {
           {/* ── Top-Bar ─────────────────────────────────────────── */}
           <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 24px':'0 -24px 32px'}}>
             <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
-              <div style={{width:'42px',height:'42px',borderRadius:'12px',background:'linear-gradient(135deg,#15803d,#4ade80)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'20px',boxShadow:'0 4px 16px rgba(74,222,128,0.25)'}}>🏓</div>
+              <div style={{width:'42px',height:'42px',borderRadius:'11px',background:'white',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 4px 16px rgba(0,0,0,0.35)',padding:'3px',flexShrink:0}}>
+                <img src="/logo.png" alt="TTC Logo" style={{width:'100%',height:'100%',objectFit:'contain'}}/>
+              </div>
               <div>
                 <p style={{margin:0,color:'white',fontWeight:'800',fontSize:'16px',letterSpacing:'-0.3px'}}>TTC Grün-Weiß Staffel</p>
                 <p style={{margin:0,color:'rgba(74,222,128,0.55)',fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>{userRole==='admin'?'Administrator':'Trainer'}</p>
@@ -2936,7 +2942,9 @@ export default function TrainingsApp() {
           {/* ── Top-Bar ── */}
           <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 22px':'0 -24px 28px'}}>
             <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
-              <div style={{width:'42px',height:'42px',borderRadius:'12px',background:'linear-gradient(135deg,#15803d,#4ade80)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'20px',boxShadow:'0 4px 16px rgba(74,222,128,0.25)'}}>🏓</div>
+              <div style={{width:'42px',height:'42px',borderRadius:'11px',background:'white',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 4px 16px rgba(0,0,0,0.35)',padding:'3px',flexShrink:0}}>
+                <img src="/logo.png" alt="TTC Logo" style={{width:'100%',height:'100%',objectFit:'contain'}}/>
+              </div>
               <div>
                 <p style={{margin:0,color:'white',fontWeight:'800',fontSize:'16px',letterSpacing:'-0.3px'}}>TTC Grün-Weiß Staffel</p>
                 <p style={{margin:0,color:'rgba(74,222,128,0.55)',fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>{userRole==='eltern'?'Eltern-Portal':'Jugend-Portal'}</p>
