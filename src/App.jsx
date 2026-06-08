@@ -25,6 +25,24 @@ if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styl
     .ttc-view-enter {
       animation: ttcFadeSlide 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
+    .ttc-sticky-hdr {
+      position: sticky;
+      top: 0;
+      z-index: 600;
+      background: rgba(2,26,10,0.97);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+    .ttc-sticky-hdr-light {
+      position: sticky;
+      top: 0;
+      z-index: 600;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+    html { scroll-behavior: smooth; }
+    button, [role=button] { -webkit-tap-highlight-color: transparent; }
     .ttc-modal-enter {
       animation: ttcScaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
@@ -1768,7 +1786,7 @@ export default function TrainingsApp() {
       <div style={{minHeight:'100vh',background:"linear-gradient(135deg,#0c2d6b 0%,#0369a1 100%)",fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
         <DeleteDialog/>
         {/* Header */}
-        <div style={{background:'rgba(0,0,0,0.3)',backdropFilter:'blur(10px)',padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
           <button onClick={()=>navTo('home')} style={s.btn('#0369a1')}><Home size={16}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>📅 Trainingsplan</h1>
         </div>
@@ -2661,10 +2679,10 @@ export default function TrainingsApp() {
           </div>
         )}
 
-        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 100px':'0 20px 60px'}}>
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 20px 60px'}}>
 
           {/* ── Top-Bar ─────────────────────────────────────────── */}
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:isMobile?'16px 0 20px':'22px 0 30px',borderBottom:'1px solid rgba(74,222,128,0.08)',marginBottom:isMobile?'24px':'32px'}}>
+          <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 24px':'0 -24px 32px'}}>
             <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
               <div style={{width:'42px',height:'42px',borderRadius:'12px',background:'linear-gradient(135deg,#15803d,#4ade80)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'20px',boxShadow:'0 4px 16px rgba(74,222,128,0.25)'}}>🏓</div>
               <div>
@@ -2840,7 +2858,6 @@ export default function TrainingsApp() {
           </div>
 
         </div>
-        {isMobile && <MobileBottomNav view={view} navTo={navTo} userRole={userRole} canEdit={canEdit} appSettings={appSettings} unreadCount={unreadCount}/>}
       </div>
     );
   }
@@ -2909,10 +2926,10 @@ export default function TrainingsApp() {
           </div>
         )}
 
-        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 100px':'0 20px 60px'}}>
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 20px 60px'}}>
 
           {/* ── Top-Bar ── */}
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:isMobile?'16px 0 20px':'22px 0 24px',borderBottom:'1px solid rgba(74,222,128,0.08)',marginBottom:isMobile?'22px':'28px'}}>
+          <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 22px':'0 -24px 28px'}}>
             <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
               <div style={{width:'42px',height:'42px',borderRadius:'12px',background:'linear-gradient(135deg,#15803d,#4ade80)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'20px',boxShadow:'0 4px 16px rgba(74,222,128,0.25)'}}>🏓</div>
               <div>
@@ -3574,7 +3591,6 @@ export default function TrainingsApp() {
           }
         </div>
 
-        {isMobile && <MobileBottomNav view={view} navTo={navTo} userRole={userRole} canEdit={canEdit} appSettings={appSettings} unreadCount={0}/>}
       </div>
     );
   }
@@ -3588,10 +3604,10 @@ export default function TrainingsApp() {
     const GRP = activeGroup;
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
-        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 90px':'0 24px 60px'}}>
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
 
           {/* Top-Bar */}
-          <div style={{display:'flex',alignItems:'center',gap:'14px',padding:isMobile?'16px 0 20px':'22px 0 28px',borderBottom:'1px solid rgba(74,222,128,0.08)',marginBottom:'24px'}}>
+          <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',gap:'14px',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 24px':'0 -24px 28px'}}>
             <button onClick={()=>navTo('home')} style={{width:'38px',height:'38px',borderRadius:'10px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',color:'#4ade80',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
               <ArrowLeft size={18}/>
             </button>
@@ -3680,10 +3696,10 @@ export default function TrainingsApp() {
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
-        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 90px':'0 24px 60px'}}>
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
 
           {/* Top-Bar */}
-          <div style={{display:'flex',alignItems:'center',gap:'14px',padding:isMobile?'16px 0 20px':'22px 0 28px',borderBottom:'1px solid rgba(74,222,128,0.08)',marginBottom:'24px'}}>
+          <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',gap:'14px',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 24px':'0 -24px 28px'}}>
             <button onClick={()=>navTo('group')} style={{width:'38px',height:'38px',borderRadius:'10px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',color:'#4ade80',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
               <ArrowLeft size={18}/>
             </button>
@@ -3786,10 +3802,10 @@ export default function TrainingsApp() {
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
-        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 90px':'0 24px 60px'}}>
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
 
           {/* Top-Bar */}
-          <div style={{display:'flex',alignItems:'center',gap:'14px',padding:isMobile?'16px 0 20px':'22px 0 28px',borderBottom:'1px solid rgba(74,222,128,0.08)',marginBottom:'24px'}}>
+          <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',gap:'14px',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 24px':'0 -24px 28px'}}>
             <button onClick={()=>navTo('home')} style={{width:'38px',height:'38px',borderRadius:'10px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',color:'#4ade80',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
               <ArrowLeft size={18}/>
             </button>
@@ -3936,10 +3952,10 @@ export default function TrainingsApp() {
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
-        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 90px':'0 24px 60px'}}>
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
 
           {/* Top-Bar */}
-          <div style={{display:'flex',alignItems:'center',gap:'14px',padding:isMobile?'16px 0 20px':'22px 0 28px',borderBottom:'1px solid rgba(74,222,128,0.08)',marginBottom:'24px'}}>
+          <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',gap:'14px',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 24px':'0 -24px 28px'}}>
             <button onClick={()=>navTo('subgroup')} style={{width:'38px',height:'38px',borderRadius:'10px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',color:'#4ade80',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
               <ArrowLeft size={18}/>
             </button>
@@ -4974,10 +4990,10 @@ export default function TrainingsApp() {
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
-        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 90px':'0 24px 60px'}}>
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
 
           {/* Top-Bar */}
-          <div style={{display:'flex',alignItems:'center',gap:'14px',padding:isMobile?'16px 0 20px':'22px 0 28px',borderBottom:'1px solid rgba(74,222,128,0.08)',marginBottom:'24px'}}>
+          <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',gap:'14px',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 24px':'0 -24px 28px'}}>
             <button onClick={()=>navTo('home')} style={{width:'38px',height:'38px',borderRadius:'10px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',color:'#4ade80',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
               <ArrowLeft size={18}/>
             </button>
@@ -5417,10 +5433,10 @@ export default function TrainingsApp() {
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
-        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 90px':'0 24px 60px'}}>
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
 
           {/* Top-Bar */}
-          <div style={{display:'flex',alignItems:'center',gap:'14px',padding:isMobile?'16px 0 20px':'22px 0 28px',borderBottom:'1px solid rgba(74,222,128,0.08)',marginBottom:'24px'}}>
+          <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',gap:'14px',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 24px':'0 -24px 28px'}}>
             <button onClick={()=>{setPtMatchEditing(null);setPtMatchDraft(null);navTo('practiceTournaments');}} style={{width:'38px',height:'38px',borderRadius:'10px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',color:'#4ade80',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
               <ArrowLeft size={18}/>
             </button>
