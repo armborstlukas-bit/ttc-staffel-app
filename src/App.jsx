@@ -1039,6 +1039,7 @@ export default function TrainingsApp() {
   };
 
   // ── Dauereinheiten materialisieren ─────────────────────────────────────
+  const localDateStr = (d) => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   const materializeRecurringSessions = (templates, currentSessions) => {
     const today = new Date(); today.setHours(0,0,0,0);
     const horizon = new Date(today); horizon.setDate(horizon.getDate() + 28);
@@ -1050,7 +1051,7 @@ export default function TrainingsApp() {
       start.setDate(start.getDate() + diff);
       const cur = new Date(start);
       while(cur <= horizon) {
-        const dateStr = cur.toISOString().split('T')[0];
+        const dateStr = localDateStr(cur);
         const exists = Object.values(currentSessions).some(s => s.templateId === tmpl.id && s.date === dateStr);
         if(!exists) {
           const id = 'session_rt_' + tmpl.id + '_' + dateStr;
@@ -1115,7 +1116,7 @@ export default function TrainingsApp() {
     if (!window.confirm('Dauereinheit und alle zukünftigen Termine löschen?')) return;
     const updTemplates = {...recurringTemplates}; delete updTemplates[templateId];
     saveRecurringTemplates(updTemplates);
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDateStr(new Date());
     const updSessions = Object.fromEntries(Object.entries(sessions).filter(([,s]) => !(s.templateId===templateId && s.date>=today)));
     saveSessions(updSessions);
   };
