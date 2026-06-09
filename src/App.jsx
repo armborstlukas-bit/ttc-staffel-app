@@ -2043,7 +2043,7 @@ export default function TrainingsApp() {
                           </p>
                           {session.trainer&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'#555'}}>👤 Trainer: {session.trainer}</p>}
                           {session.info&&<p style={{margin:'0 0 4px',fontSize:'13px',color:'#0369a1',display:'flex',alignItems:'center',gap:'4px'}}><Info size={13}/> {session.info}</p>}
-                          <p style={{margin:0,fontSize:'12px',color:'#999'}}>✓ {coming} kommen · ✗ {missing} fehlen</p>
+                          {missing>0&&<p style={{margin:0,fontSize:'12px',color:'#94a3b8'}}>✗ {missing} abgemeldet</p>}
                         </div>
                         <div style={{display:'flex',gap:'6px',flexShrink:0}}>
                           <button onClick={()=>startEdit(session)} style={{padding:'6px',background:'#e0f2fe',border:'none',borderRadius:'6px',cursor:'pointer',color:'#0369a1'}}><Edit2 size={16}/></button>
@@ -2435,7 +2435,11 @@ export default function TrainingsApp() {
                         <p style={{margin:0,fontSize:'12px',color:'#999'}}>{u.email}</p>
                       </div>
                       {u.role==='pending'&&(
-                        <button onClick={()=>saveUserRoles(u.uid,['eltern'])}
+                        <button onClick={()=>{
+                          // Use already-toggled roles (minus pending), fallback to 'eltern'
+                          const assigned = (u.roles||[u.role]).filter(r=>r!=='pending');
+                          saveUserRoles(u.uid, assigned.length>0 ? assigned : ['eltern']);
+                        }}
                           style={{padding:'10px 20px',background:'#16a34a',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'15px',whiteSpace:'nowrap',boxShadow:'0 2px 8px rgba(22,163,74,0.4)'}}>
                           ✓ Freischalten
                         </button>
@@ -2450,7 +2454,8 @@ export default function TrainingsApp() {
                           const active = userRoles.includes(key);
                           return (
                             <button key={key} onClick={()=>{
-                              const cur = u.roles && u.roles.length>0 ? u.roles : [u.role];
+                              // Always filter out 'pending' — assigning any real role removes pending status
+                              const cur = (u.roles && u.roles.length>0 ? u.roles : [u.role]).filter(r=>r!=='pending');
                               let next;
                               if (active) {
                                 next = cur.filter(r=>r!==key);
@@ -3224,14 +3229,10 @@ export default function TrainingsApp() {
                             {session.trainer&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>👤 {session.trainer}</p>}
                             {session.info&&<div style={{display:'flex',alignItems:'flex-start',gap:'6px',marginTop:'8px',padding:'8px 10px',background:'rgba(96,165,250,0.08)',border:'1px solid rgba(96,165,250,0.2)',borderRadius:'8px'}}><Info size={14} color="#93c5fd" style={{marginTop:'2px',flexShrink:0}}/><p style={{margin:0,fontSize:'13px',color:'#93c5fd'}}>{session.info}</p></div>}
                           </div>
-                          <div style={{display:'flex',gap:'8px'}}>
-                            <button onClick={()=>respondToSession(session.id,'coming')}
-                              style={{flex:1,padding:'10px',border:`2px solid #16a34a`,background:isComing?'#16a34a':'transparent',color:isComing?'white':'#4ade80',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px',transition:'all 0.12s'}}>
-                              <Check size={18}/> Ich komme
-                            </button>
+                          <div style={{display:'flex'}}>
                             <button onClick={()=>respondToSession(session.id,'missing')}
                               style={{flex:1,padding:'10px',border:`2px solid #dc2626`,background:isMissing?'#dc2626':'transparent',color:isMissing?'white':'#f87171',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px',transition:'all 0.12s'}}>
-                              <X size={18}/> Ich fehle
+                              <X size={18}/> {isMissing?'Abgemeldet – Rückgängig':'Ich fehle'}
                             </button>
                           </div>
                         </div>
@@ -4008,7 +4009,6 @@ export default function TrainingsApp() {
                         <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap',marginBottom:'2px'}}>
                           <p style={{margin:0,fontWeight:'700',color:'white',fontSize:'15px'}}>{child.name}</p>
                           {parentExcused&&<span style={{fontSize:'10px',fontWeight:'700',color:'#94a3b8',background:'rgba(148,163,184,0.12)',padding:'2px 8px',borderRadius:'20px',border:'1px solid rgba(148,163,184,0.25)'}}>{responseBy==='self'?'Selbst abgemeldet':'Eltern: abgemeldet'}</span>}
-                          {parentComing&&<span style={{fontSize:'10px',fontWeight:'700',color:'#4ade80',background:'rgba(74,222,128,0.12)',padding:'2px 8px',borderRadius:'20px',border:'1px solid rgba(74,222,128,0.25)'}}>{responseBy==='self'?'Selbst angemeldet':'Eltern: angemeldet'}</span>}
                         </div>
                         {sub&&<p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{sub.name}</p>}
                       </div>
@@ -4244,7 +4244,6 @@ export default function TrainingsApp() {
                         </p>
                         <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
                           {parentExcused&&<span style={{fontSize:'10px',fontWeight:'700',color:'#94a3b8',background:'rgba(148,163,184,0.1)',padding:'1px 7px',borderRadius:'10px',border:'1px solid rgba(148,163,184,0.2)'}}>{responseBy==='self'?'Selbst abgemeldet':'Eltern abgemeldet'}</span>}
-                          {parentComing&&<span style={{fontSize:'10px',fontWeight:'700',color:'#4ade80',background:'rgba(74,222,128,0.1)',padding:'1px 7px',borderRadius:'10px',border:'1px solid rgba(74,222,128,0.2)'}}>{responseBy==='self'?'Selbst angemeldet':'Eltern angemeldet'}</span>}
                         </div>
                       </div>
                       {canEdit() ? (
