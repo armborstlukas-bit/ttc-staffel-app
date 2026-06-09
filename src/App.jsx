@@ -971,11 +971,15 @@ export default function TrainingsApp() {
   };
 
   // Prüfen ob Eltern/Jugendliche das Kind für ein Datum abgemeldet/angemeldet haben
+  // Gibt { status: 'coming'|'missing', by: 'self'|'parent' } oder null zurück
   const getParentResponse = (childId, date) => {
     const matching = Object.values(sessions).filter(s => s.date===date && (s.subgroupIds||[]).some(sid => children[childId]?.subgroupId===sid));
     for (const s of matching) {
       const r = (s.responses||{})[childId];
-      if (r) return r; // 'coming' oder 'missing'
+      if (!r) continue;
+      // Support both old string format and new object format
+      if (typeof r === 'object') return r;
+      return { status: r, by: 'parent' }; // legacy: treat old strings as parent
     }
     return null;
   };
@@ -1153,9 +1157,17 @@ export default function TrainingsApp() {
     const childId = myChild?.id || user?.uid;
     const session = sessions[sessionId];
     if (!session) return;
-    const cur = (session.responses||{})[childId];
-    const updated = { ...sessions, [sessionId]: { ...session, responses: { ...(session.responses||{}), [childId]: cur===response?null:response } } };
-    saveSessions(updated);
+    const curRaw = (session.responses||{})[childId];
+    const curStatus = typeof curRaw === 'object' ? curRaw?.status : curRaw;
+    // Toggle: if same status → remove, else set new
+    const by = userRole === 'youth' ? 'self' : 'parent';
+    const newVal = curStatus === response ? null : { status: response, by };
+    const updatedSessions = { ...sessions, [sessionId]: { ...session, responses: { ...(session.responses||{}), [childId]: newVal } } };
+    saveSessions(updatedSessions);
+    // Auto-set attendance to absent_excused when marking as missing
+    if (response === 'missing' && curStatus !== 'missing' && myChild) {
+      saveChildren({ ...children, [myChild.id]: { ...myChild, attendance: { ...(myChild.attendance||{}), [session.date]: 'absent_excused' } } });
+    }
   };
 
   const ensureTrainingDate = (sid, date) => {
@@ -1979,8 +1991,9 @@ export default function TrainingsApp() {
                 const sessionSubs=(session.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean);
                 const isEditing=editingSession===session.id;
                 const responses=session.responses||{};
-                const coming=Object.values(responses).filter(r=>r==='coming').length;
-                const missing=Object.values(responses).filter(r=>r==='missing').length;
+                const getStatus=r=>typeof r==='object'?r?.status:r;
+                const coming=Object.values(responses).filter(r=>getStatus(r)==='coming').length;
+                const missing=Object.values(responses).filter(r=>getStatus(r)==='missing').length;
                 const blockSize=session.repeatId?(repeatBlocks[session.repeatId]||[]).length:0;
                 const sessionIsPast = session.date < new Date().toISOString().split('T')[0];
 
@@ -3192,7 +3205,8 @@ export default function TrainingsApp() {
                   : <div style={{display:'grid',gap:'10px'}}>
                     {mySessions.slice(0,10).map(session=>{
                       const childId=myChild.id;
-                      const myResponse=(session.responses||{})[childId];
+                      const myResponseRaw=(session.responses||{})[childId];
+                      const myResponse=typeof myResponseRaw==='object'?myResponseRaw?.status:myResponseRaw;
                       const sessSubIds = session.subgroupIds||[];
                       const sessGrpNames = [...new Set(sessSubIds.map(sid=>{
                         const sg=subgroups[sid]; const fg=sg?FIXED_GROUPS.find(g=>g.id===sg.groupId):null;
@@ -3981,8 +3995,9 @@ export default function TrainingsApp() {
                 const currentChild = children[child.id] || child;
                 const status = (currentChild.attendance||{})[sessionDate];
                 const parentResponse = getParentResponse(child.id, sessionDate);
-                const parentExcused = parentResponse==='missing';
-                const parentComing = parentResponse==='coming';
+                const parentExcused = parentResponse?.status==='missing';
+                const parentComing = parentResponse?.status==='coming';
+                const responseBy = parentResponse?.by ?? 'parent';
                 const sub = subgroups[child.subgroupId];
                 const cardBg = status==='present'?'rgba(74,222,128,0.08)':status==='absent_unexcused'?'rgba(239,68,68,0.07)':status==='absent_excused'?'rgba(148,163,184,0.07)':'rgba(255,255,255,0.03)';
                 const cardBorder = status==='present'?'rgba(74,222,128,0.25)':status==='absent_unexcused'?'rgba(239,68,68,0.25)':status==='absent_excused'?'rgba(148,163,184,0.25)':parentExcused?'rgba(148,163,184,0.3)':parentComing?'rgba(74,222,128,0.3)':'rgba(255,255,255,0.07)';
@@ -3992,8 +4007,8 @@ export default function TrainingsApp() {
                       <div style={{flex:1,minWidth:'100px'}}>
                         <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap',marginBottom:'2px'}}>
                           <p style={{margin:0,fontWeight:'700',color:'white',fontSize:'15px'}}>{child.name}</p>
-                          {parentExcused&&<span style={{fontSize:'10px',fontWeight:'700',color:'#94a3b8',background:'rgba(148,163,184,0.12)',padding:'2px 8px',borderRadius:'20px',border:'1px solid rgba(148,163,184,0.25)'}}>Eltern: abgemeldet</span>}
-                          {parentComing&&<span style={{fontSize:'10px',fontWeight:'700',color:'#4ade80',background:'rgba(74,222,128,0.12)',padding:'2px 8px',borderRadius:'20px',border:'1px solid rgba(74,222,128,0.25)'}}>Eltern: angemeldet</span>}
+                          {parentExcused&&<span style={{fontSize:'10px',fontWeight:'700',color:'#94a3b8',background:'rgba(148,163,184,0.12)',padding:'2px 8px',borderRadius:'20px',border:'1px solid rgba(148,163,184,0.25)'}}>{responseBy==='self'?'Selbst abgemeldet':'Eltern: abgemeldet'}</span>}
+                          {parentComing&&<span style={{fontSize:'10px',fontWeight:'700',color:'#4ade80',background:'rgba(74,222,128,0.12)',padding:'2px 8px',borderRadius:'20px',border:'1px solid rgba(74,222,128,0.25)'}}>{responseBy==='self'?'Selbst angemeldet':'Eltern: angemeldet'}</span>}
                         </div>
                         {sub&&<p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{sub.name}</p>}
                       </div>
@@ -4215,8 +4230,9 @@ export default function TrainingsApp() {
                 const status=(child.attendance||{})[date];
                 const cfg=STATUS_CONFIG[status];
                 const parentResponse=getParentResponse(child.id, date);
-                const parentExcused=parentResponse==='missing';
-                const parentComing=parentResponse==='coming';
+                const parentExcused=parentResponse?.status==='missing';
+                const parentComing=parentResponse?.status==='coming';
+                const responseBy=parentResponse?.by??'parent';
                 const rowBg=status==='present'?'rgba(74,222,128,0.07)':status==='absent_excused'?'rgba(148,163,184,0.06)':status==='absent_unexcused'?'rgba(239,68,68,0.07)':'rgba(255,255,255,0.025)';
                 const rowBorder=status==='present'?'rgba(74,222,128,0.18)':status==='absent_excused'?'rgba(148,163,184,0.15)':status==='absent_unexcused'?'rgba(239,68,68,0.2)':'rgba(255,255,255,0.07)';
                 return (
@@ -4227,8 +4243,8 @@ export default function TrainingsApp() {
                           {new Date(date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}
                         </p>
                         <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
-                          {parentExcused&&<span style={{fontSize:'10px',fontWeight:'700',color:'#94a3b8',background:'rgba(148,163,184,0.1)',padding:'1px 7px',borderRadius:'10px',border:'1px solid rgba(148,163,184,0.2)'}}>Eltern abgemeldet</span>}
-                          {parentComing&&<span style={{fontSize:'10px',fontWeight:'700',color:'#4ade80',background:'rgba(74,222,128,0.1)',padding:'1px 7px',borderRadius:'10px',border:'1px solid rgba(74,222,128,0.2)'}}>Eltern angemeldet</span>}
+                          {parentExcused&&<span style={{fontSize:'10px',fontWeight:'700',color:'#94a3b8',background:'rgba(148,163,184,0.1)',padding:'1px 7px',borderRadius:'10px',border:'1px solid rgba(148,163,184,0.2)'}}>{responseBy==='self'?'Selbst abgemeldet':'Eltern abgemeldet'}</span>}
+                          {parentComing&&<span style={{fontSize:'10px',fontWeight:'700',color:'#4ade80',background:'rgba(74,222,128,0.1)',padding:'1px 7px',borderRadius:'10px',border:'1px solid rgba(74,222,128,0.2)'}}>{responseBy==='self'?'Selbst angemeldet':'Eltern angemeldet'}</span>}
                         </div>
                       </div>
                       {canEdit() ? (
