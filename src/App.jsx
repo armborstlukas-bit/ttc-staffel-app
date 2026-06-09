@@ -2101,7 +2101,10 @@ export default function TrainingsApp() {
           <div style={s.card}>
             <h2 style={{margin:'0 0 16px',color:'#15803d',display:'flex',alignItems:'center',gap:'8px'}}>∞ Dauereinheiten</h2>
             <div style={{display:'grid',gap:'8px'}}>
-              {Object.values(recurringTemplates).map(tmpl => {
+              {Object.values(recurringTemplates).sort((a,b)=>{
+                const da=(a.dayOfWeek+6)%7, db=(b.dayOfWeek+6)%7; // Mo=0..So=6
+                return da-db || (a.time||'').localeCompare(b.time||'');
+              }).map(tmpl => {
                 const tmplSubs = (tmpl.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean);
                 return (
                   <div key={tmpl.id} style={{padding:'12px 14px',borderRadius:'10px',border:'2px solid #86efac',background:'#f0fdf4',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
