@@ -1945,6 +1945,7 @@ export default function TrainingsApp() {
   // ── TRAININGSPLAN ────────────────────────────────────────────
   if (view==='trainingsplan') {
     const upcoming=getAllUpcomingSessions().filter(s=>canAccessSession(s));
+    const allChildrenList=Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
     const allSubs=Object.values(subgroups).filter(s=>canAccessGroup(s.groupId)).sort((a,b)=>{
       const ga=FIXED_GROUPS.findIndex(g=>g.id===a.groupId), gb=FIXED_GROUPS.findIndex(g=>g.id===b.groupId);
       return ga-gb || a.name.localeCompare(b.name,'de');
