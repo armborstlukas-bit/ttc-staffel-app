@@ -1,4 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+
+// Modal portal: renders children directly into document.body so position:fixed
+// is always relative to the viewport, never affected by CSS transform stacking contexts.
+const Modal = ({ children }) => {
+  if (typeof document === 'undefined') return null;
+  return createPortal(children, document.body);
+};
 // Font: Inter via Google Fonts (injected at runtime for no build-step dependency)
 if (typeof document !== 'undefined' && !document.getElementById('inter-font')) {
   const l = document.createElement('link');
@@ -11,8 +19,8 @@ if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styl
   st.id = 'ttc-global-styles';
   st.textContent = `
     @keyframes ttcFadeSlide {
-      from { opacity: 0; transform: translateY(10px); }
-      to   { opacity: 1; transform: none; }
+      from { opacity: 0; }
+      to   { opacity: 1; }
     }
     @keyframes ttcFadeIn {
       from { opacity: 0; }
@@ -215,7 +223,8 @@ const ACHIEVEMENT_DESCRIPTIONS = {
 function AchievementPopup({ data, onClose }) {
   if (!data) return null;
   return (
-    <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:2000,padding:'20px'}} onClick={onClose}>
+    <Modal>
+    <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}} onClick={onClose}>
       <div style={{background:'white',borderRadius:'16px',padding:'28px',maxWidth:'360px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)',textAlign:'center'}} onClick={e=>e.stopPropagation()}>
         <div style={{fontSize:'48px',marginBottom:'12px'}}>{data.icon}</div>
         <h3 style={{margin:'0 0 8px',color:'#1b5e20',fontSize:'20px'}}>{data.title}</h3>
@@ -231,6 +240,7 @@ function AchievementPopup({ data, onClose }) {
         </button>
       </div>
     </div>
+    </Modal>
   );
 }
 
@@ -260,7 +270,8 @@ function ArchiveTournDialog({ tournament, onClose, onConfirm }) {
   const setResult = (kid, field, val) => setResults(prev => ({...prev, [kid]: {...(prev[kid]||{}), [field]: val}}));
   const konkurrenzen = tournament.konkurrenzen || [];
   return (
-    <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px',overflowY:'auto'}}>
+    <Modal>
+    <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px',overflowY:'auto'}}>
       <div style={{background:'white',borderRadius:'16px',padding:'28px',maxWidth:'540px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)',maxHeight:'90vh',overflowY:'auto'}}>
         <h3 style={{margin:'0 0 4px',color:'#92400e',fontSize:'20px'}}>🏆 Turnier archivieren</h3>
         <p style={{margin:'0 0 20px',color:'#666',fontSize:'13px'}}>{tournament.name} — Ergebnisse eintragen (optional)</p>
@@ -315,6 +326,7 @@ function ArchiveTournDialog({ tournament, onClose, onConfirm }) {
         </div>
       </div>
     </div>
+    </Modal>
   );
 }
 
@@ -326,7 +338,8 @@ function ArchiveTournEditDialog({ tournament, onClose, onSave }) {
     setForm(prev => ({...prev, results: {...(prev.results||{}), [kid]: {...((prev.results||{})[kid]||{}), [field]: val}}}));
   const konkurrenzen = form.konkurrenzen || [];
   return (
-    <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px',overflowY:'auto'}}>
+    <Modal>
+    <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px',overflowY:'auto'}}>
       <div style={{background:'white',borderRadius:'16px',padding:'28px',maxWidth:'540px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)',maxHeight:'90vh',overflowY:'auto'}}>
         <h3 style={{margin:'0 0 16px',color:'#92400e',fontSize:'20px'}}>✏️ Turnier bearbeiten</h3>
         <div style={{display:'grid',gap:'10px',marginBottom:'16px'}}>
@@ -402,6 +415,7 @@ function ArchiveTournEditDialog({ tournament, onClose, onSave }) {
         </div>
       </div>
     </div>
+    </Modal>
   );
 }
 
@@ -1841,7 +1855,8 @@ export default function TrainingsApp() {
       <>
         {/* Profil Modal */}
         {showProfile&&(
-          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px'}}>
+          <Modal>
+          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
             <div style={{background:'white',borderRadius:'16px',padding:'28px',maxWidth:'400px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
               <h3 style={{margin:'0 0 4px',color:'#333',fontSize:'20px'}}>Mein Profil</h3>
               <p style={{margin:'0 0 24px',color:'#999',fontSize:'13px'}}>{user?.email} · <span style={{color:rc.color,fontWeight:'600'}}>{rc.label}</span></p>
@@ -1862,6 +1877,7 @@ export default function TrainingsApp() {
               </button>
             </div>
           </div>
+          </Modal>
         )}
         <div style={{...s.card,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'12px'}}>
           <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
@@ -1918,7 +1934,8 @@ export default function TrainingsApp() {
   const DeleteDialog = () => {
     if (!deleteDialog) return null;
     return (
-      <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px'}}>
+      <Modal>
+      <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
         <div style={{background:'white',borderRadius:'16px',padding:'28px',maxWidth:'380px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
           <h3 style={{margin:'0 0 8px',color:'#333',fontSize:'18px'}}>Einheit löschen</h3>
           <p style={{margin:'0 0 24px',color:'#666',fontSize:'14px'}}>
@@ -1940,6 +1957,7 @@ export default function TrainingsApp() {
           </div>
         </div>
       </div>
+      </Modal>
     );
   };
 
@@ -2500,7 +2518,8 @@ export default function TrainingsApp() {
 
         {/* Admin-Rollen-Bestätigung */}
         {adminRoleDialog&&(
-          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px'}}>
+          <Modal>
+          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
             <div style={{background:'white',borderRadius:'16px',padding:'28px',maxWidth:'380px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
               <div style={{fontSize:'36px',textAlign:'center',marginBottom:'12px'}}>🛡️</div>
               <h3 style={{margin:'0 0 8px',color:'#7c3aed',fontSize:'18px',textAlign:'center'}}>Admin-Rolle vergeben</h3>
@@ -2529,11 +2548,13 @@ export default function TrainingsApp() {
               </div>
             </div>
           </div>
+          </Modal>
         )}
 
         {/* Passwort-Bestätigungs-Dialog */}
         {resetDialog&&(
-          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px'}}>
+          <Modal>
+          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
             <div style={{background:'white',borderRadius:'16px',padding:'28px',maxWidth:'380px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
               <h3 style={{margin:'0 0 8px',color:'#dc2626',fontSize:'18px'}}>⚠️ Anwesenheiten zurücksetzen</h3>
               <p style={{margin:'0 0 16px',color:'#666',fontSize:'14px'}}>
@@ -2561,6 +2582,7 @@ export default function TrainingsApp() {
               </div>
             </div>
           </div>
+          </Modal>
         )}
 
         {/* Nutzerverwaltung */}
@@ -2942,7 +2964,8 @@ export default function TrainingsApp() {
 
         {/* Profil-Modal */}
         {showProfile&&(
-          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px'}}>
+          <Modal>
+          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
             <div style={{background:'#0a2210',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'20px',padding:'28px',maxWidth:'400px',width:'100%',boxShadow:'0 32px 80px rgba(0,0,0,0.7)'}}>
               <h3 style={{margin:'0 0 2px',color:'white',fontSize:'20px',fontWeight:'800'}}>Mein Profil</h3>
               <p style={{margin:'0 0 22px',color:'rgba(255,255,255,0.35)',fontSize:'13px'}}>{user?.email}</p>
@@ -2959,11 +2982,13 @@ export default function TrainingsApp() {
                 style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.5)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button>
             </div>
           </div>
+          </Modal>
         )}
 
         {/* Rollenwechsel-Modal */}
         {showRolePicker&&(
-          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px'}}>
+          <Modal>
+          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
             <div style={{background:'#0a2210',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'20px',padding:'24px',maxWidth:'300px',width:'100%'}}>
               <h3 style={{margin:'0 0 16px',color:'white',fontWeight:'800',fontSize:'18px'}}>Rolle wechseln</h3>
               {(userProfile?.roles||[userRole]).filter(r=>r!=='pending').map(role=>{
@@ -2978,6 +3003,7 @@ export default function TrainingsApp() {
               <button onClick={()=>setShowRolePicker(false)} style={{width:'100%',padding:'9px',background:'transparent',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',color:'rgba(255,255,255,0.4)',fontSize:'13px',marginTop:'4px'}}>Abbrechen</button>
             </div>
           </div>
+          </Modal>
         )}
 
         <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 20px 60px'}}>
@@ -3208,7 +3234,8 @@ export default function TrainingsApp() {
 
         {/* Profil-Modal */}
         {showProfile&&(
-          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px'}}>
+          <Modal>
+          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
             <div style={{background:'#0a2210',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'20px',padding:'28px',maxWidth:'400px',width:'100%',boxShadow:'0 32px 80px rgba(0,0,0,0.7)'}}>
               <h3 style={{margin:'0 0 2px',color:'white',fontSize:'20px',fontWeight:'800'}}>Mein Profil</h3>
               <p style={{margin:'0 0 22px',color:'rgba(255,255,255,0.35)',fontSize:'13px'}}>{user?.email}</p>
@@ -3225,6 +3252,7 @@ export default function TrainingsApp() {
                 style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.5)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button>
             </div>
           </div>
+          </Modal>
         )}
 
         <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 20px 60px'}}>
@@ -5154,7 +5182,8 @@ export default function TrainingsApp() {
         {postponeForm&&(()=>{
           const md = matchdays[postponeForm.matchdayId];
           return (
-            <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:'20px'}}>
+            <Modal>
+            <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
               <div style={{background:'white',borderRadius:'16px',padding:'24px',maxWidth:'480px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)',maxHeight:'90vh',overflowY:'auto'}}>
                 <h3 style={{margin:'0 0 4px',color:'#c2410c'}}>⏳ Spieltag verlegen</h3>
                 <p style={{margin:'0 0 16px',fontSize:'13px',color:'#666'}}>Terminvorschläge für die Eltern/Jugendlichen</p>
@@ -5187,6 +5216,7 @@ export default function TrainingsApp() {
                 </div>
               </div>
             </div>
+            </Modal>
           );
         })()}
 
