@@ -1044,11 +1044,23 @@ export default function TrainingsApp() {
   const handleSendReset = async (e) => {
     e.preventDefault();
     if (!resetEmail.trim()) return;
+    setResetStatus('sending');
     try {
-      await sendPasswordResetEmail(auth, resetEmail.trim());
+      const actionCodeSettings = {
+        url: window.location.origin, // redirect back to app after reset
+        handleCodeInApp: false,
+      };
+      await sendPasswordResetEmail(auth, resetEmail.trim(), actionCodeSettings);
       setResetStatus('sent');
-    } catch {
-      setResetStatus('error');
+    } catch(err) {
+      const code = err?.code || '';
+      if (code === 'auth/user-not-found' || code === 'auth/invalid-email') {
+        setResetStatus('notfound');
+      } else if (code === 'auth/too-many-requests') {
+        setResetStatus('ratelimit');
+      } else {
+        setResetStatus('error:' + code);
+      }
     }
   };
 
@@ -1641,14 +1653,24 @@ export default function TrainingsApp() {
                   onChange={e=>setResetEmail(e.target.value)} required autoFocus
                   style={{padding:'13px 16px',background:'rgba(255,255,255,0.08)',border:'1px solid rgba(74,222,128,0.25)',borderRadius:'12px',color:'white',fontSize:'15px',outline:'none',width:'100%',boxSizing:'border-box'}}/>
               </div>
-              {resetStatus==='error'&&(
+              {resetStatus==='notfound'&&(
                 <div style={{padding:'10px 14px',background:'rgba(239,68,68,0.12)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:'10px',color:'#f87171',fontSize:'13px',fontWeight:'600'}}>
-                  ❌ E-Mail-Adresse nicht gefunden. Bitte prüfe die Adresse.
+                  ❌ Diese E-Mail-Adresse ist nicht registriert.
                 </div>
               )}
-              <button type="submit"
-                style={{padding:'14px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'12px',fontSize:'15px',fontWeight:'800',cursor:'pointer',boxShadow:'0 4px 20px rgba(22,163,74,0.35)'}}>
-                📧 Reset-Link senden
+              {resetStatus==='ratelimit'&&(
+                <div style={{padding:'10px 14px',background:'rgba(251,191,36,0.12)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'10px',color:'#fbbf24',fontSize:'13px',fontWeight:'600'}}>
+                  ⏳ Zu viele Anfragen. Bitte warte einige Minuten.
+                </div>
+              )}
+              {resetStatus&&resetStatus.startsWith('error:')&&(
+                <div style={{padding:'10px 14px',background:'rgba(239,68,68,0.12)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:'10px',color:'#f87171',fontSize:'13px',fontWeight:'600'}}>
+                  ❌ Fehler: {resetStatus.replace('error:','')||'Unbekannt'}. Bitte versuche es erneut.
+                </div>
+              )}
+              <button type="submit" disabled={resetStatus==='sending'}
+                style={{padding:'14px',background:resetStatus==='sending'?'#374151':'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'12px',fontSize:'15px',fontWeight:'800',cursor:resetStatus==='sending'?'wait':'pointer',boxShadow:'0 4px 20px rgba(22,163,74,0.35)'}}>
+                {resetStatus==='sending'?'⏳ Sende…':'📧 Reset-Link senden'}
               </button>
               <button type="button" onClick={()=>{setShowResetScreen(false);setResetStatus(null);}}
                 style={{padding:'11px',background:'transparent',color:'rgba(255,255,255,0.4)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',fontSize:'14px',fontWeight:'600',cursor:'pointer'}}>
