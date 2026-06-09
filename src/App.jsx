@@ -1632,12 +1632,15 @@ export default function TrainingsApp() {
             <div style={{textAlign:'center'}}>
               <div style={{fontSize:'52px',marginBottom:'16px'}}>📬</div>
               <h2 style={{margin:'0 0 10px',color:'#4ade80',fontSize:'18px',fontWeight:'800'}}>E-Mail wurde gesendet!</h2>
-              <p style={{margin:'0 0 6px',color:'rgba(255,255,255,0.7)',fontSize:'14px',lineHeight:'1.5'}}>
-                Wir haben eine E-Mail an <strong style={{color:'white'}}>{resetEmail}</strong> gesendet.
+              <p style={{margin:'0 0 12px',color:'rgba(255,255,255,0.7)',fontSize:'14px',lineHeight:'1.5'}}>
+                Wir haben einen Reset-Link an <strong style={{color:'white'}}>{resetEmail}</strong> gesendet.
               </p>
-              <p style={{margin:'0 0 24px',color:'rgba(255,255,255,0.45)',fontSize:'13px',lineHeight:'1.5'}}>
-                Bitte prüfe auch deinen Spam-Ordner. Der Link ist 1 Stunde gültig.
-              </p>
+              <div style={{background:'rgba(251,191,36,0.12)',border:'1px solid rgba(251,191,36,0.35)',borderRadius:'12px',padding:'14px',marginBottom:'24px',textAlign:'left'}}>
+                <p style={{margin:'0 0 6px',color:'#fbbf24',fontSize:'13px',fontWeight:'700'}}>⚠️ Wichtig: Spam-Ordner prüfen!</p>
+                <p style={{margin:0,color:'rgba(255,255,255,0.6)',fontSize:'13px',lineHeight:'1.5'}}>
+                  Die E-Mail landet häufig im <strong style={{color:'white'}}>Spam- oder Junk-Ordner</strong> — bitte dort nachschauen falls sie nicht im Posteingang erscheint. Der Link ist <strong style={{color:'white'}}>1 Stunde gültig</strong>.
+                </p>
+              </div>
               <button onClick={()=>{setShowResetScreen(false);setResetStatus(null);}}
                 style={{width:'100%',padding:'13px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'12px',fontSize:'15px',fontWeight:'800',cursor:'pointer'}}>
                 ← Zurück zum Login
