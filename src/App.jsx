@@ -575,6 +575,9 @@ export default function TrainingsApp() {
   const [loginName, setLoginName]         = useState('');
   const [error, setError]                 = useState('');
   const [showRolePicker, setShowRolePicker] = useState(false);
+  const [showResetScreen, setShowResetScreen] = useState(false);
+  const [resetEmail, setResetEmail]       = useState('');
+  const [resetStatus, setResetStatus]     = useState(null); // null | 'sent' | 'error'
 
   // ── Auth ─────────────────────────────────────────────────────
   // Mobile detection
@@ -1033,14 +1036,19 @@ export default function TrainingsApp() {
     }
   };
 
-  const handleForgotPassword = async () => {
-    if (!loginEmail.trim()) { setError('Bitte zuerst deine E-Mail eingeben!'); return; }
+  const handleForgotPassword = () => {
+    setResetEmail(loginEmail); // pre-fill if they already typed email
+    setResetStatus(null);
+    setShowResetScreen(true);
+  };
+  const handleSendReset = async (e) => {
+    e.preventDefault();
+    if (!resetEmail.trim()) return;
     try {
-      await sendPasswordResetEmail(auth, loginEmail);
-      setError('');
-      alert(`✅ Passwort-Reset E-Mail wurde an ${loginEmail} gesendet! Bitte prüfe dein Postfach.`);
+      await sendPasswordResetEmail(auth, resetEmail.trim());
+      setResetStatus('sent');
     } catch {
-      setError('E-Mail nicht gefunden. Bitte prüfe die Adresse.');
+      setResetStatus('error');
     }
   };
 
@@ -1597,6 +1605,62 @@ export default function TrainingsApp() {
 
   if (loading) return <div style={{...s.page(activeGroup?.color),display:'flex',alignItems:'center',justifyContent:'center'}}><p style={{color:'white',fontSize:'20px'}}>Laden...</p></div>;
 
+  // ── Passwort-Reset Screen ─────────────────────────────────────
+  if (!user && showResetScreen) return (
+    <div className="ttc-view-enter" key="reset" style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
+      <div style={{width:'100%',maxWidth:'400px'}}>
+        <div style={{textAlign:'center',marginBottom:'32px'}}>
+          <img src="/logo.png" alt="TTC Logo" style={{width:'100px',height:'100px',objectFit:'contain',borderRadius:'18px',display:'block',margin:'0 auto 18px',filter:'drop-shadow(0 6px 24px rgba(0,0,0,0.6))'}}/>
+          <h1 style={{margin:'0 0 4px',color:'white',fontSize:'22px',fontWeight:'900'}}>Passwort zurücksetzen</h1>
+          <p style={{margin:0,color:'rgba(74,222,128,0.55)',fontSize:'13px'}}>TTC Grün-Weiß Staffel</p>
+        </div>
+
+        <div style={{background:'rgba(255,255,255,0.05)',borderRadius:'20px',padding:'28px',border:'1px solid rgba(74,222,128,0.12)'}}>
+          {resetStatus==='sent' ? (
+            <div style={{textAlign:'center'}}>
+              <div style={{fontSize:'52px',marginBottom:'16px'}}>📬</div>
+              <h2 style={{margin:'0 0 10px',color:'#4ade80',fontSize:'18px',fontWeight:'800'}}>E-Mail wurde gesendet!</h2>
+              <p style={{margin:'0 0 6px',color:'rgba(255,255,255,0.7)',fontSize:'14px',lineHeight:'1.5'}}>
+                Wir haben eine E-Mail an <strong style={{color:'white'}}>{resetEmail}</strong> gesendet.
+              </p>
+              <p style={{margin:'0 0 24px',color:'rgba(255,255,255,0.45)',fontSize:'13px',lineHeight:'1.5'}}>
+                Bitte prüfe auch deinen Spam-Ordner. Der Link ist 1 Stunde gültig.
+              </p>
+              <button onClick={()=>{setShowResetScreen(false);setResetStatus(null);}}
+                style={{width:'100%',padding:'13px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'12px',fontSize:'15px',fontWeight:'800',cursor:'pointer'}}>
+                ← Zurück zum Login
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSendReset} style={{display:'flex',flexDirection:'column',gap:'14px'}}>
+              <div>
+                <p style={{margin:'0 0 16px',color:'rgba(255,255,255,0.6)',fontSize:'14px',lineHeight:'1.6'}}>
+                  Gib deine E-Mail-Adresse ein. Wir senden dir einen Link zum Zurücksetzen deines Passworts.
+                </p>
+                <input type="email" placeholder="Deine E-Mail-Adresse" value={resetEmail}
+                  onChange={e=>setResetEmail(e.target.value)} required autoFocus
+                  style={{padding:'13px 16px',background:'rgba(255,255,255,0.08)',border:'1px solid rgba(74,222,128,0.25)',borderRadius:'12px',color:'white',fontSize:'15px',outline:'none',width:'100%',boxSizing:'border-box'}}/>
+              </div>
+              {resetStatus==='error'&&(
+                <div style={{padding:'10px 14px',background:'rgba(239,68,68,0.12)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:'10px',color:'#f87171',fontSize:'13px',fontWeight:'600'}}>
+                  ❌ E-Mail-Adresse nicht gefunden. Bitte prüfe die Adresse.
+                </div>
+              )}
+              <button type="submit"
+                style={{padding:'14px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'12px',fontSize:'15px',fontWeight:'800',cursor:'pointer',boxShadow:'0 4px 20px rgba(22,163,74,0.35)'}}>
+                📧 Reset-Link senden
+              </button>
+              <button type="button" onClick={()=>{setShowResetScreen(false);setResetStatus(null);}}
+                style={{padding:'11px',background:'transparent',color:'rgba(255,255,255,0.4)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',fontSize:'14px',fontWeight:'600',cursor:'pointer'}}>
+                ← Zurück zum Login
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   if (!user) return (
     <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
       <div style={{width:'100%',maxWidth:'420px'}}>
@@ -1657,8 +1721,9 @@ export default function TrainingsApp() {
           )}
           {authMode==='login'&&(
             <div style={{marginTop:'14px',textAlign:'center'}}>
-              <button onClick={handleForgotPassword} style={{background:'none',border:'none',color:'rgba(74,222,128,0.5)',cursor:'pointer',fontSize:'13px',fontWeight:'600'}}>
-                Passwort vergessen?
+              <button onClick={handleForgotPassword}
+                style={{background:'none',border:'none',color:'rgba(74,222,128,0.6)',cursor:'pointer',fontSize:'13px',fontWeight:'700',textDecoration:'underline',textUnderlineOffset:'3px',textDecorationColor:'rgba(74,222,128,0.3)'}}>
+                🔑 Passwort vergessen?
               </button>
             </div>
           )}
@@ -1912,30 +1977,41 @@ export default function TrainingsApp() {
             </div>
           </div>
 
-          {/* Einzelspieler hinzufügen */}
+          {/* Einzelspieler hinzufügen – Dropdown */}
           <div style={{marginBottom:'16px'}}>
             <label style={s.label}>Einzelspieler (optional – zusätzlich zu Gruppen)</label>
-            <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
-              {allChildrenList.map(child=>{
-                const sub=subgroups[child.subgroupId];
-                const grp=FIXED_GROUPS.find(g=>g.id===sub?.groupId);
-                // Don't show children already covered by selected subgroups
-                const coveredByGroup=(newSession.subgroupIds||[]).includes(child.subgroupId);
-                if(coveredByGroup) return null;
-                const selected=(newSession.extraPlayerIds||[]).includes(child.id);
-                return (
-                  <button key={child.id} onClick={()=>toggleExtraPlayer(child.id)}
-                    style={{padding:'5px 11px',border:`2px solid ${selected?'#d97706':'#ddd'}`,borderRadius:'20px',background:selected?'#d97706':'white',color:selected?'white':'#555',cursor:'pointer',fontWeight:'600',fontSize:'12px',display:'flex',alignItems:'center',gap:'4px'}}>
-                    {selected?'✓ ':''}{child.name}
-                    {sub&&<span style={{fontSize:'10px',opacity:0.7,color:selected?'rgba(255,255,255,0.8)':(grp?.color||'#999')}}> ({sub.name})</span>}
-                  </button>
-                );
-              })}
-            </div>
+            {/* Dropdown */}
+            <select
+              value=""
+              onChange={e=>{ if(e.target.value) toggleExtraPlayer(e.target.value); }}
+              style={{width:'100%',padding:'10px 12px',border:'1px solid #ddd',borderRadius:'8px',fontSize:'14px',color:'#333',background:'white',cursor:'pointer',marginBottom:'8px'}}>
+              <option value="">+ Spieler hinzufügen…</option>
+              {allChildrenList
+                .filter(child=>!(newSession.subgroupIds||[]).includes(child.subgroupId) && !(newSession.extraPlayerIds||[]).includes(child.id))
+                .map(child=>{
+                  const sub=subgroups[child.subgroupId];
+                  const grp=FIXED_GROUPS.find(g=>g.id===sub?.groupId);
+                  return <option key={child.id} value={child.id}>{child.name}{sub?` – ${grp?.emoji||''} ${sub.name}`:''}</option>;
+                })
+              }
+            </select>
+            {/* Ausgewählte Spieler als entfernbare Chips */}
             {(newSession.extraPlayerIds||[]).length>0&&(
-              <p style={{margin:'6px 0 0',fontSize:'12px',color:'#d97706',fontWeight:'600'}}>
-                +{(newSession.extraPlayerIds||[]).length} Einzelspieler ausgewählt
-              </p>
+              <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+                {(newSession.extraPlayerIds||[]).map(cid=>{
+                  const child=children[cid]; if(!child) return null;
+                  const sub=subgroups[child.subgroupId];
+                  const grp=FIXED_GROUPS.find(g=>g.id===sub?.groupId);
+                  return (
+                    <span key={cid} style={{display:'inline-flex',alignItems:'center',gap:'5px',padding:'4px 10px',background:'#fef3c7',border:'1px solid #d97706',borderRadius:'20px',fontSize:'12px',fontWeight:'700',color:'#92400e'}}>
+                      {child.name}
+                      {sub&&<span style={{fontSize:'10px',color:'#b45309',fontWeight:'600'}}>{grp?.emoji} {sub.name}</span>}
+                      <button onClick={()=>toggleExtraPlayer(cid)}
+                        style={{background:'none',border:'none',cursor:'pointer',color:'#d97706',fontWeight:'900',fontSize:'14px',lineHeight:1,padding:'0 0 0 2px'}}>×</button>
+                    </span>
+                  );
+                })}
+              </div>
             )}
           </div>
 
@@ -4087,7 +4163,7 @@ export default function TrainingsApp() {
             }
           </div>
 
-          {/* Quick-Add Einzelspieler */}
+          {/* Quick-Add Einzelspieler – Dropdown */}
           {canEdit()&&(()=>{
             const alreadyIds = new Set(allKids.map(k=>k.id));
             const addable = Object.values(children).filter(ch=>!alreadyIds.has(ch.id)).sort((a,b)=>a.name.localeCompare(b.name,'de'));
@@ -4095,21 +4171,19 @@ export default function TrainingsApp() {
             return (
               <div style={{marginBottom:'16px',padding:'14px',background:'rgba(251,191,36,0.06)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:'12px'}}>
                 <p style={{margin:'0 0 10px',fontSize:'12px',fontWeight:'700',color:'#fbbf24'}}>⭐ Spieler kurzfristig hinzufügen</p>
-                <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+                <select value="" onChange={e=>{
+                  if(!e.target.value) return;
+                  const cur=sessions[session.id]||session;
+                  const newExtras=[...(cur.extraPlayerIds||[]),e.target.value];
+                  saveSessions({...sessions,[session.id]:{...cur,extraPlayerIds:newExtras}});
+                }}
+                  style={{width:'100%',padding:'10px 12px',borderRadius:'10px',border:'1px solid rgba(251,191,36,0.35)',background:'rgba(0,0,0,0.3)',color:'#fbbf24',fontSize:'14px',fontWeight:'600',cursor:'pointer',outline:'none'}}>
+                  <option value="" style={{background:'#1a1a1a'}}>+ Spieler zur Einheit hinzufügen…</option>
                   {addable.map(ch=>{
                     const sub2=subgroups[ch.subgroupId];
-                    return (
-                      <button key={ch.id} onClick={()=>{
-                        const cur=sessions[session.id]||session;
-                        const newExtras=[...(cur.extraPlayerIds||[]),ch.id];
-                        saveSessions({...sessions,[session.id]:{...cur,extraPlayerIds:newExtras}});
-                      }}
-                        style={{padding:'5px 11px',border:'1px solid rgba(251,191,36,0.35)',borderRadius:'20px',background:'rgba(251,191,36,0.08)',color:'#fbbf24',cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>
-                        + {ch.name}{sub2?` (${sub2.name})`:''}
-                      </button>
-                    );
+                    return <option key={ch.id} value={ch.id} style={{background:'#1a1a1a',color:'white'}}>{ch.name}{sub2?` – ${sub2.name}`:''}</option>;
                   })}
-                </div>
+                </select>
               </div>
             );
           })()}
