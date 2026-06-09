@@ -513,6 +513,7 @@ export default function TrainingsApp() {
   const [pwError, setPwError]                   = useState('');
   const [pwSuccess, setPwSuccess]               = useState(false); // {sessionId, repeatId, blockSize}
   const [adminRoleDialog, setAdminRoleDialog]   = useState(null); // { uid, newRoles } | null
+  const [pendingRoleSelections, setPendingRoleSelections] = useState({}); // { [uid]: roles[] } — local only until Freischalten
   const [adminRolePw, setAdminRolePw]           = useState('');
   const [adminRoleError, setAdminRoleError]     = useState('');
 
@@ -2588,9 +2589,10 @@ export default function TrainingsApp() {
                       </div>
                       {u.role==='pending'&&(
                         <button onClick={()=>{
-                          // Use already-toggled roles (minus pending), fallback to 'eltern'
-                          const assigned = (u.roles||[u.role]).filter(r=>r!=='pending');
+                          const selected = pendingRoleSelections[u.uid];
+                          const assigned = selected && selected.length>0 ? selected : (u.roles||[u.role]).filter(r=>r!=='pending');
                           saveUserRoles(u.uid, assigned.length>0 ? assigned : ['eltern']);
+                          setPendingRoleSelections(prev=>{ const n={...prev}; delete n[u.uid]; return n; });
                         }}
                           style={{padding:'10px 20px',background:'#16a34a',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'15px',whiteSpace:'nowrap',boxShadow:'0 2px 8px rgba(22,163,74,0.4)'}}>
                           ✓ Freischalten
@@ -2602,26 +2604,40 @@ export default function TrainingsApp() {
                       <div style={{display:'flex',gap:'5px',flexWrap:'wrap',alignItems:'center'}}>
                         <span style={{fontSize:'12px',color:'#555',fontWeight:'600',marginRight:'2px'}}>Rollen:</span>
                         {Object.entries(ROLE_CONFIG).filter(([k])=>k!=='pending').map(([key,cfg])=>{
-                          const userRoles = u.roles && u.roles.length>0 ? u.roles : [u.role];
-                          const active = userRoles.includes(key);
+                          const isPending = u.role==='pending';
+                          // For pending users use local selection state; for active users use saved roles
+                          const baseRoles = isPending
+                            ? (pendingRoleSelections[u.uid] ?? (u.roles||[u.role]).filter(r=>r!=='pending'))
+                            : (u.roles && u.roles.length>0 ? u.roles : [u.role]);
+                          const active = baseRoles.includes(key);
                           return (
                             <button key={key} onClick={()=>{
-                              // Always filter out 'pending' — assigning any real role removes pending status
-                              const cur = (u.roles && u.roles.length>0 ? u.roles : [u.role]).filter(r=>r!=='pending');
-                              let next;
-                              if (active) {
-                                next = cur.filter(r=>r!==key);
-                                if (next.length===0) return; // mindestens eine Rolle
+                              if (isPending) {
+                                // Only update local state, do NOT save to Firebase yet
+                                let next;
+                                if (active) {
+                                  next = baseRoles.filter(r=>r!==key);
+                                  if (next.length===0) next = baseRoles; // mindestens eine
+                                } else {
+                                  next = [...baseRoles, key];
+                                }
+                                setPendingRoleSelections(prev=>({...prev,[u.uid]:next}));
                               } else {
-                                next = [...cur, key];
-                              }
-                              // Admin-Rolle erfordert Passwort-Bestätigung
-                              if (key === 'admin' && !active) {
-                                setAdminRoleDialog({ uid: u.uid, newRoles: next });
-                                setAdminRolePw('');
-                                setAdminRoleError('');
-                              } else {
-                                saveUserRoles(u.uid, next);
+                                const cur = (u.roles && u.roles.length>0 ? u.roles : [u.role]).filter(r=>r!=='pending');
+                                let next;
+                                if (active) {
+                                  next = cur.filter(r=>r!==key);
+                                  if (next.length===0) return;
+                                } else {
+                                  next = [...cur, key];
+                                }
+                                if (key === 'admin' && !active) {
+                                  setAdminRoleDialog({ uid: u.uid, newRoles: next });
+                                  setAdminRolePw('');
+                                  setAdminRoleError('');
+                                } else {
+                                  saveUserRoles(u.uid, next);
+                                }
                               }
                             }} style={{padding:'3px 9px',borderRadius:'20px',border:`2px solid ${cfg.color}`,background:active?cfg.color:cfg.bg,color:active?'white':cfg.color,cursor:'pointer',fontWeight:'600',fontSize:'11px'}}>
                               {key==='admin'&&!active?'🔒 ':''}{cfg.label}
