@@ -5343,63 +5343,56 @@ export default function TrainingsApp() {
       navTo('practiceTournamentDetail');
     };
 
-    const DIN = {background:'rgba(255,255,255,0.07)',border:'1px solid rgba(167,139,250,0.2)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none'};
-    const ptBtn = (active) => ({flex:1,padding:'10px',borderRadius:'10px',border:`2px solid ${active?'#a78bfa':'rgba(255,255,255,0.1)'}`,background:active?'rgba(167,139,250,0.15)':'rgba(255,255,255,0.04)',color:active?'#c4b5fd':'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'800',fontSize:'15px',transition:'all 0.12s'});
-    const smBtn = (active) => ({width:'34px',height:'34px',borderRadius:'8px',background:active?'rgba(167,139,250,0.15)':'rgba(255,255,255,0.04)',border:`2px solid ${active?'#a78bfa':'rgba(255,255,255,0.1)'}`,color:active?'#c4b5fd':'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'800',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'});
+    const DIN = {background:'white',border:'1px solid #c4b5fd',borderRadius:'10px',color:'#1f2937',fontSize:'14px',outline:'none'};
+    const ptBtn = (active) => ({flex:1,padding:'10px',borderRadius:'10px',border:`2px solid ${active?'#7c3aed':'#e5e7eb'}`,background:active?'rgba(124,58,237,0.1)':'#f9fafb',color:active?'#7c3aed':'#6b7280',cursor:'pointer',fontWeight:'800',fontSize:'15px',transition:'all 0.12s'});
+    const smBtn = (active) => ({width:'34px',height:'34px',borderRadius:'8px',background:active?'rgba(124,58,237,0.1)':'#f9fafb',border:`2px solid ${active?'#7c3aed':'#e5e7eb'}`,color:active?'#7c3aed':'#6b7280',cursor:'pointer',fontWeight:'800',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'});
 
     return (
-      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
-        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
-
-          {/* Top-Bar */}
-          <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',gap:'14px',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 24px':'0 -24px 28px'}}>
-            <button onClick={()=>navTo('home')} style={{width:'38px',height:'38px',borderRadius:'10px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',color:'#4ade80',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-              <ArrowLeft size={18}/>
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#4a1d96 0%,#7c3aed 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
+        {/* Header */}
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+          <button onClick={()=>navTo('home')} style={s.btn('#7c3aed')}><Home size={16}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>🎮 Übungswettkämpfe</h1>
+          {!ptCreating && (<div style={{display:'flex',gap:'8px',flexShrink:0}}>
+            <button onClick={()=>{setArchiveTab('practiceTournaments');navTo('archiv');}} style={s.btn('#6d28d9')}>
+              <Archive size={14}/> Archiv
             </button>
-            <div style={{flex:1,minWidth:0}}>
-              <h2 style={{margin:0,color:'white',fontWeight:'800',fontSize:'20px'}}>🎮 Übungswettkämpfe</h2>
-              <p style={{margin:0,color:'rgba(167,139,250,0.5)',fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>{allPTList.length} laufend{allPTList.length!==1?'e':''}</p>
-            </div>
-            {!ptCreating && (<div style={{display:'flex',gap:'8px',flexShrink:0}}>
-              <button onClick={()=>{setArchiveTab('practiceTournaments');navTo('archiv');}}
-                style={{padding:'9px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'12px',color:'rgba(255,255,255,0.55)',cursor:'pointer',fontWeight:'700',fontSize:'13px',display:'flex',alignItems:'center',gap:'5px',whiteSpace:'nowrap'}}>
-                <Archive size={14}/> Archiv
-              </button>
-              <button onClick={()=>{setPtCreating(true);setPtCreateStep(1);setPtSelectedChildren([]);setPtSubgroupFilter('all');setPtCreateForm({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false});}}
-                style={{padding:'9px 16px',background:'linear-gradient(135deg,#7c3aed,#6d28d9)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'700',fontSize:'13px',display:'flex',alignItems:'center',gap:'6px',whiteSpace:'nowrap'}}>
-                <Plus size={15}/> Neuer Wettkampf
-              </button>
-            </div>)}
-          </div>
+            <button onClick={()=>{setPtCreating(true);setPtCreateStep(1);setPtSelectedChildren([]);setPtSubgroupFilter('all');setPtCreateForm({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false});}} style={s.btn('#16a34a')}>
+              <Plus size={15}/> Neuer Wettkampf
+            </button>
+          </div>)}
+        </div>
+        <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
+
 
           {/* ── Erstellungs-Wizard ─────────────────────────────── */}
           {ptCreating && (
-            <div style={{background:'rgba(167,139,250,0.05)',border:'1px solid rgba(167,139,250,0.2)',borderRadius:'20px',padding:'20px',marginBottom:'24px'}}>
+            <div style={{...s.card,border:'2px solid #c4b5fd'}}>
 
               {/* Step-Indicator */}
               <div style={{display:'flex',gap:'12px',marginBottom:'22px',alignItems:'center'}}>
                 {[{n:1,l:'Einstellungen'},{n:2,l:'Spieler'}].map(({n,l})=>(
                   <div key={n} style={{display:'flex',alignItems:'center',gap:'6px'}}>
-                    <div style={{width:'28px',height:'28px',borderRadius:'50%',background:ptCreateStep>=n?'#a78bfa':'rgba(255,255,255,0.1)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'13px',fontWeight:'800',color:'white'}}>{n}</div>
-                    <span style={{fontSize:'12px',color:ptCreateStep>=n?'#c4b5fd':'rgba(255,255,255,0.3)',fontWeight:'600'}}>{l}</span>
-                    {n<2&&<span style={{color:'rgba(255,255,255,0.2)',marginLeft:'4px'}}>›</span>}
+                    <div style={{width:'28px',height:'28px',borderRadius:'50%',background:ptCreateStep>=n?'#7c3aed':'#e5e7eb',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'13px',fontWeight:'800',color:'white'}}>{n}</div>
+                    <span style={{fontSize:'12px',color:ptCreateStep>=n?'#7c3aed':'#9ca3af',fontWeight:'600'}}>{l}</span>
+                    {n<2&&<span style={{color:'#d1d5db',marginLeft:'4px'}}>›</span>}
                   </div>
                 ))}
-                <button onClick={()=>{setPtCreating(false);setPtCreateStep(1);}} style={{marginLeft:'auto',padding:'4px 10px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'12px'}}>✕</button>
+                <button onClick={()=>{setPtCreating(false);setPtCreateStep(1);}} style={{marginLeft:'auto',padding:'4px 10px',background:'#f3f4f6',border:'1px solid #e5e7eb',borderRadius:'8px',color:'#6b7280',cursor:'pointer',fontSize:'12px'}}>✕</button>
               </div>
 
               {/* Step 1: Typ + Einstellungen */}
               {ptCreateStep===1 && (
                 <>
-                  <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'rgba(167,139,250,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Wettkampftyp</p>
-                  <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 14px',background:'rgba(167,139,250,0.06)',border:'1px solid rgba(167,139,250,0.15)',borderRadius:'12px',marginBottom:'22px'}}>
+                  <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.5px'}}>Wettkampftyp</p>
+                  <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 14px',background:'rgba(124,58,237,0.06)',border:'1px solid rgba(124,58,237,0.2)',borderRadius:'12px',marginBottom:'22px'}}>
                     <span style={{fontSize:'22px'}}>🎯</span>
                     <div style={{flex:1}}>
-                      <p style={{margin:0,fontWeight:'800',color:'white',fontSize:'14px'}}>Rundenturnier</p>
-                      <p style={{margin:'2px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>Jeder spielt gegen jeden · bester vs. zweitbester immer in der letzten Runde</p>
+                      <p style={{margin:0,fontWeight:'800',color:'#1f2937',fontSize:'14px'}}>Rundenturnier</p>
+                      <p style={{margin:'2px 0 0',fontSize:'11px',color:'#6b7280'}}>Jeder spielt gegen jeden · bester vs. zweitbester immer in der letzten Runde</p>
                     </div>
                   </div>
-                  <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'rgba(167,139,250,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Gruppengröße</p>
+                  <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.5px'}}>Gruppengröße</p>
                   <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'22px'}}>
                     {[3,4,5,6,7,8,9,10].map(n=>(
                       <button key={n} onClick={()=>setPtCreateForm(f=>({...f,groupSize:n}))}
@@ -5409,12 +5402,12 @@ export default function TrainingsApp() {
                     ))}
                   </div>
 
-                  <p style={{margin:'0 0 14px',fontSize:'11px',fontWeight:'800',color:'rgba(167,139,250,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Spielmodus</p>
+                  <p style={{margin:'0 0 14px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.5px'}}>Spielmodus</p>
                   <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'16px',marginBottom:'22px'}}>
 
                     {/* Gewinnsätze */}
                     <div>
-                      <p style={{margin:'0 0 8px',fontSize:'12px',color:'rgba(255,255,255,0.45)',fontWeight:'700'}}>Gewinnsätze</p>
+                      <p style={{margin:'0 0 8px',fontSize:'12px',color:'#555',fontWeight:'700'}}>Gewinnsätze</p>
                       <div style={{display:'flex',gap:'6px'}}>
                         {[1,2,3].map(n=>(
                           <button key={n} onClick={()=>setPtCreateForm(f=>({...f,winSets:n}))} style={ptBtn(ptCreateForm.winSets===n)}>{n}</button>
@@ -5424,7 +5417,7 @@ export default function TrainingsApp() {
 
                     {/* Ergebniserfassung */}
                     <div>
-                      <p style={{margin:'0 0 8px',fontSize:'12px',color:'rgba(255,255,255,0.45)',fontWeight:'700'}}>Ergebniserfassung</p>
+                      <p style={{margin:'0 0 8px',fontSize:'12px',color:'#555',fontWeight:'700'}}>Ergebniserfassung</p>
                       <div style={{display:'flex',gap:'6px'}}>
                         {[{v:false,l:'Nur Sätze'},{v:true,l:'Satzergebnisse'}].map(opt=>(
                           <button key={String(opt.v)} onClick={()=>setPtCreateForm(f=>({...f,trackSetScores:opt.v}))}
@@ -5438,36 +5431,36 @@ export default function TrainingsApp() {
                     {/* Satzlänge — nur bei Satzergebnissen */}
                     {ptCreateForm.trackSetScores && (
                     <div>
-                      <p style={{margin:'0 0 8px',fontSize:'12px',color:'rgba(255,255,255,0.45)',fontWeight:'700'}}>Satzlänge</p>
+                      <p style={{margin:'0 0 8px',fontSize:'12px',color:'#555',fontWeight:'700'}}>Satzlänge</p>
                       <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
                         <button onClick={()=>setPtCreateForm(f=>({...f,setLength:Math.max(5,f.setLength-1)}))} style={smBtn(false)}>−</button>
-                        <span style={{fontSize:'22px',fontWeight:'900',color:'white',minWidth:'32px',textAlign:'center'}}>{ptCreateForm.setLength}</span>
+                        <span style={{fontSize:'22px',fontWeight:'900',color:'#1f2937',minWidth:'32px',textAlign:'center'}}>{ptCreateForm.setLength}</span>
                         <button onClick={()=>setPtCreateForm(f=>({...f,setLength:Math.min(21,f.setLength+1)}))} style={smBtn(false)}>+</button>
-                        <span style={{fontSize:'12px',color:'rgba(255,255,255,0.3)'}}>Punkte</span>
+                        <span style={{fontSize:'12px',color:'#9ca3af'}}>Punkte</span>
                       </div>
                     </div>
                     )}
                   </div>
 
                   {/* Entscheidungssatz — Checkbox + bedingte Länge */}
-                  <div style={{display:'flex',alignItems:'flex-start',gap:'12px',marginBottom:'20px',padding:'12px 14px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'12px'}}>
+                  <div style={{display:'flex',alignItems:'flex-start',gap:'12px',marginBottom:'20px',padding:'12px 14px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'12px'}}>
                     <button onClick={()=>setPtCreateForm(f=>({...f,deciderCustom:!f.deciderCustom}))}
-                      style={{width:'22px',height:'22px',borderRadius:'6px',border:`2px solid ${ptCreateForm.deciderCustom?'#fde68a':'rgba(255,255,255,0.2)'}`,background:ptCreateForm.deciderCustom?'rgba(253,230,138,0.2)':'transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginTop:'1px'}}>
-                      {ptCreateForm.deciderCustom&&<span style={{fontSize:'14px',color:'#fde68a',lineHeight:1}}>✓</span>}
+                      style={{width:'22px',height:'22px',borderRadius:'6px',border:`2px solid ${ptCreateForm.deciderCustom?'#d97706':'#d1d5db'}`,background:ptCreateForm.deciderCustom?'rgba(217,119,6,0.1)':'transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginTop:'1px'}}>
+                      {ptCreateForm.deciderCustom&&<span style={{fontSize:'14px',color:'#d97706',lineHeight:1}}>✓</span>}
                     </button>
                     <div style={{flex:1}}>
-                      <p style={{margin:'0 0 2px',fontSize:'13px',fontWeight:'700',color:ptCreateForm.deciderCustom?'#fde68a':'rgba(255,255,255,0.5)',cursor:'pointer'}} onClick={()=>setPtCreateForm(f=>({...f,deciderCustom:!f.deciderCustom}))}>
+                      <p style={{margin:'0 0 2px',fontSize:'13px',fontWeight:'700',color:ptCreateForm.deciderCustom?'#d97706':'#555',cursor:'pointer'}} onClick={()=>setPtCreateForm(f=>({...f,deciderCustom:!f.deciderCustom}))}>
                         Abweichende Entscheidungssatzlänge
                       </p>
-                      <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>
+                      <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>
                         {ptCreateForm.deciderCustom?'Eigene Punktzahl für den Entscheidungssatz festlegen':'Entscheidungssatz hat dieselbe Länge wie normale Sätze'}
                       </p>
                       {ptCreateForm.deciderCustom&&(
                         <div style={{display:'flex',alignItems:'center',gap:'10px',marginTop:'10px'}}>
                           <button onClick={()=>setPtCreateForm(f=>({...f,deciderLength:Math.max(5,f.deciderLength-1)}))} style={smBtn(false)}>−</button>
-                          <span style={{fontSize:'22px',fontWeight:'900',color:'#fde68a',minWidth:'32px',textAlign:'center'}}>{ptCreateForm.deciderLength}</span>
+                          <span style={{fontSize:'22px',fontWeight:'900',color:'#d97706',minWidth:'32px',textAlign:'center'}}>{ptCreateForm.deciderLength}</span>
                           <button onClick={()=>setPtCreateForm(f=>({...f,deciderLength:Math.min(21,f.deciderLength+1)}))} style={smBtn(false)}>+</button>
-                          <span style={{fontSize:'12px',color:'rgba(255,255,255,0.3)'}}>Punkte</span>
+                          <span style={{fontSize:'12px',color:'#9ca3af'}}>Punkte</span>
                         </div>
                       )}
                     </div>
@@ -5484,15 +5477,15 @@ export default function TrainingsApp() {
               {ptCreateStep===2 && (
                 <>
                   <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'16px'}}>
-                    <button onClick={()=>setPtCreateStep(1)} style={{padding:'6px 12px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'13px',fontWeight:'600'}}>← Zurück</button>
-                    <h3 style={{margin:0,color:'#c4b5fd',fontSize:'15px',fontWeight:'800'}}>Spieler auswählen ({ptSelectedChildren.length}/{maxPlayers})</h3>
+                    <button onClick={()=>setPtCreateStep(1)} style={{padding:'6px 12px',background:'#f3f4f6',border:'1px solid #e5e7eb',borderRadius:'8px',color:'#6b7280',cursor:'pointer',fontSize:'13px',fontWeight:'600'}}>← Zurück</button>
+                    <h3 style={{margin:0,color:'#7c3aed',fontSize:'15px',fontWeight:'800'}}>Spieler auswählen ({ptSelectedChildren.length}/{maxPlayers})</h3>
                   </div>
 
                   {/* Untergruppen-Filter */}
                   <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'14px'}}>
                     {[{id:'all',name:'Alle Jugend'},...jugendSubs].map(s=>(
                       <button key={s.id} onClick={()=>setPtSubgroupFilter(s.id)}
-                        style={{padding:'5px 12px',borderRadius:'20px',border:`1px solid ${ptSubgroupFilter===s.id?'rgba(167,139,250,0.5)':'rgba(255,255,255,0.1)'}`,background:ptSubgroupFilter===s.id?'rgba(167,139,250,0.15)':'transparent',color:ptSubgroupFilter===s.id?'#c4b5fd':'rgba(255,255,255,0.4)',cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>
+                        style={{padding:'5px 12px',borderRadius:'20px',border:`2px solid ${ptSubgroupFilter===s.id?'#7c3aed':'#e5e7eb'}`,background:ptSubgroupFilter===s.id?'rgba(124,58,237,0.1)':'white',color:ptSubgroupFilter===s.id?'#7c3aed':'#6b7280',cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>
                         {s.name}
                       </button>
                     ))}
@@ -5501,7 +5494,7 @@ export default function TrainingsApp() {
                   {/* Kinderliste */}
                   <div style={{display:'grid',gap:'6px',marginBottom:'16px',maxHeight:'260px',overflowY:'auto',paddingRight:'4px'}}>
                     {filteredChildren.length===0
-                      ? <p style={{color:'rgba(255,255,255,0.3)',textAlign:'center',padding:'20px 0'}}>Keine Kinder in dieser Gruppe.</p>
+                      ? <p style={{color:'#9ca3af',textAlign:'center',padding:'20px 0'}}>Keine Kinder in dieser Gruppe.</p>
                       : filteredChildren.map(child=>{
                         const selected = ptSelectedChildren.includes(child.id);
                         const ach = getAchievements(child.id);
@@ -5510,15 +5503,15 @@ export default function TrainingsApp() {
                         const disabled = !selected && ptSelectedChildren.length>=maxPlayers;
                         return (
                           <div key={child.id} onClick={()=>{if(disabled)return;setPtSelectedChildren(prev=>selected?prev.filter(id=>id!==child.id):[...prev,child.id]);}}
-                            style={{display:'flex',alignItems:'center',gap:'12px',padding:'10px 14px',borderRadius:'10px',border:`1.5px solid ${selected?'rgba(167,139,250,0.4)':'rgba(255,255,255,0.07)'}`,background:selected?'rgba(167,139,250,0.1)':'rgba(255,255,255,0.03)',cursor:disabled?'not-allowed':'pointer',opacity:disabled?0.4:1,transition:'all 0.1s'}}>
-                            <div style={{width:'22px',height:'22px',borderRadius:'6px',border:`2px solid ${selected?'#a78bfa':'rgba(255,255,255,0.2)'}`,background:selected?'#a78bfa':'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                            style={{display:'flex',alignItems:'center',gap:'12px',padding:'10px 14px',borderRadius:'10px',border:`1.5px solid ${selected?'#7c3aed':'#e5e7eb'}`,background:selected?'rgba(124,58,237,0.06)':'#f9fafb',cursor:disabled?'not-allowed':'pointer',opacity:disabled?0.4:1,transition:'all 0.1s'}}>
+                            <div style={{width:'22px',height:'22px',borderRadius:'6px',border:`2px solid ${selected?'#7c3aed':'#d1d5db'}`,background:selected?'#7c3aed':'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                               {selected&&<Check size={13} color="white"/>}
                             </div>
                             <div style={{flex:1,minWidth:0}}>
-                              <p style={{margin:0,fontWeight:'700',color:'white',fontSize:'14px'}}>{child.name}</p>
-                              <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{subgroups[child.subgroupId]?.name}{maxTTR?` · TTR ${maxTTR}`:' · kein TTR'}</p>
+                              <p style={{margin:0,fontWeight:'700',color:'#1f2937',fontSize:'14px'}}>{child.name}</p>
+                              <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>{subgroups[child.subgroupId]?.name}{maxTTR?` · TTR ${maxTTR}`:' · kein TTR'}</p>
                             </div>
-                            {maxTTR&&<span style={{fontSize:'11px',fontWeight:'800',color:'#a78bfa',background:'rgba(167,139,250,0.12)',padding:'2px 8px',borderRadius:'10px',flexShrink:0}}>TTR {maxTTR}</span>}
+                            {maxTTR&&<span style={{fontSize:'11px',fontWeight:'800',color:'#7c3aed',background:'rgba(124,58,237,0.1)',padding:'2px 8px',borderRadius:'10px',flexShrink:0}}>TTR {maxTTR}</span>}
                           </div>
                         );
                       })
@@ -5527,14 +5520,14 @@ export default function TrainingsApp() {
 
                   {/* Setzungs-Vorschau */}
                   {seededPreview.length>0&&(
-                    <div style={{marginBottom:'14px',padding:'12px 14px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'12px'}}>
-                      <p style={{margin:'0 0 8px',fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'0.4px'}}>Setzung (nach TTR + Errungenschaften)</p>
+                    <div style={{marginBottom:'14px',padding:'12px 14px',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:'12px'}}>
+                      <p style={{margin:'0 0 8px',fontSize:'10px',fontWeight:'800',color:'#16a34a',textTransform:'uppercase',letterSpacing:'0.4px'}}>Setzung (nach TTR + Errungenschaften)</p>
                       <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
                         {seededPreview.map((p,i)=>(
                           <div key={p.childId} style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                            <span style={{fontSize:'14px',fontWeight:'900',color:'rgba(74,222,128,0.7)',minWidth:'20px'}}>{i+1}.</span>
-                            <span style={{fontSize:'14px',fontWeight:'700',color:'white'}}>{p.name}</span>
-                            {p.maxTTR>0&&<span style={{fontSize:'11px',color:'rgba(167,139,250,0.6)',fontWeight:'600'}}>TTR {p.maxTTR}</span>}
+                            <span style={{fontSize:'14px',fontWeight:'900',color:'#16a34a',minWidth:'20px'}}>{i+1}.</span>
+                            <span style={{fontSize:'14px',fontWeight:'700',color:'#1f2937'}}>{p.name}</span>
+                            {p.maxTTR>0&&<span style={{fontSize:'11px',color:'#7c3aed',fontWeight:'600'}}>TTR {p.maxTTR}</span>}
                           </div>
                         ))}
                       </div>
@@ -5542,7 +5535,7 @@ export default function TrainingsApp() {
                   )}
 
                   <button onClick={startTournament} disabled={ptSelectedChildren.length!==maxPlayers}
-                    style={{width:'100%',padding:'14px',background:ptSelectedChildren.length===maxPlayers?'linear-gradient(135deg,#7c3aed,#6d28d9)':'rgba(255,255,255,0.06)',color:'white',border:'none',borderRadius:'12px',cursor:ptSelectedChildren.length===maxPlayers?'pointer':'not-allowed',fontWeight:'800',fontSize:'15px',opacity:ptSelectedChildren.length===maxPlayers?1:0.5,transition:'all 0.15s'}}>
+                    style={{width:'100%',padding:'14px',background:ptSelectedChildren.length===maxPlayers?'linear-gradient(135deg,#7c3aed,#6d28d9)':'#e5e7eb',color:ptSelectedChildren.length===maxPlayers?'white':'#9ca3af',border:'none',borderRadius:'12px',cursor:ptSelectedChildren.length===maxPlayers?'pointer':'not-allowed',fontWeight:'800',fontSize:'15px',opacity:ptSelectedChildren.length===maxPlayers?1:0.7,transition:'all 0.15s'}}>
                     {ptSelectedChildren.length===maxPlayers?'🎮 Wettkampf starten!':`Noch ${maxPlayers-ptSelectedChildren.length} Spieler auswählen`}
                   </button>
                 </>
@@ -5595,38 +5588,38 @@ export default function TrainingsApp() {
               return (
                 <div style={{position:'relative'}}>
                   <div onClick={()=>{setActivePracticeId(pt.id);setPtMatchEditing(null);setPtMatchDraft(null);navTo('practiceTournamentDetail');}}
-                    style={{padding:'14px 16px',background:allDone2?'rgba(74,222,128,0.05)':'rgba(255,255,255,0.04)',border:`1px solid ${allDone2?'rgba(74,222,128,0.18)':'rgba(167,139,250,0.15)'}`,borderRadius:'16px',cursor:'pointer',transition:'all 0.12s'}}
-                    onMouseEnter={e=>{e.currentTarget.style.background=allDone2?'rgba(74,222,128,0.09)':'rgba(167,139,250,0.08)';}}
-                    onMouseLeave={e=>{e.currentTarget.style.background=allDone2?'rgba(74,222,128,0.05)':'rgba(255,255,255,0.04)';}}>
+                    style={{padding:'14px 16px',background:allDone2?'#f0fdf4':'white',border:`1px solid ${allDone2?'#86efac':'#e5e7eb'}`,borderRadius:'12px',cursor:'pointer',transition:'all 0.12s',boxShadow:'0 2px 4px rgba(0,0,0,0.06)'}}
+                    onMouseEnter={e=>{e.currentTarget.style.boxShadow='0 4px 12px rgba(0,0,0,0.12)';}}
+                    onMouseLeave={e=>{e.currentTarget.style.boxShadow='0 2px 4px rgba(0,0,0,0.06)';}}>
                     <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'8px',marginBottom:'8px'}}>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:'flex',alignItems:'center',gap:'7px',marginBottom:'4px',flexWrap:'wrap'}}>
                           <span style={{fontSize:'16px'}}>🎯</span>
-                          <span style={{fontWeight:'800',color:'white',fontSize:'15px'}}>{pt.players?pt.players.length+'er Gruppe':'4er Gruppe'}</span>
-                          <span style={{fontSize:'10px',fontWeight:'700',color:allDone2?'#4ade80':'#fde68a',background:allDone2?'rgba(74,222,128,0.12)':'rgba(253,230,138,0.1)',padding:'2px 7px',borderRadius:'10px',border:`1px solid ${allDone2?'rgba(74,222,128,0.25)':'rgba(253,230,138,0.25)'}`}}>
+                          <span style={{fontWeight:'800',color:'#1f2937',fontSize:'15px'}}>{pt.players?pt.players.length+'er Gruppe':'4er Gruppe'}</span>
+                          <span style={{fontSize:'10px',fontWeight:'700',color:allDone2?'#16a34a':'#d97706',background:allDone2?'#dcfce7':'#fef9c3',padding:'2px 7px',borderRadius:'10px',border:`1px solid ${allDone2?'#86efac':'#fde68a'}`}}>
                             {allDone2?'✓ Abgeschlossen':'● Laufend'}
                           </span>
                         </div>
-                        <p style={{margin:'0 0 6px',fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>
+                        <p style={{margin:'0 0 6px',fontSize:'11px',color:'#9ca3af'}}>
                           {new Date(pt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})} · {pt.settings.winSets} GS · {pt.settings.setLength}/{pt.settings.deciderLength}
                         </p>
                       </div>
                       <div style={{display:'flex',alignItems:'center',gap:'6px',flexShrink:0}}>
-                        <span style={{fontSize:'12px',fontWeight:'700',color:'rgba(167,139,250,0.6)'}}>{done}/{total}</span>
+                        <span style={{fontSize:'12px',fontWeight:'700',color:'#7c3aed'}}>{done}/{total}</span>
                         <button onClick={(e)=>deletePT(e,pt.id)}
-                          style={{width:'28px',height:'28px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}
+                          style={{width:'28px',height:'28px',borderRadius:'7px',background:'#fee2e2',border:'1px solid #fca5a5',color:'#dc2626',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}
                           title="Wettkampf löschen">
                           <Trash2 size={12}/>
                         </button>
-                        <ChevronRight size={15} color="rgba(167,139,250,0.4)"/>
+                        <ChevronRight size={15} color="#a78bfa"/>
                       </div>
                     </div>
                     <div style={{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'8px'}}>
                       {pt.players.map(p=>(
-                        <span key={p.childId} style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',background:'rgba(255,255,255,0.06)',padding:'2px 7px',borderRadius:'7px'}}>{p.seed}. {p.name}</span>
+                        <span key={p.childId} style={{fontSize:'11px',fontWeight:'700',color:'#6b7280',background:'#f3f4f6',padding:'2px 7px',borderRadius:'7px',border:'1px solid #e5e7eb'}}>{p.seed}. {p.name}</span>
                       ))}
                     </div>
-                    <div style={{height:'3px',background:'rgba(255,255,255,0.06)',borderRadius:'99px',overflow:'hidden'}}>
+                    <div style={{height:'4px',background:'#e5e7eb',borderRadius:'99px',overflow:'hidden'}}>
                       <div style={{width:`${(done/total)*100}%`,height:'100%',background:allDone2?'linear-gradient(90deg,#16a34a,#4ade80)':'linear-gradient(90deg,#7c3aed,#a78bfa)',transition:'width 0.4s ease'}}/>
                     </div>
                   </div>
@@ -5635,10 +5628,10 @@ export default function TrainingsApp() {
             };
 
             if(allPTList.length===0&&!ptCreating) return (
-              <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.2)'}}>
+              <div style={{...s.card,textAlign:'center',padding:'60px 20px'}}>
                 <div style={{fontSize:'52px',marginBottom:'14px'}}>🎮</div>
-                <p style={{fontSize:'16px',fontWeight:'700',margin:'0 0 6px'}}>Noch keine Übungswettkämpfe</p>
-                <p style={{fontSize:'13px',margin:0}}>Klicke oben auf "Neuer Wettkampf".</p>
+                <p style={{fontSize:'16px',fontWeight:'700',margin:'0 0 6px',color:'#555'}}>Noch keine Übungswettkämpfe</p>
+                <p style={{fontSize:'13px',margin:0,color:'#9ca3af'}}>Klicke oben auf "Neuer Wettkampf".</p>
               </div>
             );
 
@@ -5647,7 +5640,7 @@ export default function TrainingsApp() {
                 {/* Laufende Wettkämpfe */}
                 {activePTs.length>0&&(
                   <div style={{marginBottom:'20px'}}>
-                    <p style={{margin:'0 0 10px',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.45)',textTransform:'uppercase',letterSpacing:'2px'}}>Laufend</p>
+                    <p style={{margin:'0 0 10px',fontSize:'10px',fontWeight:'800',color:'white',textTransform:'uppercase',letterSpacing:'2px',opacity:0.7}}>Laufend</p>
                     <div style={{display:'grid',gap:'8px'}}>
                       {activePTs.map(pt=><PTCard key={pt.id} pt={pt}/>)}
                     </div>
@@ -5656,11 +5649,11 @@ export default function TrainingsApp() {
                 {/* Letzte 7 Tage – abgeschlossen */}
                 {recentDonePTs.length>0&&(
                   <div>
-                    <p style={{margin:'0 0 10px',fontSize:'10px',fontWeight:'800',color:'rgba(74,222,128,0.4)',textTransform:'uppercase',letterSpacing:'2px'}}>Letzte 7 Tage – Abgeschlossen</p>
+                    <p style={{margin:'0 0 10px',fontSize:'10px',fontWeight:'800',color:'white',textTransform:'uppercase',letterSpacing:'2px',opacity:0.7}}>Letzte 7 Tage – Abgeschlossen</p>
                     <div style={{display:'grid',gap:'8px'}}>
                       {recentDonePTs.map(pt=><PTCard key={pt.id} pt={pt}/>)}
                     </div>
-                    <p style={{margin:'8px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.2)',textAlign:'right'}}>⏱ Werden nach 7 Tagen automatisch archiviert</p>
+                    <p style={{margin:'8px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.5)',textAlign:'right'}}>⏱ Werden nach 7 Tagen automatisch archiviert</p>
                   </div>
                 )}
               </>
