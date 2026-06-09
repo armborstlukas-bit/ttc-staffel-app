@@ -11,8 +11,8 @@ if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styl
   st.id = 'ttc-global-styles';
   st.textContent = `
     @keyframes ttcFadeSlide {
-      from { opacity: 0; transform: translateY(14px); }
-      to   { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: none; }
     }
     @keyframes ttcFadeIn {
       from { opacity: 0; }
@@ -105,7 +105,7 @@ const ROLE_CONFIG = {
 
 const WEEKDAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
 
-const emptySession = { subgroupIds: [], date: new Date().toISOString().split('T')[0], time: '17:00', trainer: '', info: '', repeat: false, repeatWeeks: 8, isRecurring: false };
+const emptySession = { subgroupIds: [], extraPlayerIds: [], date: new Date().toISOString().split('T')[0], time: '17:00', trainer: '', info: '', repeat: false, repeatWeeks: 8, isRecurring: false };
 
 const TODAY = new Date().toISOString().split('T')[0];
 const emptyTournament = { name: '', location: '', dateFrom: TODAY, dateTo: TODAY, konkurrenzen: [] };
@@ -964,6 +964,16 @@ export default function TrainingsApp() {
       .filter(s => s.date >= today && (s.subgroupIds||[]).includes(subgroupId))
       .sort((a,b) => a.date.localeCompare(b.date));
   };
+  // Sessions für einen bestimmten Spieler (Gruppe + extraPlayerIds)
+  const getUpcomingSessionsForChild = (childId, subgroupId) => {
+    const today = new Date().toISOString().split('T')[0];
+    return Object.values(sessions)
+      .filter(s => s.date >= today && (
+        (s.subgroupIds||[]).includes(subgroupId) ||
+        (s.extraPlayerIds||[]).includes(childId)
+      ))
+      .sort((a,b) => a.date.localeCompare(b.date));
+  };
 
   const getAllUpcomingSessions = () => {
     const cutoff = getSevenDaysAgo();
@@ -973,13 +983,18 @@ export default function TrainingsApp() {
   // Prüfen ob Eltern/Jugendliche das Kind für ein Datum abgemeldet/angemeldet haben
   // Gibt { status: 'coming'|'missing', by: 'self'|'parent' } oder null zurück
   const getParentResponse = (childId, date) => {
-    const matching = Object.values(sessions).filter(s => s.date===date && (s.subgroupIds||[]).some(sid => children[childId]?.subgroupId===sid));
+    const child = children[childId];
+    const matching = Object.values(sessions).filter(s =>
+      s.date===date && (
+        (s.subgroupIds||[]).some(sid => child?.subgroupId===sid) ||
+        (s.extraPlayerIds||[]).includes(childId)
+      )
+    );
     for (const s of matching) {
       const r = (s.responses||{})[childId];
       if (!r) continue;
-      // Support both old string format and new object format
       if (typeof r === 'object') return r;
-      return { status: r, by: 'parent' }; // legacy: treat old strings as parent
+      return { status: r, by: 'parent' }; // legacy
     }
     return null;
   };
@@ -1059,7 +1074,7 @@ export default function TrainingsApp() {
         const exists = Object.values(currentSessions).some(s => s.templateId === tmpl.id && s.date === dateStr);
         if(!exists) {
           const id = 'session_rt_' + tmpl.id + '_' + dateStr;
-          updated[id] = { id, subgroupIds: tmpl.subgroupIds, date: dateStr, time: tmpl.time, trainer: tmpl.trainer, info: tmpl.info, templateId: tmpl.id, repeatId: null, responses: {} };
+          updated[id] = { id, subgroupIds: tmpl.subgroupIds, extraPlayerIds: tmpl.extraPlayerIds||[], date: dateStr, time: tmpl.time, trainer: tmpl.trainer, info: tmpl.info, templateId: tmpl.id, repeatId: null, responses: {} };
           changed = true;
         }
         cur.setDate(cur.getDate() + 7);
@@ -1078,14 +1093,15 @@ export default function TrainingsApp() {
 
   // ── Training anlegen ─────────────────────────────────────────
   const createSession = () => {
-    const { subgroupIds, date, time, trainer, info, repeat, repeatWeeks, isRecurring } = newSession;
+    const { subgroupIds, extraPlayerIds, date, time, trainer, info, repeat, repeatWeeks, isRecurring } = newSession;
     if (!time || subgroupIds.length===0) { alert('Bitte mindestens eine Untergruppe auswählen!'); return; }
     if (!isRecurring && !date) { alert('Bitte ein Datum auswählen!'); return; }
+    const extras = extraPlayerIds||[];
 
     if (isRecurring) {
       const dayOfWeek = new Date(date+'T12:00:00').getDay();
       const id = 'rt_' + Date.now();
-      const tmpl = { id, subgroupIds, dayOfWeek, time, trainer, info, startDate: date, createdAt: new Date().toISOString() };
+      const tmpl = { id, subgroupIds, extraPlayerIds: extras, dayOfWeek, time, trainer, info, startDate: date, createdAt: new Date().toISOString() };
       const updatedTemplates = { ...recurringTemplates, [id]: tmpl };
       saveRecurringTemplates(updatedTemplates);
       materializeRecurringSessions(updatedTemplates, sessions);
@@ -1101,11 +1117,11 @@ export default function TrainingsApp() {
         d.setDate(d.getDate()+i*7);
         const dateStr = d.toISOString().split('T')[0];
         const id = 'session_'+Date.now()+'_'+i;
-        updated[id] = { id, subgroupIds, date:dateStr, time, trainer, info, repeatId, responses:{} };
+        updated[id] = { id, subgroupIds, extraPlayerIds: extras, date:dateStr, time, trainer, info, repeatId, responses:{} };
       }
     } else {
       const id = 'session_'+Date.now();
-      updated[id] = { id, subgroupIds, date, time, trainer, info, repeatId:null, responses:{} };
+      updated[id] = { id, subgroupIds, extraPlayerIds: extras, date, time, trainer, info, repeatId:null, responses:{} };
     }
     saveSessions(updated);
     setNewSession(emptySession);
@@ -1160,7 +1176,7 @@ export default function TrainingsApp() {
     const curRaw = (session.responses||{})[childId];
     const curStatus = typeof curRaw === 'object' ? curRaw?.status : curRaw;
     // Toggle: if same status → remove, else set new
-    const by = userRole === 'youth' ? 'self' : 'parent';
+    const by = userRole === 'jugendlich' ? 'self' : 'parent';
     const newVal = curStatus === response ? null : { status: response, by };
     const updatedSessions = { ...sessions, [sessionId]: { ...session, responses: { ...(session.responses||{}), [childId]: newVal } } };
     saveSessions(updatedSessions);
@@ -1848,6 +1864,10 @@ export default function TrainingsApp() {
       const ids=newSession.subgroupIds||[];
       setNewSession({...newSession, subgroupIds: ids.includes(sid)?ids.filter(i=>i!==sid):[...ids,sid]});
     };
+    const toggleExtraPlayer = (cid) => {
+      const ids=newSession.extraPlayerIds||[];
+      setNewSession({...newSession, extraPlayerIds: ids.includes(cid)?ids.filter(i=>i!==cid):[...ids,cid]});
+    };
 
     const toggleEditSubgroup = (sid) => {
       const ids=editForm.subgroupIds||[];
@@ -1890,6 +1910,33 @@ export default function TrainingsApp() {
                 })
               }
             </div>
+          </div>
+
+          {/* Einzelspieler hinzufügen */}
+          <div style={{marginBottom:'16px'}}>
+            <label style={s.label}>Einzelspieler (optional – zusätzlich zu Gruppen)</label>
+            <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+              {allChildrenList.map(child=>{
+                const sub=subgroups[child.subgroupId];
+                const grp=FIXED_GROUPS.find(g=>g.id===sub?.groupId);
+                // Don't show children already covered by selected subgroups
+                const coveredByGroup=(newSession.subgroupIds||[]).includes(child.subgroupId);
+                if(coveredByGroup) return null;
+                const selected=(newSession.extraPlayerIds||[]).includes(child.id);
+                return (
+                  <button key={child.id} onClick={()=>toggleExtraPlayer(child.id)}
+                    style={{padding:'5px 11px',border:`2px solid ${selected?'#d97706':'#ddd'}`,borderRadius:'20px',background:selected?'#d97706':'white',color:selected?'white':'#555',cursor:'pointer',fontWeight:'600',fontSize:'12px',display:'flex',alignItems:'center',gap:'4px'}}>
+                    {selected?'✓ ':''}{child.name}
+                    {sub&&<span style={{fontSize:'10px',opacity:0.7,color:selected?'rgba(255,255,255,0.8)':(grp?.color||'#999')}}> ({sub.name})</span>}
+                  </button>
+                );
+              })}
+            </div>
+            {(newSession.extraPlayerIds||[]).length>0&&(
+              <p style={{margin:'6px 0 0',fontSize:'12px',color:'#d97706',fontWeight:'600'}}>
+                +{(newSession.extraPlayerIds||[]).length} Einzelspieler ausgewählt
+              </p>
+            )}
           </div>
 
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',marginBottom:'12px'}}>
@@ -3003,7 +3050,7 @@ export default function TrainingsApp() {
     const grp=sub?FIXED_GROUPS.find(g=>g.id===sub.groupId):null;
     const dates=(sub?.trainingDates||[]).sort().reverse();
     const stats=myChild?getAttendanceStats(myChild.id,myChild.subgroupId):null;
-    const mySessions=myChild&&sub ? getUpcomingSessionsForSubgroup(myChild.subgroupId) : [];
+    const mySessions=myChild&&sub ? getUpcomingSessionsForChild(myChild.id, myChild.subgroupId) : [];
 
     const dateToSession = {};
     Object.values(sessions||{}).forEach(sess=>{
@@ -3912,7 +3959,12 @@ export default function TrainingsApp() {
   if (view==='sessionAttendance') {
     const session = sessions[activeSession?.id] || activeSession;
     const sessionSubs = (session?.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean);
-    const allKids = sessionSubs.flatMap(sub => getChildrenForSubgroup(sub.id));
+    const subgroupKids = sessionSubs.flatMap(sub => getChildrenForSubgroup(sub.id));
+    // Extra individual players not already in a subgroup
+    const extraPlayers = (session?.extraPlayerIds||[])
+      .map(id=>children[id]).filter(Boolean)
+      .filter(ep=>!subgroupKids.some(k=>k.id===ep.id));
+    const allKids = [...subgroupKids, ...extraPlayers];
     const sessionDate = session?.date;
 
     const setSessionStatus = (childId, subgroupId, status) => {
@@ -4011,6 +4063,7 @@ export default function TrainingsApp() {
                           {parentExcused&&<span style={{fontSize:'10px',fontWeight:'700',color:'#94a3b8',background:'rgba(148,163,184,0.12)',padding:'2px 8px',borderRadius:'20px',border:'1px solid rgba(148,163,184,0.25)'}}>{responseBy==='self'?'Selbst abgemeldet':'Eltern: abgemeldet'}</span>}
                         </div>
                         {sub&&<p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{sub.name}</p>}
+                        {extraPlayers.some(ep=>ep.id===child.id)&&<p style={{margin:0,fontSize:'10px',fontWeight:'700',color:'#fbbf24'}}>⭐ Einzelspieler</p>}
                       </div>
                       {/* 3 Anwesenheits-Buttons */}
                       <div style={{display:'flex',gap:'8px',flexShrink:0}}>
@@ -4033,6 +4086,33 @@ export default function TrainingsApp() {
               })
             }
           </div>
+
+          {/* Quick-Add Einzelspieler */}
+          {canEdit()&&(()=>{
+            const alreadyIds = new Set(allKids.map(k=>k.id));
+            const addable = Object.values(children).filter(ch=>!alreadyIds.has(ch.id)).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+            if(addable.length===0) return null;
+            return (
+              <div style={{marginBottom:'16px',padding:'14px',background:'rgba(251,191,36,0.06)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:'12px'}}>
+                <p style={{margin:'0 0 10px',fontSize:'12px',fontWeight:'700',color:'#fbbf24'}}>⭐ Spieler kurzfristig hinzufügen</p>
+                <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+                  {addable.map(ch=>{
+                    const sub2=subgroups[ch.subgroupId];
+                    return (
+                      <button key={ch.id} onClick={()=>{
+                        const cur=sessions[session.id]||session;
+                        const newExtras=[...(cur.extraPlayerIds||[]),ch.id];
+                        saveSessions({...sessions,[session.id]:{...cur,extraPlayerIds:newExtras}});
+                      }}
+                        style={{padding:'5px 11px',border:'1px solid rgba(251,191,36,0.35)',borderRadius:'20px',background:'rgba(251,191,36,0.08)',color:'#fbbf24',cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>
+                        + {ch.name}{sub2?` (${sub2.name})`:''}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Legende */}
           <div style={{display:'flex',gap:'16px',flexWrap:'wrap',padding:'14px 16px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.06)',borderRadius:'12px',marginBottom:'16px'}}>
@@ -4397,8 +4477,13 @@ export default function TrainingsApp() {
     // Achievements only for Jugendgruppe children, filtered by trainer's access
     const jugendSubs = Object.values(subgroups).filter(sg=>sg.groupId==='jugend'&&canAccessGroup('jugend'));
     const jugendSubIds = new Set(jugendSubs.map(sg=>sg.id));
+    // Include children in jugend subgroups + extra players in any jugend session
+    const extraInJugend = new Set(
+      Object.values(sessions).filter(s=>(s.subgroupIds||[]).some(sid=>jugendSubIds.has(sid)))
+        .flatMap(s=>s.extraPlayerIds||[])
+    );
     const kidsWithSub = Object.values(children)
-      .filter(c => jugendSubIds.has(c.subgroupId))
+      .filter(c => jugendSubIds.has(c.subgroupId) || extraInJugend.has(c.id))
       .sort((a,b)=>a.name.localeCompare(b.name,'de'));
 
     const AchCounter = ({label, val, onInc, onDec}) => (
