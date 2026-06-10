@@ -891,26 +891,18 @@ export default function TrainingsApp() {
   const saveRangliste = (entries) => { setRangliste(entries); setDoc(doc(db,'ttc','rangliste'),{entries}); };
   const saveRanglistenspiele = (data) => { setRanglistenspiele(data); setDoc(doc(db,'ttc','ranglistenspiele'), data); };
   const finalizeRanglistenspiel = (spiel) => {
-    const { challengerId, defenderId, challengerScore, defenderScore } = spiel;
-    const cScore = parseInt(challengerScore)||0;
-    const dScore = parseInt(defenderScore)||0;
+    const { challengerId, defenderId, sets1, sets2 } = spiel;
     let newRangliste = [...rangliste];
-    const result = cScore > dScore ? 'challenger' : 'defender';
-    if (result === 'challenger') {
-      const defIdx = newRangliste.indexOf(defenderId);
-      const chalIdx = newRangliste.indexOf(challengerId);
-      if (defIdx !== -1 && chalIdx !== -1 && chalIdx > defIdx) {
-        newRangliste.splice(chalIdx, 1);
-        newRangliste.splice(defIdx, 0, challengerId);
-      }
+    const defIdx  = newRangliste.indexOf(defenderId);
+    const chalIdx = newRangliste.indexOf(challengerId);
+    const result = sets1 > sets2 ? 'challenger' : 'defender';
+    if (result === 'challenger' && defIdx !== -1 && chalIdx !== -1 && chalIdx > defIdx) {
+      newRangliste.splice(chalIdx, 1);
+      newRangliste.splice(defIdx, 0, challengerId);
     }
     saveRangliste(newRangliste);
-    const archived = { ...spiel, closedAt: new Date().toISOString(), result };
-    const newData = {
-      active: ranglistenspiele.active.filter(s => s.id !== spiel.id),
-      archived: [archived, ...ranglistenspiele.archived],
-    };
-    saveRanglistenspiele(newData);
+    const archived = { ...spiel, closedAt: new Date().toISOString(), result, challengerRank: chalIdx + 1, defenderRank: defIdx + 1 };
+    saveRanglistenspiele({ active: ranglistenspiele.active.filter(s => s.id !== spiel.id), archived: [archived, ...ranglistenspiele.archived] });
   };
   const savePracticeTournaments          = u => { setPracticeTournaments(u);          setDoc(doc(db,'ttc','practiceTournaments'),          u); };
   const saveArchivedPracticeTournaments  = u => { setArchivedPracticeTournaments(u);  setDoc(doc(db,'ttc','archivedPracticeTournaments'),  u); };
@@ -3026,7 +3018,6 @@ export default function TrainingsApp() {
       {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>navTo('notifications'), badge: unreadCount},
       {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
       {label:'Rangliste',        icon:'📊', color:'#fcd34d', bg:'rgba(252,211,77,0.1)',   border:'rgba(252,211,77,0.25)',  action:()=>navTo('rangliste')},
-      {label:'RL-Archiv',        icon:'🏅', color:'#fbbf24', bg:'rgba(251,191,36,0.1)',   border:'rgba(251,191,36,0.25)',  action:()=>navTo('ranglisten-archiv')},
       {label:'Errungenschaften', icon:'🏅', color:'#d9f99d', bg:'rgba(217,249,157,0.1)',  border:'rgba(217,249,157,0.25)', action:()=>navTo('achievements')},
       ...(appSettings.mannschaftEnabled?[{label:'Mannschaft',icon:'⚽',color:'#6ee7b7',bg:'rgba(110,231,183,0.1)',border:'rgba(110,231,183,0.25)',action:()=>navTo('mannschaft')}]:[]),
       ...(userRole==='admin'?[{label:'Admin',icon:'🛡️',color:'#c4b5fd',bg:'rgba(196,181,253,0.1)',border:'rgba(196,181,253,0.25)',action:()=>navTo('admin')}]:[]),
@@ -4738,7 +4729,7 @@ export default function TrainingsApp() {
 
     // ── Ranglistenspiele helpers ──────────────────────────────
     const activeSpiele = ranglistenspiele.active || [];
-    const updateSpielScore = (spielId, field, val) => {
+    const updateSpielField = (spielId, field, val) => {
       const updated = activeSpiele.map(s => s.id===spielId ? {...s,[field]:val} : s);
       saveRanglistenspiele({ ...ranglistenspiele, active: updated });
     };
@@ -4748,9 +4739,9 @@ export default function TrainingsApp() {
       const chalIdx = rangliste.indexOf(newSpielForm.challengerId);
       const defIdx  = rangliste.indexOf(newSpielForm.defenderId);
       if (chalIdx === -1 || defIdx === -1 || chalIdx <= defIdx) return;
-      const spiel = { id: 'spiel_'+Date.now(), challengerId: newSpielForm.challengerId, defenderId: newSpielForm.defenderId, challengerScore: '', defenderScore: '', date: new Date().toISOString().slice(0,10) };
+      const spiel = { id: 'spiel_'+Date.now(), challengerId: newSpielForm.challengerId, defenderId: newSpielForm.defenderId, sets1: null, sets2: null, winSets: newSpielForm.winSets||2, date: new Date().toISOString().slice(0,10) };
       saveRanglistenspiele({ ...ranglistenspiele, active: [...activeSpiele, spiel] });
-      setNewSpielForm({ open: false, challengerId: '', defenderId: '' });
+      setNewSpielForm({ open: false, challengerId: '', defenderId: '', winSets: 2 });
     };
 
     return (
@@ -4758,7 +4749,7 @@ export default function TrainingsApp() {
         <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
           <button onClick={()=>navTo('home')} style={s.btn('#d97706')}><Home size={16}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>📊 Rangliste Jugend</h1>
-          <button onClick={()=>navTo('ranglisten-archiv')} style={{...s.btn('#92400e'),fontSize:'12px'}}>🏅 Archiv</button>
+          <button onClick={()=>{setArchiveTab('rangliste');navTo('archiv');}} style={{...s.btn('#92400e'),fontSize:'12px'}}>🏅 Archiv</button>
         </div>
         <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
 
@@ -4804,6 +4795,18 @@ export default function TrainingsApp() {
             {newSpielForm.open && (
               <div style={{background:'#fff7ed',border:'1px solid #fb923c',borderRadius:'12px',padding:'16px',marginBottom:'16px'}}>
                 <p style={{margin:'0 0 12px',fontWeight:'700',color:'#9a3412',fontSize:'14px'}}>Neues Ranglistenspiel anlegen</p>
+
+                {/* Gewinnsätze */}
+                <p style={{margin:'0 0 6px',fontSize:'12px',color:'#92400e',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.4px'}}>Gewinnsätze</p>
+                <div style={{display:'flex',gap:'6px',marginBottom:'14px'}}>
+                  {[1,2,3].map(n=>(
+                    <button key={n} onClick={()=>setNewSpielForm(f=>({...f,winSets:n}))}
+                      style={{flex:1,padding:'10px',borderRadius:'10px',border:`2px solid ${(newSpielForm.winSets||2)===n?'#ea580c':'#e5e7eb'}`,background:(newSpielForm.winSets||2)===n?'rgba(234,88,12,0.1)':'#f9fafb',color:(newSpielForm.winSets||2)===n?'#ea580c':'#6b7280',cursor:'pointer',fontWeight:'800',fontSize:'15px'}}>
+                      {n}
+                    </button>
+                  ))}
+                </div>
+
                 <p style={{margin:'0 0 6px',fontSize:'12px',color:'#92400e',fontWeight:'600'}}>Herausforderer (niedrigerer Rang wählt höheren aus):</p>
                 <select value={newSpielForm.challengerId} onChange={e=>setNewSpielForm(f=>({...f,challengerId:e.target.value,defenderId:''}))}
                   style={{width:'100%',padding:'8px 10px',borderRadius:'8px',border:'1px solid #fb923c',fontSize:'14px',marginBottom:'10px',background:'white'}}>
@@ -4826,7 +4829,7 @@ export default function TrainingsApp() {
                 <div style={{display:'flex',gap:'8px'}}>
                   <button onClick={startNeuesSpiel} disabled={!newSpielForm.challengerId||!newSpielForm.defenderId}
                     style={{...s.btn('#ea580c'),flex:1,opacity:(!newSpielForm.challengerId||!newSpielForm.defenderId)?0.4:1}}>✓ Spiel starten</button>
-                  <button onClick={()=>setNewSpielForm({open:false,challengerId:'',defenderId:''})}
+                  <button onClick={()=>setNewSpielForm({open:false,challengerId:'',defenderId:'',winSets:2})}
                     style={{...s.btn('#6b7280'),flex:1}}>Abbrechen</button>
                 </div>
               </div>
@@ -4842,61 +4845,79 @@ export default function TrainingsApp() {
                   const def  = children[spiel.defenderId];
                   const chalIdx = rangliste.indexOf(spiel.challengerId);
                   const defIdx  = rangliste.indexOf(spiel.defenderId);
-                  const cScore = parseInt(spiel.challengerScore)||0;
-                  const dScore = parseInt(spiel.defenderScore)||0;
-                  const hasScores = spiel.challengerScore!==''&&spiel.defenderScore!=='';
-                  const canFinalize = hasScores && cScore !== dScore;
+                  const winSets = spiel.winSets || 2;
+                  const sets1 = spiel.sets1;
+                  const sets2 = spiel.sets2;
+                  const hasScores = sets1 !== null && sets2 !== null;
+                  const canFinalize = hasScores && sets1 !== sets2 && (sets1 === winSets || sets2 === winSets);
+                  // rnkBtn: interactive set-count button style
+                  const rnkBtn = (active, color) => ({width:'42px',height:'42px',borderRadius:'10px',border:`2px solid ${active?color:'#e5e7eb'}`,background:active?`rgba(${color==='#ea580c'?'234,88,12':'29,78,216'},0.1)`:'#f9fafb',color:active?color:'#9ca3af',cursor:'pointer',fontWeight:'900',fontSize:'18px',display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.1s'});
                   return (
-                    <div key={spiel.id} style={{border:'1px solid #fed7aa',borderRadius:'12px',padding:'14px',background:'#fff7ed'}}>
+                    <div key={spiel.id} style={{border:'1px solid #fed7aa',borderRadius:'14px',overflow:'hidden',background:'#fff7ed'}}>
                       {/* Header */}
-                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px',gap:'8px',flexWrap:'wrap'}}>
-                        <div style={{display:'flex',alignItems:'center',gap:'8px',flex:1,minWidth:0}}>
-                          <div style={{textAlign:'center',flex:1}}>
-                            <p style={{margin:'0 0 2px',fontWeight:'800',color:'#1f2937',fontSize:'14px'}}>{chal?.name||'?'}</p>
-                            <span style={{fontSize:'11px',fontWeight:'700',background:'#fef3c7',color:'#92400e',padding:'1px 8px',borderRadius:'8px',border:'1px solid #fcd34d'}}>#{chalIdx+1} Herausf.</span>
-                          </div>
-                          <div style={{fontWeight:'900',color:'#ea580c',fontSize:'18px',flexShrink:0}}>⚔️</div>
-                          <div style={{textAlign:'center',flex:1}}>
-                            <p style={{margin:'0 0 2px',fontWeight:'800',color:'#1f2937',fontSize:'14px'}}>{def?.name||'?'}</p>
-                            <span style={{fontSize:'11px',fontWeight:'700',background:'#dbeafe',color:'#1d4ed8',padding:'1px 8px',borderRadius:'8px',border:'1px solid #93c5fd'}}>#{defIdx+1} Vert.</span>
-                          </div>
+                      <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'12px 14px',borderBottom:'1px solid #fed7aa'}}>
+                        <div style={{textAlign:'center',flex:1,minWidth:0}}>
+                          <p style={{margin:'0 0 3px',fontWeight:'800',color:'#1f2937',fontSize:'14px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{chal?.name||'?'}</p>
+                          <span style={{fontSize:'11px',fontWeight:'700',background:'#fef3c7',color:'#92400e',padding:'1px 8px',borderRadius:'8px',border:'1px solid #fcd34d'}}>⚔️ #{chalIdx+1}</span>
+                        </div>
+                        <div style={{textAlign:'center',flexShrink:0,minWidth:'52px'}}>
+                          {hasScores
+                            ? <span style={{fontSize:'22px',fontWeight:'900',color:'#1f2937',letterSpacing:'1px'}}>{sets1}:{sets2}</span>
+                            : <span style={{fontSize:'13px',color:'#d1d5db',fontWeight:'700'}}>vs</span>}
+                        </div>
+                        <div style={{textAlign:'center',flex:1,minWidth:0}}>
+                          <p style={{margin:'0 0 3px',fontWeight:'800',color:'#1f2937',fontSize:'14px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{def?.name||'?'}</p>
+                          <span style={{fontSize:'11px',fontWeight:'700',background:'#dbeafe',color:'#1d4ed8',padding:'1px 8px',borderRadius:'8px',border:'1px solid #93c5fd'}}>🛡️ #{defIdx+1}</span>
                         </div>
                         <button onClick={()=>deleteSpiel(spiel.id)}
-                          style={{width:'28px',height:'28px',borderRadius:'6px',background:'#fee2e2',border:'none',cursor:'pointer',color:'#dc2626',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>✕</button>
+                          style={{width:'28px',height:'28px',borderRadius:'6px',background:'#fee2e2',border:'none',cursor:'pointer',color:'#dc2626',fontSize:'13px',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>✕</button>
                       </div>
-                      {/* Ergebnis */}
-                      <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'10px'}}>
-                        <div style={{flex:1}}>
-                          <p style={{margin:'0 0 4px',fontSize:'11px',fontWeight:'600',color:'#92400e'}}>{chal?.name} (Herausforderung)</p>
-                          <input type="number" min="0" placeholder="Sätze" value={spiel.challengerScore}
-                            onChange={e=>updateSpielScore(spiel.id,'challengerScore',e.target.value)}
-                            style={{width:'100%',padding:'8px 10px',border:'2px solid #fb923c',borderRadius:'8px',fontSize:'16px',fontWeight:'800',textAlign:'center',color:'#9a3412',background:'white',outline:'none',boxSizing:'border-box'}}/>
-                        </div>
-                        <div style={{fontWeight:'900',color:'#6b7280',fontSize:'16px',paddingTop:'18px',flexShrink:0}}>:</div>
-                        <div style={{flex:1}}>
-                          <p style={{margin:'0 0 4px',fontSize:'11px',fontWeight:'600',color:'#1d4ed8'}}>{def?.name} (Verteidigung)</p>
-                          <input type="number" min="0" placeholder="Sätze" value={spiel.defenderScore}
-                            onChange={e=>updateSpielScore(spiel.id,'defenderScore',e.target.value)}
-                            style={{width:'100%',padding:'8px 10px',border:'2px solid #93c5fd',borderRadius:'8px',fontSize:'16px',fontWeight:'800',textAlign:'center',color:'#1d4ed8',background:'white',outline:'none',boxSizing:'border-box'}}/>
+
+                      {/* Interaktive Satz-Eingabe */}
+                      <div style={{padding:'14px',borderBottom:'1px solid #fed7aa'}}>
+                        <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'700',color:'#92400e',textTransform:'uppercase',letterSpacing:'0.4px'}}>Gewonnene Sätze · Best of {winSets*2-1}</p>
+                        <div style={{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+                          {/* Challenger */}
+                          <div style={{flex:1,minWidth:'130px',textAlign:'center'}}>
+                            <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'800',color:'#9a3412'}}>{chal?.name}</p>
+                            <div style={{display:'flex',gap:'5px',justifyContent:'center',flexWrap:'wrap'}}>
+                              {Array.from({length:winSets+1},(_,n)=>(
+                                <button key={n} onClick={()=>updateSpielField(spiel.id,'sets1',n)} style={rnkBtn(sets1===n,'#ea580c')}>{n}</button>
+                              ))}
+                            </div>
+                          </div>
+                          <span style={{fontWeight:'900',color:'#d1d5db',fontSize:'22px',flexShrink:0}}>:</span>
+                          {/* Defender */}
+                          <div style={{flex:1,minWidth:'130px',textAlign:'center'}}>
+                            <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'800',color:'#1d4ed8'}}>{def?.name}</p>
+                            <div style={{display:'flex',gap:'5px',justifyContent:'center',flexWrap:'wrap'}}>
+                              {Array.from({length:winSets+1},(_,n)=>(
+                                <button key={n} onClick={()=>updateSpielField(spiel.id,'sets2',n)} style={rnkBtn(sets2===n,'#1d4ed8')}>{n}</button>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      {/* Vorschau Ergebnis */}
-                      {hasScores && cScore !== dScore && (
-                        <div style={{background: cScore>dScore?'#dcfce7':'#dbeafe',border:`1px solid ${cScore>dScore?'#86efac':'#93c5fd'}`,borderRadius:'8px',padding:'8px 12px',marginBottom:'10px',fontSize:'13px',fontWeight:'700',color:cScore>dScore?'#166534':'#1d4ed8',textAlign:'center'}}>
-                          {cScore>dScore
-                            ? `🎉 ${chal?.name} gewinnt → rückt auf Platz #${defIdx+1} vor`
-                            : `✅ ${def?.name} verteidigt Platz #${defIdx+1} erfolgreich`}
-                        </div>
-                      )}
-                      {hasScores && cScore === dScore && (
-                        <div style={{background:'#fef3c7',border:'1px solid #fcd34d',borderRadius:'8px',padding:'8px 12px',marginBottom:'10px',fontSize:'13px',fontWeight:'700',color:'#92400e',textAlign:'center'}}>
-                          ⚠️ Unentschieden – kein Abschluss möglich
-                        </div>
-                      )}
-                      <button onClick={()=>finalizeRanglistenspiel(spiel)} disabled={!canFinalize}
-                        style={{...s.btn(canFinalize?'#16a34a':'#9ca3af'),width:'100%',opacity:canFinalize?1:0.5,cursor:canFinalize?'pointer':'not-allowed'}}>
-                        ✓ Spiel abschließen &amp; Rangliste aktualisieren
-                      </button>
+
+                      {/* Ergebnis-Vorschau + Abschließen */}
+                      <div style={{padding:'10px 14px'}}>
+                        {canFinalize && (
+                          <div style={{background:sets1>sets2?'#dcfce7':'#dbeafe',border:`1px solid ${sets1>sets2?'#86efac':'#93c5fd'}`,borderRadius:'8px',padding:'8px 12px',marginBottom:'10px',fontSize:'13px',fontWeight:'700',color:sets1>sets2?'#166534':'#1d4ed8',textAlign:'center'}}>
+                            {sets1>sets2
+                              ? `🎉 ${chal?.name} gewinnt → rückt auf Platz #${defIdx+1} vor!`
+                              : `✅ ${def?.name} verteidigt Platz #${defIdx+1} erfolgreich`}
+                          </div>
+                        )}
+                        {hasScores && sets1===sets2 && (
+                          <div style={{background:'#fef3c7',border:'1px solid #fcd34d',borderRadius:'8px',padding:'8px 12px',marginBottom:'10px',fontSize:'13px',fontWeight:'700',color:'#92400e',textAlign:'center'}}>
+                            ⚠️ Unentschieden – kein Abschluss möglich
+                          </div>
+                        )}
+                        <button onClick={()=>finalizeRanglistenspiel(spiel)} disabled={!canFinalize}
+                          style={{...s.btn(canFinalize?'#16a34a':'#9ca3af'),width:'100%',opacity:canFinalize?1:0.4,cursor:canFinalize?'pointer':'not-allowed'}}>
+                          ✓ Spiel abschließen &amp; Rangliste aktualisieren
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -4965,70 +4986,13 @@ export default function TrainingsApp() {
                   );
                 })}
                 {ranglistenspiele.archived.length > 5 && (
-                  <button onClick={()=>navTo('ranglisten-archiv')} style={{...s.btn('#d97706'),width:'100%',fontSize:'13px'}}>
+                  <button onClick={()=>{setArchiveTab('rangliste');navTo('archiv');}} style={{...s.btn('#d97706'),width:'100%',fontSize:'13px'}}>
                     Alle {ranglistenspiele.archived.length} Spiele im Archiv ansehen →
                   </button>
                 )}
               </div>
             </div>
           )}
-        </div>
-      </div>
-    );
-  }
-
-  // ── RANGLISTEN ARCHIV VIEW ───────────────────────────────────────────────
-  if (view === 'ranglisten-archiv') {
-    const archived = ranglistenspiele.archived || [];
-    return (
-      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#78350f 0%,#d97706 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
-        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-          <button onClick={()=>navTo('rangliste')} style={s.btn('#d97706')}><ArrowLeft size={16}/></button>
-          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>🏅 Ranglisten Archiv</h1>
-          <span style={{fontSize:'13px',color:'rgba(255,255,255,0.7)',fontWeight:'600'}}>{archived.length} Spiele</span>
-        </div>
-        <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
-          <div style={s.card}>
-            {archived.length === 0 ? (
-              <div style={{textAlign:'center',padding:'60px 20px',color:'#9ca3af'}}>
-                <div style={{fontSize:'48px',marginBottom:'12px'}}>📋</div>
-                <p style={{fontWeight:'700',margin:'0 0 6px'}}>Noch keine abgeschlossenen Spiele</p>
-                <p style={{fontSize:'13px',margin:0}}>Abgeschlossene Ranglistenspiele erscheinen hier.</p>
-              </div>
-            ) : (
-              <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
-                {archived.map((spiel,i) => {
-                  const chal = children[spiel.challengerId];
-                  const def  = children[spiel.defenderId];
-                  const won  = spiel.result === 'challenger';
-                  const date = spiel.closedAt ? new Date(spiel.closedAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : spiel.date;
-                  return (
-                    <div key={spiel.id||i} style={{border:`1px solid ${won?'#86efac':'#93c5fd'}`,borderRadius:'12px',padding:'14px',background:won?'#f0fdf4':'#eff6ff'}}>
-                      <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px',flexWrap:'wrap'}}>
-                        <span style={{fontSize:'22px'}}>{won?'🎉':'🛡️'}</span>
-                        <div style={{flex:1}}>
-                          <p style={{margin:0,fontWeight:'800',color:'#1f2937',fontSize:'15px'}}>
-                            {won ? `${chal?.name||'?'} hat ${def?.name||'?'} herausgefordert` : `${def?.name||'?'} hat ${chal?.name||'?'} abgewehrt`}
-                          </p>
-                          <p style={{margin:0,fontSize:'12px',color:'#6b7280'}}>{date}</p>
-                        </div>
-                        <div style={{textAlign:'center',background:'white',border:'1px solid #e5e7eb',borderRadius:'10px',padding:'6px 14px',flexShrink:0}}>
-                          <span style={{fontWeight:'900',fontSize:'20px',color:won?'#16a34a':'#1d4ed8'}}>{spiel.challengerScore}</span>
-                          <span style={{fontWeight:'700',color:'#9ca3af',fontSize:'14px',margin:'0 4px'}}>:</span>
-                          <span style={{fontWeight:'900',fontSize:'20px',color:won?'#6b7280':'#1d4ed8'}}>{spiel.defenderScore}</span>
-                        </div>
-                      </div>
-                      <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-                        <span style={{fontSize:'12px',background:'#fef3c7',color:'#92400e',border:'1px solid #fcd34d',borderRadius:'8px',padding:'2px 10px',fontWeight:'700'}}>⚔️ {chal?.name||'?'}</span>
-                        <span style={{fontSize:'12px',background:'#dbeafe',color:'#1d4ed8',border:'1px solid #93c5fd',borderRadius:'8px',padding:'2px 10px',fontWeight:'700'}}>🛡️ {def?.name||'?'}</span>
-                        {won && <span style={{fontSize:'12px',background:'#dcfce7',color:'#166534',border:'1px solid #86efac',borderRadius:'8px',padding:'2px 10px',fontWeight:'700'}}>↑ Platzwechsel</span>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
         </div>
       </div>
     );
@@ -6529,7 +6493,7 @@ export default function TrainingsApp() {
         <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
           {/* Tabs */}
           <div style={{display:'flex',gap:'8px',marginBottom:'20px'}}>
-            {[['sessions','🏋️ Archiv Training'],['tournaments','🏆 Archiv Turniere'],['practiceTournaments','🎮 Übungswettkämpfe']].map(([key,label])=>(
+            {[['sessions','🏋️ Training'],['tournaments','🏆 Turniere'],['practiceTournaments','🎮 Übungswettkämpfe'],['rangliste','🏅 Ranglisten']].map(([key,label])=>(
               <button key={key} onClick={()=>setArchiveTab(key)}
                 style={{padding:'10px 20px',borderRadius:'10px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:'14px',
                   background:archiveTab===key?'white':'rgba(255,255,255,0.2)',
@@ -6828,6 +6792,70 @@ export default function TrainingsApp() {
                           })()}
                         </div>
                       )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+          {/* ── RANGLISTEN TAB ── */}
+          {archiveTab==='rangliste' && (()=>{
+            const archived = ranglistenspiele.archived || [];
+            return (
+              <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
+                {archived.length === 0 && (
+                  <div style={{background:'rgba(255,255,255,0.1)',borderRadius:'12px',padding:'30px',textAlign:'center',color:'rgba(255,255,255,0.7)'}}>
+                    <div style={{fontSize:'40px',marginBottom:'10px'}}>🏅</div>
+                    <p style={{margin:'0 0 4px',fontWeight:'700'}}>Noch keine abgeschlossenen Ranglistenspiele</p>
+                    <p style={{margin:0,fontSize:'13px',opacity:0.7}}>Abgeschlossene Spiele erscheinen hier nach dem Abschluss im Rangliste-Menü.</p>
+                  </div>
+                )}
+                {archived.map((spiel,i) => {
+                  const chal = children[spiel.challengerId];
+                  const def  = children[spiel.defenderId];
+                  const won  = spiel.result === 'challenger';
+                  const date = spiel.closedAt ? new Date(spiel.closedAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : spiel.date;
+                  const chalRank = spiel.challengerRank;
+                  const defRank  = spiel.defenderRank;
+                  return (
+                    <div key={spiel.id||i} style={{background:won?'rgba(74,222,128,0.06)':'rgba(147,197,253,0.06)',border:`1px solid ${won?'rgba(74,222,128,0.2)':'rgba(147,197,253,0.2)'}`,borderRadius:'14px',padding:'14px 16px'}}>
+                      {/* Top row: icon + description + score */}
+                      <div style={{display:'flex',alignItems:'flex-start',gap:'10px',marginBottom:'10px'}}>
+                        <span style={{fontSize:'24px',flexShrink:0,lineHeight:'1.2'}}>{won?'🎉':'🛡️'}</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <p style={{margin:'0 0 2px',fontWeight:'800',color:'white',fontSize:'14px',lineHeight:'1.3'}}>
+                            {won
+                              ? `${chal?.name||'?'} fordert ${def?.name||'?'} heraus & gewinnt`
+                              : `${def?.name||'?'} verteidigt gegen ${chal?.name||'?'}`}
+                          </p>
+                          <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{date}</p>
+                        </div>
+                        <div style={{background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'10px',padding:'6px 12px',flexShrink:0,textAlign:'center'}}>
+                          <span style={{fontWeight:'900',fontSize:'20px',color:won?'#4ade80':'rgba(255,255,255,0.5)'}}>{spiel.sets1??spiel.challengerScore??'?'}</span>
+                          <span style={{fontWeight:'700',color:'rgba(255,255,255,0.3)',fontSize:'14px',margin:'0 3px'}}>:</span>
+                          <span style={{fontWeight:'900',fontSize:'20px',color:won?'rgba(255,255,255,0.5)':'#93c5fd'}}>{spiel.sets2??spiel.defenderScore??'?'}</span>
+                        </div>
+                      </div>
+                      {/* Badges */}
+                      <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                        <span style={{fontSize:'12px',background:'rgba(252,211,77,0.1)',color:'#fcd34d',border:'1px solid rgba(252,211,77,0.25)',borderRadius:'8px',padding:'2px 10px',fontWeight:'700'}}>
+                          ⚔️ {chal?.name||'?'}{chalRank?` (Platz #${chalRank})`:''}
+                        </span>
+                        <span style={{fontSize:'12px',background:'rgba(147,197,253,0.1)',color:'#93c5fd',border:'1px solid rgba(147,197,253,0.25)',borderRadius:'8px',padding:'2px 10px',fontWeight:'700'}}>
+                          🛡️ {def?.name||'?'}{defRank?` (Platz #${defRank})`:''}
+                        </span>
+                        {won && chalRank && defRank && (
+                          <span style={{fontSize:'12px',background:'rgba(74,222,128,0.1)',color:'#4ade80',border:'1px solid rgba(74,222,128,0.25)',borderRadius:'8px',padding:'2px 10px',fontWeight:'700'}}>
+                            ↑ Platz #{defRank} → #{defRank}
+                          </span>
+                        )}
+                        {!won && chalRank && defRank && (
+                          <span style={{fontSize:'12px',background:'rgba(147,197,253,0.1)',color:'#93c5fd',border:'1px solid rgba(147,197,253,0.25)',borderRadius:'8px',padding:'2px 10px',fontWeight:'700'}}>
+                            = Plätze #{defRank} &amp; #{chalRank} unverändert
+                          </span>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
