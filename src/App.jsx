@@ -543,6 +543,103 @@ function RanglisteTile({ rangliste, myChildId, children: childMap, subgroups }) 
   );
 }
 
+function RlAchPanel({ rangliste, ranglisteAch, children: childMap, kidsWithSub, saveRanglisteAch, rlAchEditChild, setRlAchEditChild }) {
+  const [open, setOpen] = useState(false);
+  const editKid = rlAchEditChild ? (childMap[rlAchEditChild] || null) : null;
+  const getAch = (childId) => ranglisteAch[childId] || { reached: {}, weeks: {} };
+  const editAch = rlAchEditChild ? getAch(rlAchEditChild) : null;
+
+  const setWeekCount = (childId, key, val) => {
+    const prev = ranglisteAch[childId] || {};
+    const weeks = { ...(prev.weeks||{}) };
+    weeks[key] = { ...(weeks[key]||{ count:0, frozen:false }), count: Math.max(0, val) };
+    saveRanglisteAch({ ...ranglisteAch, [childId]: { ...prev, weeks } });
+  };
+  const toggleFrozen = (childId, key) => {
+    const prev = ranglisteAch[childId] || {};
+    const weeks = { ...(prev.weeks||{}) };
+    weeks[key] = { ...(weeks[key]||{ count:0, frozen:false }), frozen: !(weeks[key]?.frozen) };
+    saveRanglisteAch({ ...ranglisteAch, [childId]: { ...prev, weeks } });
+  };
+  const toggleReached = (childId, key) => {
+    const prev = ranglisteAch[childId] || {};
+    const reached = { ...(prev.reached||{}) };
+    if (reached[key]) delete reached[key]; else reached[key] = new Date().toISOString().slice(0,10);
+    saveRanglisteAch({ ...ranglisteAch, [childId]: { ...prev, reached } });
+  };
+
+  return (
+    <div style={{background:'white',borderRadius:'14px',marginBottom:'20px',overflow:'hidden',boxShadow:'0 2px 8px rgba(0,0,0,0.15)'}}>
+      <button onClick={()=>setOpen(o=>!o)}
+        style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'14px 16px',background:'none',border:'none',cursor:'pointer',textAlign:'left'}}>
+        <span style={{fontSize:'20px'}}>⚙️</span>
+        <div style={{flex:1}}>
+          <p style={{margin:0,fontWeight:'800',color:'#1f2937',fontSize:'14px'}}>Ranglisten-Errungenschaften verwalten</p>
+          <p style={{margin:0,fontSize:'12px',color:'#6b7280'}}>Manuelle Anpassung der automatisch gezählten Ranglisten-Errungenschaften</p>
+        </div>
+        <span style={{fontSize:'18px',color:'#9ca3af',display:'inline-block',transform:open?'rotate(180deg)':'none',transition:'transform 0.2s'}}>▼</span>
+      </button>
+      {open && (
+        <div style={{padding:'0 16px 16px',borderTop:'1px solid #f3f4f6'}}>
+          <p style={{margin:'12px 0 6px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>Kind auswählen</p>
+          <select value={rlAchEditChild} onChange={e=>setRlAchEditChild(e.target.value)}
+            style={{width:'100%',padding:'9px 12px',border:'1px solid #d1d5db',borderRadius:'8px',fontSize:'14px',color:'#1f2937',background:'white',marginBottom:'14px'}}>
+            <option value="">Kind wählen…</option>
+            {kidsWithSub.filter(c=>rangliste.includes(c.id)).map(c=>{
+              const rank = rangliste.indexOf(c.id)+1;
+              return <option key={c.id} value={c.id}>#{rank} {c.name}</option>;
+            })}
+          </select>
+          {editKid && editAch && (
+            <>
+              <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'14px',padding:'10px 12px',background:'#f9fafb',borderRadius:'10px',border:'1px solid #e5e7eb'}}>
+                <div style={{width:'32px',height:'32px',borderRadius:'50%',background:'#7c3aed',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:'700',fontSize:'13px'}}>{editKid.name[0]}</div>
+                <div>
+                  <p style={{margin:0,fontWeight:'800',color:'#1f2937',fontSize:'14px'}}>{editKid.name}</p>
+                  <p style={{margin:0,fontSize:'12px',color:'#6b7280'}}>Rang #{rangliste.indexOf(editKid.id)+1} von {rangliste.length}</p>
+                </div>
+              </div>
+              <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>🏁 Erstmals erreicht</p>
+              <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'16px'}}>
+                {RANK_TIERS.map(t=>{
+                  const has = !!editAch.reached?.[t.key];
+                  return (
+                    <button key={t.key} onClick={()=>toggleReached(editKid.id, t.key)}
+                      title={has ? `Entfernen (erreicht am ${editAch.reached[t.key]})` : 'Als erreicht markieren'}
+                      style={{padding:'5px 10px',borderRadius:'8px',border:`2px solid ${has?'#7c3aed':'#e5e7eb'}`,background:has?'rgba(124,58,237,0.1)':'#f9fafb',color:has?'#7c3aed':'#9ca3af',fontWeight:'700',fontSize:'12px',cursor:'pointer'}}>
+                      {t.icon} {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>📅 Wochen-Counter</p>
+              <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+                {RANK_TIERS.map(t=>{
+                  const w = editAch.weeks?.[t.key] || { count: 0, frozen: false };
+                  return (
+                    <div key={t.key} style={{display:'flex',alignItems:'center',gap:'8px',padding:'8px 10px',borderRadius:'8px',background:'#f9fafb',border:'1px solid #e5e7eb'}}>
+                      <span style={{fontSize:'16px',flexShrink:0}}>{t.icon}</span>
+                      <span style={{fontSize:'13px',fontWeight:'700',color:'#374151',flex:1}}>{t.label}</span>
+                      <button onClick={()=>setWeekCount(editKid.id, t.key, w.count-1)} style={{width:'26px',height:'26px',border:'1px solid #d1d5db',borderRadius:'6px',background:'#f3f4f6',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
+                      <span style={{minWidth:'28px',textAlign:'center',fontWeight:'800',fontSize:'15px',color:'#111'}}>{w.count}</span>
+                      <button onClick={()=>setWeekCount(editKid.id, t.key, w.count+1)} style={{width:'26px',height:'26px',border:'1px solid #d1d5db',borderRadius:'6px',background:'#f0fdf4',cursor:'pointer',fontWeight:'700',fontSize:'14px',color:'#16a34a',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
+                      <button onClick={()=>toggleFrozen(editKid.id, t.key)}
+                        title={w.frozen ? 'Eingefroren – Klick für Auto' : 'Automatisch – Klick zum Einfrieren'}
+                        style={{padding:'4px 8px',borderRadius:'6px',border:`1px solid ${w.frozen?'#fca5a5':'#86efac'}`,background:w.frozen?'#fee2e2':'#f0fdf4',color:w.frozen?'#dc2626':'#16a34a',cursor:'pointer',fontSize:'11px',fontWeight:'700',flexShrink:0,whiteSpace:'nowrap'}}>
+                        {w.frozen?'❄️ Eingefroren':'▶ Auto'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TrainingsApp() {
   const [user, setUser]               = useState(null);
   const [userRole, setUserRole]       = useState(null);
@@ -739,6 +836,31 @@ export default function TrainingsApp() {
       unsubs.push(onSnapshot(doc(db,'ttc','users'), s => setAllUsers(s.exists()?s.data():{})));
     return () => unsubs.forEach(u=>u());
   }, [user, userRole]);
+
+  // ── Weekly Rangliste Achievement check (runs when rangliste or achievements load) ──
+  useEffect(() => {
+    if (rangliste.length === 0) return;
+    runWeeklyRankCheck(rangliste, ranglisteAch);
+  }, [view === 'achievements']); // trigger when trainer opens achievements view
+
+  // ── Initial rank achievement seeding (run once when data is ready) ──
+  useEffect(() => {
+    if (rangliste.length === 0 || Object.keys(ranglisteAch).length > 0) return;
+    // First time: seed reached milestones for all current positions
+    const today = new Date().toISOString().slice(0,10);
+    const ach = {};
+    rangliste.forEach((childId, idx) => {
+      const rank = idx + 1;
+      const reached = {};
+      const weeks = {};
+      RANK_TIERS.forEach(({ key, maxRank }) => {
+        if (rank <= maxRank) reached[key] = today;
+        weeks[key] = { count: 0, frozen: false };
+      });
+      ach[childId] = { reached, weeks, lastCheck: today, lastRank: rank };
+    });
+    saveRanglisteAch(ach);
+  }, [rangliste.length > 0 && Object.keys(ranglisteAch).length === 0]);
 
   // ── Auto-Notifications ──────────────────────────────────────
   useEffect(() => {
@@ -2876,9 +2998,11 @@ export default function TrainingsApp() {
               {id:'tournaments', label:'Turniere (aktiv)',            desc:'Alle laufenden Turniere', icon:'🏆'},
               {id:'practiceT',   label:'Übungswettkämpfe (aktiv)',   desc:'Alle laufenden Übungswettkämpfe', icon:'🎮'},
               {id:'messages',    label:'Trainer-Nachrichten',         desc:'Alle manuell gesendeten Nachrichten', icon:'💬'},
-              {id:'archSessions',label:'Archiv Training',             desc:'Alle archivierten Trainingseinheiten', icon:'📦'},
-              {id:'archTourneys',label:'Archiv Turniere',             desc:'Alle archivierten Turniere', icon:'📦'},
-              {id:'archPT',      label:'Archiv Übungswettkämpfe',    desc:'Alle archivierten Übungswettkämpfe', icon:'📦'},
+              {id:'archSessions',  label:'Archiv Training',              desc:'Alle archivierten Trainingseinheiten', icon:'📦'},
+              {id:'archTourneys',  label:'Archiv Turniere',              desc:'Alle archivierten Turniere', icon:'📦'},
+              {id:'archPT',        label:'Archiv Übungswettkämpfe',     desc:'Alle archivierten Übungswettkämpfe', icon:'📦'},
+              {id:'allAchievements',label:'Alle Errungenschaften',       desc:'Turnier-Errungenschaften aller Kinder + Ranglisten-Errungenschaften komplett zurücksetzen', icon:'🏅', needsPw:false},
+              {id:'rlAchievements', label:'Ranglisten-Errungenschaften', desc:'Nur die automatisch gezählten Ranglisten-Errungenschaften zurücksetzen', icon:'📊'},
             ];
             const sel = dangerSelections;
             const allSel = cats.every(c=>sel[c.id]);
@@ -2906,6 +3030,21 @@ export default function TrainingsApp() {
                   if(cat.id==='archSessions')  saveArchivedSessions({});
                   if(cat.id==='archTourneys')  saveArchivedTournaments({});
                   if(cat.id==='archPT')        saveArchivedPracticeTournaments({});
+                  if(cat.id==='rlAchievements') saveRanglisteAch({});
+                  if(cat.id==='allAchievements'){
+                    saveRanglisteAch({});
+                    // Reset all tournament/counter achievements on children
+                    const resetFields = ['einzel1','einzel2','einzel3','doppel1','doppel2','doppel3','team','spielerDesMonats','ttrUnlocked'];
+                    const updatedChildren = {...children};
+                    Object.keys(updatedChildren).forEach(id=>{
+                      const ach = updatedChildren[id].achievements||{};
+                      const blank = {};
+                      resetFields.forEach(f=>{ blank[f] = f==='ttrUnlocked'?[]:0; });
+                      updatedChildren[id] = {...updatedChildren[id], achievements:{...ach,...blank}};
+                    });
+                    setChildren(updatedChildren);
+                    setDoc(doc(db,'ttc','children'), updatedChildren);
+                  }
                 });
                 setDangerSelections(p=>{const n={...p};nonPw.forEach(c=>{delete n[c.id];});return n;});
               }
@@ -5182,106 +5321,15 @@ export default function TrainingsApp() {
         <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
 
           {/* ── Ranglisten-Errungenschaften Admin-Panel ──────────── */}
-          {(()=>{
-            // Weekly check on view open
-            React.useEffect(() => { if (rangliste.length > 0) runWeeklyRankCheck(rangliste, ranglisteAch); }, []);
-            const [rlPanelOpen, setRlPanelOpen] = React.useState(false);
-            const editKid = rlAchEditChild ? (children[rlAchEditChild] || null) : null;
-            const editAch = rlAchEditChild ? getRanglisteAch(rlAchEditChild) : null;
-            const setWeekCount = (childId, key, val) => {
-              const prev = ranglisteAch[childId] || {};
-              const weeks = { ...(prev.weeks||{}) };
-              weeks[key] = { ...(weeks[key]||{ count:0, frozen:false }), count: Math.max(0, val) };
-              saveRanglisteAch({ ...ranglisteAch, [childId]: { ...prev, weeks } });
-            };
-            const toggleFrozen = (childId, key) => {
-              const prev = ranglisteAch[childId] || {};
-              const weeks = { ...(prev.weeks||{}) };
-              weeks[key] = { ...(weeks[key]||{ count:0, frozen:false }), frozen: !(weeks[key]?.frozen) };
-              saveRanglisteAch({ ...ranglisteAch, [childId]: { ...prev, weeks } });
-            };
-            const toggleReached = (childId, key) => {
-              const prev = ranglisteAch[childId] || {};
-              const reached = { ...(prev.reached||{}) };
-              if (reached[key]) delete reached[key]; else reached[key] = new Date().toISOString().slice(0,10);
-              saveRanglisteAch({ ...ranglisteAch, [childId]: { ...prev, reached } });
-            };
-            return (
-              <div style={{background:'white',borderRadius:'14px',marginBottom:'20px',overflow:'hidden',boxShadow:'0 2px 8px rgba(0,0,0,0.15)'}}>
-                <button onClick={()=>setRlPanelOpen(o=>!o)}
-                  style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'14px 16px',background:'none',border:'none',cursor:'pointer',textAlign:'left'}}>
-                  <span style={{fontSize:'20px'}}>⚙️</span>
-                  <div style={{flex:1}}>
-                    <p style={{margin:0,fontWeight:'800',color:'#1f2937',fontSize:'14px'}}>Ranglisten-Errungenschaften verwalten</p>
-                    <p style={{margin:0,fontSize:'12px',color:'#6b7280'}}>Manuelle Anpassung der automatisch gezählten Ranglisten-Errungenschaften</p>
-                  </div>
-                  <span style={{fontSize:'18px',color:'#9ca3af',transform:rlPanelOpen?'rotate(180deg)':'none',transition:'transform 0.2s'}}>▼</span>
-                </button>
-                {rlPanelOpen && (
-                  <div style={{padding:'0 16px 16px',borderTop:'1px solid #f3f4f6'}}>
-                    {/* Kind wählen */}
-                    <p style={{margin:'12px 0 6px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>Kind auswählen</p>
-                    <select value={rlAchEditChild} onChange={e=>setRlAchEditChild(e.target.value)}
-                      style={{width:'100%',padding:'9px 12px',border:'1px solid #d1d5db',borderRadius:'8px',fontSize:'14px',color:'#1f2937',background:'white',marginBottom:'14px'}}>
-                      <option value="">Kind wählen…</option>
-                      {kidsWithSub.filter(c=>rangliste.includes(c.id)).map(c=>{
-                        const rank = rangliste.indexOf(c.id)+1;
-                        return <option key={c.id} value={c.id}>#{rank} {c.name}</option>;
-                      })}
-                    </select>
-                    {editKid && editAch && (
-                      <>
-                        <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'14px',padding:'10px 12px',background:'#f9fafb',borderRadius:'10px',border:'1px solid #e5e7eb'}}>
-                          <div style={{width:'32px',height:'32px',borderRadius:'50%',background:'#7c3aed',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:'700',fontSize:'13px'}}>{editKid.name[0]}</div>
-                          <div>
-                            <p style={{margin:0,fontWeight:'800',color:'#1f2937',fontSize:'14px'}}>{editKid.name}</p>
-                            <p style={{margin:0,fontSize:'12px',color:'#6b7280'}}>Rang #{rangliste.indexOf(editKid.id)+1} von {rangliste.length}</p>
-                          </div>
-                        </div>
-
-                        {/* Erreicht-Meilensteine */}
-                        <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>🏁 Erstmals erreicht</p>
-                        <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'16px'}}>
-                          {RANK_TIERS.map(t=>{
-                            const has = !!editAch.reached?.[t.key];
-                            return (
-                              <button key={t.key} onClick={()=>toggleReached(editKid.id, t.key)}
-                                title={has ? `Entfernen (erreicht am ${editAch.reached[t.key]})` : 'Als erreicht markieren'}
-                                style={{padding:'5px 10px',borderRadius:'8px',border:`2px solid ${has?'#7c3aed':'#e5e7eb'}`,background:has?'rgba(124,58,237,0.1)':'#f9fafb',color:has?'#7c3aed':'#9ca3af',fontWeight:'700',fontSize:'12px',cursor:'pointer'}}>
-                                {t.icon} {t.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {/* Wochen-Counter */}
-                        <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>📅 Wochen-Counter</p>
-                        <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
-                          {RANK_TIERS.map(t=>{
-                            const w = editAch.weeks?.[t.key] || { count: 0, frozen: false };
-                            return (
-                              <div key={t.key} style={{display:'flex',alignItems:'center',gap:'8px',padding:'8px 10px',borderRadius:'8px',background:'#f9fafb',border:'1px solid #e5e7eb'}}>
-                                <span style={{fontSize:'16px',flexShrink:0}}>{t.icon}</span>
-                                <span style={{fontSize:'13px',fontWeight:'700',color:'#374151',flex:1}}>{t.label}</span>
-                                <button onClick={()=>setWeekCount(editKid.id, t.key, w.count-1)} style={{width:'26px',height:'26px',border:'1px solid #d1d5db',borderRadius:'6px',background:'#f3f4f6',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
-                                <span style={{minWidth:'28px',textAlign:'center',fontWeight:'800',fontSize:'15px',color:'#111'}}>{w.count}</span>
-                                <button onClick={()=>setWeekCount(editKid.id, t.key, w.count+1)} style={{width:'26px',height:'26px',border:'1px solid #d1d5db',borderRadius:'6px',background:'#f0fdf4',cursor:'pointer',fontWeight:'700',fontSize:'14px',color:'#16a34a',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
-                                <button onClick={()=>toggleFrozen(editKid.id, t.key)}
-                                  title={w.frozen ? 'Eingefroren – Klick für Auto' : 'Automatisch – Klick zum Einfrieren'}
-                                  style={{padding:'4px 8px',borderRadius:'6px',border:`1px solid ${w.frozen?'#fca5a5':'#86efac'}`,background:w.frozen?'#fee2e2':'#f0fdf4',color:w.frozen?'#dc2626':'#16a34a',cursor:'pointer',fontSize:'11px',fontWeight:'700',flexShrink:0,whiteSpace:'nowrap'}}>
-                                  {w.frozen?'❄️ Eingefroren':'▶ Auto'}
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
+          <RlAchPanel
+            rangliste={rangliste}
+            ranglisteAch={ranglisteAch}
+            children={children}
+            kidsWithSub={kidsWithSub}
+            saveRanglisteAch={saveRanglisteAch}
+            rlAchEditChild={rlAchEditChild}
+            setRlAchEditChild={setRlAchEditChild}
+          />
 
           {kidsWithSub.length===0
             ? <div style={{background:'rgba(255,255,255,0.1)',borderRadius:'12px',padding:'30px',textAlign:'center',color:'rgba(255,255,255,0.7)'}}>Keine Kinder vorhanden.</div>
