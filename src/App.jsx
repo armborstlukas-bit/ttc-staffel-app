@@ -206,6 +206,16 @@ const TTR_COLORS = [
   {bg:'#072107',text:'#66bb6a'},  // 2000
 ];
 
+const RANK_TIERS = [
+  { key:'top30',  label:'Top 30',  icon:'🎖️', maxRank:30 },
+  { key:'top20',  label:'Top 20',  icon:'🎗️', maxRank:20 },
+  { key:'top10',  label:'Top 10',  icon:'🏆', maxRank:10 },
+  { key:'top5',   label:'Top 5',   icon:'⭐', maxRank:5  },
+  { key:'platz3', label:'Platz 3', icon:'🥉', maxRank:3  },
+  { key:'platz2', label:'Platz 2', icon:'🥈', maxRank:2  },
+  { key:'platz1', label:'Platz 1', icon:'🥇', maxRank:1  },
+];
+
 const ACHIEVEMENT_DESCRIPTIONS = {
   ttr: (val) => `Du hast einen TTR-Wert von ${val} erreicht! Der TTR-Wert (Tischtennis-Ranking) misst deine Spielstärke im deutschen Tischtennis.`,
   einzel1: 'Einzelsieger! Du hast ein Turnier im Einzel gewonnen.',
@@ -561,6 +571,8 @@ export default function TrainingsApp() {
   const [rangliste, setRangliste] = useState([]); // ordered array of childIds
   const [ranglistenspiele, setRanglistenspiele] = useState({ active: [], archived: [] });
   const [newSpielForm, setNewSpielForm] = useState({ open: false, challengerId: '', defenderId: '' });
+  const [ranglisteAch, setRanglisteAch] = useState({}); // { [childId]: { reached:{}, weeks:{}, lastCheck, lastRank } }
+  const [rlAchEditChild, setRlAchEditChild] = useState(''); // trainer override: selected child
   const [editingSession, setEditingSession]     = useState(null); // session being edited
   const [editForm, setEditForm]                 = useState({});
   const [deleteDialog, setDeleteDialog]         = useState(null);
@@ -719,6 +731,7 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','appSettings'),        s => setAppSettings(s.exists()?{mannschaftEnabled:true,...s.data()}:{mannschaftEnabled:true})),
       onSnapshot(doc(db,'ttc','rangliste'), s => setRangliste(s.exists()&&s.data().entries ? s.data().entries : [])),
       onSnapshot(doc(db,'ttc','ranglistenspiele'), s => setRanglistenspiele(s.exists() ? { active: s.data().active||[], archived: s.data().archived||[] } : { active:[], archived:[] })),
+      onSnapshot(doc(db,'ttc','ranglisteAchievements'), s => setRanglisteAch(s.exists() ? s.data() : {})),
       onSnapshot(doc(db,'ttc','practiceTournaments'),          s => setPracticeTournaments(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','archivedPracticeTournaments'),  s => setArchivedPracticeTournaments(s.exists()?s.data():{})),
     ];
@@ -890,6 +903,60 @@ export default function TrainingsApp() {
   const saveAppSettings                  = u => { setAppSettings(u);                  setDoc(doc(db,'ttc','appSettings'),                  u); };
   const saveRangliste = (entries) => { setRangliste(entries); setDoc(doc(db,'ttc','rangliste'),{entries}); };
   const saveRanglistenspiele = (data) => { setRanglistenspiele(data); setDoc(doc(db,'ttc','ranglistenspiele'), data); };
+  const saveRanglisteAch = (data) => { setRanglisteAch(data); setDoc(doc(db,'ttc','ranglisteAchievements'), data); };
+
+  // Compute + save rangliste achievements for given children after rank change.
+  // childUpdates: [{ childId, newRank }]  — newRank is 1-based (1=best), 0=not in list
+  const applyRankAchievements = (newRangliste, childUpdates, existingAch) => {
+    const today = new Date().toISOString().slice(0,10);
+    let ach = { ...existingAch };
+    childUpdates.forEach(({ childId, newRank }) => {
+      const prev = ach[childId] || {};
+      const reached = { ...( prev.reached || {}) };
+      const weeks   = { ...( prev.weeks   || {}) };
+      // ── 1. Weekly check: how many weeks since lastCheck at lastRank ──
+      const lastCheck = prev.lastCheck;
+      const lastRank  = prev.lastRank ?? null;
+      if (lastCheck && lastRank !== null) {
+        const daysElapsed = Math.floor((new Date(today) - new Date(lastCheck)) / 86400000);
+        const weeksElapsed = Math.floor(daysElapsed / 7);
+        if (weeksElapsed > 0) {
+          RANK_TIERS.forEach(({ key, maxRank }) => {
+            if (lastRank > 0 && lastRank <= maxRank) {
+              const w = weeks[key] || { count: 0, frozen: false };
+              weeks[key] = { ...w, count: w.frozen ? w.count : w.count + weeksElapsed };
+            } else if (!weeks[key]) {
+              weeks[key] = { count: 0, frozen: false };
+            }
+          });
+        }
+      } else if (!lastCheck) {
+        // First time: init all weeks entries
+        RANK_TIERS.forEach(({ key }) => { if (!weeks[key]) weeks[key] = { count: 0, frozen: false }; });
+      }
+      // ── 2. "Reached" milestones at new rank ──
+      if (newRank > 0) {
+        RANK_TIERS.forEach(({ key, maxRank }) => {
+          if (newRank <= maxRank && !reached[key]) reached[key] = today;
+        });
+      }
+      ach[childId] = { ...prev, reached, weeks, lastCheck: today, lastRank: newRank };
+    });
+    saveRanglisteAch(ach);
+    return ach;
+  };
+
+  // Weekly check for all children in rangliste (called when trainer opens achievements)
+  const runWeeklyRankCheck = (currentRangliste, existingAch) => {
+    const updates = currentRangliste.map((childId, idx) => ({ childId, newRank: idx + 1 }));
+    // Also add children who left the rangliste (rank=0) if they have existing data
+    Object.keys(existingAch).forEach(childId => {
+      if (!currentRangliste.includes(childId)) updates.push({ childId, newRank: 0 });
+    });
+    if (updates.length > 0) applyRankAchievements(currentRangliste, updates, existingAch);
+  };
+
+  const getRanglisteAch = (childId) => ranglisteAch[childId] || { reached: {}, weeks: {} };
   const finalizeRanglistenspiel = (spiel) => {
     const { challengerId, defenderId, sets1, sets2 } = spiel;
     let newRangliste = [...rangliste];
@@ -903,6 +970,10 @@ export default function TrainingsApp() {
     saveRangliste(newRangliste);
     const archived = { ...spiel, closedAt: new Date().toISOString(), result, challengerRank: chalIdx + 1, defenderRank: defIdx + 1 };
     saveRanglistenspiele({ active: ranglistenspiele.active.filter(s => s.id !== spiel.id), archived: [archived, ...ranglistenspiele.archived] });
+    // Auto-update rangliste achievements for challenger + defender at their NEW ranks
+    const chalNewRank = newRangliste.indexOf(challengerId) + 1;
+    const defNewRank  = newRangliste.indexOf(defenderId) + 1;
+    applyRankAchievements(newRangliste, [{ childId: challengerId, newRank: chalNewRank }, { childId: defenderId, newRank: defNewRank }], ranglisteAch);
   };
   const savePracticeTournaments          = u => { setPracticeTournaments(u);          setDoc(doc(db,'ttc','practiceTournaments'),          u); };
   const saveArchivedPracticeTournaments  = u => { setArchivedPracticeTournaments(u);  setDoc(doc(db,'ttc','archivedPracticeTournaments'),  u); };
@@ -3980,6 +4051,41 @@ export default function TrainingsApp() {
                             onClick={()=>openCount(icon,label,desc,count)}/>
                         ))}
                       </Sec>
+
+                      {/* ── Ranglisten-Errungenschaften ── */}
+                      {rangliste.length > 0 && rangliste.includes(myChild.id) && (()=>{
+                        const rAch = getRanglisteAch(myChild.id);
+                        const myRank = rangliste.indexOf(myChild.id)+1;
+                        return (
+                          <>
+                          <Sec title="📊 Rangliste – Erstmals erreicht">
+                            {RANK_TIERS.map(t=>{
+                              const has = !!rAch.reached?.[t.key];
+                              const date = rAch.reached?.[t.key];
+                              return (
+                                <Tile key={t.key} icon={t.icon} iconGray="⬜" label={t.label}
+                                  sub={has&&date ? new Date(date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'}) : undefined}
+                                  has={has}
+                                  activeBg="rgba(252,211,77,0.12)" activeBorder="rgba(252,211,77,0.35)" activeTextColor="#fcd34d"
+                                  onClick={()=>setAchievementPopup({icon:has?t.icon:'🔒', title:t.label, desc:has?`Du hast ${t.label} in der TTC Rangliste erstmals am ${new Date(date).toLocaleDateString('de-DE')} erreicht!`:`Noch nicht erreicht. Aktuell: Platz #${myRank}`})}/>
+                              );
+                            })}
+                          </Sec>
+                          <Sec title="📅 Rangliste – Wochen im Tier" mb={false}>
+                            {RANK_TIERS.map(t=>{
+                              const wk = rAch.weeks?.[t.key]?.count||0;
+                              return (
+                                <Tile key={t.key} icon={t.icon} iconGray="⬜" label={t.label} sub={wk>0?`${wk}W`:undefined}
+                                  has={wk>0}
+                                  activeBg="rgba(252,211,77,0.08)" activeBorder="rgba(252,211,77,0.25)" activeTextColor="#fcd34d"
+                                  onClick={()=>setAchievementPopup({icon:t.icon, title:`Wochen ${t.label}`, desc:`Du hast insgesamt ${wk} Woche${wk!==1?'n':''} in der ${t.label} der TTC Rangliste verbracht.`, count:wk})}/>
+                              );
+                            })}
+                          </Sec>
+                          </>
+                        );
+                      })()}
+
                       </>}
                     </div>
                   </>
@@ -5074,6 +5180,109 @@ export default function TrainingsApp() {
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>🏅 Errungenschaften verwalten</h1>
         </div>
         <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
+
+          {/* ── Ranglisten-Errungenschaften Admin-Panel ──────────── */}
+          {(()=>{
+            // Weekly check on view open
+            React.useEffect(() => { if (rangliste.length > 0) runWeeklyRankCheck(rangliste, ranglisteAch); }, []);
+            const [rlPanelOpen, setRlPanelOpen] = React.useState(false);
+            const editKid = rlAchEditChild ? (children[rlAchEditChild] || null) : null;
+            const editAch = rlAchEditChild ? getRanglisteAch(rlAchEditChild) : null;
+            const setWeekCount = (childId, key, val) => {
+              const prev = ranglisteAch[childId] || {};
+              const weeks = { ...(prev.weeks||{}) };
+              weeks[key] = { ...(weeks[key]||{ count:0, frozen:false }), count: Math.max(0, val) };
+              saveRanglisteAch({ ...ranglisteAch, [childId]: { ...prev, weeks } });
+            };
+            const toggleFrozen = (childId, key) => {
+              const prev = ranglisteAch[childId] || {};
+              const weeks = { ...(prev.weeks||{}) };
+              weeks[key] = { ...(weeks[key]||{ count:0, frozen:false }), frozen: !(weeks[key]?.frozen) };
+              saveRanglisteAch({ ...ranglisteAch, [childId]: { ...prev, weeks } });
+            };
+            const toggleReached = (childId, key) => {
+              const prev = ranglisteAch[childId] || {};
+              const reached = { ...(prev.reached||{}) };
+              if (reached[key]) delete reached[key]; else reached[key] = new Date().toISOString().slice(0,10);
+              saveRanglisteAch({ ...ranglisteAch, [childId]: { ...prev, reached } });
+            };
+            return (
+              <div style={{background:'white',borderRadius:'14px',marginBottom:'20px',overflow:'hidden',boxShadow:'0 2px 8px rgba(0,0,0,0.15)'}}>
+                <button onClick={()=>setRlPanelOpen(o=>!o)}
+                  style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'14px 16px',background:'none',border:'none',cursor:'pointer',textAlign:'left'}}>
+                  <span style={{fontSize:'20px'}}>⚙️</span>
+                  <div style={{flex:1}}>
+                    <p style={{margin:0,fontWeight:'800',color:'#1f2937',fontSize:'14px'}}>Ranglisten-Errungenschaften verwalten</p>
+                    <p style={{margin:0,fontSize:'12px',color:'#6b7280'}}>Manuelle Anpassung der automatisch gezählten Ranglisten-Errungenschaften</p>
+                  </div>
+                  <span style={{fontSize:'18px',color:'#9ca3af',transform:rlPanelOpen?'rotate(180deg)':'none',transition:'transform 0.2s'}}>▼</span>
+                </button>
+                {rlPanelOpen && (
+                  <div style={{padding:'0 16px 16px',borderTop:'1px solid #f3f4f6'}}>
+                    {/* Kind wählen */}
+                    <p style={{margin:'12px 0 6px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>Kind auswählen</p>
+                    <select value={rlAchEditChild} onChange={e=>setRlAchEditChild(e.target.value)}
+                      style={{width:'100%',padding:'9px 12px',border:'1px solid #d1d5db',borderRadius:'8px',fontSize:'14px',color:'#1f2937',background:'white',marginBottom:'14px'}}>
+                      <option value="">Kind wählen…</option>
+                      {kidsWithSub.filter(c=>rangliste.includes(c.id)).map(c=>{
+                        const rank = rangliste.indexOf(c.id)+1;
+                        return <option key={c.id} value={c.id}>#{rank} {c.name}</option>;
+                      })}
+                    </select>
+                    {editKid && editAch && (
+                      <>
+                        <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'14px',padding:'10px 12px',background:'#f9fafb',borderRadius:'10px',border:'1px solid #e5e7eb'}}>
+                          <div style={{width:'32px',height:'32px',borderRadius:'50%',background:'#7c3aed',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:'700',fontSize:'13px'}}>{editKid.name[0]}</div>
+                          <div>
+                            <p style={{margin:0,fontWeight:'800',color:'#1f2937',fontSize:'14px'}}>{editKid.name}</p>
+                            <p style={{margin:0,fontSize:'12px',color:'#6b7280'}}>Rang #{rangliste.indexOf(editKid.id)+1} von {rangliste.length}</p>
+                          </div>
+                        </div>
+
+                        {/* Erreicht-Meilensteine */}
+                        <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>🏁 Erstmals erreicht</p>
+                        <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'16px'}}>
+                          {RANK_TIERS.map(t=>{
+                            const has = !!editAch.reached?.[t.key];
+                            return (
+                              <button key={t.key} onClick={()=>toggleReached(editKid.id, t.key)}
+                                title={has ? `Entfernen (erreicht am ${editAch.reached[t.key]})` : 'Als erreicht markieren'}
+                                style={{padding:'5px 10px',borderRadius:'8px',border:`2px solid ${has?'#7c3aed':'#e5e7eb'}`,background:has?'rgba(124,58,237,0.1)':'#f9fafb',color:has?'#7c3aed':'#9ca3af',fontWeight:'700',fontSize:'12px',cursor:'pointer'}}>
+                                {t.icon} {t.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Wochen-Counter */}
+                        <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>📅 Wochen-Counter</p>
+                        <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+                          {RANK_TIERS.map(t=>{
+                            const w = editAch.weeks?.[t.key] || { count: 0, frozen: false };
+                            return (
+                              <div key={t.key} style={{display:'flex',alignItems:'center',gap:'8px',padding:'8px 10px',borderRadius:'8px',background:'#f9fafb',border:'1px solid #e5e7eb'}}>
+                                <span style={{fontSize:'16px',flexShrink:0}}>{t.icon}</span>
+                                <span style={{fontSize:'13px',fontWeight:'700',color:'#374151',flex:1}}>{t.label}</span>
+                                <button onClick={()=>setWeekCount(editKid.id, t.key, w.count-1)} style={{width:'26px',height:'26px',border:'1px solid #d1d5db',borderRadius:'6px',background:'#f3f4f6',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
+                                <span style={{minWidth:'28px',textAlign:'center',fontWeight:'800',fontSize:'15px',color:'#111'}}>{w.count}</span>
+                                <button onClick={()=>setWeekCount(editKid.id, t.key, w.count+1)} style={{width:'26px',height:'26px',border:'1px solid #d1d5db',borderRadius:'6px',background:'#f0fdf4',cursor:'pointer',fontWeight:'700',fontSize:'14px',color:'#16a34a',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
+                                <button onClick={()=>toggleFrozen(editKid.id, t.key)}
+                                  title={w.frozen ? 'Eingefroren – Klick für Auto' : 'Automatisch – Klick zum Einfrieren'}
+                                  style={{padding:'4px 8px',borderRadius:'6px',border:`1px solid ${w.frozen?'#fca5a5':'#86efac'}`,background:w.frozen?'#fee2e2':'#f0fdf4',color:w.frozen?'#dc2626':'#16a34a',cursor:'pointer',fontSize:'11px',fontWeight:'700',flexShrink:0,whiteSpace:'nowrap'}}>
+                                  {w.frozen?'❄️ Eingefroren':'▶ Auto'}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {kidsWithSub.length===0
             ? <div style={{background:'rgba(255,255,255,0.1)',borderRadius:'12px',padding:'30px',textAlign:'center',color:'rgba(255,255,255,0.7)'}}>Keine Kinder vorhanden.</div>
             : <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
@@ -5186,6 +5395,31 @@ export default function TrainingsApp() {
                         <AchCounter label="⭐ Spieler d. Monats" val={ach.spielerDesMonats} onInc={()=>incField('spielerDesMonats')} onDec={()=>decField('spielerDesMonats')}/>
                       </div>
                     </div>
+
+                    {/* Rangliste Achievements (read-only summary per child) */}
+                    {rangliste.includes(child.id) && (()=>{
+                      const rAch = getRanglisteAch(child.id);
+                      const rank = rangliste.indexOf(child.id)+1;
+                      return (
+                        <div style={{marginTop:'12px',paddingTop:'12px',borderTop:'1px solid #f3f4f6'}}>
+                          <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>📊 Rangliste (Rang #{rank})</p>
+                          <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'6px'}}>
+                            {RANK_TIERS.map(t=>{
+                              const has = !!rAch.reached?.[t.key];
+                              const wk = rAch.weeks?.[t.key]?.count||0;
+                              const frozen = rAch.weeks?.[t.key]?.frozen;
+                              return (
+                                <div key={t.key} style={{padding:'4px 8px',borderRadius:'8px',border:`1px solid ${has?'#7c3aed':'#e5e7eb'}`,background:has?'rgba(124,58,237,0.07)':'#f9fafb',textAlign:'center',minWidth:'60px'}}>
+                                  <div style={{fontSize:'14px'}}>{t.icon}</div>
+                                  <div style={{fontSize:'10px',fontWeight:'700',color:has?'#7c3aed':'#9ca3af'}}>{t.label}</div>
+                                  <div style={{fontSize:'11px',color:has?'#374151':'#d1d5db',fontWeight:'600'}}>{wk}W {frozen?'❄️':''}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
