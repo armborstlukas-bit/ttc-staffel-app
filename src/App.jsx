@@ -488,6 +488,51 @@ function MobileBottomNav({ view, navTo, userRole, canEdit, appSettings, unreadCo
   );
 }
 
+function RanglisteTile({ rangliste, myChildId, children: childMap, subgroups }) {
+  const [open, setOpen] = useState(false);
+  const myPos = rangliste.indexOf(myChildId);
+  if (myPos === -1) return null;
+  const medal = myPos===0?'🥇':myPos===1?'🥈':myPos===2?'🥉':null;
+  return (
+    <div style={{marginBottom:'12px'}}>
+      <div onClick={()=>setOpen(o=>!o)}
+        style={{background:'linear-gradient(135deg,rgba(252,211,77,0.12) 0%,rgba(217,119,6,0.08) 100%)',border:'1px solid rgba(252,211,77,0.25)',borderRadius:open?'16px 16px 0 0':'16px',padding:'14px 18px',display:'flex',alignItems:'center',gap:'12px',cursor:'pointer',userSelect:'none'}}>
+        <div style={{width:'44px',height:'44px',borderRadius:'50%',background:myPos===0?'rgba(251,191,36,0.25)':myPos===1?'rgba(209,213,219,0.25)':myPos===2?'rgba(217,119,6,0.25)':'rgba(252,211,77,0.12)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:medal?'24px':'18px',fontWeight:'900',color:'#fcd34d'}}>
+          {medal || `#${myPos+1}`}
+        </div>
+        <div style={{flex:1}}>
+          <p style={{margin:'0 0 2px',fontWeight:'800',color:'white',fontSize:'15px'}}>📊 TTC Rangliste</p>
+          <p style={{margin:0,color:'rgba(252,211,77,0.8)',fontSize:'13px',fontWeight:'600'}}>
+            {medal?`${medal} Platz ${myPos+1} von ${rangliste.length}`:`Platz ${myPos+1} von ${rangliste.length}`}
+          </p>
+        </div>
+        <span style={{color:'rgba(252,211,77,0.6)',fontSize:'18px',display:'inline-block',transform:open?'rotate(180deg)':'none',transition:'transform 0.2s'}}>▼</span>
+      </div>
+      {open && (
+        <div style={{background:'rgba(0,0,0,0.25)',border:'1px solid rgba(252,211,77,0.18)',borderTop:'none',borderRadius:'0 0 16px 16px',padding:'12px 14px',display:'flex',flexDirection:'column',gap:'6px',maxHeight:'340px',overflowY:'auto'}}>
+          {rangliste.map((childId, idx) => {
+            const child = childMap[childId];
+            if (!child) return null;
+            const isMe = childId === myChildId;
+            const m = idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':null;
+            return (
+              <div key={childId} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',borderRadius:'10px',background:isMe?'rgba(252,211,77,0.12)':'rgba(255,255,255,0.03)',border:`1px solid ${isMe?'rgba(252,211,77,0.35)':'rgba(255,255,255,0.05)'}`,boxShadow:isMe?'0 0 0 2px rgba(252,211,77,0.2)':'none'}}>
+                <div style={{width:'30px',height:'30px',borderRadius:'50%',background:idx===0?'#fbbf24':idx===1?'rgba(209,213,219,0.3)':idx===2?'rgba(217,119,6,0.4)':'rgba(255,255,255,0.07)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontWeight:'900',fontSize:m?'16px':'13px',color:'white'}}>
+                  {m||(idx+1)}
+                </div>
+                <p style={{margin:0,fontWeight:isMe?'800':'600',color:isMe?'#fcd34d':'rgba(255,255,255,0.85)',fontSize:'14px',flex:1}}>
+                  {child.name}
+                  {isMe&&<span style={{fontSize:'10px',fontWeight:'800',color:'#fcd34d',marginLeft:'8px',background:'rgba(252,211,77,0.15)',padding:'1px 6px',borderRadius:'8px',border:'1px solid rgba(252,211,77,0.3)'}}>Du</span>}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TrainingsApp() {
   const [user, setUser]               = useState(null);
   const [userRole, setUserRole]       = useState(null);
@@ -3760,52 +3805,9 @@ export default function TrainingsApp() {
           );
         })()}
               {/* ── Rangliste Tile (nur Jugend) ── */}
-              {grp?.id === 'jugend' && rangliste.length > 0 && (() => {
-                const myPos = rangliste.indexOf(myChild.id);
-                if (myPos === -1) return null;
-                const [rlOpen, setRlOpen] = React.useState(false);
-                const medal = myPos===0?'🥇':myPos===1?'🥈':myPos===2?'🥉':null;
-                return (
-                  <div style={{marginBottom:'12px'}}>
-                    {/* Collapsed header */}
-                    <div onClick={()=>setRlOpen(o=>!o)}
-                      style={{background:'linear-gradient(135deg,rgba(252,211,77,0.12) 0%,rgba(217,119,6,0.08) 100%)',border:'1px solid rgba(252,211,77,0.25)',borderRadius: rlOpen ? '16px 16px 0 0' : '16px',padding:'14px 18px',display:'flex',alignItems:'center',gap:'12px',cursor:'pointer',userSelect:'none'}}>
-                      <div style={{width:'44px',height:'44px',borderRadius:'50%',background:myPos===0?'rgba(251,191,36,0.25)':myPos===1?'rgba(209,213,219,0.25)':myPos===2?'rgba(217,119,6,0.25)':'rgba(252,211,77,0.12)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:medal?'24px':'18px',fontWeight:'900',color:'#fcd34d'}}>
-                        {medal || `#${myPos+1}`}
-                      </div>
-                      <div style={{flex:1}}>
-                        <p style={{margin:'0 0 2px',fontWeight:'800',color:'white',fontSize:'15px'}}>📊 TTC Rangliste</p>
-                        <p style={{margin:0,color:'rgba(252,211,77,0.8)',fontSize:'13px',fontWeight:'600'}}>
-                          {medal ? `${medal} Platz ${myPos+1} von ${rangliste.length}` : `Platz ${myPos+1} von ${rangliste.length}`}
-                        </p>
-                      </div>
-                      <span style={{color:'rgba(252,211,77,0.6)',fontSize:'18px',transform:rlOpen?'rotate(180deg)':'none',transition:'transform 0.2s'}}>▼</span>
-                    </div>
-                    {/* Expanded list */}
-                    {rlOpen && (
-                      <div style={{background:'rgba(0,0,0,0.25)',border:'1px solid rgba(252,211,77,0.18)',borderTop:'none',borderRadius:'0 0 16px 16px',padding:'12px 14px',display:'flex',flexDirection:'column',gap:'6px',maxHeight:'340px',overflowY:'auto'}}>
-                        {rangliste.map((childId, idx) => {
-                          const child = children[childId];
-                          if (!child) return null;
-                          const isMe = childId === myChild.id;
-                          const m = idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':null;
-                          return (
-                            <div key={childId} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',borderRadius:'10px',background:isMe?'rgba(252,211,77,0.12)':'rgba(255,255,255,0.03)',border:`1px solid ${isMe?'rgba(252,211,77,0.35)':'rgba(255,255,255,0.05)'}`,boxShadow:isMe?'0 0 0 2px rgba(252,211,77,0.2)':'none'}}>
-                              <div style={{width:'30px',height:'30px',borderRadius:'50%',background:idx===0?'#fbbf24':idx===1?'rgba(209,213,219,0.3)':idx===2?'rgba(217,119,6,0.4)':'rgba(255,255,255,0.07)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontWeight:'900',fontSize:m?'16px':'13px',color:'white'}}>
-                                {m || (idx+1)}
-                              </div>
-                              <p style={{margin:0,fontWeight:isMe?'800':'600',color:isMe?'#fcd34d':'rgba(255,255,255,0.85)',fontSize:'14px',flex:1}}>
-                                {child.name}
-                                {isMe&&<span style={{fontSize:'10px',fontWeight:'800',color:'#fcd34d',marginLeft:'8px',background:'rgba(252,211,77,0.15)',padding:'1px 6px',borderRadius:'8px',border:'1px solid rgba(252,211,77,0.3)'}}>Du</span>}
-                              </p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
+              {grp?.id === 'jugend' && rangliste.length > 0 && (
+                <RanglisteTile rangliste={rangliste} myChildId={myChild.id} children={children} subgroups={subgroups} />
+              )}
               {/* ── Errungenschaften (nur Jugend) ── */}
               {grp?.id === 'jugend' && (()=>{
                 const ach = getAchievements(myChild.id);
