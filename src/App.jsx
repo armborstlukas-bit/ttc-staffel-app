@@ -4739,9 +4739,9 @@ export default function TrainingsApp() {
       const chalIdx = rangliste.indexOf(newSpielForm.challengerId);
       const defIdx  = rangliste.indexOf(newSpielForm.defenderId);
       if (chalIdx === -1 || defIdx === -1 || chalIdx <= defIdx) return;
-      const spiel = { id: 'spiel_'+Date.now(), challengerId: newSpielForm.challengerId, defenderId: newSpielForm.defenderId, sets1: null, sets2: null, winSets: newSpielForm.winSets||2, date: new Date().toISOString().slice(0,10) };
+      const spiel = { id: 'spiel_'+Date.now(), challengerId: newSpielForm.challengerId, defenderId: newSpielForm.defenderId, sets1: null, sets2: null, winSets: 3, date: new Date().toISOString().slice(0,10) };
       saveRanglistenspiele({ ...ranglistenspiele, active: [...activeSpiele, spiel] });
-      setNewSpielForm({ open: false, challengerId: '', defenderId: '', winSets: 2 });
+      setNewSpielForm({ open: false, challengerId: '', defenderId: '' });
     };
 
     return (
@@ -4796,17 +4796,6 @@ export default function TrainingsApp() {
               <div style={{background:'#fff7ed',border:'1px solid #fb923c',borderRadius:'12px',padding:'16px',marginBottom:'16px'}}>
                 <p style={{margin:'0 0 12px',fontWeight:'700',color:'#9a3412',fontSize:'14px'}}>Neues Ranglistenspiel anlegen</p>
 
-                {/* Gewinnsätze */}
-                <p style={{margin:'0 0 6px',fontSize:'12px',color:'#92400e',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.4px'}}>Gewinnsätze</p>
-                <div style={{display:'flex',gap:'6px',marginBottom:'14px'}}>
-                  {[1,2,3].map(n=>(
-                    <button key={n} onClick={()=>setNewSpielForm(f=>({...f,winSets:n}))}
-                      style={{flex:1,padding:'10px',borderRadius:'10px',border:`2px solid ${(newSpielForm.winSets||2)===n?'#ea580c':'#e5e7eb'}`,background:(newSpielForm.winSets||2)===n?'rgba(234,88,12,0.1)':'#f9fafb',color:(newSpielForm.winSets||2)===n?'#ea580c':'#6b7280',cursor:'pointer',fontWeight:'800',fontSize:'15px'}}>
-                      {n}
-                    </button>
-                  ))}
-                </div>
-
                 <p style={{margin:'0 0 6px',fontSize:'12px',color:'#92400e',fontWeight:'600'}}>Herausforderer (niedrigerer Rang wählt höheren aus):</p>
                 <select value={newSpielForm.challengerId} onChange={e=>setNewSpielForm(f=>({...f,challengerId:e.target.value,defenderId:''}))}
                   style={{width:'100%',padding:'8px 10px',borderRadius:'8px',border:'1px solid #fb923c',fontSize:'14px',marginBottom:'10px',background:'white'}}>
@@ -4829,7 +4818,7 @@ export default function TrainingsApp() {
                 <div style={{display:'flex',gap:'8px'}}>
                   <button onClick={startNeuesSpiel} disabled={!newSpielForm.challengerId||!newSpielForm.defenderId}
                     style={{...s.btn('#ea580c'),flex:1,opacity:(!newSpielForm.challengerId||!newSpielForm.defenderId)?0.4:1}}>✓ Spiel starten</button>
-                  <button onClick={()=>setNewSpielForm({open:false,challengerId:'',defenderId:'',winSets:2})}
+                  <button onClick={()=>setNewSpielForm({open:false,challengerId:'',defenderId:''})}
                     style={{...s.btn('#6b7280'),flex:1}}>Abbrechen</button>
                 </div>
               </div>
@@ -4845,7 +4834,7 @@ export default function TrainingsApp() {
                   const def  = children[spiel.defenderId];
                   const chalIdx = rangliste.indexOf(spiel.challengerId);
                   const defIdx  = rangliste.indexOf(spiel.defenderId);
-                  const winSets = spiel.winSets || 2;
+                  const winSets = spiel.winSets || 3;
                   const sets1 = spiel.sets1;
                   const sets2 = spiel.sets2;
                   const hasScores = sets1 !== null && sets2 !== null;
@@ -4965,23 +4954,31 @@ export default function TrainingsApp() {
           </div>
 
           {/* ── Vergangene Ranglistenspiele ────────────────────── */}
-          {ranglistenspiele.archived.length > 0 && (
+          {ranglistenspiele.archived.filter(s=>!s.hiddenInQuickView).length > 0 && (
             <div style={s.card}>
               <h2 style={{margin:'0 0 16px',color:'#92400e',fontSize:'16px',fontWeight:'800'}}>📋 Vergangene Ranglistenspiele</h2>
               <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
-                {ranglistenspiele.archived.slice(0,5).map(spiel=>{
+                {ranglistenspiele.archived.filter(s=>!s.hiddenInQuickView).slice(0,5).map(spiel=>{
                   const chal = children[spiel.challengerId];
                   const def  = children[spiel.defenderId];
                   const won = spiel.result==='challenger';
+                  const score = `${spiel.sets1??spiel.challengerScore??'?'}:${spiel.sets2??spiel.defenderScore??'?'}`;
+                  const hideFromQuickView = (spielId) => {
+                    const updated = ranglistenspiele.archived.map(s => s.id===spielId ? {...s, hiddenInQuickView:true} : s);
+                    saveRanglistenspiele({ ...ranglistenspiele, archived: updated });
+                  };
                   return (
                     <div key={spiel.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 14px',borderRadius:'10px',background:'#f9fafb',border:'1px solid #e5e7eb'}}>
                       <span style={{fontSize:'18px',flexShrink:0}}>{won?'🎉':'✅'}</span>
                       <div style={{flex:1,minWidth:0}}>
                         <p style={{margin:0,fontSize:'14px',fontWeight:'700',color:'#1f2937'}}>
-                          {chal?.name||'?'} {spiel.challengerScore}:{spiel.defenderScore} {def?.name||'?'}
+                          {chal?.name||'?'} {score} {def?.name||'?'}
                         </p>
                         <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>{won?`${chal?.name} rückte vor`:`${def?.name} verteidigte`} · {spiel.date}</p>
                       </div>
+                      <button onClick={()=>hideFromQuickView(spiel.id)}
+                        title="Aus dieser Liste entfernen (bleibt im Archiv)"
+                        style={{width:'28px',height:'28px',borderRadius:'6px',background:'#fee2e2',border:'none',cursor:'pointer',color:'#dc2626',fontSize:'13px',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>✕</button>
                     </div>
                   );
                 })}
