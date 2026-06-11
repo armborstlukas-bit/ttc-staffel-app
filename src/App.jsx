@@ -1049,48 +1049,62 @@ export default function TrainingsApp() {
     const scheduleUrl = appSettings.leagueScheduleUrl?.trim();
     if (!tableUrl && !scheduleUrl) { alert('Bitte erst URLs in den Einstellungen eintragen.'); return; }
     setLeagueFetching(true);
-    try {
-      const proxy = (url) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-      const parseHtml = (html) => new DOMParser().parseFromString(html, 'text/html');
 
-      // ── Tabelle parsen ──────────────────────────────────────────
-      let table = null;
+    const fetchViaProxy = async (url) => {
+      const proxies = [
+        u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
+        u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+        u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+      ];
+      for (const makeProxy of proxies) {
+        try {
+          const res = await fetch(makeProxy(url), { signal: AbortSignal.timeout(10000) });
+          if (!res.ok) continue;
+          const text = await res.text();
+          // allorigins wraps in JSON {contents:...}, others return raw HTML
+          try { const j = JSON.parse(text); if (j.contents) return j.contents; } catch {}
+          if (text.trim().startsWith('<') || text.length > 500) return text;
+        } catch {}
+      }
+      throw new Error('Alle Proxies fehlgeschlagen');
+    };
+
+    const parseHtml = (html) => new DOMParser().parseFromString(html, 'text/html');
+
+    const extractTable = (doc2) => {
+      // clicktt / mytischtennis selectors
+      const tbl = doc2.querySelector(
+        'table.result-set, table.league-table, table[class*="rank"], table[class*="tabelle"], table[class*="liga"], table[class*="spiel"], table[class*="schedule"], table[class*="begegnung"], table'
+      );
+      if (!tbl) return null;
+      const headers = [...tbl.querySelectorAll('thead th, thead td')].map(c => c.textContent?.trim() || '');
+      const rows    = [...tbl.querySelectorAll('tbody tr')].map(tr =>
+        [...tr.querySelectorAll('td')].map(c => c.textContent?.trim() || '')
+      ).filter(r => r.some(c => c.length > 0));
+      if (rows.length === 0) return null;
+      return { headers, rows };
+    };
+
+    try {
+      let table = null, schedule = null;
+
       if (tableUrl) {
-        const res  = await fetch(proxy(tableUrl));
-        const data = await res.json();
-        const doc2 = parseHtml(data.contents || '');
-        // Suche nach einer HTML-Tabelle mit Liga-Daten (myTischtennis / clicktt)
-        const tbl  = doc2.querySelector('table.result-set, table.league-table, table[class*="rank"], table[class*="tabelle"], table[class*="liga"], table');
-        if (tbl) {
-          const headers = [...tbl.querySelectorAll('thead th, thead td')].map(c => c.innerText?.trim() || c.textContent?.trim());
-          const rows    = [...tbl.querySelectorAll('tbody tr')].map(tr =>
-            [...tr.querySelectorAll('td')].map(c => c.innerText?.trim() || c.textContent?.trim())
-          ).filter(r => r.length > 1);
-          table = { headers, rows };
-        }
+        const html = await fetchViaProxy(tableUrl);
+        table = extractTable(parseHtml(html));
+        if (!table) throw new Error('Keine Tabellen-Daten auf der Seite gefunden. Möglicherweise wird die Seite per JavaScript geladen.');
       }
 
-      // ── Spielplan parsen ────────────────────────────────────────
-      let schedule = null;
       if (scheduleUrl) {
-        const res  = await fetch(proxy(scheduleUrl));
-        const data = await res.json();
-        const doc2 = parseHtml(data.contents || '');
-        const tbl  = doc2.querySelector('table.result-set, table[class*="spiel"], table[class*="schedule"], table[class*="begegnung"], table');
-        if (tbl) {
-          const headers = [...tbl.querySelectorAll('thead th, thead td')].map(c => c.innerText?.trim() || c.textContent?.trim());
-          const rows    = [...tbl.querySelectorAll('tbody tr')].map(tr =>
-            [...tr.querySelectorAll('td')].map(c => c.innerText?.trim() || c.textContent?.trim())
-          ).filter(r => r.length > 1);
-          schedule = { headers, rows };
-        }
+        const html = await fetchViaProxy(scheduleUrl);
+        schedule = extractTable(parseHtml(html));
+        if (!schedule) throw new Error('Keine Spielplan-Daten auf der Seite gefunden. Möglicherweise wird die Seite per JavaScript geladen.');
       }
 
       saveLeagueData({ table, schedule, fetchedAt: new Date().toISOString() });
       alert('✅ Liga-Daten erfolgreich aktualisiert!');
     } catch (err) {
       console.error('Fehler beim Laden der Liga-Daten:', err);
-      alert('❌ Fehler beim Laden der Daten. Bitte URL prüfen.');
+      alert('❌ ' + (err.message || 'Fehler beim Laden der Daten.'));
     } finally {
       setLeagueFetching(false);
     }
