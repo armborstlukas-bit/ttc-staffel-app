@@ -75,7 +75,7 @@ if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styl
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
-import { Check, X, Plus, Trash2, Download, ChevronDown, LogOut, ArrowLeft, Clock, BarChart2, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save, Trophy, Home, Archive, MessageSquare, Bell, Send } from 'lucide-react';
+import { Check, X, Plus, Trash2, Download, ChevronDown, LogOut, ArrowLeft, Clock, BarChart2, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save, Trophy, Home, Archive, MessageSquare, Bell, Send, Pencil } from 'lucide-react';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCrx34HEgaHnRE187Cja4JNAtbexvrA6Vg",
@@ -721,6 +721,8 @@ export default function TrainingsApp() {
   const [showTrainingHistory, setShowTrainingHistory]       = useState(false);
   const [showMyTeam, setShowMyTeam]                         = useState(false);
   const [showAchievements, setShowAchievements]             = useState(false);
+  const [editingChildName, setEditingChildName]             = useState(null); // childId being renamed
+  const [editingChildNameVal, setEditingChildNameVal]       = useState('');
   const [stayLoggedIn, setStayLoggedIn]                     = useState(false);
   const [registerIsParent, setRegisterIsParent]             = useState(false);
   // Mannschaft form states
@@ -4787,7 +4789,39 @@ export default function TrainingsApp() {
             </button>
             <div style={{flex:1,minWidth:0}}>
               <p style={{margin:'0 0 1px',color:'rgba(74,222,128,0.5)',fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>{grp?.emoji} {grp?.name} · {sub?.name}</p>
-              <h2 style={{margin:0,color:'white',fontWeight:'800',fontSize:'20px',letterSpacing:'-0.3px'}}>{child.name}</h2>
+              {canEdit()&&editingChildName===child.id ? (
+                <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+                  <input
+                    autoFocus
+                    value={editingChildNameVal}
+                    onChange={e=>setEditingChildNameVal(e.target.value)}
+                    onKeyDown={e=>{
+                      if(e.key==='Enter'&&editingChildNameVal.trim()){
+                        saveChildren({...children,[child.id]:{...child,name:editingChildNameVal.trim()}});
+                        setEditingChildName(null);
+                      }
+                      if(e.key==='Escape') setEditingChildName(null);
+                    }}
+                    style={{background:'rgba(255,255,255,0.12)',border:'1px solid rgba(74,222,128,0.5)',borderRadius:'8px',color:'white',fontSize:'18px',fontWeight:'800',padding:'2px 10px',outline:'none',width:'200px'}}
+                  />
+                  <button onClick={()=>{
+                    if(editingChildNameVal.trim()) saveChildren({...children,[child.id]:{...child,name:editingChildNameVal.trim()}});
+                    setEditingChildName(null);
+                  }} style={{background:'rgba(74,222,128,0.2)',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'6px',color:'#4ade80',cursor:'pointer',padding:'3px 8px',fontSize:'13px',fontWeight:'700'}}>✓</button>
+                  <button onClick={()=>setEditingChildName(null)} style={{background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'6px',color:'rgba(255,255,255,0.5)',cursor:'pointer',padding:'3px 8px',fontSize:'13px'}}>✕</button>
+                </div>
+              ) : (
+                <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                  <h2 style={{margin:0,color:'white',fontWeight:'800',fontSize:'20px',letterSpacing:'-0.3px'}}>{child.name}</h2>
+                  {canEdit()&&(
+                    <button onClick={()=>{setEditingChildName(child.id);setEditingChildNameVal(child.name);}}
+                      title="Name bearbeiten"
+                      style={{background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.35)',padding:'2px',display:'flex',alignItems:'center',lineHeight:1}}>
+                      <Pencil size={14}/>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
             {canEdit()&&(
               <div style={{display:'flex',gap:'8px',flexShrink:0}}>
