@@ -721,8 +721,11 @@ export default function TrainingsApp() {
   const [stayLoggedIn, setStayLoggedIn]                     = useState(false);
   const [registerIsParent, setRegisterIsParent]             = useState(false);
   // Mannschaft form states
-  const [teamForm, setTeamForm]                             = useState({name:'', trainerUids:[], childIds:[]});
+  const [teamForm, setTeamForm]                             = useState({name:'', liga:'', tableUrl:'', scheduleUrl:'', trainerUids:[], childIds:[]});
   const [editingTeam, setEditingTeam]                       = useState(null);
+  const [addingTeam, setAddingTeam]                         = useState(false);
+  const [teamExpanded, setTeamExpanded]                     = useState({});
+  const [teamFetching, setTeamFetching]                     = useState({});
   const [mdForm, setMdForm]                                 = useState({teamId:'',date:'',time:'',location:'',meetingPoint:'',meetingTime:'',isHome:true,opponent:''});
   const [showMdForm, setShowMdForm]                         = useState(false);
   // Practice Tournaments
@@ -1148,6 +1151,70 @@ export default function TrainingsApp() {
   const saveRangliste = (entries) => { setRangliste(entries); setDoc(doc(db,'ttc','rangliste'),{entries}); };
   const saveRanglistenspiele = (data) => { setRanglistenspiele(data); setDoc(doc(db,'ttc','ranglistenspiele'), data); };
   const saveRanglisteAch = (data) => { setRanglisteAch(data); setDoc(doc(db,'ttc','ranglisteAchievements'), data); };
+
+  // ── Pro-Team Liga-Daten laden ─────────────────────────────────────────────
+  const fetchTeamLeague = async (teamId) => {
+    const team = teams[teamId];
+    if (!team) return;
+    const tableUrl    = team.tableUrl?.trim();
+    const scheduleUrl = team.scheduleUrl?.trim();
+    if (!tableUrl && !scheduleUrl) { alert('Bitte zuerst URLs bei der Mannschaft eintragen.'); return; }
+    setTeamFetching(f => ({...f, [teamId]: true}));
+
+    const parseUrl = (url) => {
+      const m = url.match(/click-tt\/([^/]+)\/([^/]+)\/ligen\/([^/]+)\/gruppe\/(\d+)/);
+      return m ? { assoc: m[1], season: m[2], league: m[3], groupId: m[4] } : null;
+    };
+    const fmtDate = (iso) => {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (isNaN(d)) return iso;
+      return d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'})+', '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' Uhr';
+    };
+
+    try {
+      let table = null, schedule = null;
+
+      if (tableUrl) {
+        const p = parseUrl(tableUrl);
+        if (!p) throw new Error('Tabellen-URL nicht erkannt.');
+        const res = await fetch(`/api/league-proxy?assoc=${encodeURIComponent(p.assoc)}&groupId=${encodeURIComponent(p.groupId)}&season=${encodeURIComponent(p.season)}&league=${encodeURIComponent(p.league)}&type=tabelle&filter=gesamt`, { signal: AbortSignal.timeout(15000) });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        const leagueTable = json?.data?.league_table ?? json?.data ?? [];
+        if (!Array.isArray(leagueTable) || leagueTable.length === 0) throw new Error('Keine Tabellendaten.');
+        table = {
+          headers: ['#','Mannschaft','Sp','S','U','N','Sätze','Punkte'],
+          rows: leagueTable.map(t => ({ c:[String(t.table_rank??''), t.team_name??'', String((t.meetings_won??0)+(t.meetings_lost??0)+(t.meetings_tie??0)), String(t.meetings_won??''), String(t.meetings_tie??''), String(t.meetings_lost??''), `${t.sets_won??0}:${t.sets_lost??0}`, `${t.points_won??0}:${t.points_lost??0}`] })),
+        };
+        const meetings = json?.data?.meetings_excerpt?.meetings ?? [];
+        if (Array.isArray(meetings) && meetings.length > 0) {
+          schedule = { headers:['Datum','Heim','Gast','Ergebnis'], rows: meetings.map(m => ({ c:[fmtDate(m.date), m.team_home??'', m.team_away??'', m.state==='done'?`${m.matches_won??''}:${m.matches_lost??''}`:'–'] })) };
+        }
+      }
+      if (scheduleUrl && !schedule) {
+        const p = parseUrl(scheduleUrl);
+        if (p) {
+          try {
+            const res = await fetch(`/api/league-proxy?assoc=${encodeURIComponent(p.assoc)}&groupId=${encodeURIComponent(p.groupId)}&season=${encodeURIComponent(p.season)}&league=${encodeURIComponent(p.league)}&type=spielplan&filter=gesamt`, { signal: AbortSignal.timeout(15000) });
+            if (res.ok) {
+              const json = await res.json();
+              const meetings = json?.data?.meetings_excerpt?.meetings ?? [];
+              if (Array.isArray(meetings) && meetings.length > 0) {
+                schedule = { headers:['Datum','Heim','Gast','Ergebnis'], rows: meetings.map(m => ({ c:[fmtDate(m.date), m.team_home??'', m.team_away??'', m.state==='done'?`${m.matches_won??''}:${m.matches_lost??''}`:'–'] })) };
+              }
+            }
+          } catch {}
+        }
+      }
+      saveTeams({ ...teams, [teamId]: { ...team, leagueData: { table, schedule, fetchedAt: new Date().toISOString() } } });
+      alert(`✅ Liga-Daten für "${team.name}" geladen!`);
+    } catch (err) {
+      alert('❌ ' + (err.message || 'Fehler beim Laden.'));
+    } finally {
+      setTeamFetching(f => ({...f, [teamId]: false}));
+    }
+  };
 
   // Compute + save rangliste achievements for given children after rank change.
   // childUpdates: [{ childId, newRank }]  — newRank is 1-based (1=best), 0=not in list
@@ -3272,151 +3339,11 @@ export default function TrainingsApp() {
           })()}
         </div>
 
-        {/* ── Mannschaften verwalten ── */}
+        {/* ── Mannschaften & Ligen → eigene View ── */}
         <div style={s.card}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px',flexWrap:'wrap',gap:'10px'}}>
-            <h3 style={{margin:0,color:'#0f766e',display:'flex',alignItems:'center',gap:'8px'}}>⚽ Mannschaften verwalten</h3>
-            <button
-              onClick={()=>saveAppSettings({...appSettings,mannschaftEnabled:!appSettings.mannschaftEnabled})}
-              style={{display:'flex',alignItems:'center',gap:'8px',padding:'8px 16px',borderRadius:'10px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:'13px',
-                background:appSettings.mannschaftEnabled?'#ccfbf1':'#fee2e2',
-                color:appSettings.mannschaftEnabled?'#0f766e':'#dc2626',
-                transition:'all 0.2s'}}>
-              <span style={{width:'32px',height:'18px',borderRadius:'9px',background:appSettings.mannschaftEnabled?'#0f766e':'#dc2626',display:'inline-flex',alignItems:'center',padding:'2px',transition:'all 0.2s',position:'relative'}}>
-                <span style={{width:'14px',height:'14px',borderRadius:'50%',background:'white',display:'block',position:'absolute',transition:'all 0.2s',left:appSettings.mannschaftEnabled?'16px':'2px'}}/>
-              </span>
-              {appSettings.mannschaftEnabled ? 'Funktion aktiv' : 'Funktion deaktiviert'}
-            </button>
-          </div>
-          {!appSettings.mannschaftEnabled&&(
-            <div style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:'10px',padding:'16px',textAlign:'center',color:'#dc2626',fontSize:'13px',fontWeight:'600'}}>
-              🚫 Die Mannschaftsfunktion ist deaktiviert. Für alle Nutzer ausgeblendet.
-            </div>
-          )}
-          {appSettings.mannschaftEnabled&&<>
-
-          {/* Neue Mannschaft anlegen / bearbeiten */}
-          {(()=>{
-            const isEditing = !!editingTeam;
-            const form = isEditing ? editingTeam : teamForm;
-            const setForm = isEditing ? setEditingTeam : setTeamForm;
-            const allTrainers = Object.values(allUsers).filter(u=>(u.roles||[u.role]).includes('trainer')||u.role==='trainer').sort((a,b)=>a.name.localeCompare(b.name,'de'));
-            const allKidsList = Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
-            const save = () => {
-              if (!form.name.trim()) { alert('Bitte Mannschaftsname eingeben!'); return; }
-              const id = isEditing ? form.id : 'team_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
-              saveTeams({ ...teams, [id]: { ...form, id, name: form.name.trim() } });
-              if (isEditing) setEditingTeam(null); else setTeamForm({name:'',trainerUids:[],childIds:[]});
-            };
-            return (
-              <div style={{background:'#f0fdfa',borderRadius:'10px',padding:'14px',marginBottom:'16px',border:'1px solid #99f6e4'}}>
-                <p style={{margin:'0 0 10px',fontWeight:'700',color:'#0f766e',fontSize:'13px'}}>{isEditing?'✏️ Mannschaft bearbeiten':'➕ Neue Mannschaft'}</p>
-                <div style={{display:'grid',gap:'8px'}}>
-                  <input value={form.name} onChange={e=>setForm({...form,name:e.target.value})}
-                    placeholder="Mannschaftsname (z.B. Herren 1)" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/>
-                  <div>
-                    <label style={{...s.label}}>Trainer zuweisen</label>
-                    <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
-                      {allTrainers.map(t=>{
-                        const sel=(form.trainerUids||[]).includes(t.uid);
-                        return <button key={t.uid} type="button" onClick={()=>setForm({...form,trainerUids:sel?(form.trainerUids||[]).filter(x=>x!==t.uid):[...(form.trainerUids||[]),t.uid]})}
-                          style={{padding:'4px 10px',borderRadius:'20px',border:`2px solid ${sel?'#0f766e':'#e5e7eb'}`,background:sel?'#ccfbf1':'white',color:sel?'#0f766e':'#555',cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>
-                          {t.name}
-                        </button>;
-                      })}
-                      {allTrainers.length===0&&<span style={{fontSize:'12px',color:'#9ca3af'}}>Keine Trainer-Accounts vorhanden.</span>}
-                    </div>
-                  </div>
-                  <div>
-                    <label style={{...s.label}}>Kinder zuweisen</label>
-                    <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
-                      {allKidsList.map(c=>{
-                        const sel=(form.childIds||[]).includes(c.id);
-                        const sub2=subgroups[c.subgroupId];
-                        return <button key={c.id} type="button" onClick={()=>setForm({...form,childIds:sel?(form.childIds||[]).filter(x=>x!==c.id):[...(form.childIds||[]),c.id]})}
-                          style={{padding:'4px 10px',borderRadius:'20px',border:`2px solid ${sel?'#0f766e':'#e5e7eb'}`,background:sel?'#ccfbf1':'white',color:sel?'#0f766e':'#555',cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>
-                          {c.name}{sub2?` (${sub2.name})`:''}
-                        </button>;
-                      })}
-                    </div>
-                  </div>
-                  <div style={{display:'flex',gap:'8px'}}>
-                    <button onClick={save} style={{...s.btn('#0f766e'),flex:1}}>{isEditing?'💾 Speichern':'➕ Anlegen'}</button>
-                    {isEditing&&<button onClick={()=>setEditingTeam(null)} style={{...s.btn('#6b7280'),flex:1}}>Abbrechen</button>}
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Bestehende Mannschaften */}
-          {Object.values(teams).length === 0
-            ? <p style={{color:'#9ca3af',textAlign:'center',padding:'16px',margin:0}}>Noch keine Mannschaften angelegt.</p>
-            : Object.values(teams).sort((a,b)=>a.name.localeCompare(b.name,'de')).map(team=>{
-                const trainerNames = (team.trainerUids||[]).map(uid=>allUsers[uid]?.name||uid).join(', ') || '–';
-                const kidNames = (team.childIds||[]).map(id=>children[id]?.name||id);
-                const mdCount = Object.values(matchdays).filter(m=>m.teamId===team.id).length;
-                return (
-                  <div key={team.id} style={{marginBottom:'10px',border:'1px solid #99f6e4',borderRadius:'10px',overflow:'hidden'}}>
-                    <div style={{background:'#f0fdfa',padding:'10px 14px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-                      <span style={{fontWeight:'700',fontSize:'15px',color:'#0f766e',flex:1}}>⚽ {team.name}</span>
-                      <span style={{fontSize:'11px',color:'#6b7280'}}>{mdCount} Spieltage</span>
-                      <button onClick={()=>setEditingTeam({...team})} style={{...s.btn('#0f766e'),padding:'4px 10px',fontSize:'12px'}}>✏️ Bearbeiten</button>
-                      <button onClick={()=>{if(window.confirm(`Mannschaft "${team.name}" löschen?`)){const u={...teams};delete u[team.id];saveTeams(u);}}}
-                        style={{...s.btn('#dc2626'),padding:'4px 10px',fontSize:'12px'}}>🗑️</button>
-                    </div>
-                    <div style={{padding:'8px 14px',fontSize:'12px',color:'#555'}}>
-                      <span>👤 Trainer: {trainerNames}</span>
-                      {kidNames.length>0&&<span style={{marginLeft:'12px'}}>🧒 {kidNames.join(', ')}</span>}
-                    </div>
-                  </div>
-                );
-              })
-          }
-          </>}
-        </div>
-
-        {/* ── Liga-Daten (Tabelle & Spielplan) ── */}
-        <div id="admin-league-section" style={s.card}>
-          <h3 style={{margin:'0 0 6px',color:'#0f766e',display:'flex',alignItems:'center',gap:'8px'}}>{'🏓 Liga-Tabelle & Spielplan'}</h3>
-          <p style={{margin:'0 0 16px',fontSize:'13px',color:'#888'}}>{'URLs der Liga-Tabelle und des Spielplans eintragen. Die App lädt die Daten und zeigt sie bei allen Eltern & Jugendlichen an.'}</p>
-          <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'14px'}}>
-            <div>
-              <label style={s.label}>URL: Liga-Tabelle</label>
-              <input
-                type="url" placeholder="https://www.mytischtennis.de/clicktt/..."
-                value={appSettings.leagueTableUrl||''}
-                onChange={e=>saveAppSettings({...appSettings, leagueTableUrl: e.target.value})}
-                style={{...s.input, width:'100%', boxSizing:'border-box'}}
-              />
-            </div>
-            <div>
-              <label style={s.label}>URL: Spielplan</label>
-              <input
-                type="url" placeholder="https://www.mytischtennis.de/clicktt/..."
-                value={appSettings.leagueScheduleUrl||''}
-                onChange={e=>saveAppSettings({...appSettings, leagueScheduleUrl: e.target.value})}
-                style={{...s.input, width:'100%', boxSizing:'border-box'}}
-              />
-            </div>
-          </div>
-          <div style={{display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>
-            <button onClick={fetchLeagueData} disabled={leagueFetching}
-              style={{...s.btn('#0f766e'), opacity: leagueFetching ? 0.6 : 1}}>
-              {leagueFetching ? '⏳ Wird geladen...' : '🔄 Daten jetzt laden'}
-            </button>
-            {leagueData.fetchedAt && (
-              <span style={{fontSize:'12px',color:'#888'}}>
-                Zuletzt: {new Date(leagueData.fetchedAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})} Uhr
-              </span>
-            )}
-          </div>
-          {(leagueData.table||leagueData.schedule)&&(
-            <div style={{marginTop:'14px',padding:'10px 14px',background:'#f0fdf4',borderRadius:'8px',border:'1px solid #bbf7d0',fontSize:'13px',color:'#16a34a',fontWeight:'600'}}>
-              ✅ {[leagueData.table&&'Tabelle',leagueData.schedule&&'Spielplan'].filter(Boolean).join(' & ')} geladen
-              {' — '}{leagueData.table?.rows?.length||0} Tabellenzeilen, {leagueData.schedule?.rows?.length||0} Spielzeilen
-            </div>
-          )}
+          <h3 style={{margin:'0 0 8px',color:'#0f766e',display:'flex',alignItems:'center',gap:'8px'}}>⚽ Mannschaften {'&'} Ligen</h3>
+          <p style={{margin:'0 0 14px',fontSize:'13px',color:'#888'}}>Mannschaften anlegen, Spieler zuweisen und Liga-Tabellen {'&'} Spielpläne verwalten.</p>
+          <button onClick={()=>navTo('mannschaften')} style={{...s.btn('#0f766e')}}>→ Zu Mannschaften {'&'} Ligen</button>
         </div>
 
         </div>
@@ -3453,11 +3380,8 @@ export default function TrainingsApp() {
       {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
       {label:'Rangliste',        icon:'📊', color:'#fcd34d', bg:'rgba(252,211,77,0.1)',   border:'rgba(252,211,77,0.25)',  action:()=>navTo('rangliste')},
       {label:'Errungenschaften', icon:'🏅', color:'#d9f99d', bg:'rgba(217,249,157,0.1)',  border:'rgba(217,249,157,0.25)', action:()=>navTo('achievements')},
-      ...(appSettings.mannschaftEnabled?[{label:'Mannschaft',icon:'⚽',color:'#6ee7b7',bg:'rgba(110,231,183,0.1)',border:'rgba(110,231,183,0.25)',action:()=>navTo('mannschaft')}]:[]),
-      ...(userRole==='admin'?[
-        {label:'Admin',      icon:'🛡️', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)',  border:'rgba(196,181,253,0.25)', action:()=>navTo('admin')},
-        {label:'Liga-Daten', icon:'🏓', color:'#67e8f9', bg:'rgba(103,232,249,0.1)',  border:'rgba(103,232,249,0.25)', action:()=>{ navTo('admin'); setTimeout(()=>{ const el=document.getElementById('admin-league-section'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); },200); }},
-      ]:[]),
+      {label:'Mannschaften', icon:'⚽', color:'#6ee7b7', bg:'rgba(110,231,183,0.1)', border:'rgba(110,231,183,0.25)', action:()=>navTo('mannschaften')},
+      ...(userRole==='admin'?[{label:'Admin', icon:'🛡️', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('admin')}]:[]),
     ];
     const groups = FIXED_GROUPS.filter(g=>canAccessGroup(g.id));
 
@@ -3992,188 +3916,55 @@ export default function TrainingsApp() {
                 )}
               </div>
 
-              {/* ── Mannschaftsspiele ── */}
-              {appSettings.mannschaftEnabled&&(()=>{
+              {/* ── Mannschaft & Liga ── */}
+              {(()=>{
                 const myTeam = Object.values(teams).find(t=>(t.childIds||[]).includes(myChild.id));
-                const today = new Date().toISOString().split('T')[0];
-                const upcomingMds = myTeam
-                  ? Object.values(matchdays).filter(m=>m.teamId===myTeam.id && m.date>=today).sort((a,b)=>a.date.localeCompare(b.date))
-                  : [];
+                if (!myTeam) return null;
+                const ld = myTeam.leagueData || {};
+                const colSt = (i) => ({padding:'8px 10px',fontSize:'12px',color:i===0?'white':'rgba(255,255,255,0.7)',fontWeight:i<2?'700':'400',textAlign:i>1?'center':'left',whiteSpace:'nowrap',borderBottom:'1px solid rgba(255,255,255,0.05)'});
+                const hSt  = (i) => ({...colSt(i),color:'rgba(255,255,255,0.35)',fontWeight:'700',fontSize:'10px',textTransform:'uppercase',letterSpacing:'0.5px',background:'rgba(255,255,255,0.03)',borderBottom:'1px solid rgba(255,255,255,0.1)'});
+                const spSt = (i) => ({padding:'8px 10px',fontSize:'12px',color:i===3?'#86efac':'rgba(255,255,255,0.7)',fontWeight:i===3?'700':'400',textAlign:i===3?'center':'left',whiteSpace:'nowrap',borderBottom:'1px solid rgba(255,255,255,0.05)'});
+                const spH  = (i) => ({...spSt(i),color:'rgba(255,255,255,0.35)',fontWeight:'700',fontSize:'10px',textTransform:'uppercase',letterSpacing:'0.5px',background:'rgba(255,255,255,0.03)',borderBottom:'1px solid rgba(255,255,255,0.1)'});
+                const fetchedStr = ld.fetchedAt ? new Date(ld.fetchedAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : '';
                 return (
                   <>
                     <span style={SECTION_LABEL('rgba(20,184,166,0.5)')}>Mannschaft</span>
-                    <div style={{...DARK_CARD_TEAL,marginBottom:'28px'}}>
-                      <h3 style={{margin:'0 0 16px',color:'#2dd4bf',display:'flex',alignItems:'center',gap:'8px',fontWeight:'800',fontSize:'16px'}}>⚽ Mannschaftsspiele{myTeam&&<span style={{fontSize:'13px',fontWeight:'500',color:'rgba(255,255,255,0.35)'}}>· {myTeam.name}</span>}</h3>
-                      {!myTeam
-                        ? <p style={{color:'rgba(255,255,255,0.2)',fontSize:'13px',margin:0,textAlign:'center',padding:'20px 0'}}>Keine Mannschaft zugeordnet.</p>
-                        : upcomingMds.length===0
-                          ? <p style={{color:'rgba(255,255,255,0.2)',fontSize:'13px',margin:0,textAlign:'center',padding:'20px 0'}}>Kein Spiel in den nächsten Wochen.</p>
-                          : <div style={{display:'grid',gap:'12px'}}>
-                              {upcomingMds.map(md=>{
-                                const myResp = (md.responses||{})[myChild.id];
-                                const isPostponed = !!md.postponement;
-                                const dateStr = new Date(md.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
-                                const borderCol = myResp==='yes'?'rgba(74,222,128,0.4)':myResp==='no'?'rgba(248,113,113,0.4)':'rgba(20,184,166,0.25)';
-                                const bgCol = myResp==='yes'?'rgba(74,222,128,0.07)':myResp==='no'?'rgba(248,113,113,0.07)':isPostponed?'rgba(251,146,60,0.07)':'rgba(20,184,166,0.04)';
-                                return (
-                                  <div key={md.id} style={{borderRadius:'14px',border:`2px solid ${borderCol}`,background:bgCol,overflow:'hidden'}}>
-                                    <div style={{padding:'14px 16px'}}>
-                                      <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',marginBottom:'6px'}}>
-                                        <span style={{fontWeight:'800',color:'#2dd4bf',fontSize:'15px'}}>
-                                          {md.isHome?'🏠 Heim':'🚌 Auswärts'}{md.opponent?` · ${md.opponent}`:''}
-                                        </span>
-                                        {isPostponed&&<span style={{fontSize:'11px',background:'rgba(251,146,60,0.2)',color:'#fb923c',padding:'2px 8px',borderRadius:'10px',fontWeight:'700'}}>⏳ Verlegungsabfrage</span>}
-                                        {md.result&&<span style={{fontSize:'12px',background:'rgba(255,255,255,0.07)',color:'rgba(255,255,255,0.6)',padding:'2px 8px',borderRadius:'10px',fontWeight:'600'}}>Ergebnis: {md.result}</span>}
-                                      </div>
-                                      <p style={{margin:'0 0 2px',fontSize:'14px',color:'rgba(255,255,255,0.7)',fontWeight:'600'}}>{dateStr} · {md.time} Uhr</p>
-                                      {md.location&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>📍 {md.location}</p>}
-                                      {md.meetingPoint&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>🚗 Treffpunkt: {md.meetingPoint}{md.meetingTime?` · ${md.meetingTime} Uhr`:''}</p>}
-                                    </div>
-                                    {isPostponed&&md.postponement.confirmedOption==null&&(
-                                      <div style={{padding:'12px 16px',borderTop:'1px solid rgba(251,146,60,0.2)',background:'rgba(251,146,60,0.05)'}}>
-                                        <p style={{margin:'0 0 8px',fontSize:'13px',fontWeight:'700',color:'#fb923c'}}>📅 Verlegung: Welcher Termin passt?</p>
-                                        {md.postponement.reason&&<p style={{margin:'0 0 8px',fontSize:'12px',color:'rgba(251,146,60,0.7)'}}>{md.postponement.reason}</p>}
-                                        <div style={{display:'grid',gap:'6px'}}>
-                                          {(md.postponement.options||[]).map((opt,i)=>{
-                                            const myVotes = (md.postponement.responses||{})[myChild.id]||[];
-                                            const voted = myVotes.includes(i);
-                                            const optDate = new Date(opt.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'});
-                                            return (
-                                              <button key={i} onClick={()=>{
-                                                const cur = (md.postponement.responses||{})[myChild.id]||[];
-                                                const next = voted?cur.filter(x=>x!==i):[...cur,i];
-                                                saveMatchdays({...matchdays,[md.id]:{...md,postponement:{...md.postponement,responses:{...(md.postponement.responses||{}),[myChild.id]:next}}}});
-                                              }}
-                                                style={{padding:'9px 14px',borderRadius:'9px',border:`2px solid ${voted?'#fb923c':'rgba(251,146,60,0.2)'}`,background:voted?'rgba(251,146,60,0.15)':'transparent',color:voted?'#fb923c':'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'13px',textAlign:'left',transition:'all 0.12s'}}>
-                                                {voted?'✅ ':'⬜ '}{optDate} · {opt.time} Uhr
-                                              </button>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-                                    )}
-                                    {isPostponed&&md.postponement.confirmedOption!=null&&(
-                                      <div style={{padding:'10px 16px',borderTop:'1px solid rgba(74,222,128,0.15)',background:'rgba(74,222,128,0.07)',fontSize:'13px',color:'#4ade80',fontWeight:'700'}}>
-                                        ✅ Neuer Termin: {(()=>{const o=md.postponement.options[md.postponement.confirmedOption];return `${new Date(o.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})} · ${o.time} Uhr`;})()}
-                                      </div>
-                                    )}
-                                    {!isPostponed&&(
-                                      <div style={{padding:'12px 16px',borderTop:`1px solid ${borderCol}`,display:'flex',gap:'8px'}}>
-                                        <button onClick={()=>saveMatchdays({...matchdays,[md.id]:{...md,responses:{...(md.responses||{}),[myChild.id]:'yes'}}})}
-                                          style={{flex:1,padding:'9px',border:`2px solid #16a34a`,background:myResp==='yes'?'#16a34a':'transparent',color:myResp==='yes'?'white':'#4ade80',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'13px',transition:'all 0.12s'}}>
-                                          ✅ Ich bin dabei
-                                        </button>
-                                        <button onClick={()=>saveMatchdays({...matchdays,[md.id]:{...md,responses:{...(md.responses||{}),[myChild.id]:'no'}}})}
-                                          style={{flex:1,padding:'9px',border:`2px solid #dc2626`,background:myResp==='no'?'#dc2626':'transparent',color:myResp==='no'?'white':'#f87171',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'13px',transition:'all 0.12s'}}>
-                                          ❌ Ich fehle
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                      }
+                    <div style={{...DARK_CARD_TEAL,marginBottom:'20px'}}>
+                      <h3 style={{margin:'0 0 12px',color:'#2dd4bf',display:'flex',alignItems:'center',gap:'8px',fontWeight:'800',fontSize:'16px'}}>⚽ {myTeam.name}{myTeam.liga&&<span style={{fontSize:'13px',fontWeight:'500',color:'rgba(255,255,255,0.35)'}}>· {myTeam.liga}</span>}</h3>
+                      {/* Aufstellung */}
+                      {(myTeam.childIds||[]).length>0&&(
+                        <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'0'}}>
+                          {(myTeam.childIds||[]).map(id=>{
+                            const c2=children[id]; const sub2=c2&&subgroups[c2.subgroupId];
+                            return c2?<span key={id} style={{fontSize:'12px',background:'rgba(45,212,191,0.15)',border:'1px solid rgba(45,212,191,0.3)',color:'#2dd4bf',borderRadius:'20px',padding:'3px 10px',fontWeight:'600'}}>{c2.name}{sub2?` · ${sub2.name}`:''}</span>:null;
+                          })}
+                        </div>
+                      )}
                     </div>
-                  </>
-                );
-              })()}
-
-              {/* ── Liga-Tabelle & Spielplan ── */}
-              {(leagueData.table||leagueData.schedule)&&(()=>{
-                const fetchedStr = leagueData.fetchedAt
-                  ? new Date(leagueData.fetchedAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})
-                  : '';
-
-                // Tabellen-Spalten: Rang+Punkte zentriert, Name linksbündig
-                const colStyle = (i) => ({
-                  padding:'8px 10px',
-                  fontSize:'12px',
-                  color: i===0?'white':'rgba(255,255,255,0.7)',
-                  fontWeight: i===0||i===1?'700':'400',
-                  textAlign: i>1?'center':'left',
-                  whiteSpace:'nowrap',
-                  borderBottom:'1px solid rgba(255,255,255,0.05)',
-                });
-                const hStyle = (i) => ({
-                  ...colStyle(i),
-                  color:'rgba(255,255,255,0.35)',
-                  fontWeight:'700',
-                  fontSize:'10px',
-                  textTransform:'uppercase',
-                  letterSpacing:'0.5px',
-                  background:'rgba(255,255,255,0.03)',
-                  borderBottom:'1px solid rgba(255,255,255,0.1)',
-                });
-                // Spielplan-Spalten: alles linksbündig, keine Kürzung
-                const spColStyle = (i) => ({
-                  padding:'8px 10px',
-                  fontSize:'12px',
-                  color: i===3?'#86efac':'rgba(255,255,255,0.7)',
-                  fontWeight: i===3?'700':'400',
-                  textAlign: i===3?'center':'left',
-                  whiteSpace:'nowrap',
-                  borderBottom:'1px solid rgba(255,255,255,0.05)',
-                });
-                const spHStyle = (i) => ({
-                  ...spColStyle(i),
-                  color:'rgba(255,255,255,0.35)',
-                  fontWeight:'700',
-                  fontSize:'10px',
-                  textTransform:'uppercase',
-                  letterSpacing:'0.5px',
-                  background:'rgba(255,255,255,0.03)',
-                  borderBottom:'1px solid rgba(255,255,255,0.1)',
-                });
-
-                return (
-                  <>
-                    <span style={SECTION_LABEL('rgba(96,165,250,0.5)')}>Liga</span>
-
-                    {leagueData.table&&(
-                      <div style={{...DARK_CARD,marginBottom:'20px',padding:0,overflow:'hidden'}}>
-                        <div style={{padding:'14px 16px 10px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'6px'}}>
-                          <h3 style={{margin:0,color:'#93c5fd',display:'flex',alignItems:'center',gap:'8px',fontWeight:'800',fontSize:'16px'}}>📊 Liga-Tabelle</h3>
+                    {ld.table&&(
+                      <div style={{...DARK_CARD,marginTop:'16px',padding:0,overflow:'hidden'}}>
+                        <div style={{padding:'12px 16px 8px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'6px'}}>
+                          <h3 style={{margin:0,color:'#93c5fd',fontWeight:'800',fontSize:'15px'}}>📊 Liga-Tabelle</h3>
                           {fetchedStr&&<span style={{fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>Stand: {fetchedStr}</span>}
                         </div>
                         <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
                           <table style={{borderCollapse:'collapse',minWidth:'420px'}}>
-                            {leagueData.table.headers?.length>0&&(
-                              <thead>
-                                <tr>{leagueData.table.headers.map((h,i)=><th key={i} style={hStyle(i)}>{h}</th>)}</tr>
-                              </thead>
-                            )}
-                            <tbody>
-                              {(leagueData.table.rows||[]).map((row,ri)=>{const cells=row.c||row;return(
-                                <tr key={ri} style={{background: ri%2===0?'transparent':'rgba(255,255,255,0.02)'}}>
-                                  {cells.map((cell,ci)=><td key={ci} style={colStyle(ci)}>{cell}</td>)}
-                                </tr>);}
-                              )}
-                            </tbody>
+                            {ld.table.headers?.length>0&&<thead><tr>{ld.table.headers.map((h,i)=><th key={i} style={hSt(i)}>{h}</th>)}</tr></thead>}
+                            <tbody>{(ld.table.rows||[]).map((row,ri)=>{const cells=row.c||row;return<tr key={ri} style={{background:ri%2===0?'transparent':'rgba(255,255,255,0.02)'}}>{cells.map((cell,ci)=><td key={ci} style={colSt(ci)}>{cell}</td>)}</tr>;})}</tbody>
                           </table>
                         </div>
                       </div>
                     )}
-
-                    {leagueData.schedule&&(
-                      <div style={{...DARK_CARD,marginBottom:'28px',padding:0,overflow:'hidden'}}>
-                        <div style={{padding:'14px 16px 10px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'6px'}}>
-                          <h3 style={{margin:0,color:'#93c5fd',display:'flex',alignItems:'center',gap:'8px',fontWeight:'800',fontSize:'16px'}}>📅 Spielplan</h3>
+                    {ld.schedule&&(
+                      <div style={{...DARK_CARD,marginTop:'12px',marginBottom:'8px',padding:0,overflow:'hidden'}}>
+                        <div style={{padding:'12px 16px 8px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'6px'}}>
+                          <h3 style={{margin:0,color:'#93c5fd',fontWeight:'800',fontSize:'15px'}}>📅 Spielplan</h3>
                           {fetchedStr&&<span style={{fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>Stand: {fetchedStr}</span>}
                         </div>
                         <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
                           <table style={{borderCollapse:'collapse',minWidth:'620px'}}>
-                            {leagueData.schedule.headers?.length>0&&(
-                              <thead>
-                                <tr>{leagueData.schedule.headers.map((h,i)=><th key={i} style={spHStyle(i)}>{h}</th>)}</tr>
-                              </thead>
-                            )}
-                            <tbody>
-                              {(leagueData.schedule.rows||[]).map((row,ri)=>{const cells=row.c||row;return(
-                                <tr key={ri} style={{background: ri%2===0?'transparent':'rgba(255,255,255,0.02)'}}>
-                                  {cells.map((cell,ci)=><td key={ci} style={spColStyle(ci)}>{cell}</td>)}
-                                </tr>);})}
-                            </tbody>
+                            {ld.schedule.headers?.length>0&&<thead><tr>{ld.schedule.headers.map((h,i)=><th key={i} style={spH(i)}>{h}</th>)}</tr></thead>}
+                            <tbody>{(ld.schedule.rows||[]).map((row,ri)=>{const cells=row.c||row;return<tr key={ri} style={{background:ri%2===0?'transparent':'rgba(255,255,255,0.02)'}}>{cells.map((cell,ci)=><td key={ci} style={spSt(ci)}>{cell}</td>)}</tr>;})}</tbody>
                           </table>
                         </div>
                       </div>
@@ -6141,8 +5932,8 @@ export default function TrainingsApp() {
     );
   }
 
-  // ── MANNSCHAFT VIEW (Trainer/Admin) ─────────────────────────────────────
-  if (view === 'mannschaft' && canEdit() && appSettings.mannschaftEnabled) {
+  // ── MANNSCHAFTEN & LIGEN VIEW (Trainer/Admin) ───────────────────────────
+  if (view === 'mannschaften' && canEdit()) {
     const myTeams = userRole==='admin'
       ? Object.values(teams)
       : Object.values(teams).filter(t=>(t.trainerUids||[]).includes(user?.uid));
@@ -6162,7 +5953,7 @@ export default function TrainingsApp() {
       if (!mdForm.date||!mdForm.time||!mdForm.teamId) { alert('Datum, Uhrzeit und Mannschaft sind Pflichtfelder!'); return; }
       const id = editingMd ? editingMd : 'md_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
       saveMatchdays({...matchdays,[id]:{...mdForm,id,responses:matchdays[id]?.responses||{},postponement:matchdays[id]?.postponement||null,result:matchdays[id]?.result||'',createdAt:matchdays[id]?.createdAt||new Date().toISOString()}});
-      setMdForm({teamId:activeTeam?.id||'',date:'',time:'',location:'',meetingPoint:'',meetingTime:'',isHome:true,opponent:''});
+      setMdForm({teamId:'',date:'',time:'',location:'',meetingPoint:'',meetingTime:'',isHome:true,opponent:''});
       setShowMdForm(false);
       setEditingMd(null);
     };
@@ -6200,8 +5991,8 @@ export default function TrainingsApp() {
       saveMatchdays({...matchdays,[md.id]:{...md,postponement:null}});
     };
 
-    const MatchdayCard = ({md, upcoming}) => {
-      const teamKids = (activeTeam?.childIds||[]).map(id=>children[id]).filter(Boolean);
+    const MatchdayCard = ({md, upcoming, team}) => {
+      const teamKids = ((team||activeTeam)?.childIds||[]).map(id=>children[id]).filter(Boolean);
       const yesKids = teamKids.filter(c=>(md.responses||{})[c.id]==='yes');
       const noKids = teamKids.filter(c=>(md.responses||{})[c.id]==='no');
       const openKids = teamKids.filter(c=>!(md.responses||{})[c.id]);
@@ -6284,7 +6075,10 @@ export default function TrainingsApp() {
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#0f4c3a 0%,#134e4a 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
         <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
           <button onClick={()=>navTo('home')} style={s.btn('#0f766e')}><Home size={16}/></button>
-          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>⚽ Mannschaftsverwaltung</h1>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>⚽ Mannschaften {'&'} Ligen</h1>
+          <button onClick={()=>{setAddingTeam(v=>!v);setEditingTeam(null);}} style={{...s.btn(addingTeam?'#6b7280':'#0f766e')}}>
+            {addingTeam?'✕ Abbrechen':'➕ Mannschaft'}
+          </button>
         </div>
 
         {/* Postpone Modal */}
@@ -6330,95 +6124,235 @@ export default function TrainingsApp() {
         })()}
 
         <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
-          {/* Team-Auswahl Tabs */}
-          {myTeams.length>1&&(
-            <div style={{display:'flex',gap:'8px',marginBottom:'20px',flexWrap:'wrap'}}>
-              {myTeams.map(t=>(
-                <button key={t.id} onClick={()=>{setMannTeamFilter(t.id);setShowMdForm(false);setEditingMd(null);}}
-                  style={{padding:'10px 18px',borderRadius:'10px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:'14px',
-                    background:(mannTeamFilter||myTeams[0]?.id)===t.id?'white':'rgba(255,255,255,0.2)',
-                    color:(mannTeamFilter||myTeams[0]?.id)===t.id?'#0f766e':'white'}}>
-                  ⚽ {t.name}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {myTeams.length===0&&(
-            <div style={{background:'rgba(255,255,255,0.1)',borderRadius:'12px',padding:'40px',textAlign:'center',color:'rgba(255,255,255,0.7)'}}>
-              {userRole==='admin'?'Noch keine Mannschaften angelegt. Bitte im Admin-Bereich anlegen.':'Du bist keiner Mannschaft als Trainer zugewiesen.'}
-            </div>
-          )}
-
-          {activeTeam&&<>
-            {/* Neuen Spieltag anlegen / bearbeiten */}
-            <div style={{background:'white',borderRadius:'12px',padding:'16px',marginBottom:'16px'}}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:showMdForm?'16px':'0'}}>
-                <h3 style={{margin:0,color:'#0f766e',display:'flex',alignItems:'center',gap:'8px'}}><span style={{fontSize:'20px'}}>⚽</span>{activeTeam.name}</h3>
-                <button onClick={()=>{if(!showMdForm){setMdForm({teamId:activeTeam.id,date:'',time:'',location:'',meetingPoint:'',meetingTime:'',isHome:true,opponent:''});setEditingMd(null);}setShowMdForm(v=>!v);}}
-                  style={{...s.btn(showMdForm?'#6b7280':'#0f766e')}}>
-                  {showMdForm?'✕ Abbrechen':'➕ Spieltag anlegen'}
-                </button>
-              </div>
-              {showMdForm&&(
-                <div style={{display:'grid',gap:'10px',gridTemplateColumns:'1fr 1fr',rowGap:'10px'}}>
-                  <div>
-                    <label style={s.label}>Datum *</label>
-                    <input type="date" value={mdForm.date} onChange={e=>setMdForm({...mdForm,date:e.target.value})} style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/>
-                  </div>
-                  <div>
-                    <label style={s.label}>Anstoß *</label>
-                    <input type="time" value={mdForm.time} onChange={e=>setMdForm({...mdForm,time:e.target.value})} style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/>
-                  </div>
-                  <div>
-                    <label style={s.label}>Gegner</label>
-                    <input value={mdForm.opponent} onChange={e=>setMdForm({...mdForm,opponent:e.target.value})} placeholder="z.B. TTV Musterhausen" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/>
-                  </div>
-                  <div>
-                    <label style={s.label}>Heim / Auswärts</label>
-                    <div style={{display:'flex',gap:'8px'}}>
-                      {[{v:true,l:'🏠 Heim'},{v:false,l:'🚌 Auswärts'}].map(({v,l})=>(
-                        <button key={String(v)} type="button" onClick={()=>setMdForm({...mdForm,isHome:v})}
-                          style={{flex:1,padding:'8px',borderRadius:'8px',border:`2px solid ${mdForm.isHome===v?'#0f766e':'#e5e7eb'}`,background:mdForm.isHome===v?'#ccfbf1':'white',color:mdForm.isHome===v?'#0f766e':'#555',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>
-                          {l}
-                        </button>
-                      ))}
+          {/* ── Team-Formular (neu anlegen / bearbeiten) ── */}
+          {(addingTeam || editingTeam) && (()=>{
+            const isEdit = !!editingTeam;
+            const allTrainers = Object.values(userProfiles||{}).filter(p=>p.role==='trainer'||p.role==='admin');
+            const allKids = Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+            const saveTeam = () => {
+              if (!teamForm.name.trim()) { alert('Name ist ein Pflichtfeld!'); return; }
+              const id = isEdit ? editingTeam : 'team_'+Date.now();
+              const existing = isEdit ? (teams[editingTeam]||{}) : {};
+              saveTeams({...teams,[id]:{...existing,...teamForm,id}});
+              setAddingTeam(false); setEditingTeam(null);
+              setTeamForm({name:'',liga:'',tableUrl:'',scheduleUrl:'',trainerUids:[],childIds:[]});
+            };
+            const toggleArr = (key,val) => setTeamForm(f=>{
+              const arr=f[key]||[];
+              return {...f,[key]:arr.includes(val)?arr.filter(x=>x!==val):[...arr,val]};
+            });
+            return (
+              <div style={{background:'white',borderRadius:'14px',padding:'20px',marginBottom:'20px',boxShadow:'0 4px 20px rgba(0,0,0,0.15)'}}>
+                <h3 style={{margin:'0 0 16px',color:'#0f766e',fontSize:'16px'}}>{isEdit?'✏️ Mannschaft bearbeiten':'➕ Neue Mannschaft'}</h3>
+                <div style={{display:'grid',gap:'12px'}}>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}}>
+                    <div>
+                      <label style={s.label}>Name *</label>
+                      <input value={teamForm.name} onChange={e=>setTeamForm(f=>({...f,name:e.target.value}))}
+                        placeholder="z.B. 1. Herren" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/>
+                    </div>
+                    <div>
+                      <label style={s.label}>Liga</label>
+                      <input value={teamForm.liga} onChange={e=>setTeamForm(f=>({...f,liga:e.target.value}))}
+                        placeholder="z.B. Kreisliga A" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/>
                     </div>
                   </div>
                   <div>
-                    <label style={s.label}>Spielort</label>
-                    <input value={mdForm.location} onChange={e=>setMdForm({...mdForm,location:e.target.value})} placeholder="Halle / Adresse" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/>
+                    <label style={s.label}>Tabellen-URL (mytischtennis)</label>
+                    <input value={teamForm.tableUrl} onChange={e=>setTeamForm(f=>({...f,tableUrl:e.target.value}))}
+                      placeholder="https://www.mytischtennis.de/click-tt/..." style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/>
                   </div>
                   <div>
-                    <label style={s.label}>Treffpunkt / Abfahrt</label>
-                    <input value={mdForm.meetingPoint} onChange={e=>setMdForm({...mdForm,meetingPoint:e.target.value})} placeholder="z.B. Vereinsheim" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/>
+                    <label style={s.label}>Spielplan-URL (mytischtennis)</label>
+                    <input value={teamForm.scheduleUrl} onChange={e=>setTeamForm(f=>({...f,scheduleUrl:e.target.value}))}
+                      placeholder="https://www.mytischtennis.de/click-tt/..." style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/>
                   </div>
-                  <div>
-                    <label style={s.label}>Abfahrtszeit</label>
-                    <input type="time" value={mdForm.meetingTime} onChange={e=>setMdForm({...mdForm,meetingTime:e.target.value})} style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/>
-                  </div>
-                  <div style={{gridColumn:'1/-1'}}>
-                    <button onClick={saveMatchday} style={{...s.btn('#0f766e'),width:'100%',justifyContent:'center'}}>
-                      {editingMd?'💾 Spieltag speichern':'➕ Spieltag hinzufügen'}
-                    </button>
+                  {allTrainers.length>0&&<div>
+                    <label style={s.label}>Trainer</label>
+                    <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+                      {allTrainers.map(p=>{
+                        const sel=(teamForm.trainerUids||[]).includes(p.uid);
+                        return <button key={p.uid} type="button" onClick={()=>toggleArr('trainerUids',p.uid)}
+                          style={{padding:'5px 12px',borderRadius:'20px',border:`2px solid ${sel?'#0f766e':'#e5e7eb'}`,background:sel?'#ccfbf1':'#f9fafb',color:sel?'#0f766e':'#6b7280',cursor:'pointer',fontSize:'13px',fontWeight:'600'}}>
+                          {p.name||p.email}
+                        </button>;
+                      })}
+                    </div>
+                  </div>}
+                  {allKids.length>0&&<div>
+                    <label style={s.label}>Spieler</label>
+                    <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+                      {allKids.map(c=>{
+                        const sel=(teamForm.childIds||[]).includes(c.id);
+                        return <button key={c.id} type="button" onClick={()=>toggleArr('childIds',c.id)}
+                          style={{padding:'5px 12px',borderRadius:'20px',border:`2px solid ${sel?'#0f766e':'#e5e7eb'}`,background:sel?'#ccfbf1':'#f9fafb',color:sel?'#0f766e':'#6b7280',cursor:'pointer',fontSize:'13px',fontWeight:'600'}}>
+                          {c.name}
+                        </button>;
+                      })}
+                    </div>
+                  </div>}
+                  <div style={{display:'flex',gap:'8px'}}>
+                    <button onClick={saveTeam} style={{...s.btn('#0f766e'),flex:1,justifyContent:'center'}}>💾 Speichern</button>
+                    <button onClick={()=>{setAddingTeam(false);setEditingTeam(null);setTeamForm({name:'',liga:'',tableUrl:'',scheduleUrl:'',trainerUids:[],childIds:[]});}}
+                      style={{...s.btn('#6b7280'),flex:1,justifyContent:'center'}}>✕ Abbrechen</button>
+                    {isEdit&&<button onClick={()=>{if(!window.confirm('Mannschaft wirklich löschen?'))return;const u={...teams};delete u[editingTeam];saveTeams(u);setEditingTeam(null);setTeamForm({name:'',liga:'',tableUrl:'',scheduleUrl:'',trainerUids:[],childIds:[]});}}
+                      style={{...s.btn('#dc2626'),padding:'8px 14px'}}>🗑️</button>}
                   </div>
                 </div>
-              )}
+              </div>
+            );
+          })()}
+
+          {/* ── Keine Mannschaften ── */}
+          {myTeams.length===0&&!addingTeam&&(
+            <div style={{background:'rgba(255,255,255,0.1)',borderRadius:'12px',padding:'40px',textAlign:'center',color:'rgba(255,255,255,0.7)'}}>
+              {userRole==='admin'?'Noch keine Mannschaften angelegt. Klicke oben auf "➕ Mannschaft".':'Du bist keiner Mannschaft als Trainer zugewiesen.'}
             </div>
+          )}
 
-            {/* Kommende Spieltage */}
-            <h3 style={{color:'white',margin:'0 0 12px',fontSize:'16px'}}>📅 Kommende Spieltage ({upcomingMds.length})</h3>
-            {upcomingMds.length===0
-              ? <div style={{background:'rgba(255,255,255,0.1)',borderRadius:'10px',padding:'20px',textAlign:'center',color:'rgba(255,255,255,0.6)',marginBottom:'20px',fontSize:'13px'}}>Keine anstehenden Spieltage.</div>
-              : upcomingMds.map(md=><MatchdayCard key={md.id} md={md} upcoming={true}/>)
-            }
+          {/* ── Mannschafts-Kacheln ── */}
+          {myTeams.map(team=>{
+            const isOpen = !!teamExpanded[team.id];
+            const isFetching = !!teamFetching[team.id];
+            const ld = team.leagueData||{};
+            const teamMds = Object.values(matchdays).filter(m=>m.teamId===team.id).sort((a,b)=>b.date.localeCompare(a.date));
+            const todayStr = new Date().toISOString().split('T')[0];
+            const upMds = teamMds.filter(m=>m.date>=todayStr);
+            const pastMds2 = teamMds.filter(m=>m.date<todayStr);
+            const isAddingMd = showMdForm && mdForm.teamId===team.id;
+            const colSt=(i)=>({padding:'6px 10px',fontSize:'12px',whiteSpace:'nowrap',textAlign:i===0?'center':i<=2?'left':'right',color:i===0?'#0f766e':'#374151',fontWeight:i===0?'800':'400',borderRight:'1px solid #e5e7eb',minWidth:i===0?'32px':i<=2?'130px':'55px'});
+            const hSt=(i)=>({...colSt(i),background:'#f0fdfa',fontWeight:'700',color:'#0f766e',fontSize:'11px',textTransform:'uppercase',letterSpacing:'0.3px'});
+            const spSt=(i)=>({padding:'6px 10px',fontSize:'12px',whiteSpace:'nowrap',textAlign:'left',color:'#374151',borderRight:'1px solid #e5e7eb',minWidth:i===0?'160px':i<=2?'140px':'60px'});
+            const spH=(i)=>({...spSt(i),background:'#f0fdfa',fontWeight:'700',color:'#0f766e',fontSize:'11px',textTransform:'uppercase',letterSpacing:'0.3px'});
+            const fetchedStr = ld.fetchedAt ? new Date(ld.fetchedAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+new Date(ld.fetchedAt).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) : '';
+            return (
+              <div key={team.id} style={{background:'rgba(255,255,255,0.07)',borderRadius:'14px',marginBottom:'12px',overflow:'hidden',border:'1px solid rgba(255,255,255,0.15)'}}>
+                {/* Collapsed header */}
+                <div style={{padding:'14px 16px',display:'flex',alignItems:'center',gap:'10px',cursor:'pointer'}} onClick={()=>setTeamExpanded(e=>({...e,[team.id]:!e[team.id]}))}>
+                  <span style={{fontSize:'20px'}}>{isOpen?'🔽':'▶️'}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <p style={{margin:0,fontWeight:'800',fontSize:'15px',color:'white'}}>{team.name}</p>
+                    <p style={{margin:'2px 0 0',fontSize:'12px',color:'rgba(255,255,255,0.6)'}}>{team.liga||'Keine Liga'} · {(team.childIds||[]).length} Spieler</p>
+                  </div>
+                  <div style={{display:'flex',gap:'6px',flexShrink:0}} onClick={e=>e.stopPropagation()}>
+                    {(team.tableUrl||team.scheduleUrl)&&(
+                      <button disabled={isFetching} onClick={()=>fetchTeamLeague(team.id)}
+                        style={{...s.btn('#0f766e'),padding:'6px 10px',fontSize:'12px',opacity:isFetching?0.6:1}}>
+                        {isFetching?'⏳':'🔄'} Daten
+                      </button>
+                    )}
+                    <button onClick={()=>{
+                      const t=teams[team.id];
+                      setTeamForm({name:t.name||'',liga:t.liga||'',tableUrl:t.tableUrl||'',scheduleUrl:t.scheduleUrl||'',trainerUids:t.trainerUids||[],childIds:t.childIds||[]});
+                      setEditingTeam(team.id); setAddingTeam(false);
+                    }} style={{...s.btn('#6b7280'),padding:'6px 10px',fontSize:'12px'}}>✏️</button>
+                  </div>
+                </div>
 
-            {/* Vergangene Spieltage */}
-            {pastMds.length>0&&<>
-              <h3 style={{color:'white',margin:'20px 0 12px',fontSize:'16px'}}>📋 Vergangene Spieltage ({pastMds.length})</h3>
-              {pastMds.map(md=><MatchdayCard key={md.id} md={md} upcoming={false}/>)}
-            </>}
-          </>}
+                {/* Expanded body */}
+                {isOpen&&(
+                  <div style={{borderTop:'1px solid rgba(255,255,255,0.1)',padding:'16px',background:'rgba(0,0,0,0.15)'}}>
+
+                    {/* Aufstellung */}
+                    {(team.childIds||[]).length>0&&(
+                      <div style={{marginBottom:'16px'}}>
+                        <p style={{margin:'0 0 8px',fontSize:'11px',fontWeight:'800',color:'rgba(255,255,255,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Aufstellung</p>
+                        <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+                          {(team.childIds||[]).map(id=>{
+                            const c=children[id];
+                            return c?<span key={id} style={{padding:'4px 10px',background:'rgba(255,255,255,0.15)',borderRadius:'20px',fontSize:'13px',color:'white',fontWeight:'600'}}>{c.name}</span>:null;
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Liga-Daten */}
+                    {ld.table&&(
+                      <div style={{marginBottom:'16px'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px',flexWrap:'wrap'}}>
+                          <p style={{margin:0,fontSize:'11px',fontWeight:'800',color:'rgba(255,255,255,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Tabelle</p>
+                          {fetchedStr&&<span style={{fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>Stand: {fetchedStr}</span>}
+                        </div>
+                        <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',borderRadius:'10px',background:'white'}}>
+                          <table style={{borderCollapse:'collapse',width:'100%',minWidth:'400px'}}>
+                            <thead><tr>{(ld.table.headers||[]).map((h,i)=><th key={i} style={hSt(i)}>{h}</th>)}</tr></thead>
+                            <tbody>{(ld.table.rows||[]).map((row,ri)=>{const cols=row.c||row;return <tr key={ri} style={{borderBottom:'1px solid #f3f4f6',background:ri%2===0?'white':'#fafafa'}}>{cols.map((cell,ci)=><td key={ci} style={colSt(ci)}>{cell}</td>)}</tr>;})}</tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {ld.schedule&&(
+                      <div style={{marginBottom:'16px'}}>
+                        <p style={{margin:'0 0 8px',fontSize:'11px',fontWeight:'800',color:'rgba(255,255,255,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Spielplan</p>
+                        <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',borderRadius:'10px',background:'white'}}>
+                          <table style={{borderCollapse:'collapse',width:'100%',minWidth:'500px'}}>
+                            <thead><tr>{(ld.schedule.headers||[]).map((h,i)=><th key={i} style={spH(i)}>{h}</th>)}</tr></thead>
+                            <tbody>{(ld.schedule.rows||[]).map((row,ri)=>{const cols=row.c||row;return <tr key={ri} style={{borderBottom:'1px solid #f3f4f6',background:ri%2===0?'white':'#fafafa'}}>{cols.map((cell,ci)=><td key={ci} style={spSt(ci)}>{cell}</td>)}</tr>;})}</tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {!ld.table&&!ld.schedule&&(team.tableUrl||team.scheduleUrl)&&(
+                      <div style={{marginBottom:'16px',padding:'12px',background:'rgba(255,255,255,0.07)',borderRadius:'10px',textAlign:'center',color:'rgba(255,255,255,0.5)',fontSize:'13px'}}>
+                        Noch keine Daten geladen. Klicke auf "🔄 Daten".
+                      </div>
+                    )}
+
+                    {/* Spieltage */}
+                    <div style={{borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:'16px'}}>
+                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px'}}>
+                        <p style={{margin:0,fontSize:'11px',fontWeight:'800',color:'rgba(255,255,255,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Spieltage</p>
+                        <button onClick={()=>{if(isAddingMd){setShowMdForm(false);setEditingMd(null);}else{setMdForm({teamId:team.id,date:'',time:'',location:'',meetingPoint:'',meetingTime:'',isHome:true,opponent:''});setEditingMd(null);setShowMdForm(true);}}}
+                          style={{...s.btn(isAddingMd?'#6b7280':'#0f766e'),padding:'6px 12px',fontSize:'12px'}}>
+                          {isAddingMd?'✕ Abbrechen':'➕ Spieltag'}
+                        </button>
+                      </div>
+
+                      {isAddingMd&&(
+                        <div style={{background:'white',borderRadius:'10px',padding:'14px',marginBottom:'12px'}}>
+                          <div style={{display:'grid',gap:'10px',gridTemplateColumns:'1fr 1fr',rowGap:'10px'}}>
+                            <div><label style={s.label}>Datum *</label><input type="date" value={mdForm.date} onChange={e=>setMdForm({...mdForm,date:e.target.value})} style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/></div>
+                            <div><label style={s.label}>Anstoß *</label><input type="time" value={mdForm.time} onChange={e=>setMdForm({...mdForm,time:e.target.value})} style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/></div>
+                            <div><label style={s.label}>Gegner</label><input value={mdForm.opponent} onChange={e=>setMdForm({...mdForm,opponent:e.target.value})} placeholder="z.B. TTV Musterhausen" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/></div>
+                            <div><label style={s.label}>Heim / Auswärts</label>
+                              <div style={{display:'flex',gap:'8px'}}>
+                                {[{v:true,l:'🏠 Heim'},{v:false,l:'🚌 Auswärts'}].map(({v,l})=>(
+                                  <button key={String(v)} type="button" onClick={()=>setMdForm({...mdForm,isHome:v})}
+                                    style={{flex:1,padding:'8px',borderRadius:'8px',border:`2px solid ${mdForm.isHome===v?'#0f766e':'#e5e7eb'}`,background:mdForm.isHome===v?'#ccfbf1':'white',color:mdForm.isHome===v?'#0f766e':'#555',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>
+                                    {l}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <div><label style={s.label}>Spielort</label><input value={mdForm.location} onChange={e=>setMdForm({...mdForm,location:e.target.value})} placeholder="Halle / Adresse" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/></div>
+                            <div><label style={s.label}>Treffpunkt / Abfahrt</label><input value={mdForm.meetingPoint} onChange={e=>setMdForm({...mdForm,meetingPoint:e.target.value})} placeholder="z.B. Vereinsheim" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/></div>
+                            <div><label style={s.label}>Abfahrtszeit</label><input type="time" value={mdForm.meetingTime} onChange={e=>setMdForm({...mdForm,meetingTime:e.target.value})} style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/></div>
+                            <div style={{gridColumn:'1/-1'}}>
+                              <button onClick={saveMatchday} style={{...s.btn('#0f766e'),width:'100%',justifyContent:'center'}}>
+                                {editingMd?'💾 Spieltag speichern':'➕ Spieltag hinzufügen'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {upMds.length>0&&<>
+                        <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'700',color:'rgba(255,255,255,0.6)'}}>📅 Kommend ({upMds.length})</p>
+                        {upMds.map(md=><MatchdayCard key={md.id} md={md} upcoming={true} team={team}/>)}
+                      </>}
+                      {pastMds2.length>0&&<>
+                        <p style={{margin:'12px 0 8px',fontSize:'12px',fontWeight:'700',color:'rgba(255,255,255,0.6)'}}>📋 Vergangen ({pastMds2.length})</p>
+                        {pastMds2.map(md=><MatchdayCard key={md.id} md={md} upcoming={false} team={team}/>)}
+                      </>}
+                      {teamMds.length===0&&<div style={{padding:'12px',textAlign:'center',color:'rgba(255,255,255,0.4)',fontSize:'13px'}}>Noch keine Spieltage.</div>}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
