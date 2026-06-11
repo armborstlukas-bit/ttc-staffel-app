@@ -677,7 +677,6 @@ export default function TrainingsApp() {
   const [resetDialog, setResetDialog]           = useState(false);
   const [resetPassword, setResetPassword]       = useState('');
   const [resetError, setResetError]             = useState('');
-  const [dangerSelections, setDangerSelections]         = useState({});
   const [expandedUser, setExpandedUser]                 = useState(null);
   const [dangerSelected, setDangerSelected]             = useState('');
   const [showProfile, setShowProfile]           = useState(false);
@@ -709,8 +708,7 @@ export default function TrainingsApp() {
   const [notificationsLoaded, setNotificationsLoaded]       = useState(false);
   const notificationsRef = React.useRef({});  // immer aktueller Wert ohne Dep-Trigger
   const [teams, setTeams]                                   = useState({});
-  const [matchdays, setMatchdays]                           = useState({});
-  const [appSettings, setAppSettings]                       = useState({mannschaftEnabled: true});
+  const [appSettings, setAppSettings]                       = useState({});
   const [leagueData, setLeagueData]                         = useState({ table: null, schedule: null, fetchedAt: null });
   const [leagueFetching, setLeagueFetching]                 = useState(false);
   const [notifComposeTarget, setNotifComposeTarget]         = useState('all'); // 'all' | subgroupId | childId
@@ -731,8 +729,6 @@ export default function TrainingsApp() {
   const [addingTeam, setAddingTeam]                         = useState(false);
   const [teamExpanded, setTeamExpanded]                     = useState({});
   const [teamFetching, setTeamFetching]                     = useState({});
-  const [mdForm, setMdForm]                                 = useState({teamId:'',date:'',time:'',location:'',meetingPoint:'',meetingTime:'',isHome:true,opponent:''});
-  const [showMdForm, setShowMdForm]                         = useState(false);
   // Practice Tournaments
   const [practiceTournaments, setPracticeTournaments]               = useState({});
   const [archivedPracticeTournaments, setArchivedPracticeTournaments] = useState({});
@@ -746,9 +742,6 @@ export default function TrainingsApp() {
   const [ptMatchDraft, setPtMatchDraft]                             = useState(null);
   const [ptArchiveExpanded, setPtArchiveExpanded]                     = useState({});
   const [ptDetailModal, setPtDetailModal]                           = useState(null);
-  const [editingMd, setEditingMd]                           = useState(null);
-  const [mdResultForm, setMdResultForm]                     = useState(null); // {id, result}
-  const [postponeForm, setPostponeForm]                     = useState(null); // {matchdayId, reason, options:[{date,time}]}
   const [mannTeamFilter, setMannTeamFilter]                 = useState(null);
   const [showParentCompose, setShowParentCompose]           = useState(false);
   const [parentMsgTitle, setParentMsgTitle]                 = useState('');
@@ -837,8 +830,7 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','archivedTournaments'),s => setArchivedTournaments(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','notifications'),      s => { setNotifications(s.exists()?s.data():{}); setNotificationsLoaded(true); }),
       onSnapshot(doc(db,'ttc','teams'),              s => setTeams(s.exists()?s.data():{})),
-      onSnapshot(doc(db,'ttc','matchdays'),          s => setMatchdays(s.exists()?s.data():{})),
-      onSnapshot(doc(db,'ttc','appSettings'),        s => setAppSettings(s.exists()?{mannschaftEnabled:true,...s.data()}:{mannschaftEnabled:true})),
+      onSnapshot(doc(db,'ttc','appSettings'),        s => setAppSettings(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','leagueData'),         s => setLeagueData(s.exists()?s.data():{ table: null, schedule: null, fetchedAt: null })),
       onSnapshot(doc(db,'ttc','rangliste'), s => setRangliste(s.exists()&&s.data().entries ? s.data().entries : [])),
       onSnapshot(doc(db,'ttc','ranglistenspiele'), s => setRanglistenspiele(s.exists() ? { active: s.data().active||[], archived: s.data().archived||[] } : { active:[], archived:[] })),
@@ -1059,7 +1051,6 @@ export default function TrainingsApp() {
     }));
   };
   const saveTeams = u => { const s=sanitizeTeams(u); setTeams(s); setDoc(doc(db,'ttc','teams'), s).catch(e=>console.error('saveTeams failed:',e)); };
-  const saveMatchdays          = u => { setMatchdays(u);          setDoc(doc(db,'ttc','matchdays'),          u); };
   const saveAppSettings                  = u => { setAppSettings(u);                  setDoc(doc(db,'ttc','appSettings'),                  u); };
   const saveLeagueData                   = u => { setLeagueData(u);                   setDoc(doc(db,'ttc','leagueData'),                   u); };
 
@@ -5977,138 +5968,6 @@ export default function TrainingsApp() {
   if (view === 'mannschaften' && canEdit()) {
     const myTeams = Object.values(teams).sort((a,b)=>a.name.localeCompare(b.name,'de'));
     const isMyTeam = (t) => (t.trainerUids||[]).includes(user?.uid);
-    const activeTeam = mannTeamFilter
-      ? teams[mannTeamFilter]
-      : (myTeams[0] || null);
-    const today = new Date().toISOString().split('T')[0];
-
-    const teamMatchdays = activeTeam
-      ? Object.values(matchdays).filter(m=>m.teamId===activeTeam.id).sort((a,b)=>b.date.localeCompare(a.date))
-      : [];
-    const upcomingMds = teamMatchdays.filter(m=>m.date>=today);
-    const pastMds = teamMatchdays.filter(m=>m.date<today);
-
-    const saveMatchday = () => {
-      if (!mdForm.date||!mdForm.time||!mdForm.teamId) { alert('Datum, Uhrzeit und Mannschaft sind Pflichtfelder!'); return; }
-      const id = editingMd ? editingMd : 'md_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
-      saveMatchdays({...matchdays,[id]:{...mdForm,id,responses:matchdays[id]?.responses||{},postponement:matchdays[id]?.postponement||null,result:matchdays[id]?.result||'',createdAt:matchdays[id]?.createdAt||new Date().toISOString()}});
-      setMdForm({teamId:'',date:'',time:'',location:'',meetingPoint:'',meetingTime:'',isHome:true,opponent:''});
-      setShowMdForm(false);
-      setEditingMd(null);
-    };
-
-    const startEdit = (md) => {
-      setMdForm({teamId:md.teamId,date:md.date,time:md.time,location:md.location||'',meetingPoint:md.meetingPoint||'',meetingTime:md.meetingTime||'',isHome:md.isHome!==false,opponent:md.opponent||''});
-      setEditingMd(md.id);
-      setShowMdForm(true);
-    };
-
-    const deleteMd = (id) => {
-      if (!window.confirm('Spieltag löschen?')) return;
-      const u={...matchdays}; delete u[id]; saveMatchdays(u);
-    };
-
-    const startPostpone = (md) => {
-      setPostponeForm({matchdayId:md.id, reason:'', options:[{date:'',time:''},{date:'',time:''}]});
-    };
-
-    const sendPostponement = () => {
-      if (!postponeForm) return;
-      const opts = postponeForm.options.filter(o=>o.date&&o.time);
-      if (opts.length < 1) { alert('Bitte mindestens einen Terminvorschlag eintragen!'); return; }
-      const md = matchdays[postponeForm.matchdayId];
-      saveMatchdays({...matchdays,[md.id]:{...md,postponement:{reason:postponeForm.reason,options:opts,responses:{},confirmedOption:null}}});
-      setPostponeForm(null);
-    };
-
-    const confirmPostpone = (md, optIdx) => {
-      const opt = md.postponement.options[optIdx];
-      saveMatchdays({...matchdays,[md.id]:{...md,date:opt.date,time:opt.time,postponement:{...md.postponement,confirmedOption:optIdx}}});
-    };
-
-    const cancelPostpone = (md) => {
-      saveMatchdays({...matchdays,[md.id]:{...md,postponement:null}});
-    };
-
-    const MatchdayCard = ({md, upcoming, team}) => {
-      const teamKids = ((team||activeTeam)?.childIds||[]).map(id=>children[id]).filter(Boolean);
-      const yesKids = teamKids.filter(c=>(md.responses||{})[c.id]==='yes');
-      const noKids = teamKids.filter(c=>(md.responses||{})[c.id]==='no');
-      const openKids = teamKids.filter(c=>!(md.responses||{})[c.id]);
-      const dateStr = new Date(md.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
-      const isPostponed = !!md.postponement;
-      return (
-        <div style={{border:`2px solid ${isPostponed?'#fed7aa':upcoming?'#99f6e4':'#e5e7eb'}`,borderRadius:'12px',background:isPostponed?'#fff7ed':upcoming?'#f0fdfa':'#f9fafb',overflow:'hidden',marginBottom:'12px'}}>
-          <div style={{padding:'12px 16px',display:'flex',alignItems:'flex-start',gap:'10px',flexWrap:'wrap'}}>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',marginBottom:'4px'}}>
-                <span style={{fontWeight:'700',fontSize:'15px',color:'#0f766e'}}>{md.isHome!==false?'🏠 Heim':'🚌 Auswärts'}{md.opponent?` · vs. ${md.opponent}`:''}</span>
-                {isPostponed&&<span style={{fontSize:'11px',background:'#fed7aa',color:'#c2410c',padding:'2px 7px',borderRadius:'10px',fontWeight:'700'}}>⏳ Verlegung läuft</span>}
-                {md.result&&<span style={{fontSize:'12px',background:'#f3f4f6',color:'#374151',padding:'2px 8px',borderRadius:'10px',fontWeight:'600'}}>Ergebnis: {md.result}</span>}
-              </div>
-              <p style={{margin:'0 0 2px',fontSize:'13px',color:'#333',fontWeight:'600'}}>{dateStr} · {md.time} Uhr</p>
-              {md.location&&<p style={{margin:'0 0 2px',fontSize:'12px',color:'#555'}}>📍 {md.location}</p>}
-              {md.meetingPoint&&<p style={{margin:'0 0 2px',fontSize:'12px',color:'#555'}}>🚗 {md.meetingPoint}{md.meetingTime?` · ${md.meetingTime} Uhr`:''}</p>}
-            </div>
-            <div style={{display:'flex',gap:'4px',flexShrink:0,flexWrap:'wrap'}}>
-              <button onClick={()=>startEdit(md)} style={{...s.btn('#6b7280'),padding:'4px 8px',fontSize:'12px'}}>✏️</button>
-              {!isPostponed&&upcoming&&<button onClick={()=>startPostpone(md)} style={{...s.btn('#f97316'),padding:'4px 8px',fontSize:'12px'}}>⏳ Verlegen</button>}
-              {isPostponed&&<button onClick={()=>cancelPostpone(md)} style={{...s.btn('#6b7280'),padding:'4px 8px',fontSize:'12px'}}>✕ Abbrechen</button>}
-              {mdResultForm?.id===md.id
-                ? <div style={{display:'flex',gap:'4px',alignItems:'center'}}>
-                    <input value={mdResultForm.result} onChange={e=>setMdResultForm({...mdResultForm,result:e.target.value})}
-                      placeholder="z.B. 3:2" style={{...s.input,flex:'none',width:'80px',padding:'4px 8px',fontSize:'12px'}}/>
-                    <button onClick={()=>{saveMatchdays({...matchdays,[md.id]:{...md,result:mdResultForm.result}});setMdResultForm(null);}} style={{...s.btn('#0f766e'),padding:'4px 8px',fontSize:'12px'}}>💾</button>
-                    <button onClick={()=>setMdResultForm(null)} style={{...s.btn('#6b7280'),padding:'4px 8px',fontSize:'12px'}}>✕</button>
-                  </div>
-                : <button onClick={()=>setMdResultForm({id:md.id,result:md.result||''})} style={{...s.btn('#0f766e'),padding:'4px 8px',fontSize:'12px'}}>🏆 Ergebnis</button>
-              }
-              <button onClick={()=>deleteMd(md.id)} style={{...s.btn('#dc2626'),padding:'4px 8px',fontSize:'12px'}}>🗑️</button>
-            </div>
-          </div>
-
-          {/* Verlegungsabstimmung: Trainer-Sicht */}
-          {isPostponed&&md.postponement.confirmedOption==null&&(
-            <div style={{padding:'10px 16px',borderTop:'1px solid #fed7aa',background:'#fffbeb'}}>
-              <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'700',color:'#c2410c'}}>📊 Abstimmungsergebnis Verlegung</p>
-              {md.postponement.reason&&<p style={{margin:'0 0 6px',fontSize:'12px',color:'#92400e'}}>Grund: {md.postponement.reason}</p>}
-              <div style={{display:'grid',gap:'6px'}}>
-                {(md.postponement.options||[]).map((opt,i)=>{
-                  const votes = Object.values(md.postponement.responses||{}).filter(arr=>(arr||[]).includes(i)).length;
-                  const total = (activeTeam?.childIds||[]).length;
-                  const optDate = new Date(opt.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'});
-                  return (
-                    <div key={i} style={{display:'flex',alignItems:'center',gap:'10px',padding:'7px 10px',background:'white',borderRadius:'8px',border:'1px solid #fde68a'}}>
-                      <div style={{flex:1}}>
-                        <span style={{fontWeight:'600',fontSize:'13px',color:'#92400e'}}>{optDate} · {opt.time} Uhr</span>
-                        <span style={{marginLeft:'8px',fontSize:'12px',color:'#b45309'}}>✅ {votes}/{total}</span>
-                      </div>
-                      <button onClick={()=>confirmPostpone(md,i)}
-                        style={{...s.btn('#16a34a'),padding:'4px 10px',fontSize:'12px'}}>✅ Als neuen Termin bestätigen</button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          {isPostponed&&md.postponement.confirmedOption!=null&&(
-            <div style={{padding:'8px 16px',borderTop:'1px solid #bbf7d0',background:'#f0fdf4',fontSize:'13px',color:'#16a34a',fontWeight:'600'}}>
-              ✅ Neuer Termin bestätigt: {(()=>{const o=md.postponement.options[md.postponement.confirmedOption];return `${new Date(o.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})} · ${o.time} Uhr`;})()}
-            </div>
-          )}
-
-          {/* Anwesenheits-Übersicht */}
-          {!isPostponed&&(
-            <div style={{padding:'8px 16px',borderTop:`1px solid ${upcoming?'#99f6e4':'#e5e7eb'}`,display:'flex',gap:'12px',flexWrap:'wrap',fontSize:'12px'}}>
-              {yesKids.length>0&&<span style={{color:'#16a34a',fontWeight:'600'}}>✅ Dabei ({yesKids.length}): {yesKids.map(c=>c.name).join(', ')}</span>}
-              {noKids.length>0&&<span style={{color:'#dc2626',fontWeight:'600'}}>❌ Fehlt ({noKids.length}): {noKids.map(c=>c.name).join(', ')}</span>}
-              {openKids.length>0&&<span style={{color:'#9ca3af',fontWeight:'600'}}>– Offen ({openKids.length}): {openKids.map(c=>c.name).join(', ')}</span>}
-              {teamKids.length===0&&<span style={{color:'#9ca3af'}}>Keine Kinder zugewiesen.</span>}
-            </div>
-          )}
-        </div>
-      );
-    };
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#0f4c3a 0%,#134e4a 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
@@ -6119,48 +5978,6 @@ export default function TrainingsApp() {
             {addingTeam?'✕ Abbrechen':'➕ Mannschaft'}
           </button>
         </div>
-
-        {/* Postpone Modal */}
-        {postponeForm&&(()=>{
-          const md = matchdays[postponeForm.matchdayId];
-          return (
-            <Modal>
-            <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
-              <div style={{background:'white',borderRadius:'16px',padding:'24px',maxWidth:'480px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)',maxHeight:'90vh',overflowY:'auto'}}>
-                <h3 style={{margin:'0 0 4px',color:'#c2410c'}}>⏳ Spieltag verlegen</h3>
-                <p style={{margin:'0 0 16px',fontSize:'13px',color:'#666'}}>Terminvorschläge für die Eltern/Jugendlichen</p>
-                <div style={{display:'grid',gap:'10px'}}>
-                  <div>
-                    <label style={s.label}>Grund der Verlegung (optional)</label>
-                    <input value={postponeForm.reason} onChange={e=>setPostponeForm({...postponeForm,reason:e.target.value})}
-                      placeholder="z.B. Hallenausfall" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/>
-                  </div>
-                  <label style={s.label}>Terminvorschläge</label>
-                  {postponeForm.options.map((opt,i)=>(
-                    <div key={i} style={{display:'flex',gap:'8px',alignItems:'center'}}>
-                      <span style={{fontSize:'12px',color:'#6b7280',width:'20px',flexShrink:0}}>#{i+1}</span>
-                      <input type="date" value={opt.date} onChange={e=>{const o=[...postponeForm.options];o[i]={...o[i],date:e.target.value};setPostponeForm({...postponeForm,options:o});}}
-                        style={{...s.input,flex:1,boxSizing:'border-box'}}/>
-                      <input type="time" value={opt.time} onChange={e=>{const o=[...postponeForm.options];o[i]={...o[i],time:e.target.value};setPostponeForm({...postponeForm,options:o});}}
-                        style={{...s.input,flex:'none',width:'100px'}}/>
-                      {postponeForm.options.length>1&&<button onClick={()=>setPostponeForm({...postponeForm,options:postponeForm.options.filter((_,j)=>j!==i)})}
-                        style={{padding:'4px',background:'#fee2e2',border:'none',borderRadius:'6px',cursor:'pointer',color:'#dc2626'}}><X size={14}/></button>}
-                    </div>
-                  ))}
-                  {postponeForm.options.length<4&&(
-                    <button onClick={()=>setPostponeForm({...postponeForm,options:[...postponeForm.options,{date:'',time:''}]})}
-                      style={{...s.btn('#6b7280'),alignSelf:'flex-start',fontSize:'12px'}}>+ Weiterer Vorschlag</button>
-                  )}
-                  <div style={{display:'flex',gap:'8px',marginTop:'8px'}}>
-                    <button onClick={sendPostponement} style={{...s.btn('#f97316'),flex:1}}>📤 Abfrage senden</button>
-                    <button onClick={()=>setPostponeForm(null)} style={{...s.btn('#6b7280'),flex:1}}>Abbrechen</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            </Modal>
-          );
-        })()}
 
         <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
           {/* ── Team-Formular (neu anlegen / bearbeiten) ── */}
@@ -6255,11 +6072,6 @@ export default function TrainingsApp() {
             const isFetching = !!teamFetching[team.id];
             const isMine = isMyTeam(team);
             const ld = team.leagueData||{};
-            const teamMds = Object.values(matchdays).filter(m=>m.teamId===team.id).sort((a,b)=>b.date.localeCompare(a.date));
-            const todayStr = new Date().toISOString().split('T')[0];
-            const upMds = teamMds.filter(m=>m.date>=todayStr);
-            const pastMds2 = teamMds.filter(m=>m.date<todayStr);
-            const isAddingMd = showMdForm && mdForm.teamId===team.id;
             const colSt=(i)=>({padding:'6px 10px',fontSize:'12px',whiteSpace:'nowrap',textAlign:i===0?'center':i<=2?'left':'right',color:i===0?'#0f766e':'#374151',fontWeight:i===0?'800':'400',borderRight:'1px solid #e5e7eb',minWidth:i===0?'32px':i<=2?'130px':'55px'});
             const hSt=(i)=>({...colSt(i),background:'#f0fdfa',fontWeight:'700',color:'#0f766e',fontSize:'11px',textTransform:'uppercase',letterSpacing:'0.3px'});
             const spSt=(i)=>({padding:'6px 10px',fontSize:'12px',whiteSpace:'nowrap',textAlign:'left',color:'#374151',borderRight:'1px solid #e5e7eb',minWidth:i===0?'160px':i<=2?'140px':'60px'});
@@ -6342,55 +6154,6 @@ export default function TrainingsApp() {
                         Noch keine Daten geladen. Klicke auf "🔄 Daten".
                       </div>
                     )}
-
-                    {/* Spieltage */}
-                    <div style={{borderTop:'1px solid rgba(255,255,255,0.1)',paddingTop:'16px'}}>
-                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px'}}>
-                        <p style={{margin:0,fontSize:'11px',fontWeight:'800',color:'rgba(255,255,255,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Spieltage</p>
-                        <button onClick={()=>{if(isAddingMd){setShowMdForm(false);setEditingMd(null);}else{setMdForm({teamId:team.id,date:'',time:'',location:'',meetingPoint:'',meetingTime:'',isHome:true,opponent:''});setEditingMd(null);setShowMdForm(true);}}}
-                          style={{...s.btn(isAddingMd?'#6b7280':'#0f766e'),padding:'6px 12px',fontSize:'12px'}}>
-                          {isAddingMd?'✕ Abbrechen':'➕ Spieltag'}
-                        </button>
-                      </div>
-
-                      {isAddingMd&&(
-                        <div style={{background:'white',borderRadius:'10px',padding:'14px',marginBottom:'12px'}}>
-                          <div style={{display:'grid',gap:'10px',gridTemplateColumns:'1fr 1fr',rowGap:'10px'}}>
-                            <div><label style={s.label}>Datum *</label><input type="date" value={mdForm.date} onChange={e=>setMdForm({...mdForm,date:e.target.value})} style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/></div>
-                            <div><label style={s.label}>Anstoß *</label><input type="time" value={mdForm.time} onChange={e=>setMdForm({...mdForm,time:e.target.value})} style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/></div>
-                            <div><label style={s.label}>Gegner</label><input value={mdForm.opponent} onChange={e=>setMdForm({...mdForm,opponent:e.target.value})} placeholder="z.B. TTV Musterhausen" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/></div>
-                            <div><label style={s.label}>Heim / Auswärts</label>
-                              <div style={{display:'flex',gap:'8px'}}>
-                                {[{v:true,l:'🏠 Heim'},{v:false,l:'🚌 Auswärts'}].map(({v,l})=>(
-                                  <button key={String(v)} type="button" onClick={()=>setMdForm({...mdForm,isHome:v})}
-                                    style={{flex:1,padding:'8px',borderRadius:'8px',border:`2px solid ${mdForm.isHome===v?'#0f766e':'#e5e7eb'}`,background:mdForm.isHome===v?'#ccfbf1':'white',color:mdForm.isHome===v?'#0f766e':'#555',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>
-                                    {l}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                            <div><label style={s.label}>Spielort</label><input value={mdForm.location} onChange={e=>setMdForm({...mdForm,location:e.target.value})} placeholder="Halle / Adresse" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/></div>
-                            <div><label style={s.label}>Treffpunkt / Abfahrt</label><input value={mdForm.meetingPoint} onChange={e=>setMdForm({...mdForm,meetingPoint:e.target.value})} placeholder="z.B. Vereinsheim" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/></div>
-                            <div><label style={s.label}>Abfahrtszeit</label><input type="time" value={mdForm.meetingTime} onChange={e=>setMdForm({...mdForm,meetingTime:e.target.value})} style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/></div>
-                            <div style={{gridColumn:'1/-1'}}>
-                              <button onClick={saveMatchday} style={{...s.btn('#0f766e'),width:'100%',justifyContent:'center'}}>
-                                {editingMd?'💾 Spieltag speichern':'➕ Spieltag hinzufügen'}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {upMds.length>0&&<>
-                        <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'700',color:'rgba(255,255,255,0.6)'}}>📅 Kommend ({upMds.length})</p>
-                        {upMds.map(md=><MatchdayCard key={md.id} md={md} upcoming={true} team={team}/>)}
-                      </>}
-                      {pastMds2.length>0&&<>
-                        <p style={{margin:'12px 0 8px',fontSize:'12px',fontWeight:'700',color:'rgba(255,255,255,0.6)'}}>📋 Vergangen ({pastMds2.length})</p>
-                        {pastMds2.map(md=><MatchdayCard key={md.id} md={md} upcoming={false} team={team}/>)}
-                      </>}
-                      {teamMds.length===0&&<div style={{padding:'12px',textAlign:'center',color:'rgba(255,255,255,0.4)',fontSize:'13px'}}>Noch keine Spieltage.</div>}
-                    </div>
                   </div>
                 )}
               </div>
