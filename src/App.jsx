@@ -1991,6 +1991,32 @@ export default function TrainingsApp() {
     const u = { ...sessions }; delete u[session.id]; saveSessions(u);
   };
 
+  const cancelSession = (session) => {
+    // Archive as cancelled — no attendance data, not counted in stats
+    const archivedAt = new Date().toISOString();
+    saveArchivedSessions({ ...archivedSessions, [session.id]: { ...session, archivedAt, cancelled: true } });
+    // Remove from active sessions
+    const u = { ...sessions }; delete u[session.id]; saveSessions(u);
+    // Remove this date from all subgroups' trainingDates (so it never counts)
+    const updatedSubgroups = { ...subgroups };
+    (session.subgroupIds||[]).forEach(sid => {
+      if (updatedSubgroups[sid]) {
+        updatedSubgroups[sid] = { ...updatedSubgroups[sid], trainingDates: (updatedSubgroups[sid].trainingDates||[]).filter(d=>d!==session.date) };
+      }
+    });
+    saveSubgroups(updatedSubgroups);
+    // Remove any attendance entries already set for this date
+    const updatedChildren = { ...children };
+    Object.keys(updatedChildren).forEach(id => {
+      const att = updatedChildren[id].attendance||{};
+      if (att[session.date] !== undefined) {
+        const newAtt = { ...att }; delete newAtt[session.date];
+        updatedChildren[id] = { ...updatedChildren[id], attendance: newAtt };
+      }
+    });
+    saveChildren(updatedChildren);
+  };
+
   const restoreSession = (session) => {
     const { archivedAt, ...rest } = session;
     saveSessions({ ...sessions, [rest.id]: rest });
@@ -4706,11 +4732,23 @@ export default function TrainingsApp() {
             <span style={{fontSize:'12px',color:'#94a3b8',fontWeight:'600',display:'flex',alignItems:'center',gap:'5px'}}><Clock size={13}/> Entschuldigt</span>
           </div>
 
+          {/* Training fällt aus */}
+          {canEdit()&&(
+            <button onClick={()=>{
+              if(window.confirm('Training als ausgefallen markieren?\n\nDas Training wird archiviert, keine Anwesenheitsdaten werden erfasst und es zählt nicht in Statistiken oder Errungenschaften.')) {
+                cancelSession(session);
+                navTo('home');
+              }
+            }} style={{width:'100%',padding:'13px',background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:'12px',cursor:'pointer',color:'#f87171',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',marginBottom:'10px'}}>
+              ✕ Training fällt aus
+            </button>
+          )}
+
           {/* Archiv-Button */}
           {canEdit()&&(()=>{
             const archivable = isSessionArchivable(session);
             return archivable ? (
-              <button onClick={()=>{if(window.confirm('Dieses Training archivieren? Es verschwindet aus der Übersicht, die Anwesenheitsdaten bleiben erhalten.')) archiveSession(session); navTo('home');}}
+              <button onClick={()=>{if(window.confirm('Dieses Training archivieren? Es verschwindet aus der Übersicht, die Anwesenheitsdaten bleiben erhalten.')) { archiveSession(session); navTo('home'); }}}
                 style={{width:'100%',padding:'13px',background:'rgba(55,65,81,0.4)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',cursor:'pointer',color:'rgba(255,255,255,0.5)',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px'}}>
                 <Archive size={16}/> Training archivieren
               </button>
@@ -6945,11 +6983,14 @@ export default function TrainingsApp() {
                 return (
                   <div key={session.id} style={{background:'white',borderRadius:'12px',boxShadow:'0 1px 4px rgba(0,0,0,0.12)'}}>
                     {/* ── Slim card (always visible) ── */}
-                    <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 14px',flexWrap:'wrap'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 14px',flexWrap:'wrap',background:session.cancelled?'#fff5f5':'white',borderRadius:'12px'}}>
                       {/* Date */}
                       <div style={{minWidth:'160px'}}>
-                        <div style={{fontWeight:'700',fontSize:'14px',color:'#1a3a2a'}}>
-                          {session.date ? new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'}) : '–'}
+                        <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+                          <span style={{fontWeight:'700',fontSize:'14px',color:session.cancelled?'#dc2626':'#1a3a2a'}}>
+                            {session.date ? new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'}) : '–'}
+                          </span>
+                          {session.cancelled&&<span style={{fontSize:'11px',fontWeight:'700',background:'#fee2e2',color:'#dc2626',padding:'2px 7px',borderRadius:'20px',border:'1px solid #fca5a5'}}>Ausgefallen</span>}
                         </div>
                         <div style={{fontSize:'12px',color:'#888'}}>{session.time||''} Uhr{session.trainer||session.trainerName ? ` · ${session.trainer||session.trainerName}` : ''}</div>
                       </div>
@@ -6960,10 +7001,13 @@ export default function TrainingsApp() {
                           return sg ? <span key={sid} style={{background:sg.color||'#ddd',color:'white',fontSize:'11px',padding:'2px 7px',borderRadius:'20px',fontWeight:'600'}}>{sg.name}</span> : null;
                         })}
                       </div>
-                      {/* Attendance % */}
+                      {/* Attendance % — ausgefallene nicht anzeigen */}
                       <div style={{textAlign:'right',minWidth:'70px'}}>
-                        <span style={{fontSize:'15px',fontWeight:'700',color:totalPct>=75?'#16a34a':totalPct>=50?'#d97706':'#dc2626'}}>{totalPct}%</span>
-                        <div style={{fontSize:'11px',color:'#888'}}>{totalPresent}/{totalKids} da</div>
+                        {session.cancelled
+                          ? <span style={{fontSize:'13px',color:'#dc2626',fontWeight:'600'}}>–</span>
+                          : <><span style={{fontSize:'15px',fontWeight:'700',color:totalPct>=75?'#16a34a':totalPct>=50?'#d97706':'#dc2626'}}>{totalPct}%</span>
+                            <div style={{fontSize:'11px',color:'#888'}}>{totalPresent}/{totalKids} da</div></>
+                        }
                       </div>
                       {/* Buttons */}
                       <div style={{display:'flex',gap:'5px',flexShrink:0}}>
