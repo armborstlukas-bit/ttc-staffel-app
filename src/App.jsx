@@ -1059,23 +1059,31 @@ export default function TrainingsApp() {
     try {
       let table = null, schedule = null;
 
-      // ── Tabelle: eigene Vercel Function als Proxy ──────────────────
+      const buildProxyUrl = (url, type) => {
+        const parsed = parseClickTTUrl(url);
+        if (!parsed) return null;
+        const seasonM = url.match(/click-tt\/[^/]+\/([^/]+)\/ligen/);
+        const leagueM = url.match(/ligen\/([^/]+)\/gruppe/);
+        const season  = seasonM?.[1] ?? '';
+        const league  = leagueM?.[1] ?? '_';
+        return `/api/league-proxy?assoc=${encodeURIComponent(parsed.assoc)}&groupId=${encodeURIComponent(parsed.groupId)}&season=${encodeURIComponent(season)}&league=${encodeURIComponent(league)}&type=${type}&filter=gesamt`;
+      };
+
+      // ── Tabelle: Vercel Function → Remix _data endpoint (volle Stats) ───
       if (tableUrl) {
-        const parsed = parseClickTTUrl(tableUrl);
-        if (!parsed) throw new Error('Tabellen-URL nicht erkannt. Bitte eine mytischtennis.de click-tt URL eintragen.');
-        const res = await fetch(`/api/league-proxy?assoc=${encodeURIComponent(parsed.assoc)}&groupId=${encodeURIComponent(parsed.groupId)}`, {
-          signal: AbortSignal.timeout(15000),
-        });
+        const proxyUrl = buildProxyUrl(tableUrl, 'tabelle');
+        if (!proxyUrl) throw new Error('Tabellen-URL nicht erkannt. Bitte eine mytischtennis.de click-tt URL eintragen.');
+        const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
         if (!res.ok) throw new Error(`Tabelle konnte nicht geladen werden (HTTP ${res.status}).`);
         const json = await res.json();
-        const data = json?.data || [];
+        // Remix _data returns { tableRows: [...] } or { data: [...] }
+        const data = json?.tableRows ?? json?.data ?? [];
         if (data.length === 0) throw new Error('Keine Tabellendaten gefunden.');
-        // Firestore doesn't support nested arrays — store rows as objects {c: [...]}
         table = {
           headers: ['#', 'Mannschaft', 'Sp', 'S', 'U', 'N', 'Sätze', 'Punkte'],
           rows: data.map(t => ({ c: [
-            String(t.table_rank ?? ''),
-            t.team_name ?? '',
+            String(t.table_rank ?? t.rank ?? ''),
+            t.team_name ?? t.name ?? '',
             String((t.meetings_won ?? 0) + (t.meetings_lost ?? 0) + (t.meetings_tie ?? 0)),
             String(t.meetings_won ?? ''),
             String(t.meetings_tie ?? ''),
@@ -1086,16 +1094,34 @@ export default function TrainingsApp() {
         };
       }
 
-      // ── Spielplan: mytischtennis ist eine JS-App, Spielplan-Daten
-      //    sind nicht über eine öffentliche API verfügbar.
-      //    Tabelle wird gespeichert, Spielplan vorerst nicht unterstützt.
-      if (scheduleUrl && !table) {
-        throw new Error('Bitte zuerst die Tabellen-URL eintragen.');
+      // ── Spielplan: Vercel Function → Remix _data endpoint ───────────────
+      if (scheduleUrl) {
+        const proxyUrl = buildProxyUrl(scheduleUrl, 'spielplan');
+        if (proxyUrl) {
+          try {
+            const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
+            if (res.ok) {
+              const json = await res.json();
+              const rows = json?.matches ?? json?.games ?? json?.schedule ?? [];
+              if (rows.length > 0) {
+                schedule = {
+                  headers: ['Datum', 'Heimmannschaft', 'Gastmannschaft', 'Ergebnis'],
+                  rows: rows.map(m => ({ c: [
+                    m.date ?? m.scheduledAt ?? '',
+                    m.homeTeam ?? m.home_team ?? '',
+                    m.guestTeam ?? m.guest_team ?? '',
+                    m.result ?? m.score ?? '',
+                  ]})),
+                };
+              }
+            }
+          } catch {}
+        }
       }
 
       saveLeagueData({ table, schedule, fetchedAt: new Date().toISOString() });
       const msg = table && !schedule
-        ? '✅ Tabelle geladen!\n(Spielplan: mytischtennis.de stellt dafür leider keine öffentliche API bereit.)'
+        ? '✅ Tabelle geladen!\n(Spielplan: konnte nicht geladen werden — wird ggf. ab September verfügbar sein.)'
         : '✅ Liga-Daten erfolgreich aktualisiert!';
       alert(msg);
     } catch (err) {
