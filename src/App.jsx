@@ -1041,7 +1041,19 @@ export default function TrainingsApp() {
   const saveArchivedSessions   = u => { setArchivedSessions(u);   setDoc(doc(db,'ttc','archivedSessions'),   u); };
   const saveArchivedTournaments= u => { setArchivedTournaments(u);setDoc(doc(db,'ttc','archivedTournaments'),u); };
   const saveNotifications      = u => { setNotifications(u);      setDoc(doc(db,'ttc','notifications'),      u); };
-  const saveTeams              = u => { setTeams(u);              setDoc(doc(db,'ttc','teams'),              u); };
+  const sanitizeTeams = (u) => {
+    const sanitizeRows = (rows) => (rows||[]).map(r => Array.isArray(r) ? {c:r} : r);
+    return Object.fromEntries(Object.entries(u).map(([id,t]) => {
+      if (!t.leagueData) return [id,t];
+      const ld = t.leagueData;
+      return [id, {...t, leagueData: {
+        ...ld,
+        table:    ld.table    ? {...ld.table,    rows: sanitizeRows(ld.table.rows)}    : ld.table,
+        schedule: ld.schedule ? {...ld.schedule, rows: sanitizeRows(ld.schedule.rows)} : ld.schedule,
+      }}];
+    }));
+  };
+  const saveTeams = u => { const s=sanitizeTeams(u); setTeams(s); setDoc(doc(db,'ttc','teams'), s).catch(e=>console.error('saveTeams failed:',e)); };
   const saveMatchdays          = u => { setMatchdays(u);          setDoc(doc(db,'ttc','matchdays'),          u); };
   const saveAppSettings                  = u => { setAppSettings(u);                  setDoc(doc(db,'ttc','appSettings'),                  u); };
   const saveLeagueData                   = u => { setLeagueData(u);                   setDoc(doc(db,'ttc','leagueData'),                   u); };
