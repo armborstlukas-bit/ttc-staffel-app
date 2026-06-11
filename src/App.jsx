@@ -678,6 +678,8 @@ export default function TrainingsApp() {
   const [resetPassword, setResetPassword]       = useState('');
   const [resetError, setResetError]             = useState('');
   const [dangerSelections, setDangerSelections]         = useState({});
+  const [expandedUser, setExpandedUser]                 = useState(null);
+  const [dangerSelected, setDangerSelected]             = useState('');
   const [showProfile, setShowProfile]           = useState(false);
   const [pwCurrent, setPwCurrent]               = useState('');
   const [pwNew, setPwNew]                       = useState('');
@@ -3110,256 +3112,223 @@ export default function TrainingsApp() {
           </Modal>
         )}
 
-        {/* Nutzerverwaltung */}
+        {/* ── Nutzerverwaltung ── */}
         <div style={s.card}>
           <h2 style={{margin:'0 0 16px',color:'#7c3aed',display:'flex',alignItems:'center',gap:'8px'}}><Users size={20}/> Nutzerverwaltung</h2>
-          {pendingCount>0&&<div style={{marginBottom:'16px',padding:'12px',background:'#fee2e2',borderRadius:'8px',border:'1px solid #fca5a5'}}><p style={{margin:0,fontWeight:'600',color:'#dc2626',fontSize:'14px'}}>⚠️ {pendingCount} Nutzer warten auf Freischaltung!</p></div>}
-          <div style={{display:'grid',gap:'10px'}}>
-            {Object.values(allUsers).sort((a,b)=>{
-              if(a.role==='pending'&&b.role!=='pending') return -1;
-              if(a.role!=='pending'&&b.role==='pending') return 1;
-              return (a.name||'').localeCompare(b.name||'');
-            }).map(u=>{
-              const rc=ROLE_CONFIG[u.role]||{};
-              const linkedChild=u.linkedChildId?children[u.linkedChildId]:null;
-              return (
-                <div key={u.uid} style={{padding:'12px 16px',background:u.role==='pending'?'#fff5f5':'#f8f9fa',borderRadius:'8px',border:u.role==='pending'?'2px solid #fca5a5':'1px solid #ddd'}}>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'8px'}}>
-                    <div style={{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-                      <div>
-                        <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',marginBottom:'2px'}}>
-                          <p style={{margin:0,fontWeight:'700',color:'#333',fontSize:'15px'}}>{u.name||u.email}</p>
-                          {u.isParent&&<span style={{fontSize:'11px',background:'#dbeafe',color:'#1d4ed8',padding:'2px 8px',borderRadius:'10px',fontWeight:'700'}}>👨‍👧 Elternteil</span>}
-                          {u.isParent===false&&u.role==='pending'&&<span style={{fontSize:'11px',background:'#fef9c3',color:'#92400e',padding:'2px 8px',borderRadius:'10px',fontWeight:'700'}}>🧒 Kein Elternteil</span>}
+
+          {/* Neue Registrierungen */}
+          {(()=>{
+            const pending = Object.values(allUsers).filter(u=>u.role==='pending');
+            if(pending.length===0) return (
+              <div style={{padding:'10px 14px',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:'10px',marginBottom:'16px'}}>
+                <p style={{margin:0,fontSize:'13px',color:'#16a34a',fontWeight:'600'}}>✅ Keine ausstehenden Registrierungen</p>
+              </div>
+            );
+            return (
+              <div style={{marginBottom:'20px'}}>
+                <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'#dc2626',textTransform:'uppercase',letterSpacing:'0.5px'}}>⏳ Neue Registrierungen ({pending.length})</p>
+                <div style={{display:'grid',gap:'8px'}}>
+                  {pending.map(u=>(
+                    <div key={u.uid} style={{padding:'14px 16px',background:'#fff5f5',borderRadius:'10px',border:'2px solid #fca5a5'}}>
+                      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'10px',flexWrap:'wrap',marginBottom:'10px'}}>
+                        <div>
+                          <p style={{margin:'0 0 2px',fontWeight:'700',color:'#333',fontSize:'15px'}}>{u.name||u.email}</p>
+                          <p style={{margin:0,fontSize:'12px',color:'#999'}}>{u.email}</p>
+                          {u.isParent&&<span style={{fontSize:'11px',background:'#dbeafe',color:'#1d4ed8',padding:'2px 8px',borderRadius:'10px',fontWeight:'700',display:'inline-block',marginTop:'4px'}}>👨‍👧 Elternteil</span>}
+                          {u.isParent===false&&<span style={{fontSize:'11px',background:'#fef9c3',color:'#92400e',padding:'2px 8px',borderRadius:'10px',fontWeight:'700',display:'inline-block',marginTop:'4px'}}>🧒 Kein Elternteil</span>}
                         </div>
-                        <p style={{margin:0,fontSize:'12px',color:'#999'}}>{u.email}</p>
-                      </div>
-                      {u.role==='pending'&&(
                         <button onClick={()=>{
-                          const selected = pendingRoleSelections[u.uid];
-                          const assigned = selected && selected.length>0 ? selected : (u.roles||[u.role]).filter(r=>r!=='pending');
-                          saveUserRoles(u.uid, assigned.length>0 ? assigned : ['eltern']);
-                          setPendingRoleSelections(prev=>{ const n={...prev}; delete n[u.uid]; return n; });
-                        }}
-                          style={{padding:'10px 20px',background:'#16a34a',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'15px',whiteSpace:'nowrap',boxShadow:'0 2px 8px rgba(22,163,74,0.4)'}}>
+                          const sel=pendingRoleSelections[u.uid];
+                          const assigned=sel&&sel.length>0?sel:(u.roles||[u.role]).filter(r=>r!=='pending');
+                          saveUserRoles(u.uid,assigned.length>0?assigned:['eltern']);
+                          setPendingRoleSelections(prev=>{const n={...prev};delete n[u.uid];return n;});
+                        }} style={{padding:'10px 20px',background:'#16a34a',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px',whiteSpace:'nowrap',boxShadow:'0 2px 8px rgba(22,163,74,0.3)'}}>
                           ✓ Freischalten
                         </button>
-                      )}
-                    </div>
-                    <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
-                      {/* Rollen als Toggle-Buttons – Mehrfachauswahl möglich */}
+                      </div>
                       <div style={{display:'flex',gap:'5px',flexWrap:'wrap',alignItems:'center'}}>
-                        <span style={{fontSize:'12px',color:'#555',fontWeight:'600',marginRight:'2px'}}>Rollen:</span>
+                        <span style={{fontSize:'12px',color:'#555',fontWeight:'600'}}>Rolle:</span>
                         {Object.entries(ROLE_CONFIG).filter(([k])=>k!=='pending').map(([key,cfg])=>{
-                          const isPending = u.role==='pending';
-                          // For pending users use local selection state; for active users use saved roles
-                          const baseRoles = isPending
-                            ? (pendingRoleSelections[u.uid] ?? (u.roles||[u.role]).filter(r=>r!=='pending'))
-                            : (u.roles && u.roles.length>0 ? u.roles : [u.role]);
-                          const active = baseRoles.includes(key);
-                          return (
-                            <button key={key} onClick={()=>{
-                              if (isPending) {
-                                // Only update local state, do NOT save to Firebase yet
-                                let next;
-                                if (active) {
-                                  next = baseRoles.filter(r=>r!==key);
-                                  if (next.length===0) next = baseRoles; // mindestens eine
-                                } else {
-                                  next = [...baseRoles, key];
-                                }
-                                setPendingRoleSelections(prev=>({...prev,[u.uid]:next}));
-                              } else {
-                                const cur = (u.roles && u.roles.length>0 ? u.roles : [u.role]).filter(r=>r!=='pending');
-                                let next;
-                                if (active) {
-                                  next = cur.filter(r=>r!==key);
-                                  if (next.length===0) return;
-                                } else {
-                                  next = [...cur, key];
-                                }
-                                if (key === 'admin' && !active) {
-                                  setAdminRoleDialog({ uid: u.uid, newRoles: next });
-                                  setAdminRolePw('');
-                                  setAdminRoleError('');
-                                } else {
-                                  saveUserRoles(u.uid, next);
-                                }
-                              }
-                            }} style={{padding:'3px 9px',borderRadius:'20px',border:`2px solid ${cfg.color}`,background:active?cfg.color:cfg.bg,color:active?'white':cfg.color,cursor:'pointer',fontWeight:'600',fontSize:'11px'}}>
-                              {key==='admin'&&!active?'🔒 ':''}{cfg.label}
-                            </button>
-                          );
+                          const base=pendingRoleSelections[u.uid]??(u.roles||[u.role]).filter(r=>r!=='pending');
+                          const active=base.includes(key);
+                          return <button key={key} onClick={()=>{
+                            const next=active?base.filter(r=>r!==key):[...base,key];
+                            setPendingRoleSelections(p=>({...p,[u.uid]:next.length>0?next:base}));
+                          }} style={{padding:'3px 9px',borderRadius:'20px',border:`2px solid ${cfg.color}`,background:active?cfg.color:cfg.bg,color:active?'white':cfg.color,cursor:'pointer',fontWeight:'600',fontSize:'11px'}}>{cfg.label}</button>;
                         })}
-                        {u.role==='pending'&&<span style={{fontSize:'11px',fontWeight:'700',color:'#dc2626',background:'#fee2e2',padding:'2px 8px',borderRadius:'20px'}}>⏳ Wartend</span>}
                       </div>
-                      {/* Kind zuordnen bei Eltern/Jugendlichen */}
-                      {(()=>{
-                        const userRoles = u.roles && u.roles.length>0 ? u.roles : [u.role];
-                        const needsChild = userRoles.some(r=>['eltern','jugendlich'].includes(r));
-                        if (!needsChild) return null;
-                        return (
-                          <select value={u.linkedChildId||''} onChange={e=>linkChildToUser(u.uid,e.target.value||null)} style={{padding:'6px 10px',border:'1px solid #ddd',borderRadius:'6px',fontSize:'13px',cursor:'pointer'}}>
-                            <option value=''>-- Kind zuordnen --</option>
-                            {allChildrenList.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-                          </select>
-                        );
-                      })()}
                     </div>
-                  </div>
-                  {linkedChild&&<p style={{margin:'6px 0 0',fontSize:'12px',color:'#358941'}}>👶 Verknüpft mit: <strong>{linkedChild.name}</strong></p>}
-                  {/* Gruppenauswahl – sobald Trainer-Rolle aktiv */}
-                  {(u.roles||[u.role]).includes('trainer')&&(
-                    <div style={{marginTop:'8px',display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
-                      <span style={{fontSize:'12px',fontWeight:'600',color:'#555'}}>Gruppen:</span>
-                      {FIXED_GROUPS.map(g=>{
-                        const assigned=(u.groupIds||[]).includes(g.id);
-                        return (
-                          <button key={g.id} onClick={()=>{
-                            const cur=u.groupIds||[];
-                            saveUserGroupIds(u.uid, assigned?cur.filter(x=>x!==g.id):[...cur,g.id]);
-                          }} style={{padding:'3px 10px',borderRadius:'20px',border:`2px solid ${g.color}`,background:assigned?g.color:'white',color:assigned?'white':g.color,cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>
-                            {g.emoji} {g.name}
-                          </button>
-                        );
-                      })}
-                      {(u.groupIds||[]).length===0&&<span style={{fontSize:'11px',color:'#dc2626',fontStyle:'italic'}}>⚠️ Keine Gruppe zugewiesen</span>}
-                    </div>
-                  )}
-                  {/* Account-Aktionen: Zurück auf Wartend + Löschen */}
-                  {u.role!=='pending'&&(
-                    <div style={{marginTop:'8px',display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                      <button onClick={()=>{
-                        if(window.confirm(`"${u.name||u.email}" zurück auf Wartend setzen?`))
-                          saveUserRoles(u.uid,['pending']);
-                      }} style={{padding:'3px 10px',background:'#fef3c7',border:'1px solid #d97706',borderRadius:'6px',cursor:'pointer',color:'#92400e',fontSize:'11px',fontWeight:'600'}}>
-                        ⏳ Auf Wartend setzen
-                      </button>
-                      <button onClick={async()=>{
-                        if(!window.confirm(`Account von "${u.name||u.email}" (${u.email}) wirklich löschen?\n\nDies entfernt den Account aus der App. Die Firebase-Auth-Anmeldung bleibt bestehen.`)) return;
-                        const updated={...allUsers}; delete updated[u.uid];
-                        await setDoc(doc(db,'ttc','users'),updated);
-                        setAllUsers(updated);
-                      }} style={{padding:'3px 10px',background:'#fee2e2',border:'1px solid #fca5a5',borderRadius:'6px',cursor:'pointer',color:'#dc2626',fontSize:'11px',fontWeight:'600'}}>
-                        🗑️ Account löschen
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            {Object.keys(allUsers).length===0&&<p style={{color:'#999',textAlign:'center',padding:'20px'}}>Noch keine Nutzer.</p>}
-          </div>
-        </div>
-
-        {/* Gefahrenzone */}
-        <div style={{...s.card,border:'2px solid #fca5a5',background:'#fff5f5'}}>
-          <h2 style={{margin:'0 0 4px',color:'#dc2626',fontSize:'18px'}}>⚠️ Gefahrenzone</h2>
-          <p style={{margin:'0 0 16px',color:'#888',fontSize:'12px'}}>Wähle die Datenbereiche aus, die du löschen möchtest.</p>
-          {(()=>{
-            const cats = [
-              {id:'attendance',  label:'Anwesenheitsdaten',          desc:'Alle Anwesenheiten aller Kinder + Trainingsdaten in Untergruppen', icon:'📋', needsPw:true},
-              {id:'sessions',    label:'Trainingseinheiten (aktiv)',  desc:'Alle geplanten und laufenden Einheiten', icon:'🏋️'},
-              {id:'tournaments', label:'Turniere (aktiv)',            desc:'Alle laufenden Turniere', icon:'🏆'},
-              {id:'practiceT',   label:'Übungswettkämpfe (aktiv)',   desc:'Alle laufenden Übungswettkämpfe', icon:'🎮'},
-              {id:'messages',    label:'Trainer-Nachrichten',         desc:'Alle manuell gesendeten Nachrichten', icon:'💬'},
-              {id:'archSessions',  label:'Archiv Training',              desc:'Alle archivierten Trainingseinheiten', icon:'📦'},
-              {id:'archTourneys',  label:'Archiv Turniere',              desc:'Alle archivierten Turniere', icon:'📦'},
-              {id:'archPT',        label:'Archiv Übungswettkämpfe',     desc:'Alle archivierten Übungswettkämpfe', icon:'📦'},
-              {id:'allAchievements',label:'Alle Errungenschaften',       desc:'Turnier-Errungenschaften aller Kinder + Ranglisten-Errungenschaften komplett zurücksetzen', icon:'🏅', needsPw:false},
-              {id:'rlAchievements', label:'Ranglisten-Errungenschaften', desc:'Nur die automatisch gezählten Ranglisten-Errungenschaften zurücksetzen', icon:'📊'},
-            ];
-            const sel = dangerSelections;
-            const allSel = cats.every(c=>sel[c.id]);
-            const anySel = cats.some(c=>sel[c.id]);
-            const toggle = id => setDangerSelections(p=>({...p,[id]:!p[id]}));
-            const selectAll = () => setDangerSelections(Object.fromEntries(cats.map(c=>[c.id,true])));
-            const selectNone = () => setDangerSelections({});
-            const handleDelete = () => {
-              const selected = cats.filter(c=>sel[c.id]);
-              if(selected.length===0) return;
-              const nonPw = selected.filter(c=>!c.needsPw);
-              const hasPw = selected.some(c=>c.needsPw);
-              const labels = selected.map(c=>c.label).join(', ');
-              if(nonPw.length>0){
-                if(!window.confirm(`Folgende Daten werden unwiderruflich gelöscht:\n\n${nonPw.map(c=>c.label).join('\n')}\n\nFortfahren?`)) return;
-                nonPw.forEach(cat=>{
-                  if(cat.id==='sessions')     saveSessions({});
-                  if(cat.id==='tournaments')  saveTournaments({});
-                  if(cat.id==='practiceT')    savePracticeTournaments({});
-                  if(cat.id==='messages'){
-                    const u={};
-                    Object.values(notifications).forEach(n=>{if(n.type!=='trainer_message')u[n.id]=n;});
-                    saveNotifications(u);
-                  }
-                  if(cat.id==='archSessions')  saveArchivedSessions({});
-                  if(cat.id==='archTourneys')  saveArchivedTournaments({});
-                  if(cat.id==='archPT')        saveArchivedPracticeTournaments({});
-                  if(cat.id==='rlAchievements') saveRanglisteAch({});
-                  if(cat.id==='allAchievements'){
-                    saveRanglisteAch({});
-                    // Reset all tournament/counter achievements on children
-                    const resetFields = ['einzel1','einzel2','einzel3','doppel1','doppel2','doppel3','team','spielerDesMonats','ttrUnlocked'];
-                    const updatedChildren = {...children};
-                    Object.keys(updatedChildren).forEach(id=>{
-                      const ach = updatedChildren[id].achievements||{};
-                      const blank = {};
-                      resetFields.forEach(f=>{ blank[f] = f==='ttrUnlocked'?[]:0; });
-                      updatedChildren[id] = {...updatedChildren[id], achievements:{...ach,...blank}};
-                    });
-                    setChildren(updatedChildren);
-                    setDoc(doc(db,'ttc','children'), updatedChildren);
-                  }
-                });
-                setDangerSelections(p=>{const n={...p};nonPw.forEach(c=>{delete n[c.id];});return n;});
-              }
-              if(hasPw){ setResetDialog(true); }
-            };
-            return (
-              <div>
-                <div style={{display:'flex',gap:'8px',marginBottom:'12px'}}>
-                  <button onClick={selectAll} style={{padding:'5px 12px',fontSize:'12px',fontWeight:'700',borderRadius:'7px',border:'1px solid #fca5a5',background:allSel?'#fca5a5':'white',color:allSel?'white':'#dc2626',cursor:'pointer'}}>
-                    Alle auswählen
-                  </button>
-                  <button onClick={selectNone} style={{padding:'5px 12px',fontSize:'12px',fontWeight:'700',borderRadius:'7px',border:'1px solid #e5e7eb',background:'white',color:'#6b7280',cursor:'pointer'}}>
-                    Keine
-                  </button>
-                </div>
-                <div style={{display:'grid',gap:'6px',marginBottom:'16px'}}>
-                  {cats.map(cat=>(
-                    <label key={cat.id} style={{display:'flex',alignItems:'flex-start',gap:'10px',padding:'10px 12px',background:sel[cat.id]?'#fee2e2':'#fafafa',border:`1px solid ${sel[cat.id]?'#fca5a5':'#e5e7eb'}`,borderRadius:'10px',cursor:'pointer',transition:'all 0.1s'}}
-                      onClick={()=>toggle(cat.id)}>
-                      <div style={{width:'18px',height:'18px',borderRadius:'4px',border:`2px solid ${sel[cat.id]?'#dc2626':'#d1d5db'}`,background:sel[cat.id]?'#dc2626':'white',flexShrink:0,marginTop:'1px',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        {sel[cat.id]&&<span style={{color:'white',fontSize:'12px',lineHeight:1,fontWeight:'900'}}>✓</span>}
-                      </div>
-                      <div style={{flex:1}}>
-                        <div style={{display:'flex',alignItems:'center',gap:'5px'}}>
-                          <span style={{fontSize:'13px'}}>{cat.icon}</span>
-                          <span style={{fontWeight:'700',fontSize:'13px',color:'#1f2937'}}>{cat.label}</span>
-                          {cat.needsPw&&<span style={{fontSize:'10px',background:'#fef3c7',color:'#92400e',padding:'1px 5px',borderRadius:'4px',fontWeight:'600'}}>Passwort</span>}
-                        </div>
-                        <p style={{margin:'2px 0 0',fontSize:'11px',color:'#9ca3af'}}>{cat.desc}</p>
-                      </div>
-                    </label>
                   ))}
                 </div>
-                <button
-                  onClick={handleDelete}
-                  disabled={!anySel}
-                  style={{width:'100%',padding:'12px',background:anySel?'#dc2626':'#e5e7eb',color:anySel?'white':'#9ca3af',border:'none',borderRadius:'10px',cursor:anySel?'pointer':'not-allowed',fontWeight:'700',fontSize:'14px',transition:'all 0.2s'}}>
-                  🗑️ {anySel ? `${cats.filter(c=>sel[c.id]).length} Bereich${cats.filter(c=>sel[c.id]).length!==1?'e':''} löschen` : 'Keine Auswahl'}
-                </button>
               </div>
             );
           })()}
+
+          {/* Bestehende Nutzer — klappbare Liste */}
+          {(()=>{
+            const active = Object.values(allUsers).filter(u=>u.role!=='pending').sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+            if(active.length===0) return null;
+            return (
+              <div>
+                <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.5px'}}>Nutzer ({active.length})</p>
+                <div style={{display:'grid',gap:'6px'}}>
+                  {active.map(u=>{
+                    const isOpen = expandedUser===u.uid;
+                    const rc=ROLE_CONFIG[u.role]||{};
+                    const userRoles=u.roles&&u.roles.length>0?u.roles:[u.role];
+                    const linkedChild=u.linkedChildId?children[u.linkedChildId]:null;
+                    const roleLabels=userRoles.filter(r=>r!=='pending').map(r=>ROLE_CONFIG[r]?.label||r).join(', ');
+                    return (
+                      <div key={u.uid} style={{borderRadius:'10px',border:'1px solid #e5e7eb',overflow:'hidden'}}>
+                        {/* Kompakte Zeile */}
+                        <button onClick={()=>setExpandedUser(isOpen?null:u.uid)}
+                          style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'#f8f9fa',border:'none',cursor:'pointer',gap:'10px',textAlign:'left'}}>
+                          <div style={{flex:1,minWidth:0}}>
+                            <span style={{fontWeight:'700',color:'#333',fontSize:'14px'}}>{u.name||u.email}</span>
+                            <span style={{marginLeft:'8px',fontSize:'12px',color:'#9ca3af'}}>{roleLabels}</span>
+                            {linkedChild&&<span style={{marginLeft:'8px',fontSize:'12px',color:'#16a34a',fontWeight:'600'}}>· {linkedChild.name}</span>}
+                          </div>
+                          <span style={{fontSize:'14px',color:'#9ca3af',transform:isOpen?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.15s',flexShrink:0}}>▾</span>
+                        </button>
+
+                        {/* Aufgeklappte Bearbeitung */}
+                        {isOpen&&(
+                          <div style={{padding:'14px 16px',borderTop:'1px solid #e5e7eb',background:'white'}}>
+                            <p style={{margin:'0 0 2px',fontWeight:'700',color:'#333'}}>{u.name||u.email}</p>
+                            <p style={{margin:'0 0 12px',fontSize:'12px',color:'#999'}}>{u.email}</p>
+
+                            {/* Rollen */}
+                            <div style={{marginBottom:'10px'}}>
+                              <span style={{fontSize:'12px',color:'#555',fontWeight:'600',display:'block',marginBottom:'6px'}}>Rollen:</span>
+                              <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
+                                {Object.entries(ROLE_CONFIG).filter(([k])=>k!=='pending').map(([key,cfg])=>{
+                                  const cur=userRoles.filter(r=>r!=='pending');
+                                  const active=cur.includes(key);
+                                  return <button key={key} onClick={()=>{
+                                    let next;
+                                    if(active){next=cur.filter(r=>r!==key);if(next.length===0)return;}
+                                    else next=[...cur,key];
+                                    if(key==='admin'&&!active){setAdminRoleDialog({uid:u.uid,newRoles:next});setAdminRolePw('');setAdminRoleError('');}
+                                    else saveUserRoles(u.uid,next);
+                                  }} style={{padding:'4px 10px',borderRadius:'20px',border:`2px solid ${cfg.color}`,background:active?cfg.color:cfg.bg,color:active?'white':cfg.color,cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>
+                                    {key==='admin'&&!active?'🔒 ':''}{cfg.label}
+                                  </button>;
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Kind zuordnen */}
+                            {userRoles.some(r=>['eltern','jugendlich'].includes(r))&&(
+                              <div style={{marginBottom:'10px'}}>
+                                <span style={{fontSize:'12px',color:'#555',fontWeight:'600',display:'block',marginBottom:'6px'}}>Kind zuordnen:</span>
+                                <select value={u.linkedChildId||''} onChange={e=>linkChildToUser(u.uid,e.target.value||null)}
+                                  style={{padding:'6px 10px',border:'1px solid #ddd',borderRadius:'6px',fontSize:'13px',cursor:'pointer',width:'100%'}}>
+                                  <option value=''>-- Kind zuordnen --</option>
+                                  {allChildrenList.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                              </div>
+                            )}
+
+                            {/* Gruppen (Trainer) */}
+                            {userRoles.includes('trainer')&&(
+                              <div style={{marginBottom:'10px'}}>
+                                <span style={{fontSize:'12px',color:'#555',fontWeight:'600',display:'block',marginBottom:'6px'}}>Gruppen:</span>
+                                <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
+                                  {FIXED_GROUPS.map(g=>{
+                                    const assigned=(u.groupIds||[]).includes(g.id);
+                                    return <button key={g.id} onClick={()=>{
+                                      const cur=u.groupIds||[];
+                                      saveUserGroupIds(u.uid,assigned?cur.filter(x=>x!==g.id):[...cur,g.id]);
+                                    }} style={{padding:'3px 10px',borderRadius:'20px',border:`2px solid ${g.color}`,background:assigned?g.color:'white',color:assigned?'white':g.color,cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>
+                                      {g.emoji} {g.name}
+                                    </button>;
+                                  })}
+                                  {(u.groupIds||[]).length===0&&<span style={{fontSize:'11px',color:'#dc2626',fontStyle:'italic'}}>⚠️ Keine Gruppe</span>}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Aktionen */}
+                            <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginTop:'4px'}}>
+                              <button onClick={()=>{if(window.confirm(`"${u.name||u.email}" zurück auf Wartend setzen?`))saveUserRoles(u.uid,['pending']);}}
+                                style={{padding:'4px 10px',background:'#fef3c7',border:'1px solid #d97706',borderRadius:'6px',cursor:'pointer',color:'#92400e',fontSize:'11px',fontWeight:'600'}}>
+                                ⏳ Auf Wartend setzen
+                              </button>
+                              <button onClick={async()=>{
+                                if(!window.confirm(`Account von "${u.name||u.email}" wirklich löschen?`))return;
+                                const updated={...allUsers};delete updated[u.uid];
+                                await setDoc(doc(db,'ttc','users'),updated);setAllUsers(updated);setExpandedUser(null);
+                              }} style={{padding:'4px 10px',background:'#fee2e2',border:'1px solid #fca5a5',borderRadius:'6px',cursor:'pointer',color:'#dc2626',fontSize:'11px',fontWeight:'600'}}>
+                                🗑️ Löschen
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+          {Object.keys(allUsers).length===0&&<p style={{color:'#999',textAlign:'center',padding:'20px'}}>Noch keine Nutzer.</p>}
         </div>
 
-        {/* ── Mannschaften & Ligen → eigene View ── */}
-        <div style={s.card}>
-          <h3 style={{margin:'0 0 8px',color:'#0f766e',display:'flex',alignItems:'center',gap:'8px'}}>⚽ Mannschaften {'&'} Ligen</h3>
-          <p style={{margin:'0 0 14px',fontSize:'13px',color:'#888'}}>Mannschaften anlegen, Spieler zuweisen und Liga-Tabellen {'&'} Spielpläne verwalten.</p>
-          <button onClick={()=>navTo('mannschaften')} style={{...s.btn('#0f766e')}}>→ Zu Mannschaften {'&'} Ligen</button>
-        </div>
+        {/* ── Datenlöschen ── */}
+        {(()=>{
+          const cats = [
+            {id:'attendance',      label:'Anwesenheitsdaten',          icon:'📋', needsPw:true},
+            {id:'sessions',        label:'Trainingseinheiten (aktiv)',  icon:'🏋️'},
+            {id:'tournaments',     label:'Turniere (aktiv)',            icon:'🏆'},
+            {id:'practiceT',       label:'Übungswettkämpfe (aktiv)',   icon:'🎮'},
+            {id:'messages',        label:'Trainer-Nachrichten',         icon:'💬'},
+            {id:'archSessions',    label:'Archiv Training',             icon:'📦'},
+            {id:'archTourneys',    label:'Archiv Turniere',             icon:'📦'},
+            {id:'archPT',          label:'Archiv Übungswettkämpfe',    icon:'📦'},
+            {id:'allAchievements', label:'Alle Errungenschaften',       icon:'🏅'},
+            {id:'rlAchievements',  label:'Ranglisten-Errungenschaften', icon:'📊'},
+          ];
+          const handleDelete = () => {
+            const cat = cats.find(c=>c.id===dangerSelected);
+            if(!cat) return;
+            if(!window.confirm(`"${cat.label}" unwiderruflich löschen?\n\nFortfahren?`)) return;
+            if(cat.needsPw){ setResetDialog(true); return; }
+            if(cat.id==='sessions')     saveSessions({});
+            if(cat.id==='tournaments')  saveTournaments({});
+            if(cat.id==='practiceT')    savePracticeTournaments({});
+            if(cat.id==='messages'){const u={};Object.values(notifications).forEach(n=>{if(n.type!=='trainer_message')u[n.id]=n;});saveNotifications(u);}
+            if(cat.id==='archSessions')  saveArchivedSessions({});
+            if(cat.id==='archTourneys')  saveArchivedTournaments({});
+            if(cat.id==='archPT')        saveArchivedPracticeTournaments({});
+            if(cat.id==='rlAchievements') saveRanglisteAch({});
+            if(cat.id==='allAchievements'){
+              saveRanglisteAch({});
+              const resetFields=['einzel1','einzel2','einzel3','doppel1','doppel2','doppel3','team','spielerDesMonats','ttrUnlocked'];
+              const updatedChildren={...children};
+              Object.keys(updatedChildren).forEach(id=>{
+                const ach=updatedChildren[id].achievements||{};const blank={};
+                resetFields.forEach(f=>{blank[f]=f==='ttrUnlocked'?[]:0;});
+                updatedChildren[id]={...updatedChildren[id],achievements:{...ach,...blank}};
+              });
+              setChildren(updatedChildren);setDoc(doc(db,'ttc','children'),updatedChildren);
+            }
+            setDangerSelected('');
+          };
+          return (
+            <div style={{...s.card,border:'1px solid #fca5a5',padding:'14px 18px',display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>
+              <span style={{fontWeight:'800',color:'#dc2626',fontSize:'14px',whiteSpace:'nowrap'}}>🗑️ Datenlöschen</span>
+              <select value={dangerSelected} onChange={e=>setDangerSelected(e.target.value)}
+                style={{flex:1,minWidth:'180px',padding:'7px 10px',border:'1px solid #fca5a5',borderRadius:'8px',fontSize:'13px',background:'white',color:dangerSelected?'#1f2937':'#9ca3af',cursor:'pointer'}}>
+                <option value=''>-- Bereich auswählen --</option>
+                {cats.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+              </select>
+              <button onClick={handleDelete} disabled={!dangerSelected}
+                style={{padding:'8px 16px',background:dangerSelected?'#dc2626':'#e5e7eb',color:dangerSelected?'white':'#9ca3af',border:'none',borderRadius:'8px',cursor:dangerSelected?'pointer':'not-allowed',fontWeight:'700',fontSize:'13px',whiteSpace:'nowrap'}}>
+                Löschen
+              </button>
+            </div>
+          );
+        })()}
 
         </div>
       </div>
