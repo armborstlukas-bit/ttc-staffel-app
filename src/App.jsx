@@ -1059,6 +1059,23 @@ export default function TrainingsApp() {
     try {
       let table = null, schedule = null;
 
+      const fmtDate = (iso) => {
+        if (!iso) return '';
+        const d = new Date(iso);
+        if (isNaN(d)) return iso;
+        return d.toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'2-digit', year:'numeric' })
+          + ', ' + d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' }) + ' Uhr';
+      };
+      const buildSchedule = (meetings) => ({
+        headers: ['Datum', 'Heim', 'Gast', 'Ergebnis'],
+        rows: meetings.map(m => ({ c: [
+          fmtDate(m.date),
+          m.team_home ?? '',
+          m.team_away ?? '',
+          m.state === 'done' ? `${m.matches_won ?? ''}:${m.matches_lost ?? ''}` : '–',
+        ]})),
+      });
+
       const buildProxyUrl = (url, type) => {
         const parsed = parseClickTTUrl(url);
         if (!parsed) return null;
@@ -1095,15 +1112,7 @@ export default function TrainingsApp() {
         // Spielplan aus demselben Response extrahieren (meetings_excerpt)
         const meetings = json?.data?.meetings_excerpt?.meetings ?? [];
         if (Array.isArray(meetings) && meetings.length > 0) {
-          schedule = {
-            headers: ['Datum', 'Heim', 'Gast', 'Ergebnis'],
-            rows: meetings.map(m => ({ c: [
-              m.date ?? '',
-              m.team_home ?? '',
-              m.team_away ?? '',
-              m.state === 'played' ? `${m.matches_won ?? ''}:${m.matches_lost ?? ''}` : (m.state ?? ''),
-            ]})),
-          };
+          schedule = buildSchedule(meetings);
         }
       }
 
@@ -1117,15 +1126,7 @@ export default function TrainingsApp() {
               const json = await res.json();
               const meetings = json?.data?.meetings_excerpt?.meetings ?? json?.data?.meetings ?? [];
               if (Array.isArray(meetings) && meetings.length > 0) {
-                schedule = {
-                  headers: ['Datum', 'Heim', 'Gast', 'Ergebnis'],
-                  rows: meetings.map(m => ({ c: [
-                    m.date ?? '',
-                    m.team_home ?? '',
-                    m.team_away ?? '',
-                    m.state === 'played' ? `${m.matches_won ?? ''}:${m.matches_lost ?? ''}` : (m.state ?? ''),
-                  ]})),
-                };
+                schedule = buildSchedule(meetings);
               }
             }
           } catch {}
