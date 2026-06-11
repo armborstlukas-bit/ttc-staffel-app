@@ -4085,21 +4085,38 @@ export default function TrainingsApp() {
                   ? new Date(leagueData.fetchedAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})
                   : '';
 
-                // Spaltenbreiten schätzen: erste Spalte (Rang/Name) breiter
-                const colStyle = (i, total) => ({
+                // Tabellen-Spalten: Rang+Punkte zentriert, Name linksbündig
+                const colStyle = (i) => ({
                   padding:'8px 10px',
                   fontSize:'12px',
                   color: i===0?'white':'rgba(255,255,255,0.7)',
                   fontWeight: i===0||i===1?'700':'400',
                   textAlign: i>1?'center':'left',
                   whiteSpace:'nowrap',
-                  overflow:'hidden',
-                  textOverflow:'ellipsis',
-                  maxWidth: i===1?'140px':'60px',
                   borderBottom:'1px solid rgba(255,255,255,0.05)',
                 });
                 const hStyle = (i) => ({
-                  ...colStyle(i,0),
+                  ...colStyle(i),
+                  color:'rgba(255,255,255,0.35)',
+                  fontWeight:'700',
+                  fontSize:'10px',
+                  textTransform:'uppercase',
+                  letterSpacing:'0.5px',
+                  background:'rgba(255,255,255,0.03)',
+                  borderBottom:'1px solid rgba(255,255,255,0.1)',
+                });
+                // Spielplan-Spalten: alles linksbündig, keine Kürzung
+                const spColStyle = (i) => ({
+                  padding:'8px 10px',
+                  fontSize:'12px',
+                  color: i===3?'#86efac':'rgba(255,255,255,0.7)',
+                  fontWeight: i===3?'700':'400',
+                  textAlign: i===3?'center':'left',
+                  whiteSpace:'nowrap',
+                  borderBottom:'1px solid rgba(255,255,255,0.05)',
+                });
+                const spHStyle = (i) => ({
+                  ...spColStyle(i),
                   color:'rgba(255,255,255,0.35)',
                   fontWeight:'700',
                   fontSize:'10px',
@@ -4119,8 +4136,8 @@ export default function TrainingsApp() {
                           <h3 style={{margin:0,color:'#93c5fd',display:'flex',alignItems:'center',gap:'8px',fontWeight:'800',fontSize:'16px'}}>📊 Liga-Tabelle</h3>
                           {fetchedStr&&<span style={{fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>Stand: {fetchedStr}</span>}
                         </div>
-                        <div style={{overflowX:'auto'}}>
-                          <table style={{width:'100%',borderCollapse:'collapse',minWidth:'320px'}}>
+                        <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+                          <table style={{borderCollapse:'collapse',minWidth:'420px'}}>
                             {leagueData.table.headers?.length>0&&(
                               <thead>
                                 <tr>{leagueData.table.headers.map((h,i)=><th key={i} style={hStyle(i)}>{h}</th>)}</tr>
@@ -4129,7 +4146,7 @@ export default function TrainingsApp() {
                             <tbody>
                               {(leagueData.table.rows||[]).map((row,ri)=>{const cells=row.c||row;return(
                                 <tr key={ri} style={{background: ri%2===0?'transparent':'rgba(255,255,255,0.02)'}}>
-                                  {cells.map((cell,ci)=><td key={ci} style={colStyle(ci,cells.length)}>{cell}</td>)}
+                                  {cells.map((cell,ci)=><td key={ci} style={colStyle(ci)}>{cell}</td>)}
                                 </tr>);}
                               )}
                             </tbody>
@@ -4144,17 +4161,17 @@ export default function TrainingsApp() {
                           <h3 style={{margin:0,color:'#93c5fd',display:'flex',alignItems:'center',gap:'8px',fontWeight:'800',fontSize:'16px'}}>📅 Spielplan</h3>
                           {fetchedStr&&<span style={{fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>Stand: {fetchedStr}</span>}
                         </div>
-                        <div style={{overflowX:'auto'}}>
-                          <table style={{width:'100%',borderCollapse:'collapse',minWidth:'320px'}}>
+                        <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+                          <table style={{borderCollapse:'collapse',minWidth:'620px'}}>
                             {leagueData.schedule.headers?.length>0&&(
                               <thead>
-                                <tr>{leagueData.schedule.headers.map((h,i)=><th key={i} style={hStyle(i)}>{h}</th>)}</tr>
+                                <tr>{leagueData.schedule.headers.map((h,i)=><th key={i} style={spHStyle(i)}>{h}</th>)}</tr>
                               </thead>
                             )}
                             <tbody>
                               {(leagueData.schedule.rows||[]).map((row,ri)=>{const cells=row.c||row;return(
                                 <tr key={ri} style={{background: ri%2===0?'transparent':'rgba(255,255,255,0.02)'}}>
-                                  {cells.map((cell,ci)=><td key={ci} style={colStyle(ci,cells.length)}>{cell}</td>)}
+                                  {cells.map((cell,ci)=><td key={ci} style={spColStyle(ci)}>{cell}</td>)}
                                 </tr>);})}
                             </tbody>
                           </table>
