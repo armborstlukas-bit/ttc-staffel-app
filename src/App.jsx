@@ -1070,9 +1070,10 @@ export default function TrainingsApp() {
         const json = await res.json();
         const data = json?.data || [];
         if (data.length === 0) throw new Error('Keine Tabellendaten gefunden.');
+        // Firestore doesn't support nested arrays — store rows as objects {c: [...]}
         table = {
           headers: ['#', 'Mannschaft', 'Sp', 'S', 'U', 'N', 'Sätze', 'Punkte'],
-          rows: data.map(t => [
+          rows: data.map(t => ({ c: [
             String(t.table_rank ?? ''),
             t.team_name ?? '',
             String((t.meetings_won ?? 0) + (t.meetings_lost ?? 0) + (t.meetings_tie ?? 0)),
@@ -1081,7 +1082,7 @@ export default function TrainingsApp() {
             String(t.meetings_lost ?? ''),
             `${t.sets_won ?? 0}:${t.sets_lost ?? 0}`,
             `${t.points_won ?? 0}:${t.points_lost ?? 0}`,
-          ]),
+          ]})),
         };
       }
 
@@ -4086,11 +4087,11 @@ export default function TrainingsApp() {
                               </thead>
                             )}
                             <tbody>
-                              {(leagueData.table.rows||[]).map((row,ri)=>(
+                              {(leagueData.table.rows||[]).map((row,ri)=>{const cells=row.c||row;return(
                                 <tr key={ri} style={{background: ri%2===0?'transparent':'rgba(255,255,255,0.02)'}}>
-                                  {row.map((cell,ci)=><td key={ci} style={colStyle(ci,row.length)}>{cell}</td>)}
-                                </tr>
-                              ))}
+                                  {cells.map((cell,ci)=><td key={ci} style={colStyle(ci,cells.length)}>{cell}</td>)}
+                                </tr>);}
+                              )}
                             </tbody>
                           </table>
                         </div>
@@ -4111,11 +4112,10 @@ export default function TrainingsApp() {
                               </thead>
                             )}
                             <tbody>
-                              {(leagueData.schedule.rows||[]).map((row,ri)=>(
+                              {(leagueData.schedule.rows||[]).map((row,ri)=>{const cells=row.c||row;return(
                                 <tr key={ri} style={{background: ri%2===0?'transparent':'rgba(255,255,255,0.02)'}}>
-                                  {row.map((cell,ci)=><td key={ci} style={colStyle(ci,row.length)}>{cell}</td>)}
-                                </tr>
-                              ))}
+                                  {cells.map((cell,ci)=><td key={ci} style={colStyle(ci,cells.length)}>{cell}</td>)}
+                                </tr>);})}
                             </tbody>
                           </table>
                         </div>
