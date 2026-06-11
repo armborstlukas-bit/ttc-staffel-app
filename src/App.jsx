@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 // Modal portal: renders children directly into document.body so position:fixed
@@ -649,6 +649,7 @@ export default function TrainingsApp() {
   const [subgroups, setSubgroups]     = useState({});
   const [children, setChildren]       = useState({});
   const [allUsers, setAllUsers]       = useState({});
+  const allUsersRef = useRef({});
   const [sessions, setSessions]       = useState({});
   const [tournaments, setTournaments] = useState({});
 
@@ -658,6 +659,7 @@ export default function TrainingsApp() {
   const [activeGroup, setActiveGroup]       = useState(null);
   const [activeSubgroup, setActiveSubgroup] = useState(null);
   const [activeChild, setActiveChild]       = useState(null);
+  const [activeChildId, setActiveChildId]   = useState(null); // for parent with multiple children
   const [activeSession, setActiveSession]   = useState(null);
 
   const [trainingDate, setTrainingDate]         = useState(new Date().toISOString().split('T')[0]);
@@ -839,7 +841,7 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','archivedPracticeTournaments'),  s => setArchivedPracticeTournaments(s.exists()?s.data():{})),
     ];
     if (userRole==='admin')
-      unsubs.push(onSnapshot(doc(db,'ttc','users'), s => setAllUsers(s.exists()?s.data():{})));
+      unsubs.push(onSnapshot(doc(db,'ttc','users'), s => { const d=s.exists()?s.data():{};allUsersRef.current=d;setAllUsers(d); }));
     return () => unsubs.forEach(u=>u());
   }, [user, userRole]);
 
@@ -1447,7 +1449,17 @@ export default function TrainingsApp() {
 
   const getSubgroupsForGroup = gid => Object.values(subgroups).filter(s=>s.groupId===gid);
   const getChildrenForSubgroup = sid => Object.values(children).filter(c=>c.subgroupId===sid).sort((a,b)=>a.name.localeCompare(b.name,'de'));
-  const getMyChild = () => userProfile?.linkedChildId ? children[userProfile.linkedChildId]||null : null;
+  const getMyLinkedChildIds = () => {
+    if (userProfile?.linkedChildIds?.length > 0) return userProfile.linkedChildIds;
+    if (userProfile?.linkedChildId) return [userProfile.linkedChildId];
+    return [];
+  };
+  const getMyChild = () => {
+    const ids = getMyLinkedChildIds();
+    if (ids.length === 0) return null;
+    const id = activeChildId && ids.includes(activeChildId) ? activeChildId : ids[0];
+    return children[id] || null;
+  };
 
   const getAttendanceStats = (childId, subgroupId) => {
     const child=children[childId], sub=subgroups[subgroupId];
@@ -2082,6 +2094,17 @@ export default function TrainingsApp() {
     await setDoc(doc(db,'ttc','users'),updated);
     await setDoc(doc(db,'users',uid),{...allUsers[uid],linkedChildId:childId||null});
     setAllUsers(updated);
+  };
+  const linkChildrenToUser = async (uid, childIds) => {
+    const cur = allUsersRef.current;
+    const profile = cur[uid]||{};
+    const primary = childIds[0]||null;
+    const updatedProfile = {...profile, linkedChildIds: childIds, linkedChildId: primary};
+    const updated = {...cur, [uid]: updatedProfile};
+    allUsersRef.current = updated;
+    setAllUsers(updated);
+    await setDoc(doc(db,'ttc','users'), updated);
+    await setDoc(doc(db,'users',uid), updatedProfile);
   };
 
   const exportSubgroupExcel = (sub) => {
@@ -3195,7 +3218,8 @@ export default function TrainingsApp() {
                     const isOpen = expandedUser===u.uid;
                     const rc=ROLE_CONFIG[u.role]||{};
                     const userRoles=u.roles&&u.roles.length>0?u.roles:[u.role];
-                    const linkedChild=u.linkedChildId?children[u.linkedChildId]:null;
+                    const linkedChildIds=(u.linkedChildIds?.length>0?u.linkedChildIds:(u.linkedChildId?[u.linkedChildId]:[]));
+                    const linkedChild=linkedChildIds.length>0?children[linkedChildIds[0]]:null;
                     const roleLabels=userRoles.filter(r=>r!=='pending').map(r=>ROLE_CONFIG[r]?.label||r).join(', ');
                     return (
                       <div key={u.uid} style={{borderRadius:'10px',border:'1px solid #e5e7eb',overflow:'hidden'}}>
@@ -3205,7 +3229,7 @@ export default function TrainingsApp() {
                           <div style={{flex:1,minWidth:0}}>
                             <span style={{fontWeight:'700',color:'#333',fontSize:'14px'}}>{u.name||u.email}</span>
                             <span style={{marginLeft:'8px',fontSize:'12px',color:'#9ca3af'}}>{roleLabels}</span>
-                            {linkedChild&&<span style={{marginLeft:'8px',fontSize:'12px',color:'#16a34a',fontWeight:'600'}}>· {linkedChild.name}</span>}
+                            {linkedChildIds.length>0&&<span style={{marginLeft:'8px',fontSize:'12px',color:'#16a34a',fontWeight:'600'}}>· {linkedChildIds.map(id=>children[id]?.name).filter(Boolean).join(', ')}</span>}
                           </div>
                           <span style={{fontSize:'14px',color:'#9ca3af',transform:isOpen?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.15s',flexShrink:0}}>▾</span>
                         </button>
@@ -3236,15 +3260,25 @@ export default function TrainingsApp() {
                               </div>
                             </div>
 
-                            {/* Kind zuordnen */}
+                            {/* Kinder zuordnen (Multi-Select) */}
                             {userRoles.some(r=>['eltern','jugendlich'].includes(r))&&(
                               <div style={{marginBottom:'10px'}}>
-                                <span style={{fontSize:'12px',color:'#555',fontWeight:'600',display:'block',marginBottom:'6px'}}>Kind zuordnen:</span>
-                                <select value={u.linkedChildId||''} onChange={e=>linkChildToUser(u.uid,e.target.value||null)}
-                                  style={{padding:'6px 10px',border:'1px solid #ddd',borderRadius:'6px',fontSize:'13px',cursor:'pointer',width:'100%'}}>
-                                  <option value=''>-- Kind zuordnen --</option>
-                                  {allChildrenList.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-                                </select>
+                                <span style={{fontSize:'12px',color:'#555',fontWeight:'600',display:'block',marginBottom:'6px'}}>Kinder zuordnen:</span>
+                                <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
+                                  {allChildrenList.map(c=>{
+                                    const latestProfile=allUsers[u.uid]||u;
+                                    const curIds=(latestProfile.linkedChildIds?.length>0?latestProfile.linkedChildIds:(latestProfile.linkedChildId?[latestProfile.linkedChildId]:[]));
+                                    const assigned=curIds.includes(c.id);
+                                    return <button key={c.id} onClick={()=>{
+                                      const fresh=allUsersRef.current[u.uid]||u;
+                                      const freshIds=(fresh.linkedChildIds?.length>0?fresh.linkedChildIds:(fresh.linkedChildId?[fresh.linkedChildId]:[]));
+                                      const next=freshIds.includes(c.id)?freshIds.filter(id=>id!==c.id):[...freshIds,c.id];
+                                      linkChildrenToUser(u.uid,next);
+                                    }} style={{padding:'4px 10px',borderRadius:'20px',border:'2px solid #16a34a',background:assigned?'#16a34a':'white',color:assigned?'white':'#16a34a',cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>
+                                      {c.name}
+                                    </button>;
+                                  })}
+                                </div>
                               </div>
                             )}
 
@@ -3700,6 +3734,7 @@ export default function TrainingsApp() {
             </div>
             <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
               {(()=>{const sel=(userProfile?.roles||[userRole]).filter(r=>r!=='pending');return sel.length>1?<button onClick={()=>setShowRolePicker(true)} style={{padding:'8px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'10px',color:'#86efac',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'👤':'👤 Rolle'}</button>:null;})()}
+              {(()=>{const ids=getMyLinkedChildIds();if(ids.length<2)return null;const cur=activeChildId&&ids.includes(activeChildId)?activeChildId:ids[0];const curName=children[cur]?.name?.split(' ')[0]||'Kind';return <button onClick={()=>{const idx=ids.indexOf(cur);setActiveChildId(ids[(idx+1)%ids.length]);}} style={{padding:'8px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'10px',color:'#86efac',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'🔄':`🔄 ${curName}`}</button>;})()}
               <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{padding:'8px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.6)',fontSize:isMobile?'16px':'12px',fontWeight:'600',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'⚙️':'⚙️ Profil'}</button>
               <button onClick={()=>signOut(auth)} style={{padding:'8px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',color:'#fca5a5',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'🚪':'Abmelden'}</button>
             </div>
