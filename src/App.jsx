@@ -2423,7 +2423,7 @@ export default function TrainingsApp() {
             {canEdit()&&<button onClick={()=>navTo('archiv')} style={s.btn('#374151')}><Archive size={16}/> Archiv</button>}
             {canEdit()&&<button onClick={()=>navTo('rangliste')} style={s.btn('#f59e0b')}>📊 Rangliste</button>}
             {canEdit()&&<button onClick={()=>navTo('achievements')} style={s.btn('#7c3aed')}>🏅 Errungenschaften</button>}
-            {canEdit()&&appSettings.mannschaftEnabled&&<button onClick={()=>navTo('mannschaft')} style={s.btn('#0f766e')}>⚽ Mannschaft</button>}
+            {canEdit()&&<button onClick={()=>navTo('mannschaften')} style={s.btn('#0f766e')}>🏓 Mannschaften</button>}
             {canEdit()&&(()=>{
               const unreadCount = getTrainerUnreadCount();
               return (
@@ -6127,7 +6127,7 @@ export default function TrainingsApp() {
           {/* ── Team-Formular (neu anlegen / bearbeiten) ── */}
           {(addingTeam || editingTeam) && (()=>{
             const isEdit = !!editingTeam;
-            const allTrainers = Object.values(allUsers||{}).filter(p=>p.role==='trainer'||p.role==='admin');
+            const allTrainers = Object.entries(allUsers||{}).map(([uid,p])=>({...p,uid})).filter(p=>p.role==='trainer'||p.role==='admin');
             const allKids = Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
             const saveTeam = () => {
               if (!teamForm.name.trim()) { alert('Name ist ein Pflichtfeld!'); return; }
