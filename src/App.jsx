@@ -1076,14 +1076,14 @@ export default function TrainingsApp() {
         const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
         if (!res.ok) throw new Error(`Tabelle konnte nicht geladen werden (HTTP ${res.status}).`);
         const json = await res.json();
-        // Remix _data returns { tableRows: [...] } or { data: [...] }
-        const data = json?.tableRows ?? json?.data ?? [];
-        if (data.length === 0) throw new Error('Keine Tabellendaten gefunden.');
+        // Remix _data: { data: { league_table: [...], meetings_excerpt: { meetings: [...] } } }
+        const leagueTable = json?.data?.league_table ?? json?.data ?? [];
+        if (!Array.isArray(leagueTable) || leagueTable.length === 0) throw new Error('Keine Tabellendaten gefunden.');
         table = {
           headers: ['#', 'Mannschaft', 'Sp', 'S', 'U', 'N', 'Sätze', 'Punkte'],
-          rows: data.map(t => ({ c: [
-            String(t.table_rank ?? t.rank ?? ''),
-            t.team_name ?? t.name ?? '',
+          rows: leagueTable.map(t => ({ c: [
+            String(t.table_rank ?? ''),
+            t.team_name ?? '',
             String((t.meetings_won ?? 0) + (t.meetings_lost ?? 0) + (t.meetings_tie ?? 0)),
             String(t.meetings_won ?? ''),
             String(t.meetings_tie ?? ''),
@@ -1092,25 +1092,38 @@ export default function TrainingsApp() {
             `${t.points_won ?? 0}:${t.points_lost ?? 0}`,
           ]})),
         };
+        // Spielplan aus demselben Response extrahieren (meetings_excerpt)
+        const meetings = json?.data?.meetings_excerpt?.meetings ?? [];
+        if (Array.isArray(meetings) && meetings.length > 0) {
+          schedule = {
+            headers: ['Datum', 'Heim', 'Gast', 'Ergebnis'],
+            rows: meetings.map(m => ({ c: [
+              m.date ?? '',
+              m.team_home ?? '',
+              m.team_away ?? '',
+              m.state === 'played' ? `${m.matches_won ?? ''}:${m.matches_lost ?? ''}` : (m.state ?? ''),
+            ]})),
+          };
+        }
       }
 
-      // ── Spielplan: Vercel Function → Remix _data endpoint ───────────────
-      if (scheduleUrl) {
+      // ── Spielplan-URL: falls anders als Tabellen-URL, separaten Request ──
+      if (scheduleUrl && !schedule) {
         const proxyUrl = buildProxyUrl(scheduleUrl, 'spielplan');
         if (proxyUrl) {
           try {
             const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
             if (res.ok) {
               const json = await res.json();
-              const rows = json?.matches ?? json?.games ?? json?.schedule ?? [];
-              if (rows.length > 0) {
+              const meetings = json?.data?.meetings_excerpt?.meetings ?? json?.data?.meetings ?? [];
+              if (Array.isArray(meetings) && meetings.length > 0) {
                 schedule = {
-                  headers: ['Datum', 'Heimmannschaft', 'Gastmannschaft', 'Ergebnis'],
-                  rows: rows.map(m => ({ c: [
-                    m.date ?? m.scheduledAt ?? '',
-                    m.homeTeam ?? m.home_team ?? '',
-                    m.guestTeam ?? m.guest_team ?? '',
-                    m.result ?? m.score ?? '',
+                  headers: ['Datum', 'Heim', 'Gast', 'Ergebnis'],
+                  rows: meetings.map(m => ({ c: [
+                    m.date ?? '',
+                    m.team_home ?? '',
+                    m.team_away ?? '',
+                    m.state === 'played' ? `${m.matches_won ?? ''}:${m.matches_lost ?? ''}` : (m.state ?? ''),
                   ]})),
                 };
               }
