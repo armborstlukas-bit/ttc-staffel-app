@@ -1043,61 +1043,99 @@ export default function TrainingsApp() {
   const saveAppSettings                  = u => { setAppSettings(u);                  setDoc(doc(db,'ttc','appSettings'),                  u); };
   const saveLeagueData                   = u => { setLeagueData(u);                   setDoc(doc(db,'ttc','leagueData'),                   u); };
 
-  // ── Liga-Daten via CORS-Proxy laden und parsen ──────────────────────────
+  // ── Liga-Daten via myTischtennis JSON-API laden ──────────────────────────
   const fetchLeagueData = async () => {
     const tableUrl    = appSettings.leagueTableUrl?.trim();
     const scheduleUrl = appSettings.leagueScheduleUrl?.trim();
     if (!tableUrl && !scheduleUrl) { alert('Bitte erst URLs in den Einstellungen eintragen.'); return; }
     setLeagueFetching(true);
 
-    const fetchViaProxy = async (url) => {
-      const proxies = [
-        u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
-        u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-        u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
-      ];
-      for (const makeProxy of proxies) {
-        try {
-          const res = await fetch(makeProxy(url), { signal: AbortSignal.timeout(10000) });
-          if (!res.ok) continue;
-          const text = await res.text();
-          // allorigins wraps in JSON {contents:...}, others return raw HTML
-          try { const j = JSON.parse(text); if (j.contents) return j.contents; } catch {}
-          if (text.trim().startsWith('<') || text.length > 500) return text;
-        } catch {}
-      }
-      throw new Error('Alle Proxies fehlgeschlagen');
-    };
-
-    const parseHtml = (html) => new DOMParser().parseFromString(html, 'text/html');
-
-    const extractTable = (doc2) => {
-      // clicktt / mytischtennis selectors
-      const tbl = doc2.querySelector(
-        'table.result-set, table.league-table, table[class*="rank"], table[class*="tabelle"], table[class*="liga"], table[class*="spiel"], table[class*="schedule"], table[class*="begegnung"], table'
-      );
-      if (!tbl) return null;
-      const headers = [...tbl.querySelectorAll('thead th, thead td')].map(c => c.textContent?.trim() || '');
-      const rows    = [...tbl.querySelectorAll('tbody tr')].map(tr =>
-        [...tr.querySelectorAll('td')].map(c => c.textContent?.trim() || '')
-      ).filter(r => r.some(c => c.length > 0));
-      if (rows.length === 0) return null;
-      return { headers, rows };
+    // Extrahiere Association + GroupId aus einer click-tt URL
+    // z.B. https://www.mytischtennis.de/click-tt/HeTTV/25--26/ligen/Hessenliga/gruppe/496424/tabelle/gesamt
+    const parseClickTTUrl = (url) => {
+      const m = url.match(/click-tt\/([^/]+)\/[^/]+\/ligen\/[^/]+\/gruppe\/(\d+)/);
+      return m ? { assoc: m[1], groupId: m[2] } : null;
     };
 
     try {
       let table = null, schedule = null;
 
+      // ── Tabelle: direkt per JSON-API (kein Proxy nötig) ──────────
       if (tableUrl) {
-        const html = await fetchViaProxy(tableUrl);
-        table = extractTable(parseHtml(html));
-        if (!table) throw new Error('Keine Tabellen-Daten auf der Seite gefunden. Möglicherweise wird die Seite per JavaScript geladen.');
+        const parsed = parseClickTTUrl(tableUrl);
+        if (!parsed) throw new Error('Tabellen-URL nicht erkannt. Bitte eine click-tt URL von mytischtennis.de eintragen.');
+        const res = await fetch(
+          `https://www.mytischtennis.de/api/league-table/${parsed.assoc}/${parsed.groupId}`,
+          { signal: AbortSignal.timeout(15000) }
+        );
+        if (!res.ok) throw new Error(`Tabelle konnte nicht geladen werden (HTTP ${res.status}).`);
+        const json = await res.json();
+        const data = json?.data || [];
+        if (data.length === 0) throw new Error('Keine Tabellendaten gefunden.');
+        table = {
+          headers: ['#', 'Mannschaft', 'Sp', 'S', 'U', 'N', 'Sätze', 'Punkte'],
+          rows: data.map(t => [
+            String(t.table_rank ?? ''),
+            t.team_name ?? '',
+            String((t.meetings_won ?? 0) + (t.meetings_lost ?? 0) + (t.meetings_tie ?? 0)),
+            String(t.meetings_won ?? ''),
+            String(t.meetings_tie ?? ''),
+            String(t.meetings_lost ?? ''),
+            `${t.sets_won ?? 0}:${t.sets_lost ?? 0}`,
+            `${t.points_won ?? 0}:${t.points_lost ?? 0}`,
+          ]),
+        };
       }
 
+      // ── Spielplan: JSON-API mit gruppenspezifischem Endpoint ─────
       if (scheduleUrl) {
-        const html = await fetchViaProxy(scheduleUrl);
-        schedule = extractTable(parseHtml(html));
-        if (!schedule) throw new Error('Keine Spielplan-Daten auf der Seite gefunden. Möglicherweise wird die Seite per JavaScript geladen.');
+        const parsed = parseClickTTUrl(scheduleUrl);
+        if (!parsed) throw new Error('Spielplan-URL nicht erkannt. Bitte eine click-tt URL von mytischtennis.de eintragen.');
+        // Saison aus URL extrahieren (z.B. "25--26")
+        const seasonM = scheduleUrl.match(/click-tt\/[^/]+\/([^/]+)\/ligen/);
+        const season  = seasonM ? seasonM[1] : '';
+        // Liga-Slug aus URL extrahieren (z.B. "Hessenliga")
+        const leagueM = scheduleUrl.match(/ligen\/([^/]+)\/gruppe/);
+        const league  = leagueM ? leagueM[1] : '_';
+        const apiUrl  = `https://www.mytischtennis.de/click-tt/${parsed.assoc}/${season}/ligen/${league}/gruppe/${parsed.groupId}/spielplan/gesamt`;
+        // Versuche direkten Fetch; CORS-Proxies als Fallback für HTML-Seite
+        let scheduleHtml = null;
+        try {
+          const r = await fetch(apiUrl, { signal: AbortSignal.timeout(15000) });
+          if (r.ok) scheduleHtml = await r.text();
+        } catch {}
+        if (!scheduleHtml) {
+          // Proxy-Fallback
+          for (const makeProxy of [
+            u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+            u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
+          ]) {
+            try {
+              const r = await fetch(makeProxy(apiUrl), { signal: AbortSignal.timeout(12000) });
+              if (!r.ok) continue;
+              const text = await r.text();
+              try { const j = JSON.parse(text); if (j.contents) { scheduleHtml = j.contents; break; } } catch {}
+              if (text.length > 200) { scheduleHtml = text; break; }
+            } catch {}
+          }
+        }
+        if (scheduleHtml) {
+          const doc2 = new DOMParser().parseFromString(scheduleHtml, 'text/html');
+          const tbl  = doc2.querySelector('table');
+          if (tbl) {
+            const headers = [...tbl.querySelectorAll('thead th, thead td')].map(c => c.textContent?.trim() || '');
+            const rows    = [...tbl.querySelectorAll('tbody tr')].map(tr =>
+              [...tr.querySelectorAll('td')].map(c => c.textContent?.trim() || '')
+            ).filter(r => r.some(c => c.length > 0));
+            if (rows.length > 0) schedule = { headers, rows };
+          }
+        }
+        if (!schedule) {
+          // Spielplan nicht ladbar — Tabelle trotzdem speichern, Warnung ausgeben
+          saveLeagueData({ table, schedule: null, fetchedAt: new Date().toISOString() });
+          alert('✅ Tabelle geladen!\n⚠️ Spielplan konnte nicht automatisch geladen werden (Seite nutzt JavaScript-Rendering). Nur die Tabelle wird angezeigt.');
+          return;
+        }
       }
 
       saveLeagueData({ table, schedule, fetchedAt: new Date().toISOString() });
