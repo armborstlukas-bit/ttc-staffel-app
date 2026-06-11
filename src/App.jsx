@@ -91,6 +91,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+
 const FIXED_GROUPS = [
   { id: 'jugend',    name: 'Jugendgruppe',    emoji: '🏓', color: '#358941' },
   { id: 'anfaenger', name: 'Anfängergruppe',  emoji: '⭐', color: '#2563eb' },
@@ -703,9 +704,13 @@ export default function TrainingsApp() {
   const [scrollToTournId, setScrollToTournId]               = useState(null);
   const [achievementPopup, setAchievementPopup]             = useState(null);
   const [notifications, setNotifications]                   = useState({});
+  const [notificationsLoaded, setNotificationsLoaded]       = useState(false);
+  const notificationsRef = React.useRef({});  // immer aktueller Wert ohne Dep-Trigger
   const [teams, setTeams]                                   = useState({});
   const [matchdays, setMatchdays]                           = useState({});
   const [appSettings, setAppSettings]                       = useState({mannschaftEnabled: true});
+  const [leagueData, setLeagueData]                         = useState({ table: null, schedule: null, fetchedAt: null });
+  const [leagueFetching, setLeagueFetching]                 = useState(false);
   const [notifComposeTarget, setNotifComposeTarget]         = useState('all'); // 'all' | subgroupId | childId
   const [notifComposeText, setNotifComposeText]             = useState('');
   const [notifComposeTitle, setNotifComposeTitle]           = useState('');
@@ -822,10 +827,11 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','tournaments'),        s => setTournaments(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','archivedSessions'),   s => setArchivedSessions(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','archivedTournaments'),s => setArchivedTournaments(s.exists()?s.data():{})),
-      onSnapshot(doc(db,'ttc','notifications'),      s => setNotifications(s.exists()?s.data():{})),
+      onSnapshot(doc(db,'ttc','notifications'),      s => { setNotifications(s.exists()?s.data():{}); setNotificationsLoaded(true); }),
       onSnapshot(doc(db,'ttc','teams'),              s => setTeams(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','matchdays'),          s => setMatchdays(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','appSettings'),        s => setAppSettings(s.exists()?{mannschaftEnabled:true,...s.data()}:{mannschaftEnabled:true})),
+      onSnapshot(doc(db,'ttc','leagueData'),         s => setLeagueData(s.exists()?s.data():{ table: null, schedule: null, fetchedAt: null })),
       onSnapshot(doc(db,'ttc','rangliste'), s => setRangliste(s.exists()&&s.data().entries ? s.data().entries : [])),
       onSnapshot(doc(db,'ttc','ranglistenspiele'), s => setRanglistenspiele(s.exists() ? { active: s.data().active||[], archived: s.data().archived||[] } : { active:[], archived:[] })),
       onSnapshot(doc(db,'ttc','ranglisteAchievements'), s => setRanglisteAch(s.exists() ? s.data() : {})),
@@ -862,12 +868,21 @@ export default function TrainingsApp() {
     saveRanglisteAch(ach);
   }, [rangliste.length > 0 && Object.keys(ranglisteAch).length === 0]);
 
+  // Ref immer aktuell halten — ohne Auto-Notification-Effect neu auszulösen
+  useEffect(() => { notificationsRef.current = notifications; }, [notifications]);
+
   // ── Auto-Notifications ──────────────────────────────────────
+  // WICHTIG: notifications ist bewusst NICHT in deps — der Effect soll nur bei
+  // Datenänderungen (Sessions/Turniere/Kinder) laufen, NICHT wenn ein Nutzer
+  // eine Nachricht löscht (sonst wird sie sofort neu erstellt).
+  // Den aktuellen Notification-Stand lesen wir über notificationsRef.
   useEffect(() => {
+    if (!notificationsLoaded) return; // warten bis Notifications aus Firestore geladen sind
     if (Object.keys(children).length === 0) return;
-    if (Object.keys(notifications).length === 0 && Object.keys(sessions).length === 0 && Object.keys(tournaments).length === 0) return;
+    const currentNotifs = notificationsRef.current;
+    if (Object.keys(currentNotifs).length === 0 && Object.keys(sessions).length === 0 && Object.keys(tournaments).length === 0) return;
     const now = new Date();
-    const updatedNotifs = { ...notifications };
+    const updatedNotifs = { ...currentNotifs };
     let changed = false;
 
     // 0. Cleanup: Veraltete auto-Erinnerungen wegräumen
@@ -907,9 +922,11 @@ export default function TrainingsApp() {
       }
     });
 
-    // Helper: create if not exists (dedup by key)
+    // Helper: create if not exists (dedup by key).
+    // Prüft bewusst OHNE !n.trashedAt — eine manuell gelöschte Auto-Nachricht
+    // soll nicht neu erstellt werden, auch wenn sie getrasht wurde.
     const maybeCreate = (childId, type, title, message, key) => {
-      const exists = Object.values(updatedNotifs).some(n => n.key === key && !n.trashedAt);
+      const exists = Object.values(updatedNotifs).some(n => n.key === key);
       if (exists) return;
       const id = 'notif_' + Date.now() + '_' + Math.random().toString(36).slice(2,6) + '_' + childId;
       updatedNotifs[id] = { id, childId, type, title, message, createdAt: now.toISOString(), trashedAt: null, key, batchId: null, trainerTrashedAt: {}, trainerDeletedBy: {} };
@@ -1001,7 +1018,8 @@ export default function TrainingsApp() {
 
     if (changed) saveNotifications(updatedNotifs);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessions, tournaments, children, archivedSessions, notifications]);
+  }, [sessions, tournaments, children, archivedSessions, notificationsLoaded]);
+  // ↑ notifications selbst NICHT in deps — nur das einmalige "loaded"-Flag
 
   // Scroll to tournament when navigating from home → Turnierwelt
   useEffect(() => {
@@ -1023,6 +1041,60 @@ export default function TrainingsApp() {
   const saveTeams              = u => { setTeams(u);              setDoc(doc(db,'ttc','teams'),              u); };
   const saveMatchdays          = u => { setMatchdays(u);          setDoc(doc(db,'ttc','matchdays'),          u); };
   const saveAppSettings                  = u => { setAppSettings(u);                  setDoc(doc(db,'ttc','appSettings'),                  u); };
+  const saveLeagueData                   = u => { setLeagueData(u);                   setDoc(doc(db,'ttc','leagueData'),                   u); };
+
+  // ── Liga-Daten via CORS-Proxy laden und parsen ──────────────────────────
+  const fetchLeagueData = async () => {
+    const tableUrl    = appSettings.leagueTableUrl?.trim();
+    const scheduleUrl = appSettings.leagueScheduleUrl?.trim();
+    if (!tableUrl && !scheduleUrl) { alert('Bitte erst URLs in den Einstellungen eintragen.'); return; }
+    setLeagueFetching(true);
+    try {
+      const proxy = (url) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+      const parseHtml = (html) => new DOMParser().parseFromString(html, 'text/html');
+
+      // ── Tabelle parsen ──────────────────────────────────────────
+      let table = null;
+      if (tableUrl) {
+        const res  = await fetch(proxy(tableUrl));
+        const data = await res.json();
+        const doc2 = parseHtml(data.contents || '');
+        // Suche nach einer HTML-Tabelle mit Liga-Daten (myTischtennis / clicktt)
+        const tbl  = doc2.querySelector('table.result-set, table.league-table, table[class*="rank"], table[class*="tabelle"], table[class*="liga"], table');
+        if (tbl) {
+          const headers = [...tbl.querySelectorAll('thead th, thead td')].map(c => c.innerText?.trim() || c.textContent?.trim());
+          const rows    = [...tbl.querySelectorAll('tbody tr')].map(tr =>
+            [...tr.querySelectorAll('td')].map(c => c.innerText?.trim() || c.textContent?.trim())
+          ).filter(r => r.length > 1);
+          table = { headers, rows };
+        }
+      }
+
+      // ── Spielplan parsen ────────────────────────────────────────
+      let schedule = null;
+      if (scheduleUrl) {
+        const res  = await fetch(proxy(scheduleUrl));
+        const data = await res.json();
+        const doc2 = parseHtml(data.contents || '');
+        const tbl  = doc2.querySelector('table.result-set, table[class*="spiel"], table[class*="schedule"], table[class*="begegnung"], table');
+        if (tbl) {
+          const headers = [...tbl.querySelectorAll('thead th, thead td')].map(c => c.innerText?.trim() || c.textContent?.trim());
+          const rows    = [...tbl.querySelectorAll('tbody tr')].map(tr =>
+            [...tr.querySelectorAll('td')].map(c => c.innerText?.trim() || c.textContent?.trim())
+          ).filter(r => r.length > 1);
+          schedule = { headers, rows };
+        }
+      }
+
+      saveLeagueData({ table, schedule, fetchedAt: new Date().toISOString() });
+      alert('✅ Liga-Daten erfolgreich aktualisiert!');
+    } catch (err) {
+      console.error('Fehler beim Laden der Liga-Daten:', err);
+      alert('❌ Fehler beim Laden der Daten. Bitte URL prüfen.');
+    } finally {
+      setLeagueFetching(false);
+    }
+  };
   const saveRangliste = (entries) => { setRangliste(entries); setDoc(doc(db,'ttc','rangliste'),{entries}); };
   const saveRanglistenspiele = (data) => { setRanglistenspiele(data); setDoc(doc(db,'ttc','ranglistenspiele'), data); };
   const saveRanglisteAch = (data) => { setRanglisteAch(data); setDoc(doc(db,'ttc','ranglisteAchievements'), data); };
@@ -1100,11 +1172,26 @@ export default function TrainingsApp() {
   const savePracticeTournaments          = u => { setPracticeTournaments(u);          setDoc(doc(db,'ttc','practiceTournaments'),          u); };
   const saveArchivedPracticeTournaments  = u => { setArchivedPracticeTournaments(u);  setDoc(doc(db,'ttc','archivedPracticeTournaments'),  u); };
 
+  // ── Trainer Unread Count (Eltern-Nachrichten + Registrierungen) ──────────
+  const getTrainerUnreadCount = () => {
+    const uid = user?.uid || '';
+    return Object.values(notifications).filter(n => {
+      if (n.type === 'parent_message') return !n.trashedAt && canAccessGroup(n.toGroupId);
+      if (n.type === 'new_registration') {
+        const tdb = typeof n.trainerDeletedBy === 'object' && n.trainerDeletedBy ? n.trainerDeletedBy : {};
+        const tta = typeof n.trainerTrashedAt === 'object' && n.trainerTrashedAt ? n.trainerTrashedAt : {};
+        return !tdb[uid] && !tta[uid];
+      }
+      return false;
+    }).length;
+  };
+
   // ── Notification Helpers ─────────────────────────────────────
   const createNotification = (childId, type, title, message, key=null) => {
     const now = new Date().toISOString();
     if (key) {
-      const exists = Object.values(notifications).some(n => n.key===key && !n.trashedAt);
+      // Auch getrastete Nachrichten zählen — einmal gelöscht = nicht neu erstellen
+      const exists = Object.values(notifications).some(n => n.key===key);
       if (exists) return;
     }
     const id = 'notif_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
@@ -1115,14 +1202,28 @@ export default function TrainingsApp() {
   // Child-side trash (only affects child's inbox)
   const trashNotification = (id) => {
     const n = notifications[id]; if (!n) return;
-    saveNotifications({ ...notifications, [id]: { ...n, trashedAt: new Date().toISOString() } });
+    // Auto-generierte Nachrichten (key vorhanden): permanentlyDismissed setzen,
+    // damit maybeCreate sie nie neu anlegt
+    const update = { ...n, trashedAt: new Date().toISOString() };
+    if (n.key) update.permanentlyDismissed = true;
+    saveNotifications({ ...notifications, [id]: update });
   };
   const restoreNotification = (id) => {
     const n = notifications[id]; if (!n) return;
-    saveNotifications({ ...notifications, [id]: { ...n, trashedAt: null } });
+    // Wiederherstellen entfernt permanentlyDismissed — Nutzer will sie zurück
+    const update = { ...n, trashedAt: null };
+    delete update.permanentlyDismissed;
+    saveNotifications({ ...notifications, [id]: update });
   };
   const deleteNotificationPermanently = (id) => {
-    const u = { ...notifications }; delete u[id]; saveNotifications(u);
+    const n = notifications[id]; if (!n) return;
+    // Auto-generierte Nachrichten (key vorhanden) nie wirklich löschen —
+    // nur als permanentlyDismissed markieren, damit sie nicht neu erstellt werden.
+    if (n.key) {
+      saveNotifications({ ...notifications, [id]: { ...n, trashedAt: new Date().toISOString(), permanentlyDismissed: true } });
+    } else {
+      const u = { ...notifications }; delete u[id]; saveNotifications(u);
+    }
   };
 
   // Trainer-side trash: per-user uid maps, does NOT touch child's trashedAt
@@ -1181,6 +1282,7 @@ export default function TrainingsApp() {
     const trashed = [];
     Object.values(notifications).forEach(n => {
       if (n.childId !== childId) return;
+      if (n.permanentlyDismissed) return; // dauerhaft ausgeblendet — nie anzeigen
       const daysSinceCreated = (now - new Date(n.createdAt)) / 86400000;
       if (n.trashedAt) {
         const daysTrashed = (now - new Date(n.trashedAt)) / 86400000;
@@ -1348,6 +1450,38 @@ export default function TrainingsApp() {
       const snap = await getDoc(doc(db,'ttc','users'));
       await setDoc(doc(db,'ttc','users'), { ...(snap.exists()?snap.data():{}), [cred.user.uid]:profile });
       setUserRole('pending'); setUserProfile(profile);
+
+      // ── Admin-Benachrichtigung im App-Nachrichten-Modul ──────────
+      try {
+        const now = new Date().toISOString();
+        const dateStr = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+        const userType = registerIsParent ? 'Elternteil' : 'Jugendlicher / Trainer';
+        const notifId = 'notif_reg_' + cred.user.uid + '_' + Date.now();
+        const regSnap = await getDoc(doc(db,'ttc','notifications'));
+        const existing = regSnap.exists() ? regSnap.data() : {};
+        await setDoc(doc(db,'ttc','notifications'), {
+          ...existing,
+          [notifId]: {
+            id: notifId,
+            type: 'new_registration',
+            childId: null,
+            toGroupId: null,
+            fromUid: cred.user.uid,
+            fromName: loginName,
+            fromEmail: loginEmail,
+            userType,
+            title: `🆕 Neuer Nutzer: ${loginName}`,
+            message: `${loginName} (${loginEmail}) hat sich am ${dateStr} Uhr als ${userType} registriert und wartet auf Freischaltung.`,
+            createdAt: now,
+            trashedAt: null,
+            trainerTrashedAt: {},
+            trainerDeletedBy: {},
+          }
+        });
+      } catch (err) {
+        console.warn('Registrierungs-Benachrichtigung konnte nicht gespeichert werden:', err);
+      }
+
     } catch(err) { setError('Fehler: '+err.message); }
   };
 
@@ -1365,8 +1499,10 @@ export default function TrainingsApp() {
       const cur = new Date(start);
       while(cur <= horizon) {
         const dateStr = localDateStr(cur);
-        const exists = Object.values(currentSessions).some(s => s.templateId === tmpl.id && s.date === dateStr);
-        if(!exists) {
+        // Check both active sessions AND archived sessions — don't re-create an archived session
+        const existsActive   = Object.values(currentSessions).some(s => s.templateId === tmpl.id && s.date === dateStr);
+        const existsArchived = Object.values(archivedSessions).some(s => s.templateId === tmpl.id && s.date === dateStr);
+        if(!existsActive && !existsArchived) {
           const id = 'session_rt_' + tmpl.id + '_' + dateStr;
           updated[id] = { id, subgroupIds: tmpl.subgroupIds, extraPlayerIds: tmpl.extraPlayerIds||[], date: dateStr, time: tmpl.time, trainer: tmpl.trainer, info: tmpl.info, templateId: tmpl.id, repeatId: null, responses: {} };
           changed = true;
@@ -2116,7 +2252,7 @@ export default function TrainingsApp() {
         {showProfile&&(
           <Modal>
           <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
-            <div style={{background:'white',borderRadius:'16px',padding:'28px',maxWidth:'400px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
+            <div style={{background:'white',borderRadius:'16px',padding:'28px',maxWidth:'400px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
               <h3 style={{margin:'0 0 4px',color:'#333',fontSize:'20px'}}>Mein Profil</h3>
               <p style={{margin:'0 0 24px',color:'#999',fontSize:'13px'}}>{user?.email} · <span style={{color:rc.color,fontWeight:'600'}}>{rc.label}</span></p>
               <h4 style={{margin:'0 0 12px',color:'#333',fontSize:'15px'}}>Passwort ändern</h4>
@@ -2172,10 +2308,7 @@ export default function TrainingsApp() {
             {canEdit()&&<button onClick={()=>navTo('achievements')} style={s.btn('#7c3aed')}>🏅 Errungenschaften</button>}
             {canEdit()&&appSettings.mannschaftEnabled&&<button onClick={()=>navTo('mannschaft')} style={s.btn('#0f766e')}>⚽ Mannschaft</button>}
             {canEdit()&&(()=>{
-              // Badge = nur eingehende Eltern-Nachrichten für zugängliche Gruppen
-              const unreadCount = Object.values(notifications).filter(n =>
-                n.type === 'parent_message' && !n.trashedAt && canAccessGroup(n.toGroupId)
-              ).length;
+              const unreadCount = getTrainerUnreadCount();
               return (
                 <button onClick={()=>navTo('notifications')} style={{...s.btn('#059669'),position:'relative'}} title="Benachrichtigungen">
                   <MessageSquare size={16}/>
@@ -3193,6 +3326,49 @@ export default function TrainingsApp() {
           </>}
         </div>
 
+        {/* ── Liga-Daten (Tabelle & Spielplan) ── */}
+        <div id="admin-league-section" style={s.card}>
+          <h3 style={{margin:'0 0 6px',color:'#0f766e',display:'flex',alignItems:'center',gap:'8px'}}>{'🏓 Liga-Tabelle & Spielplan'}</h3>
+          <p style={{margin:'0 0 16px',fontSize:'13px',color:'#888'}}>{'URLs der Liga-Tabelle und des Spielplans eintragen. Die App lädt die Daten und zeigt sie bei allen Eltern & Jugendlichen an.'}</p>
+          <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'14px'}}>
+            <div>
+              <label style={s.label}>URL: Liga-Tabelle</label>
+              <input
+                type="url" placeholder="https://www.mytischtennis.de/clicktt/..."
+                value={appSettings.leagueTableUrl||''}
+                onChange={e=>saveAppSettings({...appSettings, leagueTableUrl: e.target.value})}
+                style={{...s.input, width:'100%', boxSizing:'border-box'}}
+              />
+            </div>
+            <div>
+              <label style={s.label}>URL: Spielplan</label>
+              <input
+                type="url" placeholder="https://www.mytischtennis.de/clicktt/..."
+                value={appSettings.leagueScheduleUrl||''}
+                onChange={e=>saveAppSettings({...appSettings, leagueScheduleUrl: e.target.value})}
+                style={{...s.input, width:'100%', boxSizing:'border-box'}}
+              />
+            </div>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>
+            <button onClick={fetchLeagueData} disabled={leagueFetching}
+              style={{...s.btn('#0f766e'), opacity: leagueFetching ? 0.6 : 1}}>
+              {leagueFetching ? '⏳ Wird geladen...' : '🔄 Daten jetzt laden'}
+            </button>
+            {leagueData.fetchedAt && (
+              <span style={{fontSize:'12px',color:'#888'}}>
+                Zuletzt: {new Date(leagueData.fetchedAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})} Uhr
+              </span>
+            )}
+          </div>
+          {(leagueData.table||leagueData.schedule)&&(
+            <div style={{marginTop:'14px',padding:'10px 14px',background:'#f0fdf4',borderRadius:'8px',border:'1px solid #bbf7d0',fontSize:'13px',color:'#16a34a',fontWeight:'600'}}>
+              ✅ {[leagueData.table&&'Tabelle',leagueData.schedule&&'Spielplan'].filter(Boolean).join(' & ')} geladen
+              {' — '}{leagueData.table?.rows?.length||0} Tabellenzeilen, {leagueData.schedule?.rows?.length||0} Spielzeilen
+            </div>
+          )}
+        </div>
+
         </div>
       </div>
     );
@@ -3209,9 +3385,7 @@ export default function TrainingsApp() {
     const in3m=new Date(); in3m.setMonth(in3m.getMonth()+3);
     const in3mStr=in3m.toISOString().split('T')[0];
     const tourneys=getUpcomingTournaments().filter(t=>(t.dateFrom||t.date||'')<=in3mStr);
-    const unreadCount = Object.values(notifications).filter(n=>
-      n.type==='parent_message'&&!n.trashedAt&&canAccessGroup(n.toGroupId)
-    ).length;
+    const unreadCount = getTrainerUnreadCount();
     const hour = new Date().getHours();
     const greeting = hour<12?'Guten Morgen':hour<18?'Guten Tag':'Guten Abend';
     const dateLabel = new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
@@ -3230,7 +3404,10 @@ export default function TrainingsApp() {
       {label:'Rangliste',        icon:'📊', color:'#fcd34d', bg:'rgba(252,211,77,0.1)',   border:'rgba(252,211,77,0.25)',  action:()=>navTo('rangliste')},
       {label:'Errungenschaften', icon:'🏅', color:'#d9f99d', bg:'rgba(217,249,157,0.1)',  border:'rgba(217,249,157,0.25)', action:()=>navTo('achievements')},
       ...(appSettings.mannschaftEnabled?[{label:'Mannschaft',icon:'⚽',color:'#6ee7b7',bg:'rgba(110,231,183,0.1)',border:'rgba(110,231,183,0.25)',action:()=>navTo('mannschaft')}]:[]),
-      ...(userRole==='admin'?[{label:'Admin',icon:'🛡️',color:'#c4b5fd',bg:'rgba(196,181,253,0.1)',border:'rgba(196,181,253,0.25)',action:()=>navTo('admin')}]:[]),
+      ...(userRole==='admin'?[
+        {label:'Admin',      icon:'🛡️', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)',  border:'rgba(196,181,253,0.25)', action:()=>navTo('admin')},
+        {label:'Liga-Daten', icon:'🏓', color:'#67e8f9', bg:'rgba(103,232,249,0.1)',  border:'rgba(103,232,249,0.25)', action:()=>{ navTo('admin'); setTimeout(()=>{ const el=document.getElementById('admin-league-section'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); },200); }},
+      ]:[]),
     ];
     const groups = FIXED_GROUPS.filter(g=>canAccessGroup(g.id));
 
@@ -3848,6 +4025,93 @@ export default function TrainingsApp() {
                             </div>
                       }
                     </div>
+                  </>
+                );
+              })()}
+
+              {/* ── Liga-Tabelle & Spielplan ── */}
+              {(leagueData.table||leagueData.schedule)&&(()=>{
+                const fetchedStr = leagueData.fetchedAt
+                  ? new Date(leagueData.fetchedAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})
+                  : '';
+
+                // Spaltenbreiten schätzen: erste Spalte (Rang/Name) breiter
+                const colStyle = (i, total) => ({
+                  padding:'8px 10px',
+                  fontSize:'12px',
+                  color: i===0?'white':'rgba(255,255,255,0.7)',
+                  fontWeight: i===0||i===1?'700':'400',
+                  textAlign: i>1?'center':'left',
+                  whiteSpace:'nowrap',
+                  overflow:'hidden',
+                  textOverflow:'ellipsis',
+                  maxWidth: i===1?'140px':'60px',
+                  borderBottom:'1px solid rgba(255,255,255,0.05)',
+                });
+                const hStyle = (i) => ({
+                  ...colStyle(i,0),
+                  color:'rgba(255,255,255,0.35)',
+                  fontWeight:'700',
+                  fontSize:'10px',
+                  textTransform:'uppercase',
+                  letterSpacing:'0.5px',
+                  background:'rgba(255,255,255,0.03)',
+                  borderBottom:'1px solid rgba(255,255,255,0.1)',
+                });
+
+                return (
+                  <>
+                    <span style={SECTION_LABEL('rgba(96,165,250,0.5)')}>Liga</span>
+
+                    {leagueData.table&&(
+                      <div style={{...DARK_CARD,marginBottom:'20px',padding:0,overflow:'hidden'}}>
+                        <div style={{padding:'14px 16px 10px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'6px'}}>
+                          <h3 style={{margin:0,color:'#93c5fd',display:'flex',alignItems:'center',gap:'8px',fontWeight:'800',fontSize:'16px'}}>📊 Liga-Tabelle</h3>
+                          {fetchedStr&&<span style={{fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>Stand: {fetchedStr}</span>}
+                        </div>
+                        <div style={{overflowX:'auto'}}>
+                          <table style={{width:'100%',borderCollapse:'collapse',minWidth:'320px'}}>
+                            {leagueData.table.headers?.length>0&&(
+                              <thead>
+                                <tr>{leagueData.table.headers.map((h,i)=><th key={i} style={hStyle(i)}>{h}</th>)}</tr>
+                              </thead>
+                            )}
+                            <tbody>
+                              {(leagueData.table.rows||[]).map((row,ri)=>(
+                                <tr key={ri} style={{background: ri%2===0?'transparent':'rgba(255,255,255,0.02)'}}>
+                                  {row.map((cell,ci)=><td key={ci} style={colStyle(ci,row.length)}>{cell}</td>)}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {leagueData.schedule&&(
+                      <div style={{...DARK_CARD,marginBottom:'28px',padding:0,overflow:'hidden'}}>
+                        <div style={{padding:'14px 16px 10px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'6px'}}>
+                          <h3 style={{margin:0,color:'#93c5fd',display:'flex',alignItems:'center',gap:'8px',fontWeight:'800',fontSize:'16px'}}>📅 Spielplan</h3>
+                          {fetchedStr&&<span style={{fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>Stand: {fetchedStr}</span>}
+                        </div>
+                        <div style={{overflowX:'auto'}}>
+                          <table style={{width:'100%',borderCollapse:'collapse',minWidth:'320px'}}>
+                            {leagueData.schedule.headers?.length>0&&(
+                              <thead>
+                                <tr>{leagueData.schedule.headers.map((h,i)=><th key={i} style={hStyle(i)}>{h}</th>)}</tr>
+                              </thead>
+                            )}
+                            <tbody>
+                              {(leagueData.schedule.rows||[]).map((row,ri)=>(
+                                <tr key={ri} style={{background: ri%2===0?'transparent':'rgba(255,255,255,0.02)'}}>
+                                  {row.map((cell,ci)=><td key={ci} style={colStyle(ci,row.length)}>{cell}</td>)}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
                   </>
                 );
               })()}
@@ -4609,7 +4873,10 @@ export default function TrainingsApp() {
     const child=children[activeChild.id]||activeChild;
     const sub=subgroups[child.subgroupId];
     const grp=FIXED_GROUPS.find(g=>g.id===sub?.groupId);
-    const dates=(sub?.trainingDates||[]).sort().reverse();
+    const currentDates=(sub?.trainingDates||[]);
+    // Also show historical attendance entries from previous subgroups (dates not in current subgroup)
+    const historicalDates=Object.keys(child.attendance||{}).filter(d=>!currentDates.includes(d));
+    const dates=[...new Set([...currentDates,...historicalDates])].sort().reverse();
     const stats=getAttendanceStats(child.id,child.subgroupId);
     const allSubs=Object.values(subgroups);
 
@@ -4619,6 +4886,27 @@ export default function TrainingsApp() {
       const next=cur===status?null:status;
       const att={...(child.attendance||{}),[date]:next};
       if (next===null) delete att[date];
+      saveChildren({...children,[child.id]:{...child,attendance:att}});
+    };
+
+    const deleteTrainingDate = (date) => {
+      const isHist = !currentDates.includes(date);
+      const label = new Date(date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+      const msg = isHist
+        ? `Historischen Eintrag vom ${label} löschen?\n\nNur der Anwesenheitseintrag dieses Kindes wird entfernt (Termin gehörte zu einer früheren Gruppe).`
+        : `Trainingseinheit vom ${label} löschen?\n\nDas Datum wird aus der Gruppe entfernt und der Anwesenheitseintrag dieses Kindes wird gelöscht.`;
+      if (!window.confirm(msg)) return;
+      // Only remove from current subgroup's trainingDates if it's a current date
+      if (!isHist) {
+        const sub2 = subgroups[child.subgroupId];
+        if (sub2) {
+          const newDates = (sub2.trainingDates||[]).filter(d=>d!==date);
+          saveSubgroups({...subgroups,[child.subgroupId]:{...sub2,trainingDates:newDates}});
+        }
+      }
+      // Remove attendance entry for this date from child
+      const att={...(child.attendance||{})};
+      delete att[date];
       saveChildren({...children,[child.id]:{...child,attendance:att}});
     };
 
@@ -4777,24 +5065,28 @@ export default function TrainingsApp() {
                 const parentExcused=parentResponse?.status==='missing';
                 const parentComing=parentResponse?.status==='coming';
                 const responseBy=parentResponse?.by??'parent';
+                const isHistorical=!currentDates.includes(date);
                 const rowBg=status==='present'?'rgba(74,222,128,0.07)':status==='absent_excused'?'rgba(148,163,184,0.06)':status==='absent_unexcused'?'rgba(239,68,68,0.07)':'rgba(255,255,255,0.025)';
-                const rowBorder=status==='present'?'rgba(74,222,128,0.18)':status==='absent_excused'?'rgba(148,163,184,0.15)':status==='absent_unexcused'?'rgba(239,68,68,0.2)':'rgba(255,255,255,0.07)';
+                const rowBorder=isHistorical?'rgba(96,165,250,0.2)':status==='present'?'rgba(74,222,128,0.18)':status==='absent_excused'?'rgba(148,163,184,0.15)':status==='absent_unexcused'?'rgba(239,68,68,0.2)':'rgba(255,255,255,0.07)';
                 return (
-                  <div key={date} style={{padding:'11px 14px',background:rowBg,borderRadius:'10px',border:`1px solid ${rowBorder}`}}>
+                  <div key={date} style={{padding:'11px 14px',background:isHistorical?'rgba(96,165,250,0.04)':rowBg,borderRadius:'10px',border:`1px solid ${rowBorder}`}}>
                     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'8px'}}>
                       <div>
                         <p style={{margin:'0 0 3px',fontSize:'13px',color:'rgba(255,255,255,0.7)',fontWeight:'600'}}>
                           {new Date(date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}
                         </p>
                         <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
+                          {isHistorical&&<span style={{fontSize:'10px',fontWeight:'700',color:'#93c5fd',background:'rgba(96,165,250,0.1)',padding:'1px 7px',borderRadius:'10px',border:'1px solid rgba(96,165,250,0.2)'}}>Frühere Gruppe</span>}
                           {parentExcused&&<span style={{fontSize:'10px',fontWeight:'700',color:'#94a3b8',background:'rgba(148,163,184,0.1)',padding:'1px 7px',borderRadius:'10px',border:'1px solid rgba(148,163,184,0.2)'}}>{responseBy==='self'?'Selbst abgemeldet':'Eltern abgemeldet'}</span>}
                         </div>
                       </div>
                       {canEdit() ? (
-                        <div style={{display:'flex',gap:'5px'}}>
+                        <div style={{display:'flex',gap:'5px',alignItems:'center'}}>
                           <button onClick={()=>setChildStatus(date,'present')} style={{width:'34px',height:'34px',border:`2px solid ${status==='present'?'#16a34a':'rgba(74,222,128,0.2)'}`,background:status==='present'?'#16a34a':'rgba(74,222,128,0.06)',color:status==='present'?'white':'#4ade80',borderRadius:'8px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}><Check size={16}/></button>
                           <button onClick={()=>setChildStatus(date,'absent_unexcused')} style={{width:'34px',height:'34px',border:`2px solid ${status==='absent_unexcused'?'#ef4444':'rgba(239,68,68,0.2)'}`,background:status==='absent_unexcused'?'rgba(220,38,38,0.75)':'rgba(239,68,68,0.06)',color:status==='absent_unexcused'?'white':'#f87171',borderRadius:'8px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'18px',fontWeight:'700'}}>–</button>
                           <button onClick={()=>setChildStatus(date,'absent_excused')} style={{width:'34px',height:'34px',border:`2px solid ${status==='absent_excused'?'#64748b':'rgba(148,163,184,0.2)'}`,background:status==='absent_excused'?'rgba(71,85,105,0.8)':'rgba(148,163,184,0.05)',color:status==='absent_excused'?'white':'#94a3b8',borderRadius:'8px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}><Clock size={15}/></button>
+                          <div style={{width:'1px',height:'22px',background:'rgba(255,255,255,0.08)',margin:'0 2px'}}/>
+                          <button onClick={()=>deleteTrainingDate(date)} title="Einheit löschen" style={{width:'30px',height:'30px',border:'1px solid rgba(239,68,68,0.25)',background:'rgba(239,68,68,0.07)',color:'#f87171',borderRadius:'7px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',opacity:0.7}}><Trash2 size={13}/></button>
                         </div>
                       ) : (
                         <span style={{fontSize:'12px',fontWeight:'700',color:cfg?.color||'rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.06)',padding:'4px 11px',borderRadius:'20px'}}>
@@ -5525,6 +5817,14 @@ export default function TrainingsApp() {
     // Trainer-side: per-uid batch inbox — each trainer sees their own view
     const uid = user?.uid || '';
     const now2 = new Date();
+
+    // Registrierungs-Benachrichtigungen für Admin/Trainer
+    const regNotifs = Object.values(notifications).filter(n => {
+      if (n.type !== 'new_registration') return false;
+      const tdb = typeof n.trainerDeletedBy === 'object' && n.trainerDeletedBy ? n.trainerDeletedBy : {};
+      return !tdb[uid];
+    }).sort((a,b) => b.createdAt.localeCompare(a.createdAt));
+
     const trainerMessages = Object.values(notifications).filter(n => n.type === 'trainer_message');
 
     // Auto-promote trainer trash → deleted after 7 days (per-uid)
@@ -5636,11 +5936,47 @@ export default function TrainingsApp() {
             <h3 style={{margin:0,color:'#333',display:'flex',alignItems:'center',gap:'8px'}}><MessageSquare size={18}/> Nachrichten</h3>
             <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
               <button onClick={()=>setNotifTrainerTab('sent')} style={{padding:'4px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'600',fontSize:'12px',background:notifTrainerTab==='sent'?'#059669':'#f3f4f6',color:notifTrainerTab==='sent'?'white':'#555'}}>Gesendet {sentBatches.length>0&&`(${sentBatches.length})`}</button>
+              <button onClick={()=>setNotifTrainerTab('registrations')} style={{position:'relative',padding:'4px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'600',fontSize:'12px',background:notifTrainerTab==='registrations'?'#dc2626':'#f3f4f6',color:notifTrainerTab==='registrations'?'white':'#555'}}>
+                🆕 Registrierungen
+                {regNotifs.length>0&&<span style={{position:'absolute',top:'-5px',right:'-5px',background:'#dc2626',color:'white',borderRadius:'50%',width:'16px',height:'16px',fontSize:'10px',fontWeight:'800',display:'flex',alignItems:'center',justifyContent:'center',border:'2px solid white'}}>{regNotifs.length>9?'9+':regNotifs.length}</span>}
+              </button>
               <button onClick={()=>setNotifTrainerTab('inbox')} style={{padding:'4px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'600',fontSize:'12px',background:notifTrainerTab==='inbox'?'#7c3aed':'#f3f4f6',color:notifTrainerTab==='inbox'?'white':'#555'}}>✉️ Von Eltern {parentMessages.length>0&&`(${parentMessages.length})`}</button>
               <button onClick={()=>setNotifTrainerTab('trash')} style={{padding:'4px 12px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'600',fontSize:'12px',background:notifTrainerTab==='trash'?'#374151':'#f3f4f6',color:notifTrainerTab==='trash'?'white':'#555'}}>🗑️ Papierkorb {trashedBatches.length>0&&`(${trashedBatches.length})`}</button>
             </div>
           </div>
-          {notifTrainerTab === 'inbox'
+          {notifTrainerTab === 'registrations'
+            ? regNotifs.length === 0
+              ? <p style={{color:'#9ca3af',textAlign:'center',padding:'20px',margin:0}}>Keine neuen Registrierungen.</p>
+              : <div style={{display:'grid',gap:'10px'}}>
+                  {regNotifs.map(n => {
+                    const dateStr = new Date(n.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+                    const isTrashedReg = typeof n.trainerTrashedAt === 'object' && n.trainerTrashedAt && n.trainerTrashedAt[uid];
+                    return (
+                      <div key={n.id} style={{border:'1px solid #fecaca',borderRadius:'10px',padding:'12px 14px',background:'#fff5f5'}}>
+                        <div style={{display:'flex',alignItems:'flex-start',gap:'10px'}}>
+                          <span style={{fontSize:'22px',flexShrink:0}}>🆕</span>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',marginBottom:'4px'}}>
+                              <p style={{margin:0,fontWeight:'700',fontSize:'14px',color:'#1f2937'}}>{n.fromName}</p>
+                              <span style={{fontSize:'11px',background:'#fee2e2',color:'#dc2626',padding:'1px 7px',borderRadius:'10px',fontWeight:'700'}}>Wartet auf Freischaltung</span>
+                              <span style={{fontSize:'11px',background:'#f3f4f6',color:'#6b7280',padding:'1px 7px',borderRadius:'10px',fontWeight:'600'}}>{n.userType}</span>
+                            </div>
+                            <p style={{margin:'0 0 2px',fontSize:'13px',color:'#374151'}}>{n.fromEmail}</p>
+                            <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>{dateStr} Uhr</p>
+                          </div>
+                          <div style={{display:'flex',gap:'4px',flexShrink:0}}>
+                            <button onClick={()=>navTo('admin')} title="Zur Nutzerverwaltung" style={{padding:'5px 10px',background:'#dc2626',border:'none',borderRadius:'8px',cursor:'pointer',color:'white',fontSize:'12px',fontWeight:'700'}}>Freischalten →</button>
+                            <button onClick={()=>{
+                              const tdb = typeof n.trainerDeletedBy==='object'&&n.trainerDeletedBy?{...n.trainerDeletedBy}:{};
+                              saveNotifications({...notifications,[n.id]:{...n,trainerDeletedBy:{...tdb,[uid]:true}}});
+                            }} title="Entfernen" style={{padding:'5px',background:'rgba(0,0,0,0.06)',border:'none',borderRadius:'8px',cursor:'pointer',color:'#6b7280'}}><X size={15}/></button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+          : notifTrainerTab === 'inbox'
             ? parentMessages.length === 0
               ? <p style={{color:'#9ca3af',textAlign:'center',padding:'20px',margin:0}}>Keine Nachrichten von Eltern/Jugendlichen.</p>
               : parentMessages.map(msg => {
