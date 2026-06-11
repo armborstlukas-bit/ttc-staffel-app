@@ -5934,10 +5934,8 @@ export default function TrainingsApp() {
 
   // ── MANNSCHAFTEN & LIGEN VIEW (Trainer/Admin) ───────────────────────────
   if (view === 'mannschaften' && canEdit()) {
-    const myTeams = userRole==='admin'
-      ? Object.values(teams)
-      : Object.values(teams).filter(t=>(t.trainerUids||[]).includes(user?.uid));
-    myTeams.sort((a,b)=>a.name.localeCompare(b.name,'de'));
+    const myTeams = Object.values(teams).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+    const isMyTeam = (t) => (t.trainerUids||[]).includes(user?.uid);
     const activeTeam = mannTeamFilter
       ? teams[mannTeamFilter]
       : (myTeams[0] || null);
@@ -6214,6 +6212,7 @@ export default function TrainingsApp() {
           {myTeams.map(team=>{
             const isOpen = !!teamExpanded[team.id];
             const isFetching = !!teamFetching[team.id];
+            const isMine = isMyTeam(team);
             const ld = team.leagueData||{};
             const teamMds = Object.values(matchdays).filter(m=>m.teamId===team.id).sort((a,b)=>b.date.localeCompare(a.date));
             const todayStr = new Date().toISOString().split('T')[0];
@@ -6226,12 +6225,15 @@ export default function TrainingsApp() {
             const spH=(i)=>({...spSt(i),background:'#f0fdfa',fontWeight:'700',color:'#0f766e',fontSize:'11px',textTransform:'uppercase',letterSpacing:'0.3px'});
             const fetchedStr = ld.fetchedAt ? new Date(ld.fetchedAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+new Date(ld.fetchedAt).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) : '';
             return (
-              <div key={team.id} style={{background:'rgba(255,255,255,0.07)',borderRadius:'14px',marginBottom:'12px',overflow:'hidden',border:'1px solid rgba(255,255,255,0.15)'}}>
+              <div key={team.id} style={{background: isMine?'rgba(110,231,183,0.12)':'rgba(255,255,255,0.07)',borderRadius:'14px',marginBottom:'12px',overflow:'hidden',border:`1px solid ${isMine?'rgba(110,231,183,0.45)':'rgba(255,255,255,0.15)'}`}}>
                 {/* Collapsed header */}
                 <div style={{padding:'14px 16px',display:'flex',alignItems:'center',gap:'10px',cursor:'pointer'}} onClick={()=>setTeamExpanded(e=>({...e,[team.id]:!e[team.id]}))}>
                   <span style={{fontSize:'20px'}}>{isOpen?'🔽':'▶️'}</span>
                   <div style={{flex:1,minWidth:0}}>
-                    <p style={{margin:0,fontWeight:'800',fontSize:'15px',color:'white'}}>{team.name}</p>
+                    <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                      <p style={{margin:0,fontWeight:'800',fontSize:'15px',color:'white'}}>{team.name}</p>
+                      {isMine&&<span style={{fontSize:'11px',fontWeight:'700',background:'rgba(110,231,183,0.25)',color:'#6ee7b7',padding:'2px 8px',borderRadius:'20px',border:'1px solid rgba(110,231,183,0.4)'}}>Meine Mannschaft</span>}
+                    </div>
                     <p style={{margin:'2px 0 0',fontSize:'12px',color:'rgba(255,255,255,0.6)'}}>{team.liga||'Keine Liga'} · {(team.childIds||[]).length} Spieler</p>
                   </div>
                   <div style={{display:'flex',gap:'6px',flexShrink:0}} onClick={e=>e.stopPropagation()}>
