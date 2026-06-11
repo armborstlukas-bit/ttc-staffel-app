@@ -3380,7 +3380,7 @@ export default function TrainingsApp() {
       {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
       {label:'Rangliste',        icon:'📊', color:'#fcd34d', bg:'rgba(252,211,77,0.1)',   border:'rgba(252,211,77,0.25)',  action:()=>navTo('rangliste')},
       {label:'Errungenschaften', icon:'🏅', color:'#d9f99d', bg:'rgba(217,249,157,0.1)',  border:'rgba(217,249,157,0.25)', action:()=>navTo('achievements')},
-      {label:'Mannschaften', icon:'⚽', color:'#6ee7b7', bg:'rgba(110,231,183,0.1)', border:'rgba(110,231,183,0.25)', action:()=>navTo('mannschaften')},
+      {label:'Mannschaften', icon:'🏓', color:'#6ee7b7', bg:'rgba(110,231,183,0.1)', border:'rgba(110,231,183,0.25)', action:()=>navTo('mannschaften')},
       ...(userRole==='admin'?[{label:'Admin', icon:'🛡️', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('admin')}]:[]),
     ];
     const groups = FIXED_GROUPS.filter(g=>canAccessGroup(g.id));
@@ -6127,7 +6127,7 @@ export default function TrainingsApp() {
           {/* ── Team-Formular (neu anlegen / bearbeiten) ── */}
           {(addingTeam || editingTeam) && (()=>{
             const isEdit = !!editingTeam;
-            const allTrainers = Object.values(userProfiles||{}).filter(p=>p.role==='trainer'||p.role==='admin');
+            const allTrainers = Object.values(allUsers||{}).filter(p=>p.role==='trainer'||p.role==='admin');
             const allKids = Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
             const saveTeam = () => {
               if (!teamForm.name.trim()) { alert('Name ist ein Pflichtfeld!'); return; }
