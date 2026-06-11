@@ -1043,7 +1043,7 @@ export default function TrainingsApp() {
   const saveAppSettings                  = u => { setAppSettings(u);                  setDoc(doc(db,'ttc','appSettings'),                  u); };
   const saveLeagueData                   = u => { setLeagueData(u);                   setDoc(doc(db,'ttc','leagueData'),                   u); };
 
-  // ── Liga-Daten via myTischtennis JSON-API (über CORS-Proxy) laden ────────
+  // ── Liga-Daten via eigene Vercel Serverless Function laden ──────────────
   const fetchLeagueData = async () => {
     const tableUrl    = appSettings.leagueTableUrl?.trim();
     const scheduleUrl = appSettings.leagueScheduleUrl?.trim();
@@ -1056,34 +1056,18 @@ export default function TrainingsApp() {
       return m ? { assoc: m[1], groupId: m[2] } : null;
     };
 
-    // JSON-API über Proxy abrufen (umgeht CORS)
-    const fetchJsonApi = async (apiUrl) => {
-      const proxies = [
-        u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-        u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
-        u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
-      ];
-      for (const makeProxy of proxies) {
-        try {
-          const r = await fetch(makeProxy(apiUrl), { signal: AbortSignal.timeout(12000) });
-          if (!r.ok) continue;
-          const text = await r.text();
-          // allorigins wraps result in {contents: "..."}
-          try { const j = JSON.parse(text); if (j.contents) return JSON.parse(j.contents); if (j.data) return j; } catch {}
-          try { return JSON.parse(text); } catch {}
-        } catch {}
-      }
-      throw new Error('Daten konnten nicht geladen werden (alle Proxies fehlgeschlagen).');
-    };
-
     try {
       let table = null, schedule = null;
 
-      // ── Tabelle: JSON-API ──────────────────────────────────────────
+      // ── Tabelle: eigene Vercel Function als Proxy ──────────────────
       if (tableUrl) {
         const parsed = parseClickTTUrl(tableUrl);
-        if (!parsed) throw new Error('Tabellen-URL nicht erkannt. Bitte eine click-tt URL von mytischtennis.de eintragen.');
-        const json = await fetchJsonApi(`https://www.mytischtennis.de/api/league-table/${parsed.assoc}/${parsed.groupId}`);
+        if (!parsed) throw new Error('Tabellen-URL nicht erkannt. Bitte eine mytischtennis.de click-tt URL eintragen.');
+        const res = await fetch(`/api/league-proxy?assoc=${encodeURIComponent(parsed.assoc)}&groupId=${encodeURIComponent(parsed.groupId)}`, {
+          signal: AbortSignal.timeout(15000),
+        });
+        if (!res.ok) throw new Error(`Tabelle konnte nicht geladen werden (HTTP ${res.status}).`);
+        const json = await res.json();
         const data = json?.data || [];
         if (data.length === 0) throw new Error('Keine Tabellendaten gefunden.');
         table = {
@@ -1101,52 +1085,18 @@ export default function TrainingsApp() {
         };
       }
 
-      // ── Spielplan: kein JSON-API vorhanden → Proxy + HTML-Parser ──
-      if (scheduleUrl) {
-        const parsed = parseClickTTUrl(scheduleUrl);
-        if (!parsed) throw new Error('Spielplan-URL nicht erkannt. Bitte eine click-tt URL von mytischtennis.de eintragen.');
-        const seasonM = scheduleUrl.match(/click-tt\/[^/]+\/([^/]+)\/ligen/);
-        const season  = seasonM ? seasonM[1] : '';
-        const leagueM = scheduleUrl.match(/ligen\/([^/]+)\/gruppe/);
-        const league  = leagueM ? leagueM[1] : '_';
-        const htmlUrl = `https://www.mytischtennis.de/click-tt/${parsed.assoc}/${season}/ligen/${league}/gruppe/${parsed.groupId}/spielplan/gesamt`;
-
-        let scheduleHtml = null;
-        const proxies = [
-          u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-          u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
-          u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
-        ];
-        for (const makeProxy of proxies) {
-          try {
-            const r = await fetch(makeProxy(htmlUrl), { signal: AbortSignal.timeout(12000) });
-            if (!r.ok) continue;
-            const text = await r.text();
-            try { const j = JSON.parse(text); if (j.contents && j.contents.includes('<table')) { scheduleHtml = j.contents; break; } } catch {}
-            if (text.includes('<table')) { scheduleHtml = text; break; }
-          } catch {}
-        }
-        if (scheduleHtml) {
-          const doc2 = new DOMParser().parseFromString(scheduleHtml, 'text/html');
-          const tbl  = doc2.querySelector('table');
-          if (tbl) {
-            const headers = [...tbl.querySelectorAll('thead th, thead td')].map(c => c.textContent?.trim() || '');
-            const rows    = [...tbl.querySelectorAll('tbody tr')].map(tr =>
-              [...tr.querySelectorAll('td')].map(c => c.textContent?.trim() || '')
-            ).filter(r => r.some(c => c.length > 0));
-            if (rows.length > 0) schedule = { headers, rows };
-          }
-        }
-        if (!schedule) {
-          // Spielplan nicht ladbar — Tabelle trotzdem speichern, Warnung ausgeben
-          saveLeagueData({ table, schedule: null, fetchedAt: new Date().toISOString() });
-          alert('✅ Tabelle geladen!\n⚠️ Spielplan konnte nicht automatisch geladen werden (Seite nutzt JavaScript-Rendering). Nur die Tabelle wird angezeigt.');
-          return;
-        }
+      // ── Spielplan: mytischtennis ist eine JS-App, Spielplan-Daten
+      //    sind nicht über eine öffentliche API verfügbar.
+      //    Tabelle wird gespeichert, Spielplan vorerst nicht unterstützt.
+      if (scheduleUrl && !table) {
+        throw new Error('Bitte zuerst die Tabellen-URL eintragen.');
       }
 
       saveLeagueData({ table, schedule, fetchedAt: new Date().toISOString() });
-      alert('✅ Liga-Daten erfolgreich aktualisiert!');
+      const msg = table && !schedule
+        ? '✅ Tabelle geladen!\n(Spielplan: mytischtennis.de stellt dafür leider keine öffentliche API bereit.)'
+        : '✅ Liga-Daten erfolgreich aktualisiert!';
+      alert(msg);
     } catch (err) {
       console.error('Fehler beim Laden der Liga-Daten:', err);
       alert('❌ ' + (err.message || 'Fehler beim Laden der Daten.'));
