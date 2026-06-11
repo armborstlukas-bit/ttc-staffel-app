@@ -717,6 +717,7 @@ export default function TrainingsApp() {
   const [notifTab, setNotifTab]                             = useState('inbox'); // 'inbox' | 'trash'
   const [notifTrainerTab, setNotifTrainerTab]               = useState('sent'); // 'sent' | 'trash' | 'inbox'
   const [showTrainingHistory, setShowTrainingHistory]       = useState(false);
+  const [showMyTeam, setShowMyTeam]                         = useState(false);
   const [showAchievements, setShowAchievements]             = useState(false);
   const [stayLoggedIn, setStayLoggedIn]                     = useState(false);
   const [registerIsParent, setRegisterIsParent]             = useState(false);
@@ -1475,8 +1476,10 @@ export default function TrainingsApp() {
   // Sessions für einen bestimmten Spieler (Gruppe + extraPlayerIds)
   const getUpcomingSessionsForChild = (childId, subgroupId) => {
     const today = new Date().toISOString().split('T')[0];
+    const in6 = new Date(); in6.setDate(in6.getDate()+6);
+    const in6Str = in6.toISOString().split('T')[0];
     return Object.values(sessions)
-      .filter(s => s.date >= today && (
+      .filter(s => s.date >= today && s.date <= in6Str && (
         (s.subgroupIds||[]).includes(subgroupId) ||
         (s.extraPlayerIds||[]).includes(childId)
       ))
@@ -3841,11 +3844,11 @@ export default function TrainingsApp() {
               {/* ── Kommende Trainings ── */}
               <span style={SECTION_LABEL()}>Kommende Trainings</span>
               <div style={{...DARK_CARD,marginBottom:'28px',border:'1px solid rgba(74,222,128,0.18)'}}>
-                <h3 style={{margin:'0 0 16px',color:'#4ade80',display:'flex',alignItems:'center',gap:'8px',fontWeight:'800',fontSize:'16px'}}><Calendar size={18}/> Kommende 10 Trainings</h3>
+                <h3 style={{margin:'0 0 16px',color:'#4ade80',display:'flex',alignItems:'center',gap:'8px',fontWeight:'800',fontSize:'16px'}}><Calendar size={18}/> Trainings diese Woche</h3>
                 {mySessions.length===0
-                  ? <p style={{color:'rgba(255,255,255,0.2)',fontSize:'13px',margin:0,textAlign:'center',padding:'20px 0'}}>Kein Training geplant.</p>
+                  ? <p style={{color:'rgba(255,255,255,0.2)',fontSize:'13px',margin:0,textAlign:'center',padding:'20px 0'}}>Kein Training in den nächsten 7 Tagen.</p>
                   : <div style={{display:'grid',gap:'10px'}}>
-                    {mySessions.slice(0,10).map(session=>{
+                    {mySessions.map(session=>{
                       const childId=myChild.id;
                       const myResponseRaw=(session.responses||{})[childId];
                       const myResponse=typeof myResponseRaw==='object'?myResponseRaw?.status:myResponseRaw;
@@ -3941,46 +3944,66 @@ export default function TrainingsApp() {
                 return (
                   <>
                     <span style={SECTION_LABEL('rgba(20,184,166,0.5)')}>Mannschaft</span>
-                    <div style={{...DARK_CARD_TEAL,marginBottom:'20px'}}>
-                      <h3 style={{margin:'0 0 12px',color:'#2dd4bf',display:'flex',alignItems:'center',gap:'8px',fontWeight:'800',fontSize:'16px'}}>⚽ {myTeam.name}{myTeam.liga&&<span style={{fontSize:'13px',fontWeight:'500',color:'rgba(255,255,255,0.35)'}}>· {myTeam.liga}</span>}</h3>
-                      {/* Aufstellung */}
-                      {(myTeam.childIds||[]).length>0&&(
-                        <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'0'}}>
-                          {(myTeam.childIds||[]).map(id=>{
-                            const c2=children[id]; const sub2=c2&&subgroups[c2.subgroupId];
-                            return c2?<span key={id} style={{fontSize:'12px',background:'rgba(45,212,191,0.15)',border:'1px solid rgba(45,212,191,0.3)',color:'#2dd4bf',borderRadius:'20px',padding:'3px 10px',fontWeight:'600'}}>{c2.name}{sub2?` · ${sub2.name}`:''}</span>:null;
-                          })}
+                    <div style={{...DARK_CARD_TEAL,marginBottom:'28px',padding:0,overflow:'hidden'}}>
+                      {/* Kachel-Header — immer sichtbar */}
+                      <button onClick={()=>setShowMyTeam(v=>!v)}
+                        style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',background:'none',border:'none',cursor:'pointer',padding:'16px',gap:'12px'}}>
+                        <div style={{textAlign:'left',minWidth:0}}>
+                          <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(45,212,191,0.6)',textTransform:'uppercase',letterSpacing:'1.5px',display:'block',marginBottom:'4px'}}>Meine Mannschaft</span>
+                          <div style={{display:'flex',alignItems:'baseline',gap:'8px',flexWrap:'wrap'}}>
+                            <span style={{fontWeight:'800',color:'white',fontSize:'16px'}}>🏓 {myTeam.name}</span>
+                            {myTeam.liga&&<span style={{fontSize:'13px',color:'rgba(45,212,191,0.7)',fontWeight:'600'}}>{myTeam.liga}</span>}
+                          </div>
+                        </div>
+                        <span style={{fontSize:'20px',color:'rgba(45,212,191,0.6)',transform:showMyTeam?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s',flexShrink:0}}>▾</span>
+                      </button>
+
+                      {/* Ausgeklappter Inhalt */}
+                      {showMyTeam&&(
+                        <div style={{borderTop:'1px solid rgba(45,212,191,0.2)',padding:'16px'}}>
+                          {/* Mannschaftskollegen */}
+                          {(myTeam.childIds||[]).length>0&&(
+                            <div style={{marginBottom:'16px'}}>
+                              <p style={{margin:'0 0 8px',fontSize:'11px',fontWeight:'800',color:'rgba(45,212,191,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Mannschaftskollegen</p>
+                              <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+                                {(myTeam.childIds||[]).map(id=>{
+                                  const c2=children[id];
+                                  return c2?<span key={id} style={{fontSize:'12px',background:'rgba(45,212,191,0.15)',border:'1px solid rgba(45,212,191,0.3)',color:'#2dd4bf',borderRadius:'20px',padding:'3px 10px',fontWeight:'600'}}>{c2.name}</span>:null;
+                                })}
+                              </div>
+                            </div>
+                          )}
+                          {/* Liga-Tabelle */}
+                          {ld.table&&(
+                            <div style={{marginBottom:'12px'}}>
+                              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'6px',flexWrap:'wrap',gap:'4px'}}>
+                                <p style={{margin:0,fontSize:'11px',fontWeight:'800',color:'rgba(45,212,191,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Tabelle</p>
+                                {fetchedStr&&<span style={{fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>Stand: {fetchedStr}</span>}
+                              </div>
+                              <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',borderRadius:'8px',background:'rgba(0,0,0,0.2)'}}>
+                                <table style={{borderCollapse:'collapse',minWidth:'420px'}}>
+                                  {ld.table.headers?.length>0&&<thead><tr>{ld.table.headers.map((h,i)=><th key={i} style={hSt(i)}>{h}</th>)}</tr></thead>}
+                                  <tbody>{(ld.table.rows||[]).map((row,ri)=>{const cells=row.c||row;return<tr key={ri} style={{background:ri%2===0?'transparent':'rgba(255,255,255,0.02)'}}>{cells.map((cell,ci)=><td key={ci} style={colSt(ci)}>{cell}</td>)}</tr>;})}</tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
+                          {/* Spielplan */}
+                          {ld.schedule&&(
+                            <div>
+                              <p style={{margin:'0 0 6px',fontSize:'11px',fontWeight:'800',color:'rgba(45,212,191,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Spielplan</p>
+                              <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',borderRadius:'8px',background:'rgba(0,0,0,0.2)'}}>
+                                <table style={{borderCollapse:'collapse',minWidth:'520px'}}>
+                                  {ld.schedule.headers?.length>0&&<thead><tr>{ld.schedule.headers.map((h,i)=><th key={i} style={spH(i)}>{h}</th>)}</tr></thead>}
+                                  <tbody>{(ld.schedule.rows||[]).map((row,ri)=>{const cells=row.c||row;return<tr key={ri} style={{background:ri%2===0?'transparent':'rgba(255,255,255,0.02)'}}>{cells.map((cell,ci)=><td key={ci} style={spSt(ci)}>{cell}</td>)}</tr>;})}</tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
+                          {!ld.table&&!ld.schedule&&<p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.3)',textAlign:'center',padding:'8px 0'}}>Noch keine Liga-Daten geladen.</p>}
                         </div>
                       )}
                     </div>
-                    {ld.table&&(
-                      <div style={{...DARK_CARD,marginTop:'16px',padding:0,overflow:'hidden'}}>
-                        <div style={{padding:'12px 16px 8px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'6px'}}>
-                          <h3 style={{margin:0,color:'#93c5fd',fontWeight:'800',fontSize:'15px'}}>📊 Liga-Tabelle</h3>
-                          {fetchedStr&&<span style={{fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>Stand: {fetchedStr}</span>}
-                        </div>
-                        <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
-                          <table style={{borderCollapse:'collapse',minWidth:'420px'}}>
-                            {ld.table.headers?.length>0&&<thead><tr>{ld.table.headers.map((h,i)=><th key={i} style={hSt(i)}>{h}</th>)}</tr></thead>}
-                            <tbody>{(ld.table.rows||[]).map((row,ri)=>{const cells=row.c||row;return<tr key={ri} style={{background:ri%2===0?'transparent':'rgba(255,255,255,0.02)'}}>{cells.map((cell,ci)=><td key={ci} style={colSt(ci)}>{cell}</td>)}</tr>;})}</tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-                    {ld.schedule&&(
-                      <div style={{...DARK_CARD,marginTop:'12px',marginBottom:'8px',padding:0,overflow:'hidden'}}>
-                        <div style={{padding:'12px 16px 8px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'6px'}}>
-                          <h3 style={{margin:0,color:'#93c5fd',fontWeight:'800',fontSize:'15px'}}>📅 Spielplan</h3>
-                          {fetchedStr&&<span style={{fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>Stand: {fetchedStr}</span>}
-                        </div>
-                        <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
-                          <table style={{borderCollapse:'collapse',minWidth:'620px'}}>
-                            {ld.schedule.headers?.length>0&&<thead><tr>{ld.schedule.headers.map((h,i)=><th key={i} style={spH(i)}>{h}</th>)}</tr></thead>}
-                            <tbody>{(ld.schedule.rows||[]).map((row,ri)=>{const cells=row.c||row;return<tr key={ri} style={{background:ri%2===0?'transparent':'rgba(255,255,255,0.02)'}}>{cells.map((cell,ci)=><td key={ci} style={spSt(ci)}>{cell}</td>)}</tr>;})}</tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
                   </>
                 );
               })()}
@@ -4167,7 +4190,10 @@ export default function TrainingsApp() {
         })()}
               {/* ── Rangliste Tile (nur Jugend) ── */}
               {grp?.id === 'jugend' && rangliste.length > 0 && (
-                <RanglisteTile rangliste={rangliste} myChildId={myChild.id} children={children} subgroups={subgroups} />
+                <>
+                  <span style={SECTION_LABEL('rgba(251,191,36,0.5)')}>Rangliste</span>
+                  <RanglisteTile rangliste={rangliste} myChildId={myChild.id} children={children} subgroups={subgroups} />
+                </>
               )}
               {/* ── Errungenschaften (nur Jugend) ── */}
               {grp?.id === 'jugend' && (()=>{
