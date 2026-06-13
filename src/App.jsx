@@ -1452,17 +1452,9 @@ export default function TrainingsApp() {
   // Navigation helper – increments viewKey so CSS enter-animation fires
   const fetchTtcNews = () => {
     setTtcNewsLoading(true);
-    const bust = Date.now();
-    fetch('https://api.rss2json.com/v1/api.json?rss_url='+encodeURIComponent('https://ttc-staffel.de/index.php?format=feed&type=rss&_='+bust))
+    fetch('/api/news?_='+Date.now())
       .then(r=>r.json()).then(d=>{
-        if(d.status!=='ok')return;
-        const items=(d.items||[]).slice(0,3).map(it=>({
-          title:it.title||'',
-          link:it.link||it.guid||'',
-          date:it.pubDate||'',
-          desc:(it.description||'').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim().slice(0,220),
-        }));
-        setTtcNews(items);
+        setTtcNews(Array.isArray(d.items)?d.items:[]);
       }).catch(()=>{}).finally(()=>setTtcNewsLoading(false));
   };
   const navTo = (v) => { setView(v); setViewKey(k => k + 1); setGegnerAdding(false); setGegnerEditId(null); setGegnerForm({date:'',verein:'',gegner:'',taktik:''}); };
