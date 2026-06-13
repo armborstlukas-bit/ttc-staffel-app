@@ -2356,7 +2356,7 @@ export default function TrainingsApp() {
   );
 
   // ── Rollenwahl-Modal (Mehrfachrollen) ───────────────────────
-  if (showRolePicker) {
+  if (showRolePicker && userRole !== 'aktiver') {
     const selectableRoles = (userProfile?.roles || [userRole]).filter(r => r !== 'pending');
     const roleAccents = {
       admin:      {icon:'🛡️', accent:'rgba(196,181,253,0.9)', accentBg:'rgba(196,181,253,0.1)', accentBorder:'rgba(196,181,253,0.3)', desc:'Vollzugriff auf alle Bereiche'},
@@ -3709,6 +3709,34 @@ export default function TrainingsApp() {
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#0c1a2e 0%,#0e2a3a 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+
+        {/* Rollenwechsel-Modal */}
+        {showRolePicker&&(
+          <Modal>
+          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.8)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
+            <div style={{background:'#071520',border:`1px solid ${accentBorder}`,borderRadius:'20px',padding:'28px',maxWidth:'400px',width:'100%'}}>
+              <p style={{margin:'0 0 20px',color:'rgba(255,255,255,0.4)',fontSize:'14px',textAlign:'center',fontWeight:'500'}}>Mit welcher Rolle möchtest du fortfahren?</p>
+              <div style={{display:'grid',gap:'10px'}}>
+                {(userProfile?.roles||[userRole]).filter(r=>r!=='pending').map(role=>{
+                  const ra={admin:{icon:'🛡️',accent:'rgba(196,181,253,0.9)',accentBg:'rgba(196,181,253,0.1)',accentBorder:'rgba(196,181,253,0.3)',desc:'Vollzugriff auf alle Bereiche'},trainer:{icon:'🏓',accent:'rgba(134,239,172,0.9)',accentBg:'rgba(134,239,172,0.1)',accentBorder:'rgba(134,239,172,0.3)',desc:'Trainingsplanung, Gruppen & Turniere'},eltern:{icon:'👨‍👩‍👧',accent:'rgba(253,230,138,0.9)',accentBg:'rgba(253,230,138,0.08)',accentBorder:'rgba(253,230,138,0.25)',desc:'Übersicht & An-/Abmeldung für dein Kind'},jugendlich:{icon:'🧒',accent:'rgba(110,231,183,0.9)',accentBg:'rgba(110,231,183,0.08)',accentBorder:'rgba(110,231,183,0.25)',desc:'Eigene Übersicht, Turniere & Errungenschaften'},aktiver:{icon:'🏓',accent:'rgba(103,232,249,0.9)',accentBg:'rgba(8,145,178,0.08)',accentBorder:'rgba(8,145,178,0.3)',desc:'Aktiven-Portal & Gegnerlogbuch'}}[role]||{icon:'👤',accent:'rgba(255,255,255,0.7)',accentBg:'rgba(255,255,255,0.05)',accentBorder:'rgba(255,255,255,0.15)',desc:''};
+                  return (
+                    <button key={role} onClick={()=>{setUserRole(role);setShowRolePicker(false);navTo('home');}}
+                      style={{padding:'16px 18px',background:ra.accentBg,border:`1px solid ${ra.accentBorder}`,borderRadius:'14px',cursor:'pointer',display:'flex',alignItems:'center',gap:'14px',textAlign:'left',width:'100%'}}>
+                      <div style={{width:'44px',height:'44px',borderRadius:'12px',background:'rgba(0,0,0,0.2)',border:`1px solid ${ra.accentBorder}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'22px',flexShrink:0}}>{ra.icon}</div>
+                      <div style={{flex:1}}>
+                        <p style={{margin:'0 0 2px',fontWeight:'800',fontSize:'15px',color:ra.accent}}>{ROLE_CONFIG[role]?.label||role}</p>
+                        <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>{ra.desc}</p>
+                      </div>
+                      <span style={{color:ra.accentBorder,fontSize:'18px'}}>›</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <button onClick={()=>setShowRolePicker(false)} style={{marginTop:'14px',width:'100%',padding:'10px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
+            </div>
+          </div>
+          </Modal>
+        )}
 
         {/* Profil-Modal */}
         {showProfile&&(
