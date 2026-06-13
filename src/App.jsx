@@ -746,6 +746,10 @@ export default function TrainingsApp() {
   const [gegnerSearchPlayer, setGegnerSearchPlayer] = useState('');
   const [gegnerSearchVerein, setGegnerSearchVerein] = useState('');
   const [gegnerExpandedId, setGegnerExpandedId] = useState(null);
+  const [trainingsmatches, setTrainingsmatches] = useState([]);
+  const [tmSort, setTmSort] = useState('winrate');
+  const [tmAdding, setTmAdding] = useState(false);
+  const [tmForm, setTmForm] = useState({opponent:'',opponentCustom:'',useCustom:false,result:'3:0',vorgabe:false,vorgabePlayer:'',vorgabePoints:1,date:''});
   const [activePracticeId, setActivePracticeId]                     = useState(null);
   const [ptCreating, setPtCreating]                                 = useState(false);
   const [ptCreateStep, setPtCreateStep]                             = useState(1);
@@ -852,6 +856,7 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','practiceTournaments'),          s => setPracticeTournaments(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','archivedPracticeTournaments'),  s => setArchivedPracticeTournaments(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','gegnerLogbuch'), s => setGegnerLogbuch(s.exists()&&Array.isArray(s.data().entries)?s.data().entries:[])),
+      onSnapshot(doc(db,'ttc','trainingsmatches'), s => setTrainingsmatches(s.exists()&&Array.isArray(s.data().matches)?s.data().matches:[])),
     ];
     // Fetch TTC News via rss2json
     setTtcNewsLoading(true);
@@ -866,7 +871,7 @@ export default function TrainingsApp() {
         }));
         setTtcNews(items);
       }).catch(()=>{}).finally(()=>setTtcNewsLoading(false));
-    if (userRole==='admin')
+    if (['admin','aktiver'].includes(userRole))
       unsubs.push(onSnapshot(doc(db,'ttc','users'), s => { const d=s.exists()?s.data():{};allUsersRef.current=d;setAllUsers(d); }));
     return () => unsubs.forEach(u=>u());
   }, [user, userRole]);
@@ -3449,7 +3454,8 @@ export default function TrainingsApp() {
       ...(userRole==='admin'?[
         {label:'Admin',         icon:'🛡️', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('admin')},
         {label:'Gegnerlogbuch', icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.1)',   border:'rgba(8,145,178,0.25)',   action:()=>navTo('gegnerlogbuch')},
-        {label:'TTC News',      icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.1)',  border:'rgba(74,222,128,0.25)',  action:()=>navTo('ttcnews')},
+        {label:'TTC News',        icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.1)',  border:'rgba(74,222,128,0.25)',  action:()=>navTo('ttcnews')},
+        {label:'Trainingsmatches', icon:'⚔️', color:'#f9a8d4', bg:'rgba(244,114,182,0.1)', border:'rgba(244,114,182,0.25)', action:()=>navTo('trainingsmatches')},
         {label:'MyTischtennis', icon:'🏓', color:'#fcd34d', bg:'rgba(251,191,36,0.1)',  border:'rgba(251,191,36,0.25)',  action:()=>(()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);})()},
       ]:[]),
     ];
@@ -3691,7 +3697,7 @@ export default function TrainingsApp() {
 
 
   // ── AKTIVER DASHBOARD ────────────────────────────────────────────────────
-  if (userRole === 'aktiver' && !['gegnerlogbuch','ttcnews'].includes(view)) {
+  if (userRole === 'aktiver' && !['gegnerlogbuch','ttcnews','trainingsmatches'].includes(view)) {
     const dateLabel = new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
     const greeting = new Date().getHours()<12?'Guten Morgen':new Date().getHours()<18?'Hallo':'Guten Abend';
 
@@ -3809,7 +3815,8 @@ export default function TrainingsApp() {
           <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'12px',marginBottom:'0'}}>
             {[
               {label:'Gegnerlogbuch', icon:'🎯', desc:`${gegnerLogbuch.length} ${gegnerLogbuch.length===1?'Eintrag':'Einträge'} · Taktiken & Hinweise`, color:'#67e8f9', bg:'rgba(8,145,178,0.08)', border:'rgba(8,145,178,0.2)', action:()=>navTo('gegnerlogbuch')},
-              {label:'TTC News',      icon:'📰', desc:'Aktuelle Vereinsnachrichten',                                                                     color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',  action:()=>navTo('ttcnews')},
+              {label:'TTC News',        icon:'📰', desc:'Aktuelle Vereinsnachrichten',             color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',  action:()=>navTo('ttcnews')},
+              {label:'Trainingsmatches',icon:'⚔️', desc:'Duelle & Allzeittabelle',                  color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>navTo('trainingsmatches')},
               {label:'MyTischtennis', icon:'🏓', desc:'Vereinsübersicht auf MyTischtennis',                                                                  color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)',  action:()=>(()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);})()},
             ].map(t=>(
               <button key={t.label} onClick={t.action}
@@ -7836,6 +7843,227 @@ export default function TrainingsApp() {
                     {item.desc&&<p style={{margin:'0 0 12px',fontSize:'13px',color:'rgba(255,255,255,0.55)',lineHeight:'1.6'}}>{item.desc}{item.desc.length>=200?'…':''}</p>}
                     <span style={{fontSize:'12px',color:accentColor,fontWeight:'700'}}>Weiterlesen →</span>
                   </a>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── TRAININGSMATCHES VIEW ─────────────────────────────────────────────────
+  if (view === 'trainingsmatches') {
+    const isAdmin = userRole === 'admin';
+    const ac = '#f472b6';
+    const acBorder = 'rgba(244,114,182,0.2)';
+    const acBg = 'rgba(244,114,182,0.07)';
+    const me = userProfile?.name || user?.email || '';
+
+    // Player list: all aktiver + admin users, excluding self
+    const registeredPlayers = Object.values(allUsers)
+      .filter(u => (u.roles||[u.role]).some(r=>['aktiver','admin'].includes(r)) && (u.name||u.email) !== me)
+      .map(u => u.name || u.email)
+      .filter(Boolean)
+      .sort((a,b)=>a.localeCompare(b,'de'));
+
+    const saveMatches = matches => { setTrainingsmatches(matches); setDoc(doc(db,'ttc','trainingsmatches'),{matches}); };
+
+    const submitMatch = () => {
+      const opponent = tmForm.useCustom ? tmForm.opponentCustom.trim() : tmForm.opponent;
+      if (!opponent || !tmForm.result) return;
+      const [s1,s2] = tmForm.result.split(':').map(Number);
+      const entry = {
+        id:'tm_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+        date: tmForm.date || TODAY,
+        player1: me,
+        player2: opponent,
+        score1: s1,
+        score2: s2,
+        vorgabe: tmForm.vorgabe && tmForm.vorgabePlayer ? {player: tmForm.vorgabePlayer, points: tmForm.vorgabePoints} : null,
+        createdBy: me,
+        createdAt: new Date().toISOString(),
+      };
+      saveMatches([entry, ...trainingsmatches]);
+      setTmAdding(false);
+      setTmForm({opponent:'',opponentCustom:'',useCustom:false,result:'3:0',vorgabe:false,vorgabePlayer:'',vorgabePoints:1,date:''});
+    };
+
+    // Build allzeit table
+    const stats = {};
+    trainingsmatches.forEach(m => {
+      [m.player1, m.player2].forEach((p,i) => {
+        if (!stats[p]) stats[p] = {name:p, matches:0, wins:0, losses:0};
+        stats[p].matches++;
+        const won = i===0 ? m.score1>m.score2 : m.score2>m.score1;
+        if (won) stats[p].wins++; else stats[p].losses++;
+      });
+    });
+    const tableData = Object.values(stats).map(s=>({...s, winrate:s.matches>0?s.wins/s.matches:0}))
+      .sort((a,b) => tmSort==='matches' ? b.matches-a.matches : tmSort==='wins' ? b.wins-a.wins : b.winrate-a.winrate);
+
+    const resultOptions = ['3:0','3:1','3:2','2:3','1:3','0:3'];
+    const vorgabeTarget = tmForm.useCustom ? (tmForm.opponentCustom.trim()||'Gegner') : (tmForm.opponent||'Gegner');
+
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#1a0a1e 0%,#0d0a1f 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
+          <button onClick={()=>navTo('home')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'9px',color:'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:'600'}}><Home size={15}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>⚔️ Trainingsmatches</h1>
+          {!tmAdding&&<button onClick={()=>setTmAdding(true)}
+            style={{padding:'8px 14px',background:`linear-gradient(135deg,${ac},#db2777)`,border:'none',borderRadius:'10px',color:'white',fontWeight:'700',fontSize:'13px',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px'}}>
+            <Plus size={14}/> Neues Match
+          </button>}
+        </div>
+
+        <div style={{padding:'20px',maxWidth:'820px',margin:'0 auto'}}>
+
+          {/* Neues Match Formular */}
+          {tmAdding&&(
+            <div style={{background:acBg,border:`1px solid ${acBorder}`,borderRadius:'16px',padding:'18px',marginBottom:'20px'}}>
+              <p style={{margin:'0 0 14px',fontSize:'12px',fontWeight:'800',color:ac,textTransform:'uppercase',letterSpacing:'0.5px'}}>Neues Trainingsmatch</p>
+              <div style={{display:'grid',gap:'12px'}}>
+                {/* Gegner */}
+                <div>
+                  <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'6px',textTransform:'uppercase'}}>Gegner</label>
+                  <div style={{display:'flex',gap:'8px',marginBottom:'8px'}}>
+                    <button onClick={()=>setTmForm(f=>({...f,useCustom:false}))}
+                      style={{flex:1,padding:'8px',borderRadius:'8px',border:`1px solid ${tmForm.useCustom?'rgba(255,255,255,0.1)':acBorder}`,background:tmForm.useCustom?'rgba(255,255,255,0.04)':acBg,color:tmForm.useCustom?'rgba(255,255,255,0.4)':ac,cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>
+                      Registriert
+                    </button>
+                    <button onClick={()=>setTmForm(f=>({...f,useCustom:true}))}
+                      style={{flex:1,padding:'8px',borderRadius:'8px',border:`1px solid ${!tmForm.useCustom?'rgba(255,255,255,0.1)':acBorder}`,background:!tmForm.useCustom?'rgba(255,255,255,0.04)':acBg,color:!tmForm.useCustom?'rgba(255,255,255,0.4)':ac,cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>
+                      Manuell eingeben
+                    </button>
+                  </div>
+                  {tmForm.useCustom
+                    ? <input type="text" placeholder="Name des Gegners" value={tmForm.opponentCustom} onChange={e=>setTmForm(f=>({...f,opponentCustom:e.target.value}))}
+                        style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${acBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
+                    : <select value={tmForm.opponent} onChange={e=>setTmForm(f=>({...f,opponent:e.target.value}))}
+                        style={{width:'100%',padding:'10px 12px',background:'#1a0a1e',border:`1px solid ${acBorder}`,borderRadius:'10px',color:tmForm.opponent?'white':'rgba(255,255,255,0.4)',fontSize:'14px',outline:'none',boxSizing:'border-box'}}>
+                        <option value="">— Spieler auswählen —</option>
+                        {registeredPlayers.map(p=><option key={p} value={p}>{p}</option>)}
+                      </select>
+                  }
+                </div>
+
+                {/* Ergebnis + Datum */}
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
+                  <div>
+                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'6px',textTransform:'uppercase'}}>Ergebnis (Sätze)</label>
+                    <select value={tmForm.result} onChange={e=>setTmForm(f=>({...f,result:e.target.value}))}
+                      style={{width:'100%',padding:'10px 12px',background:'#1a0a1e',border:`1px solid ${acBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}>
+                      {resultOptions.map(r=>{const [a,b]=r.split(':');return <option key={r} value={r}>{me.split(' ')[0]||'Ich'} {a}:{b} {(tmForm.useCustom?tmForm.opponentCustom:tmForm.opponent||'Gegner').split(' ')[0]}</option>;})}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'6px',textTransform:'uppercase'}}>Datum</label>
+                    <input type="date" value={tmForm.date||TODAY} onChange={e=>setTmForm(f=>({...f,date:e.target.value}))}
+                      style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${acBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
+                  </div>
+                </div>
+
+                {/* Vorgabe */}
+                <div>
+                  <button onClick={()=>setTmForm(f=>({...f,vorgabe:!f.vorgabe,vorgabePlayer:!f.vorgabe?vorgabeTarget:''}))}
+                    style={{display:'flex',alignItems:'center',gap:'8px',background:'none',border:'none',cursor:'pointer',padding:0,color:tmForm.vorgabe?ac:'rgba(255,255,255,0.4)',fontSize:'13px',fontWeight:'700'}}>
+                    <span style={{width:'18px',height:'18px',borderRadius:'4px',border:`2px solid ${tmForm.vorgabe?ac:'rgba(255,255,255,0.2)'}`,background:tmForm.vorgabe?ac:'none',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',flexShrink:0}}>{tmForm.vorgabe?'✓':''}</span>
+                    Match mit Vorgabe
+                  </button>
+                  {tmForm.vorgabe&&(
+                    <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:'10px',marginTop:'10px',alignItems:'end'}}>
+                      <div>
+                        <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase'}}>Wer bekommt Vorgabe?</label>
+                        <select value={tmForm.vorgabePlayer} onChange={e=>setTmForm(f=>({...f,vorgabePlayer:e.target.value}))}
+                          style={{width:'100%',padding:'9px 12px',background:'#1a0a1e',border:`1px solid ${acBorder}`,borderRadius:'9px',color:'white',fontSize:'13px',outline:'none',boxSizing:'border-box'}}>
+                          <option value={me}>{me.split(' ')[0]||'Ich'} (ich)</option>
+                          <option value={vorgabeTarget}>{vorgabeTarget.split(' ')[0]||'Gegner'} (Gegner)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase'}}>Punkte</label>
+                        <select value={tmForm.vorgabePoints} onChange={e=>setTmForm(f=>({...f,vorgabePoints:Number(e.target.value)}))}
+                          style={{padding:'9px 12px',background:'#1a0a1e',border:`1px solid ${acBorder}`,borderRadius:'9px',color:'white',fontSize:'13px',outline:'none'}}>
+                          {[1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={n}>{n}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Buttons */}
+                <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>
+                  <button onClick={()=>setTmAdding(false)}
+                    style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
+                  <button onClick={submitMatch} disabled={!(tmForm.useCustom?tmForm.opponentCustom.trim():tmForm.opponent)}
+                    style={{padding:'9px 20px',background:(tmForm.useCustom?tmForm.opponentCustom.trim():tmForm.opponent)?`linear-gradient(135deg,${ac},#db2777)`:'rgba(255,255,255,0.1)',color:'white',border:'none',borderRadius:'10px',cursor:(tmForm.useCustom?tmForm.opponentCustom.trim():tmForm.opponent)?'pointer':'not-allowed',fontWeight:'700',fontSize:'13px',opacity:(tmForm.useCustom?tmForm.opponentCustom.trim():tmForm.opponent)?1:0.5}}>
+                    Match speichern
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Allzeittabelle */}
+          <div style={{marginBottom:'28px'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px',flexWrap:'wrap',gap:'8px'}}>
+              <h2 style={{margin:0,fontSize:'16px',fontWeight:'800',color:'white'}}>🏆 Allzeittabelle</h2>
+              <div style={{display:'flex',gap:'6px'}}>
+                {[{key:'winrate',label:'Siegquote'},{key:'wins',label:'Siege'},{key:'matches',label:'Matches'}].map(s=>(
+                  <button key={s.key} onClick={()=>setTmSort(s.key)}
+                    style={{padding:'5px 10px',borderRadius:'7px',border:`1px solid ${tmSort===s.key?acBorder:'rgba(255,255,255,0.1)'}`,background:tmSort===s.key?acBg:'rgba(255,255,255,0.04)',color:tmSort===s.key?ac:'rgba(255,255,255,0.4)',cursor:'pointer',fontSize:'11px',fontWeight:'700'}}>
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {tableData.length===0?(
+              <div style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.2)',fontSize:'13px'}}>Noch keine Matches gespielt</div>
+            ):(
+              <div style={{background:'rgba(255,255,255,0.03)',border:`1px solid ${acBorder}`,borderRadius:'14px',overflow:'hidden'}}>
+                <div style={{display:'grid',gridTemplateColumns:'28px 1fr 50px 50px 50px 56px',gap:'4px',padding:'8px 14px',borderBottom:`1px solid ${acBorder}`,fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'0.5px'}}>
+                  <span>#</span><span>Spieler</span><span style={{textAlign:'center'}}>M</span><span style={{textAlign:'center'}}>S</span><span style={{textAlign:'center'}}>N</span><span style={{textAlign:'right'}}>Quote</span>
+                </div>
+                {tableData.map((row,i)=>(
+                  <div key={row.name} style={{display:'grid',gridTemplateColumns:'28px 1fr 50px 50px 50px 56px',gap:'4px',padding:'10px 14px',borderBottom:i<tableData.length-1?'1px solid rgba(255,255,255,0.04)':'none',alignItems:'center'}}>
+                    <span style={{fontSize:'12px',fontWeight:'800',color:i===0?'#fbbf24':i===1?'rgba(255,255,255,0.5)':i===2?'#cd7c32':'rgba(255,255,255,0.25)'}}>{i+1}</span>
+                    <span style={{fontSize:'14px',fontWeight:'700',color:'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{row.name}</span>
+                    <span style={{textAlign:'center',fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>{row.matches}</span>
+                    <span style={{textAlign:'center',fontSize:'13px',color:'#86efac',fontWeight:'700'}}>{row.wins}</span>
+                    <span style={{textAlign:'center',fontSize:'13px',color:'#fca5a5'}}>{row.losses}</span>
+                    <span style={{textAlign:'right',fontSize:'13px',fontWeight:'800',color:ac}}>{Math.round(row.winrate*100)}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Match-Verlauf */}
+          <h2 style={{margin:'0 0 12px',fontSize:'16px',fontWeight:'800',color:'white'}}>📋 Vergangene Matches</h2>
+          {trainingsmatches.length===0?(
+            <div style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.2)',fontSize:'13px'}}>Noch keine Matches</div>
+          ):(
+            <div style={{display:'grid',gap:'8px'}}>
+              {trainingsmatches.map(m=>{
+                const d = m.date?new Date(m.date+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
+                const p1wins = m.score1>m.score2;
+                return (
+                  <div key={m.id} style={{background:'rgba(255,255,255,0.03)',border:`1px solid ${acBorder}`,borderRadius:'12px',padding:'12px 14px',display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                        <span style={{fontWeight:'700',color:p1wins?'#86efac':'rgba(255,255,255,0.6)',fontSize:'14px'}}>{m.player1}</span>
+                        <span style={{fontWeight:'900',fontSize:'16px',color:'white'}}>{m.score1}:{m.score2}</span>
+                        <span style={{fontWeight:'700',color:!p1wins?'#86efac':'rgba(255,255,255,0.6)',fontSize:'14px'}}>{m.player2}</span>
+                      </div>
+                      <div style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',marginTop:'3px'}}>
+                        {d}{m.vorgabe?` · Vorgabe: ${m.vorgabe.player.split(' ')[0]} +${m.vorgabe.points}Pkt`:''}
+                      </div>
+                    </div>
+                    {isAdmin&&<button onClick={()=>{if(!window.confirm('Match löschen?'))return;saveMatches(trainingsmatches.filter(x=>x.id!==m.id));}}
+                      style={{width:'28px',height:'28px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                      <Trash2 size={12}/>
+                    </button>}
+                  </div>
                 );
               })}
             </div>
