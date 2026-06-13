@@ -3818,7 +3818,7 @@ export default function TrainingsApp() {
               </div>
             ):(
               <div style={{display:'grid',gap:'10px'}}>
-                {gegnerLogbuch.map(e=>{
+                {gegnerLogbuch.filter(e=>e.id!==gegnerEditId).map(e=>{
                   const meId = userProfile?.name||user?.email;
                   const isOwnerG = e.createdBy && e.createdBy===meId;
                   const canEditG = isOwnerG||userRole==='admin';
@@ -7766,7 +7766,7 @@ export default function TrainingsApp() {
             </div>
           ):(
             <div style={{display:'grid',gap:'10px'}}>
-              {gegnerLogbuch.map(e=>{
+              {gegnerLogbuch.filter(e=>e.id!==gegnerEditId).map(e=>{
                 const dateStrGA = e.date?new Date(e.date+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
                 return (
                   <div key={e.id} style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'14px',padding:'14px 16px'}}>
