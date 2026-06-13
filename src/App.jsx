@@ -736,7 +736,7 @@ export default function TrainingsApp() {
   const [practiceTournaments, setPracticeTournaments]               = useState({});
   const [archivedPracticeTournaments, setArchivedPracticeTournaments] = useState({});
   const [gegnerLogbuch, setGegnerLogbuch] = useState([]);
-  const [gegnerForm, setGegnerForm] = useState({date:'', verein:'', taktik:''});
+  const [gegnerForm, setGegnerForm] = useState({date:'', verein:'', gegner:'', taktik:''});
   const [gegnerAdding, setGegnerAdding] = useState(false);
   const [gegnerEditId, setGegnerEditId] = useState(null);
   const [activePracticeId, setActivePracticeId]                     = useState(null);
@@ -3679,6 +3679,7 @@ export default function TrainingsApp() {
         id: 'gl_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
         date: gegnerForm.date,
         verein: gegnerForm.verein.trim(),
+        gegner: gegnerForm.gegner.trim(),
         taktik: gegnerForm.taktik.trim(),
         createdBy: userProfile?.name || user?.email || 'Unbekannt',
         createdAt: new Date().toISOString(),
@@ -3689,7 +3690,7 @@ export default function TrainingsApp() {
       } else {
         saveGegnerLogbuch([entry, ...gegnerLogbuch]);
       }
-      setGegnerForm({date:'',verein:'',taktik:''});
+      setGegnerForm({date:'',verein:'',gegner:'',taktik:''});
       setGegnerAdding(false);
     };
 
@@ -3790,7 +3791,7 @@ export default function TrainingsApp() {
                       rows={4} style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',resize:'vertical',boxSizing:'border-box',fontFamily:'inherit'}}/>
                   </div>
                   <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>
-                    <button onClick={()=>{setGegnerAdding(false);setGegnerEditId(null);setGegnerForm({date:'',verein:'',taktik:''});}}
+                    <button onClick={()=>{setGegnerAdding(false);setGegnerEditId(null);setGegnerForm({date:'',verein:'',gegner:'',taktik:''});}}
                       style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
                     <button onClick={submitGegner} disabled={!gegnerForm.verein.trim()||!gegnerForm.date}
                       style={{padding:'9px 20px',background:gegnerForm.verein.trim()&&gegnerForm.date?`linear-gradient(135deg,${accentColor},#0e7490)`:'rgba(255,255,255,0.1)',color:'white',border:'none',borderRadius:'10px',cursor:gegnerForm.verein.trim()&&gegnerForm.date?'pointer':'not-allowed',fontWeight:'700',fontSize:'13px',opacity:gegnerForm.verein.trim()&&gegnerForm.date?1:0.5}}>
@@ -3814,13 +3815,13 @@ export default function TrainingsApp() {
                   <div key={e.id} style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'14px',padding:'14px 16px'}}>
                     <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'10px',marginBottom:e.taktik?'10px':'0'}}>
                       <div style={{flex:1,minWidth:0}}>
-                        <p style={{margin:'0 0 2px',fontWeight:'800',color:'white',fontSize:'15px'}}>{e.verein}</p>
+                        <p style={{margin:'0 0 1px',fontWeight:'800',color:'white',fontSize:'15px'}}>{e.verein}{e.gegner?<span style={{color:'rgba(103,232,249,0.8)',fontWeight:'600',fontSize:'13px',marginLeft:'8px'}}>· {e.gegner}</span>:null}</p>
                         <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>
                           {e.date?new Date(e.date+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):''}{e.createdBy?` · ${e.createdBy}`:''}
                         </p>
                       </div>
                       <div style={{display:'flex',gap:'5px',flexShrink:0}}>
-                        <button onClick={()=>{setGegnerEditId(e.id);setGegnerForm({date:e.date,verein:e.verein,taktik:e.taktik||''});setGegnerAdding(true);}}
+                        <button onClick={()=>{setGegnerEditId(e.id);setGegnerForm({date:e.date,verein:e.verein,gegner:e.gegner||'',taktik:e.taktik||''});setGegnerAdding(true);}}
                           style={{width:'28px',height:'28px',borderRadius:'7px',background:'rgba(8,145,178,0.1)',border:`1px solid ${accentBorder}`,color:'#67e8f9',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
                           <Pencil size={12}/>
                         </button>
@@ -7650,6 +7651,7 @@ export default function TrainingsApp() {
         id: 'gl_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
         date: gegnerForm.date,
         verein: gegnerForm.verein.trim(),
+        gegner: gegnerForm.gegner.trim(),
         taktik: gegnerForm.taktik.trim(),
         createdBy: userProfile?.name || user?.email || 'Admin',
         createdAt: new Date().toISOString(),
@@ -7660,7 +7662,7 @@ export default function TrainingsApp() {
       } else {
         saveGegnerLogbuch([entry, ...gegnerLogbuch]);
       }
-      setGegnerForm({date:'',verein:'',taktik:''});
+      setGegnerForm({date:'',verein:'',gegner:'',taktik:''});
       setGegnerAdding(false);
     };
 
@@ -7694,6 +7696,11 @@ export default function TrainingsApp() {
                     <input type="text" placeholder="z.B. TTC Musterstadt" value={gegnerForm.verein} onChange={e=>setGegnerForm(f=>({...f,verein:e.target.value}))}
                       style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
                   </div>
+                  <div>
+                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Name des Gegners</label>
+                    <input type="text" placeholder="z.B. Max Mustermann" value={gegnerForm.gegner} onChange={e=>setGegnerForm(f=>({...f,gegner:e.target.value}))}
+                      style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
+                  </div>
                 </div>
                 <div>
                   <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Taktikhinweise</label>
@@ -7701,7 +7708,7 @@ export default function TrainingsApp() {
                     rows={4} style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',resize:'vertical',boxSizing:'border-box',fontFamily:'inherit'}}/>
                 </div>
                 <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>
-                  <button onClick={()=>{setGegnerAdding(false);setGegnerEditId(null);setGegnerForm({date:'',verein:'',taktik:''}); }}
+                  <button onClick={()=>{setGegnerAdding(false);setGegnerEditId(null);setGegnerForm({date:'',verein:'',gegner:'',taktik:''}); }}
                     style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
                   <button onClick={submitGegnerAdmin} disabled={!gegnerForm.verein.trim()||!gegnerForm.date}
                     style={{padding:'9px 20px',background:gegnerForm.verein.trim()&&gegnerForm.date?`linear-gradient(135deg,${accentColor},#0e7490)`:'rgba(255,255,255,0.1)',color:'white',border:'none',borderRadius:'10px',cursor:gegnerForm.verein.trim()&&gegnerForm.date?'pointer':'not-allowed',fontWeight:'700',fontSize:'13px',opacity:gegnerForm.verein.trim()&&gegnerForm.date?1:0.5}}>
@@ -7730,7 +7737,7 @@ export default function TrainingsApp() {
                       </p>
                     </div>
                     <div style={{display:'flex',gap:'5px',flexShrink:0}}>
-                      <button onClick={()=>{setGegnerEditId(e.id);setGegnerForm({date:e.date,verein:e.verein,taktik:e.taktik||''});setGegnerAdding(true);}}
+                      <button onClick={()=>{setGegnerEditId(e.id);setGegnerForm({date:e.date,verein:e.verein,gegner:e.gegner||'',taktik:e.taktik||''});setGegnerAdding(true);}}
                         style={{width:'28px',height:'28px',borderRadius:'7px',background:accentBg,border:`1px solid ${accentBorder}`,color:'#67e8f9',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
                         <Pencil size={12}/>
                       </button>
