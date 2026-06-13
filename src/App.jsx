@@ -741,6 +741,8 @@ export default function TrainingsApp() {
   const [gegnerEditId, setGegnerEditId] = useState(null);
   const [gegnerWeitereId, setGegnerWeitereId] = useState(null);
   const [gegnerWeitereText, setGegnerWeitereText] = useState('');
+  const [gegnerSearchPlayer, setGegnerSearchPlayer] = useState('');
+  const [gegnerSearchVerein, setGegnerSearchVerein] = useState('');
   const [activePracticeId, setActivePracticeId]                     = useState(null);
   const [ptCreating, setPtCreating]                                 = useState(false);
   const [ptCreateStep, setPtCreateStep]                             = useState(1);
@@ -3790,6 +3792,9 @@ export default function TrainingsApp() {
                       <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Name des Gegners</label>
                       <input type="text" placeholder="z.B. Max Mustermann" value={gegnerForm.gegner} onChange={e=>setGegnerForm(f=>({...f,gegner:e.target.value}))}
                         style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
+                      {!gegnerEditId&&gegnerForm.gegner.trim()&&gegnerLogbuch.some(x=>x.gegner?.toLowerCase()===gegnerForm.gegner.trim().toLowerCase())&&(
+                        <p style={{margin:'5px 0 0',fontSize:'11px',color:'#fbbf24',fontWeight:'600'}}>⚠️ Dieser Gegner ist bereits im Logbuch eingetragen.</p>
+                      )}
                     </div>
                   </div>
                   <div>
@@ -3809,6 +3814,22 @@ export default function TrainingsApp() {
               </div>
             )}
 
+            {/* Suche */}
+            {gegnerLogbuch.length>0&&(
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'12px'}}>
+                <div style={{position:'relative'}}>
+                  <span style={{position:'absolute',left:'10px',top:'50%',transform:'translateY(-50%)',fontSize:'13px',opacity:0.4}}>🔍</span>
+                  <input type="text" placeholder="Nach Spieler suchen..." value={gegnerSearchPlayer} onChange={e=>setGegnerSearchPlayer(e.target.value)}
+                    style={{width:'100%',boxSizing:'border-box',paddingLeft:'30px',paddingRight:'10px',paddingTop:'8px',paddingBottom:'8px',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'13px',outline:'none'}}/>
+                </div>
+                <div style={{position:'relative'}}>
+                  <span style={{position:'absolute',left:'10px',top:'50%',transform:'translateY(-50%)',fontSize:'13px',opacity:0.4}}>🏓</span>
+                  <input type="text" placeholder="Nach Verein suchen..." value={gegnerSearchVerein} onChange={e=>setGegnerSearchVerein(e.target.value)}
+                    style={{width:'100%',boxSizing:'border-box',paddingLeft:'30px',paddingRight:'10px',paddingTop:'8px',paddingBottom:'8px',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'13px',outline:'none'}}/>
+                </div>
+              </div>
+            )}
+
             {/* Einträge */}
             {gegnerLogbuch.length===0&&!gegnerAdding?(
               <div style={{textAlign:'center',padding:'40px 20px',color:'rgba(255,255,255,0.2)'}}>
@@ -3818,7 +3839,7 @@ export default function TrainingsApp() {
               </div>
             ):(
               <div style={{display:'grid',gap:'10px'}}>
-                {gegnerLogbuch.filter(e=>e.id!==gegnerEditId).map(e=>{
+                {gegnerLogbuch.filter(e=>e.id!==gegnerEditId&&(!gegnerSearchPlayer||e.gegner?.toLowerCase().includes(gegnerSearchPlayer.toLowerCase()))&&(!gegnerSearchVerein||e.verein?.toLowerCase().includes(gegnerSearchVerein.toLowerCase()))).map(e=>{
                   const meId = userProfile?.name||user?.email;
                   const isOwnerG = e.createdBy && e.createdBy===meId;
                   const canEditG = isOwnerG||userRole==='admin';
@@ -7739,6 +7760,9 @@ export default function TrainingsApp() {
                     <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Name des Gegners</label>
                     <input type="text" placeholder="z.B. Max Mustermann" value={gegnerForm.gegner} onChange={e=>setGegnerForm(f=>({...f,gegner:e.target.value}))}
                       style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
+                    {!gegnerEditId&&gegnerForm.gegner.trim()&&gegnerLogbuch.some(x=>x.gegner?.toLowerCase()===gegnerForm.gegner.trim().toLowerCase())&&(
+                      <p style={{margin:'5px 0 0',fontSize:'11px',color:'#fbbf24',fontWeight:'600'}}>⚠️ Dieser Gegner ist bereits im Logbuch eingetragen.</p>
+                    )}
                   </div>
                 </div>
                 <div>
@@ -7758,6 +7782,21 @@ export default function TrainingsApp() {
             </div>
           )}
 
+          {gegnerLogbuch.length>0&&(
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px',marginBottom:'16px'}}>
+              <div style={{position:'relative'}}>
+                <span style={{position:'absolute',left:'11px',top:'50%',transform:'translateY(-50%)',fontSize:'14px',opacity:0.4}}>🔍</span>
+                <input type="text" placeholder="Nach Spieler suchen..." value={gegnerSearchPlayer} onChange={e=>setGegnerSearchPlayer(e.target.value)}
+                  style={{width:'100%',boxSizing:'border-box',paddingLeft:'32px',paddingRight:'10px',paddingTop:'9px',paddingBottom:'9px',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none'}}/>
+              </div>
+              <div style={{position:'relative'}}>
+                <span style={{position:'absolute',left:'11px',top:'50%',transform:'translateY(-50%)',fontSize:'14px',opacity:0.4}}>🏓</span>
+                <input type="text" placeholder="Nach Verein suchen..." value={gegnerSearchVerein} onChange={e=>setGegnerSearchVerein(e.target.value)}
+                  style={{width:'100%',boxSizing:'border-box',paddingLeft:'32px',paddingRight:'10px',paddingTop:'9px',paddingBottom:'9px',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none'}}/>
+              </div>
+            </div>
+          )}
+
           {gegnerLogbuch.length===0&&!gegnerAdding?(
             <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.2)'}}>
               <div style={{fontSize:'48px',marginBottom:'12px'}}>📋</div>
@@ -7766,7 +7805,7 @@ export default function TrainingsApp() {
             </div>
           ):(
             <div style={{display:'grid',gap:'10px'}}>
-              {gegnerLogbuch.filter(e=>e.id!==gegnerEditId).map(e=>{
+              {gegnerLogbuch.filter(e=>e.id!==gegnerEditId&&(!gegnerSearchPlayer||e.gegner?.toLowerCase().includes(gegnerSearchPlayer.toLowerCase()))&&(!gegnerSearchVerein||e.verein?.toLowerCase().includes(gegnerSearchVerein.toLowerCase()))).map(e=>{
                 const dateStrGA = e.date?new Date(e.date+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
                 return (
                   <div key={e.id} style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'14px',padding:'14px 16px'}}>
