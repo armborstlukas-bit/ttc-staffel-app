@@ -7862,7 +7862,10 @@ export default function TrainingsApp() {
 
     // Player list: all aktiver + admin users, excluding self
     const registeredPlayers = Object.values(allUsers)
-      .filter(u => (u.roles||[u.role]).some(r=>['aktiver','admin'].includes(r)) && (u.name||u.email) !== me)
+      .filter(u => {
+        const roles = Array.isArray(u.roles) ? u.roles : (u.role ? [u.role] : []);
+        return roles.some(r=>['aktiver','admin'].includes(r)) && (u.name||u.email) !== me;
+      })
       .map(u => u.name || u.email)
       .filter(Boolean)
       .sort((a,b)=>a.localeCompare(b,'de'));
@@ -7889,9 +7892,9 @@ export default function TrainingsApp() {
       setTmForm({opponent:'',opponentCustom:'',useCustom:false,result:'3:0',vorgabe:false,vorgabePlayer:'',vorgabePoints:1,date:''});
     };
 
-    // Build allzeit table
+    // Build allzeit table (Vorgabe-Matches ausgeschlossen)
     const stats = {};
-    trainingsmatches.forEach(m => {
+    trainingsmatches.filter(m=>!m.vorgabe).forEach(m => {
       [m.player1, m.player2].forEach((p,i) => {
         if (!stats[p]) stats[p] = {name:p, matches:0, wins:0, losses:0};
         stats[p].matches++;
@@ -7926,25 +7929,20 @@ export default function TrainingsApp() {
                 {/* Gegner */}
                 <div>
                   <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'6px',textTransform:'uppercase'}}>Gegner</label>
-                  <div style={{display:'flex',gap:'8px',marginBottom:'8px'}}>
-                    <button onClick={()=>setTmForm(f=>({...f,useCustom:false}))}
-                      style={{flex:1,padding:'8px',borderRadius:'8px',border:`1px solid ${tmForm.useCustom?'rgba(255,255,255,0.1)':acBorder}`,background:tmForm.useCustom?'rgba(255,255,255,0.04)':acBg,color:tmForm.useCustom?'rgba(255,255,255,0.4)':ac,cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>
-                      Registriert
-                    </button>
-                    <button onClick={()=>setTmForm(f=>({...f,useCustom:true}))}
-                      style={{flex:1,padding:'8px',borderRadius:'8px',border:`1px solid ${!tmForm.useCustom?'rgba(255,255,255,0.1)':acBorder}`,background:!tmForm.useCustom?'rgba(255,255,255,0.04)':acBg,color:!tmForm.useCustom?'rgba(255,255,255,0.4)':ac,cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>
-                      Manuell eingeben
-                    </button>
-                  </div>
-                  {tmForm.useCustom
-                    ? <input type="text" placeholder="Name des Gegners" value={tmForm.opponentCustom} onChange={e=>setTmForm(f=>({...f,opponentCustom:e.target.value}))}
-                        style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${acBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
-                    : <select value={tmForm.opponent} onChange={e=>setTmForm(f=>({...f,opponent:e.target.value}))}
-                        style={{width:'100%',padding:'10px 12px',background:'#1a0a1e',border:`1px solid ${acBorder}`,borderRadius:'10px',color:tmForm.opponent?'white':'rgba(255,255,255,0.4)',fontSize:'14px',outline:'none',boxSizing:'border-box'}}>
-                        <option value="">— Spieler auswählen —</option>
-                        {registeredPlayers.map(p=><option key={p} value={p}>{p}</option>)}
-                      </select>
-                  }
+                  <select value={tmForm.useCustom?'__custom__':tmForm.opponent}
+                    onChange={e=>{
+                      if(e.target.value==='__custom__') setTmForm(f=>({...f,useCustom:true,opponent:'__custom__'}));
+                      else setTmForm(f=>({...f,useCustom:false,opponent:e.target.value,opponentCustom:''}));
+                    }}
+                    style={{width:'100%',padding:'10px 12px',background:'#1a0a1e',border:`1px solid ${acBorder}`,borderRadius:'10px',color:(tmForm.opponent&&!tmForm.useCustom)||tmForm.useCustom?'white':'rgba(255,255,255,0.4)',fontSize:'14px',outline:'none',boxSizing:'border-box'}}>
+                    <option value="">— Spieler auswählen —</option>
+                    {registeredPlayers.map(p=><option key={p} value={p}>{p}</option>)}
+                    <option value="__custom__">✏️ Manuell eingeben…</option>
+                  </select>
+                  {tmForm.useCustom&&(
+                    <input type="text" placeholder="Name des Gegners" value={tmForm.opponentCustom} onChange={e=>setTmForm(f=>({...f,opponentCustom:e.target.value}))}
+                      style={{width:'100%',marginTop:'8px',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${acBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
+                  )}
                 </div>
 
                 {/* Ergebnis + Datum */}
