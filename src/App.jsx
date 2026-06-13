@@ -743,6 +743,7 @@ export default function TrainingsApp() {
   const [gegnerWeitereText, setGegnerWeitereText] = useState('');
   const [gegnerSearchPlayer, setGegnerSearchPlayer] = useState('');
   const [gegnerSearchVerein, setGegnerSearchVerein] = useState('');
+  const [gegnerExpandedId, setGegnerExpandedId] = useState(null);
   const [activePracticeId, setActivePracticeId]                     = useState(null);
   const [ptCreating, setPtCreating]                                 = useState(false);
   const [ptCreateStep, setPtCreateStep]                             = useState(1);
@@ -3761,16 +3762,16 @@ export default function TrainingsApp() {
           {/* ── Gegnerlogbuch ── */}
           <span style={{display:'block',fontSize:'10px',fontWeight:'800',color:accentMid,textTransform:'uppercase',letterSpacing:'2px',marginBottom:'10px'}}>Gegnerlogbuch</span>
           <div style={{...CARD,marginBottom:'0'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px',flexWrap:'wrap',gap:'10px'}}>
-              <div>
-                <h3 style={{margin:'0 0 2px',color:'white',fontWeight:'800',fontSize:'17px'}}>🎯 Gegnerlogbuch</h3>
-                <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>Gemeinsame Taktikdatenbank aller Aktiven · {gegnerLogbuch.length} {gegnerLogbuch.length===1?'Eintrag':'Einträge'}</p>
-              </div>
-              {!gegnerAdding&&<button onClick={()=>{setGegnerAdding(true);setGegnerEditId(null);setGegnerForm({date:TODAY,verein:'',taktik:''});}}
-                style={{padding:'8px 16px',background:`linear-gradient(135deg,${accentColor},#0e7490)`,color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'13px',display:'flex',alignItems:'center',gap:'6px'}}>
-                <Plus size={15}/> Eintrag hinzufügen
-              </button>}
+            <div style={{marginBottom:'14px'}}>
+              <h3 style={{margin:'0 0 2px',color:'white',fontWeight:'800',fontSize:'17px'}}>🎯 Gegnerlogbuch</h3>
+              <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>Gemeinsame Taktikdatenbank aller Aktiven · {gegnerLogbuch.length} {gegnerLogbuch.length===1?'Eintrag':'Einträge'}</p>
             </div>
+
+            {/* Neuer Eintrag Button */}
+            {!gegnerAdding&&<button onClick={()=>{setGegnerAdding(true);setGegnerEditId(null);setGegnerForm({date:TODAY,verein:'',gegner:'',taktik:''});}}
+              style={{width:'100%',padding:'11px',background:`linear-gradient(135deg,${accentColor},#0e7490)`,color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',marginBottom:'14px'}}>
+              <Plus size={16}/> Neuer Eintrag
+            </button>}
 
             {/* Formular */}
             {gegnerAdding&&(
@@ -3838,62 +3839,69 @@ export default function TrainingsApp() {
                 <p style={{margin:'4px 0 0',fontSize:'13px'}}>Füge den ersten Gegner hinzu!</p>
               </div>
             ):(
-              <div style={{display:'grid',gap:'10px'}}>
-                {gegnerLogbuch.filter(e=>e.id!==gegnerEditId&&(!gegnerSearchPlayer||e.gegner?.toLowerCase().includes(gegnerSearchPlayer.toLowerCase()))&&(!gegnerSearchVerein||e.verein?.toLowerCase().includes(gegnerSearchVerein.toLowerCase()))).map(e=>{
+              <div style={{display:'grid',gap:'6px'}}>
+                {[...gegnerLogbuch].sort((a,b)=>(a.gegner||a.verein||'').localeCompare(b.gegner||b.verein||'','de')).filter(e=>e.id!==gegnerEditId&&(!gegnerSearchPlayer||e.gegner?.toLowerCase().includes(gegnerSearchPlayer.toLowerCase()))&&(!gegnerSearchVerein||e.verein?.toLowerCase().includes(gegnerSearchVerein.toLowerCase()))).map(e=>{
                   const meId = userProfile?.name||user?.email;
                   const isOwnerG = e.createdBy && e.createdBy===meId;
                   const canEditG = isOwnerG||userRole==='admin';
                   const canDeleteG = userRole==='admin';
+                  const expanded = gegnerExpandedId===e.id;
                   const dateStrG = e.date?new Date(e.date+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
                   return (
-                    <div key={e.id} style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'14px',padding:'14px 16px'}}>
-                      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'10px',marginBottom:(e.taktik||gegnerWeitereId===e.id)?'10px':'0'}}>
-                        <div style={{flex:1,minWidth:0}}>
-                          <p style={{margin:'0 0 2px',fontWeight:'800',color:'white',fontSize:'15px'}}>{e.gegner||e.verein}</p>
-                          <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>
+                    <div key={e.id} style={{background:'rgba(255,255,255,0.03)',border:`1px solid ${expanded?accentBorder:'rgba(255,255,255,0.07)'}`,borderRadius:'12px',overflow:'hidden'}}>
+                      {/* Header – immer sichtbar */}
+                      <button onClick={()=>setGegnerExpandedId(expanded?null:e.id)}
+                        style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',background:'none',border:'none',cursor:'pointer',gap:'10px'}}>
+                        <span style={{fontWeight:'700',color:'white',fontSize:'14px',textAlign:'left'}}>{e.gegner||e.verein||'—'}</span>
+                        <span style={{color:'rgba(255,255,255,0.3)',fontSize:'12px',transition:'transform 0.2s',display:'inline-block',transform:expanded?'rotate(180deg)':'rotate(0deg)'}}>▼</span>
+                      </button>
+                      {/* Aufgeklappter Inhalt */}
+                      {expanded&&(
+                        <div style={{padding:'0 14px 14px'}}>
+                          <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>
                             {[e.verein,dateStrG,e.createdBy].filter(Boolean).join(' · ')}
                           </p>
-                        </div>
-                        <div style={{display:'flex',gap:'5px',flexShrink:0}}>
-                          {canEditG&&<button onClick={()=>{setGegnerEditId(e.id);setGegnerForm({date:e.date,verein:e.verein,gegner:e.gegner||'',taktik:e.taktik||''});setGegnerAdding(true);}}
-                            style={{width:'28px',height:'28px',borderRadius:'7px',background:'rgba(8,145,178,0.1)',border:`1px solid ${accentBorder}`,color:'#67e8f9',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                            <Pencil size={12}/>
-                          </button>}
-                          {canDeleteG&&<button onClick={()=>deleteGegner(e.id)}
-                            style={{width:'28px',height:'28px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                            <Trash2 size={12}/>
-                          </button>}
-                          <button onClick={()=>{setGegnerWeitereId(gegnerWeitereId===e.id?null:e.id);setGegnerWeitereText('');}}
-                            style={{padding:'4px 10px',height:'28px',borderRadius:'7px',background:'rgba(8,145,178,0.1)',border:`1px solid ${accentBorder}`,color:'#67e8f9',cursor:'pointer',fontSize:'11px',fontWeight:'600',whiteSpace:'nowrap'}}>
-                            + Taktikhinweise
-                          </button>
-                        </div>
-                      </div>
-                      {e.taktik&&(
-                        <div style={{background:'rgba(8,145,178,0.06)',border:`1px solid ${accentBorder}`,borderRadius:'10px',padding:'10px 12px',marginBottom:gegnerWeitereId===e.id?'8px':'0'}}>
-                          <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'800',color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px'}}>Taktikhinweise</p>
-                          <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.75)',lineHeight:'1.6',whiteSpace:'pre-wrap'}}>{e.taktik}</p>
-                        </div>
-                      )}
-                      {gegnerWeitereId===e.id&&(
-                        <div>
-                          <textarea value={gegnerWeitereText} onChange={ev=>setGegnerWeitereText(ev.target.value)} placeholder="Weitere Taktikhinweise..."
-                            style={{width:'100%',boxSizing:'border-box',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'8px',padding:'8px 10px',color:'white',fontSize:'13px',resize:'vertical',minHeight:'70px',outline:'none'}}/>
-                          <div style={{display:'flex',gap:'6px',marginTop:'6px'}}>
-                            <button onClick={()=>{
-                              if(!gegnerWeitereText.trim())return;
-                              const note=`\n\n[${meId}]: ${gegnerWeitereText.trim()}`;
-                              saveGegnerLogbuch(gegnerLogbuch.map(x=>x.id===e.id?{...x,taktik:(x.taktik||'')+note}:x));
-                              setGegnerWeitereId(null);setGegnerWeitereText('');
-                            }} disabled={!gegnerWeitereText.trim()}
-                              style={{flex:1,padding:'6px',borderRadius:'7px',background:accentColor,border:'none',color:'white',fontSize:'12px',fontWeight:'700',cursor:'pointer',opacity:gegnerWeitereText.trim()?1:0.5}}>
-                              Speichern
-                            </button>
-                            <button onClick={()=>{setGegnerWeitereId(null);setGegnerWeitereText('');}}
-                              style={{padding:'6px 10px',borderRadius:'7px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.6)',fontSize:'12px',cursor:'pointer'}}>
-                              Abbrechen
+                          {e.taktik&&(
+                            <div style={{background:'rgba(8,145,178,0.06)',border:`1px solid ${accentBorder}`,borderRadius:'10px',padding:'10px 12px',marginBottom:'10px'}}>
+                              <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'800',color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px'}}>Taktikhinweise</p>
+                              <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.75)',lineHeight:'1.6',whiteSpace:'pre-wrap'}}>{e.taktik}</p>
+                            </div>
+                          )}
+                          <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                            {canEditG&&<button onClick={()=>{setGegnerEditId(e.id);setGegnerForm({date:e.date,verein:e.verein,gegner:e.gegner||'',taktik:e.taktik||''});setGegnerAdding(true);setGegnerExpandedId(null);}}
+                              style={{display:'flex',alignItems:'center',gap:'5px',padding:'6px 12px',borderRadius:'8px',background:'rgba(8,145,178,0.1)',border:`1px solid ${accentBorder}`,color:'#67e8f9',cursor:'pointer',fontSize:'12px',fontWeight:'600'}}>
+                              <Pencil size={11}/> Bearbeiten
+                            </button>}
+                            {canDeleteG&&<button onClick={()=>deleteGegner(e.id)}
+                              style={{display:'flex',alignItems:'center',gap:'5px',padding:'6px 12px',borderRadius:'8px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',fontSize:'12px',fontWeight:'600'}}>
+                              <Trash2 size={11}/> Löschen
+                            </button>}
+                            <button onClick={()=>{setGegnerWeitereId(gegnerWeitereId===e.id?null:e.id);setGegnerWeitereText('');}}
+                              style={{padding:'6px 12px',borderRadius:'8px',background:'rgba(8,145,178,0.1)',border:`1px solid ${accentBorder}`,color:'#67e8f9',cursor:'pointer',fontSize:'12px',fontWeight:'600'}}>
+                              + Taktikhinweise
                             </button>
                           </div>
+                          {gegnerWeitereId===e.id&&(
+                            <div style={{marginTop:'10px'}}>
+                              <textarea value={gegnerWeitereText} onChange={ev=>setGegnerWeitereText(ev.target.value)} placeholder="Weitere Taktikhinweise..."
+                                style={{width:'100%',boxSizing:'border-box',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'8px',padding:'8px 10px',color:'white',fontSize:'13px',resize:'vertical',minHeight:'70px',outline:'none'}}/>
+                              <div style={{display:'flex',gap:'6px',marginTop:'6px'}}>
+                                <button onClick={()=>{
+                                  if(!gegnerWeitereText.trim())return;
+                                  const note=`\n\n[${meId}]: ${gegnerWeitereText.trim()}`;
+                                  saveGegnerLogbuch(gegnerLogbuch.map(x=>x.id===e.id?{...x,taktik:(x.taktik||'')+note}:x));
+                                  setGegnerWeitereId(null);setGegnerWeitereText('');
+                                }} disabled={!gegnerWeitereText.trim()}
+                                  style={{flex:1,padding:'6px',borderRadius:'7px',background:accentColor,border:'none',color:'white',fontSize:'12px',fontWeight:'700',cursor:'pointer',opacity:gegnerWeitereText.trim()?1:0.5}}>
+                                  Speichern
+                                </button>
+                                <button onClick={()=>{setGegnerWeitereId(null);setGegnerWeitereText('');}}
+                                  style={{padding:'6px 10px',borderRadius:'7px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.6)',fontSize:'12px',cursor:'pointer'}}>
+                                  Abbrechen
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -7733,13 +7741,15 @@ export default function TrainingsApp() {
         <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
           <button onClick={()=>navTo('home')} style={s.btn('#0891b2')}><Home size={16}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🎯 Gegnerlogbuch</h1>
-          {!gegnerAdding&&<button onClick={()=>{setGegnerAdding(true);setGegnerEditId(null);setGegnerForm({date:TODAY,verein:'',taktik:''}); }}
-            style={{padding:'8px 16px',background:`linear-gradient(135deg,${accentColor},#0e7490)`,color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'13px',display:'flex',alignItems:'center',gap:'6px'}}>
-            <Plus size={15}/> Eintrag
-          </button>}
         </div>
         <div style={{padding:'20px',maxWidth:'820px',margin:'0 auto'}}>
-          <p style={{margin:'0 0 16px',fontSize:'13px',color:'rgba(255,255,255,0.35)'}}>Kollaborative Taktikdatenbank aller Aktiven · {gegnerLogbuch.length} {gegnerLogbuch.length===1?'Eintrag':'Einträge'}</p>
+          <p style={{margin:'0 0 14px',fontSize:'13px',color:'rgba(255,255,255,0.35)'}}>Kollaborative Taktikdatenbank aller Aktiven · {gegnerLogbuch.length} {gegnerLogbuch.length===1?'Eintrag':'Einträge'}</p>
+
+          {/* Neuer Eintrag Button */}
+          {!gegnerAdding&&<button onClick={()=>{setGegnerAdding(true);setGegnerEditId(null);setGegnerForm({date:TODAY,verein:'',gegner:'',taktik:''}); }}
+            style={{width:'100%',padding:'12px',background:`linear-gradient(135deg,${accentColor},#0e7490)`,color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',marginBottom:'14px'}}>
+            <Plus size={16}/> Neuer Eintrag
+          </button>}
 
           {gegnerAdding&&(
             <div style={{background:accentBg,border:`1px solid ${accentBorder}`,borderRadius:'14px',padding:'16px',marginBottom:'16px'}}>
@@ -7804,59 +7814,64 @@ export default function TrainingsApp() {
               <p style={{margin:'6px 0 0',fontSize:'13px'}}>Füge den ersten Gegner hinzu!</p>
             </div>
           ):(
-            <div style={{display:'grid',gap:'10px'}}>
-              {gegnerLogbuch.filter(e=>e.id!==gegnerEditId&&(!gegnerSearchPlayer||e.gegner?.toLowerCase().includes(gegnerSearchPlayer.toLowerCase()))&&(!gegnerSearchVerein||e.verein?.toLowerCase().includes(gegnerSearchVerein.toLowerCase()))).map(e=>{
+            <div style={{display:'grid',gap:'6px'}}>
+              {[...gegnerLogbuch].sort((a,b)=>(a.gegner||a.verein||'').localeCompare(b.gegner||b.verein||'','de')).filter(e=>e.id!==gegnerEditId&&(!gegnerSearchPlayer||e.gegner?.toLowerCase().includes(gegnerSearchPlayer.toLowerCase()))&&(!gegnerSearchVerein||e.verein?.toLowerCase().includes(gegnerSearchVerein.toLowerCase()))).map(e=>{
+                const expandedA = gegnerExpandedId===e.id;
                 const dateStrGA = e.date?new Date(e.date+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
+                const meIdA = userProfile?.name||user?.email;
                 return (
-                  <div key={e.id} style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'14px',padding:'14px 16px'}}>
-                    <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'10px',marginBottom:e.taktik?'10px':'0'}}>
-                      <div style={{flex:1,minWidth:0}}>
-                        <p style={{margin:'0 0 2px',fontWeight:'800',color:'white',fontSize:'15px'}}>{e.gegner||e.verein}</p>
-                        <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>
+                  <div key={e.id} style={{background:'rgba(255,255,255,0.03)',border:`1px solid ${expandedA?accentBorder:'rgba(255,255,255,0.07)'}`,borderRadius:'12px',overflow:'hidden'}}>
+                    <button onClick={()=>setGegnerExpandedId(expandedA?null:e.id)}
+                      style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'13px 16px',background:'none',border:'none',cursor:'pointer',gap:'10px'}}>
+                      <span style={{fontWeight:'700',color:'white',fontSize:'14px',textAlign:'left'}}>{e.gegner||e.verein||'—'}</span>
+                      <span style={{color:'rgba(255,255,255,0.3)',fontSize:'12px',display:'inline-block',transform:expandedA?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s'}}>▼</span>
+                    </button>
+                    {expandedA&&(
+                      <div style={{padding:'0 16px 14px'}}>
+                        <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>
                           {[e.verein,dateStrGA,e.createdBy].filter(Boolean).join(' · ')}
                         </p>
-                      </div>
-                      <div style={{display:'flex',gap:'5px',flexShrink:0}}>
-                        <button onClick={()=>{setGegnerEditId(e.id);setGegnerForm({date:e.date,verein:e.verein,gegner:e.gegner||'',taktik:e.taktik||''});setGegnerAdding(true);}}
-                          style={{width:'28px',height:'28px',borderRadius:'7px',background:accentBg,border:`1px solid ${accentBorder}`,color:'#67e8f9',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                          <Pencil size={12}/>
-                        </button>
-                        <button onClick={()=>deleteGegnerAdmin(e.id)}
-                          style={{width:'28px',height:'28px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                          <Trash2 size={12}/>
-                        </button>
-                        <button onClick={()=>{setGegnerWeitereId(gegnerWeitereId===e.id?null:e.id);setGegnerWeitereText('');}}
-                          style={{padding:'4px 10px',height:'28px',borderRadius:'7px',background:accentBg,border:`1px solid ${accentBorder}`,color:'#67e8f9',cursor:'pointer',fontSize:'11px',fontWeight:'600',whiteSpace:'nowrap'}}>
-                          + Taktikhinweise
-                        </button>
-                      </div>
-                    </div>
-                    {e.taktik&&(
-                      <div style={{background:accentBg,border:`1px solid ${accentBorder}`,borderRadius:'10px',padding:'10px 12px',marginBottom:gegnerWeitereId===e.id?'8px':'0'}}>
-                        <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'800',color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px'}}>Taktikhinweise</p>
-                        <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.75)',lineHeight:'1.6',whiteSpace:'pre-wrap'}}>{e.taktik}</p>
-                      </div>
-                    )}
-                    {gegnerWeitereId===e.id&&(
-                      <div>
-                        <textarea value={gegnerWeitereText} onChange={ev=>setGegnerWeitereText(ev.target.value)} placeholder="Weitere Taktikhinweise..."
-                          style={{width:'100%',boxSizing:'border-box',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'8px',padding:'8px 10px',color:'white',fontSize:'13px',resize:'vertical',minHeight:'70px',outline:'none'}}/>
-                        <div style={{display:'flex',gap:'6px',marginTop:'6px'}}>
-                          <button onClick={()=>{
-                            if(!gegnerWeitereText.trim())return;
-                            const meIdA=userProfile?.name||user?.email;
-                            const note=`\n\n[${meIdA}]: ${gegnerWeitereText.trim()}`;
-                            saveGegnerLogbuch(gegnerLogbuch.map(x=>x.id===e.id?{...x,taktik:(x.taktik||'')+note}:x));
-                            setGegnerWeitereId(null);setGegnerWeitereText('');
-                          }} disabled={!gegnerWeitereText.trim()}
-                            style={{flex:1,padding:'6px',borderRadius:'7px',background:accentColor,border:'none',color:'white',fontSize:'12px',fontWeight:'700',cursor:'pointer',opacity:gegnerWeitereText.trim()?1:0.5}}>
-                            Speichern
+                        {e.taktik&&(
+                          <div style={{background:accentBg,border:`1px solid ${accentBorder}`,borderRadius:'10px',padding:'10px 12px',marginBottom:'10px'}}>
+                            <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'800',color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px'}}>Taktikhinweise</p>
+                            <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.75)',lineHeight:'1.6',whiteSpace:'pre-wrap'}}>{e.taktik}</p>
+                          </div>
+                        )}
+                        <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                          <button onClick={()=>{setGegnerEditId(e.id);setGegnerForm({date:e.date,verein:e.verein,gegner:e.gegner||'',taktik:e.taktik||''});setGegnerAdding(true);setGegnerExpandedId(null);}}
+                            style={{display:'flex',alignItems:'center',gap:'5px',padding:'6px 12px',borderRadius:'8px',background:accentBg,border:`1px solid ${accentBorder}`,color:'#67e8f9',cursor:'pointer',fontSize:'12px',fontWeight:'600'}}>
+                            <Pencil size={11}/> Bearbeiten
                           </button>
-                          <button onClick={()=>{setGegnerWeitereId(null);setGegnerWeitereText('');}}
-                            style={{padding:'6px 10px',borderRadius:'7px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.6)',fontSize:'12px',cursor:'pointer'}}>
-                            Abbrechen
+                          <button onClick={()=>deleteGegnerAdmin(e.id)}
+                            style={{display:'flex',alignItems:'center',gap:'5px',padding:'6px 12px',borderRadius:'8px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',fontSize:'12px',fontWeight:'600'}}>
+                            <Trash2 size={11}/> Löschen
+                          </button>
+                          <button onClick={()=>{setGegnerWeitereId(gegnerWeitereId===e.id?null:e.id);setGegnerWeitereText('');}}
+                            style={{padding:'6px 12px',borderRadius:'8px',background:accentBg,border:`1px solid ${accentBorder}`,color:'#67e8f9',cursor:'pointer',fontSize:'12px',fontWeight:'600'}}>
+                            + Taktikhinweise
                           </button>
                         </div>
+                        {gegnerWeitereId===e.id&&(
+                          <div style={{marginTop:'10px'}}>
+                            <textarea value={gegnerWeitereText} onChange={ev=>setGegnerWeitereText(ev.target.value)} placeholder="Weitere Taktikhinweise..."
+                              style={{width:'100%',boxSizing:'border-box',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'8px',padding:'8px 10px',color:'white',fontSize:'13px',resize:'vertical',minHeight:'70px',outline:'none'}}/>
+                            <div style={{display:'flex',gap:'6px',marginTop:'6px'}}>
+                              <button onClick={()=>{
+                                if(!gegnerWeitereText.trim())return;
+                                const note=`\n\n[${meIdA}]: ${gegnerWeitereText.trim()}`;
+                                saveGegnerLogbuch(gegnerLogbuch.map(x=>x.id===e.id?{...x,taktik:(x.taktik||'')+note}:x));
+                                setGegnerWeitereId(null);setGegnerWeitereText('');
+                              }} disabled={!gegnerWeitereText.trim()}
+                                style={{flex:1,padding:'6px',borderRadius:'7px',background:accentColor,border:'none',color:'white',fontSize:'12px',fontWeight:'700',cursor:'pointer',opacity:gegnerWeitereText.trim()?1:0.5}}>
+                                Speichern
+                              </button>
+                              <button onClick={()=>{setGegnerWeitereId(null);setGegnerWeitereText('');}}
+                                style={{padding:'6px 10px',borderRadius:'7px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.6)',fontSize:'12px',cursor:'pointer'}}>
+                                Abbrechen
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
