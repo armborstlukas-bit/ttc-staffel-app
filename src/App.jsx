@@ -6776,7 +6776,74 @@ export default function TrainingsApp() {
     );
   }
 
-  // ── ARCHIV VIEW ──────────────────────────────────────────────────────────
+  // ── KO Runde Helpers ──────────────────────────────────────────────────────
+  const buildKoBracketGraph = (B) => {
+    const wbM=[], lbM=[];
+    for(let i=0;i<B/2;i++) wbM.push({id:`wb_1_${i}`,bracket:'W',round:1,slot:i,p1Src:{t:'slot',s:2*i},p2Src:{t:'slot',s:2*i+1}});
+    let prevWB=wbM.slice(), wbRnd=1;
+    while(prevWB.length>1){ wbRnd++; const next=[];
+      for(let i=0;i<prevWB.length;i+=2){ const m={id:`wb_${wbRnd}_${Math.floor(i/2)}`,bracket:'W',round:wbRnd,slot:Math.floor(i/2),p1Src:{t:'win',id:prevWB[i].id},p2Src:{t:'win',id:prevWB[i+1].id}}; wbM.push(m); next.push(m); }
+      prevWB=next; }
+    const wbFinal=prevWB[0];
+    const wbR1=wbM.filter(m=>m.round===1); let prevLB=[], lbRnd=0;
+    if(wbR1.length>1){
+      lbRnd=1;
+      for(let i=0;i<Math.floor(wbR1.length/2);i++){ const m={id:`lb_1_${i}`,bracket:'L',round:1,slot:i,p1Src:{t:'lose',id:wbR1[i].id},p2Src:{t:'lose',id:wbR1[wbR1.length-1-i].id}}; lbM.push(m); prevLB.push(m); }
+      let wbDrop=2;
+      while(wbDrop<=wbRnd){
+        const droppers=wbM.filter(m=>m.round===wbDrop&&m.id!==wbFinal.id);
+        if(droppers.length>0){
+          lbRnd++; const dropIn=[]; const n=Math.max(prevLB.length,droppers.length);
+          for(let i=0;i<n;i++){ const m={id:`lb_${lbRnd}_${i}`,bracket:'L',round:lbRnd,slot:i,p1Src:prevLB[i]?{t:'win',id:prevLB[i].id}:{t:'bye'},p2Src:droppers[i]?{t:'lose',id:droppers[i].id}:{t:'bye'}}; lbM.push(m); dropIn.push(m); }
+          prevLB=dropIn; wbDrop++;
+          if(prevLB.length>1){ lbRnd++; const cons=[];
+            for(let i=0;i<prevLB.length;i+=2){ const m={id:`lb_${lbRnd}_${Math.floor(i/2)}`,bracket:'L',round:lbRnd,slot:Math.floor(i/2),p1Src:{t:'win',id:prevLB[i].id},p2Src:{t:'win',id:prevLB[i+1].id}}; lbM.push(m); cons.push(m); }
+            prevLB=cons; }
+        } else { wbDrop++; }
+      }
+      lbRnd++;
+      const lbFinal={id:`lb_${lbRnd}_0`,bracket:'L',round:lbRnd,slot:0,p1Src:{t:'win',id:prevLB[0].id},p2Src:{t:'lose',id:wbFinal.id}};
+      lbM.push(lbFinal);
+      const grandFinal={id:'gf',bracket:'F',round:1,slot:0,p1Src:{t:'win',id:wbFinal.id},p2Src:{t:'win',id:lbFinal.id}};
+      return {wbMatches:wbM,lbMatches:lbM,grandFinal,wbFinal,lbFinal};
+    }
+    return {wbMatches:wbM,lbMatches:[],grandFinal:wbFinal,wbFinal,lbFinal:null};
+  };
+  const resolveKoBracket = (pt) => {
+    const B=pt.bracketSize, pSlots=pt.playerSlots||[], mRes=pt.matchResults||{};
+    const graph=buildKoBracketGraph(B);
+    const allM=[...graph.wbMatches,...graph.lbMatches,...(graph.grandFinal?[graph.grandFinal]:[])];
+    const byId=Object.fromEntries(allM.map(m=>[m.id,m]));
+    const cache={};
+    const getP=(mid)=>{
+      if(cache[mid]) return cache[mid];
+      const m=byId[mid]; if(!m) return {p1:undefined,p2:undefined};
+      const res=(src)=>{
+        if(src.t==='slot') return pSlots[src.s]??null;
+        if(src.t==='bye') return null;
+        const {p1,p2}=getP(src.id); const r=mRes[src.id];
+        if(p1===null&&p2===null) return null;
+        if(p1===null) return src.t==='win'?p2:null;
+        if(p2===null) return src.t==='win'?p1:null;
+        if(p1===undefined||p2===undefined) return undefined;
+        if(!r) return undefined;
+        return src.t==='win'?(r.sets1>r.sets2?p1:p2):(r.sets1>r.sets2?p2:p1);
+      };
+      const rv={...m,p1:res(m.p1Src),p2:res(m.p2Src),result:mRes[mid]||null};
+      cache[mid]=rv; return rv;
+    };
+    allM.forEach(m=>getP(m.id));
+    allM.forEach(m=>{ const r=cache[m.id];
+      if(pt.settings?.handicap&&r.p1!=null&&r.p1!==undefined&&r.p2!=null&&r.p2!==undefined){
+        const t1=pt.players[r.p1]?.maxTTR||0,t2=pt.players[r.p2]?.maxTTR||0,diff=t1-t2;
+        const raw=Math.round(Math.abs(diff)/100)*(pt.settings.handicapPer100||1);
+        const pts=Math.min(raw,pt.settings.handicapMax||6);
+        if(pts>0) cache[m.id].handicap={b:diff>0?'p2':'p1',pts};
+      }
+    });
+    return {resolved:cache,graph};
+  };
+
   // ── ÜBUNGSWETTKÄMPFE (Liste + Erstellen) ─────────────────────
   if (view === 'practiceTournaments') {
     const jugendSubs = Object.values(subgroups).filter(sg => sg.groupId === 'jugend');
@@ -6799,7 +6866,33 @@ export default function TrainingsApp() {
     const filteredChildren = ptSubgroupFilter==='all' ? jugendChildren : jugendChildren.filter(c=>c.subgroupId===ptSubgroupFilter);
     const seededPreview = getSeededPlayers(ptSelectedChildren);
 
+    const startKoTournament = () => {
+      const seeded = getSeededPlayers(ptSelectedChildren);
+      const N = seeded.length;
+      const B = Math.pow(2, Math.ceil(Math.log2(Math.max(N, 2))));
+      const getSlots = (size) => { if(size===1) return [0]; const prev=getSlots(size/2); const result=new Array(size); for(let i=0;i<size/2;i++){result[2*i]=prev[i];result[2*i+1]=size-1-prev[i];} return result; };
+      const seeds = getSlots(B);
+      const playerSlots = seeds.map(s => s < N ? s : null);
+      const id = 'pt_' + Date.now();
+      const newPT = {
+        id, type:'ko_runde',
+        createdAt: new Date().toISOString(),
+        createdBy: userProfile?.name || user?.email || 'Trainer',
+        settings: { winSets:ptCreateForm.winSets, setLength:ptCreateForm.setLength, deciderLength:ptCreateForm.deciderCustom?ptCreateForm.deciderLength:ptCreateForm.setLength, trackSetScores:ptCreateForm.trackSetScores, handicap:ptCreateForm.handicap, handicapPer100:ptCreateForm.handicapPer100, handicapMax:ptCreateForm.handicapMax },
+        players: seeded.map((p,i) => ({...p, seed:i+1})),
+        bracketSize: B,
+        playerSlots,
+        matchResults: {},
+        status: 'active',
+      };
+      savePracticeTournaments({...practiceTournaments, [id]: newPT});
+      setActivePracticeId(id);
+      setPtCreating(false); setPtCreateStep(1); setPtSelectedChildren([]); setPtSubgroupFilter('all');
+      navTo('practiceTournamentDetail');
+    };
+
     const startTournament = () => {
+      if (ptCreateForm.type === 'ko_runde') { startKoTournament(); return; }
       const seeded = getSeededPlayers(ptSelectedChildren);
       const id = 'pt_' + Date.now();
       const newPT = {
@@ -6886,13 +6979,17 @@ export default function TrainingsApp() {
               {ptCreateStep===1 && (
                 <>
                   <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.5px'}}>Wettkampftyp</p>
-                  <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 14px',background:'rgba(124,58,237,0.06)',border:'1px solid rgba(124,58,237,0.2)',borderRadius:'12px',marginBottom:'22px'}}>
-                    <span style={{fontSize:'22px'}}>🎯</span>
-                    <div style={{flex:1}}>
-                      <p style={{margin:0,fontWeight:'800',color:'#1f2937',fontSize:'14px'}}>Rundenturnier</p>
-                      <p style={{margin:'2px 0 0',fontSize:'11px',color:'#6b7280'}}>Jeder spielt gegen jeden · bester vs. zweitbester immer in der letzten Runde</p>
-                    </div>
+                  <div style={{display:'flex',gap:'8px',marginBottom:'22px'}}>
+                    {[{v:'4er_gruppe',icon:'🎯',label:'Rundenturnier',desc:'Jeder gegen jeden'},{v:'ko_runde',icon:'🏆',label:'KO Runde',desc:'Turnierbaum · Double Elimination'}].map(opt=>(
+                      <button key={opt.v} onClick={()=>setPtCreateForm(f=>({...f,type:opt.v}))}
+                        style={{flex:1,padding:'12px 10px',border:`2px solid ${ptCreateForm.type===opt.v?'#7c3aed':'#e5e7eb'}`,borderRadius:'12px',background:ptCreateForm.type===opt.v?'rgba(124,58,237,0.08)':'#f9fafb',cursor:'pointer',textAlign:'left',transition:'all 0.1s'}}>
+                        <div style={{fontSize:'20px',marginBottom:'3px'}}>{opt.icon}</div>
+                        <div style={{fontWeight:'800',color:ptCreateForm.type===opt.v?'#7c3aed':'#1f2937',fontSize:'13px'}}>{opt.label}</div>
+                        <div style={{fontSize:'10px',color:'#9ca3af',marginTop:'1px'}}>{opt.desc}</div>
+                      </button>
+                    ))}
                   </div>
+                  {ptCreateForm.type!=='ko_runde'&&<>
                   <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.5px'}}>Gruppengröße</p>
                   <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'22px'}}>
                     {[3,4,5,6,7,8,9,10].map(n=>(
@@ -6902,6 +6999,7 @@ export default function TrainingsApp() {
                       </button>
                     ))}
                   </div>
+                  </>}
 
                   <p style={{margin:'0 0 14px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.5px'}}>Spielmodus</p>
                   <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'16px',marginBottom:'22px'}}>
@@ -7014,11 +7112,14 @@ export default function TrainingsApp() {
               )}
 
               {/* Step 2: Spieler */}
-              {ptCreateStep===2 && (
+              {ptCreateStep===2 && (()=>{
+                const isKo = ptCreateForm.type==='ko_runde';
+                const canStart = isKo ? ptSelectedChildren.length>=3 : ptSelectedChildren.length===maxPlayers;
+                return (
                 <>
                   <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'16px'}}>
                     <button onClick={()=>setPtCreateStep(1)} style={{padding:'6px 12px',background:'#f3f4f6',border:'1px solid #e5e7eb',borderRadius:'8px',color:'#6b7280',cursor:'pointer',fontSize:'13px',fontWeight:'600'}}>← Zurück</button>
-                    <h3 style={{margin:0,color:'#7c3aed',fontSize:'15px',fontWeight:'800'}}>Spieler auswählen ({ptSelectedChildren.length}/{maxPlayers})</h3>
+                    <h3 style={{margin:0,color:'#7c3aed',fontSize:'15px',fontWeight:'800'}}>Spieler auswählen ({ptSelectedChildren.length}{isKo?'+ (min. 3)':'/'+maxPlayers})</h3>
                   </div>
 
                   {/* Untergruppen-Filter */}
@@ -7074,12 +7175,13 @@ export default function TrainingsApp() {
                     </div>
                   )}
 
-                  <button onClick={startTournament} disabled={ptSelectedChildren.length!==maxPlayers}
-                    style={{width:'100%',padding:'14px',background:ptSelectedChildren.length===maxPlayers?'linear-gradient(135deg,#7c3aed,#6d28d9)':'#e5e7eb',color:ptSelectedChildren.length===maxPlayers?'white':'#9ca3af',border:'none',borderRadius:'12px',cursor:ptSelectedChildren.length===maxPlayers?'pointer':'not-allowed',fontWeight:'800',fontSize:'15px',opacity:ptSelectedChildren.length===maxPlayers?1:0.7,transition:'all 0.15s'}}>
-                    {ptSelectedChildren.length===maxPlayers?'🎮 Wettkampf starten!':`Noch ${maxPlayers-ptSelectedChildren.length} Spieler auswählen`}
+                  <button onClick={startTournament} disabled={!canStart}
+                    style={{width:'100%',padding:'14px',background:canStart?'linear-gradient(135deg,#7c3aed,#6d28d9)':'#e5e7eb',color:canStart?'white':'#9ca3af',border:'none',borderRadius:'12px',cursor:canStart?'pointer':'not-allowed',fontWeight:'800',fontSize:'15px',opacity:canStart?1:0.7,transition:'all 0.15s'}}>
+                    {canStart?(isKo?`🏆 KO Turnier starten! (${ptSelectedChildren.length} Spieler)`:'🎮 Wettkampf starten!'):(isKo?`Mind. 3 Spieler auswählen (${ptSelectedChildren.length}/3)`:`Noch ${maxPlayers-ptSelectedChildren.length} Spieler auswählen`)}
                   </button>
                 </>
-              )}
+                );
+              })()}
             </div>
           )}
 
@@ -7087,7 +7189,7 @@ export default function TrainingsApp() {
           {(()=>{
             const sevenDaysAgo = new Date(Date.now()-7*24*60*60*1000).toISOString();
             const toAutoArchive = allPTList.filter(pt=>{
-              const done=pt.matches.every(m=>m.result);
+              const done = pt.type==='ko_runde' ? !!(pt.matchResults?.gf) : (pt.matches||[]).every(m=>m.result);
               return done && pt.createdAt < sevenDaysAgo;
             });
             if(toAutoArchive.length>0){
@@ -7110,9 +7212,10 @@ export default function TrainingsApp() {
 
           {/* ── Aktive Wettkämpfe ──────────────────────────────── */}
           {(()=>{
-            const activePTs = allPTList.filter(pt=>!pt.matches.every(m=>m.result));
+            const isPtDone = (pt) => pt.type==='ko_runde' ? !!(pt.matchResults?.gf) : (pt.matches||[]).every(m=>m.result);
+            const activePTs = allPTList.filter(pt=>!isPtDone(pt));
             const recentDonePTs = allPTList.filter(pt=>{
-              const done=pt.matches.every(m=>m.result);
+              const done=isPtDone(pt);
               const sevenDaysAgo2=new Date(Date.now()-7*24*60*60*1000).toISOString();
               return done && pt.createdAt >= sevenDaysAgo2;
             });
@@ -7122,9 +7225,10 @@ export default function TrainingsApp() {
               const upd={...practiceTournaments}; delete upd[ptId]; savePracticeTournaments(upd);
             };
             const PTCard = ({pt, showBadge}) => {
-              const done=pt.matches.filter(m=>m.result).length;
-              const total=pt.matches.length;
-              const allDone2=done===total;
+              const isKoPt = pt.type==='ko_runde';
+              const done = isKoPt ? Object.keys(pt.matchResults||{}).length : (pt.matches||[]).filter(m=>m.result).length;
+              const total = isKoPt ? null : (pt.matches||[]).length;
+              const allDone2 = isKoPt ? !!(pt.matchResults?.gf) : done===total;
               return (
                 <div style={{position:'relative'}}>
                   <div onClick={()=>{setActivePracticeId(pt.id);setPtMatchEditing(null);setPtMatchDraft(null);navTo('practiceTournamentDetail');}}
@@ -7134,8 +7238,8 @@ export default function TrainingsApp() {
                     <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'8px',marginBottom:'8px'}}>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:'flex',alignItems:'center',gap:'7px',marginBottom:'4px',flexWrap:'wrap'}}>
-                          <span style={{fontSize:'16px'}}>🎯</span>
-                          <span style={{fontWeight:'800',color:'#1f2937',fontSize:'15px'}}>{pt.players?pt.players.length+'er Gruppe':'4er Gruppe'}</span>
+                          <span style={{fontSize:'16px'}}>{isKoPt?'🏆':'🎯'}</span>
+                          <span style={{fontWeight:'800',color:'#1f2937',fontSize:'15px'}}>{isKoPt?`KO Runde · ${pt.players?.length} Spieler`:(pt.players?.length||4)+'er Gruppe'}</span>
                           <span style={{fontSize:'10px',fontWeight:'700',color:allDone2?'#16a34a':'#d97706',background:allDone2?'#dcfce7':'#fef9c3',padding:'2px 7px',borderRadius:'10px',border:`1px solid ${allDone2?'#86efac':'#fde68a'}`}}>
                             {allDone2?'✓ Abgeschlossen':'● Laufend'}
                           </span>
@@ -7145,7 +7249,7 @@ export default function TrainingsApp() {
                         </p>
                       </div>
                       <div style={{display:'flex',alignItems:'center',gap:'6px',flexShrink:0}}>
-                        <span style={{fontSize:'12px',fontWeight:'700',color:'#7c3aed'}}>{done}/{total}</span>
+                        <span style={{fontSize:'12px',fontWeight:'700',color:'#7c3aed'}}>{done}{total!==null?'/'+total:' Partien'}</span>
                         <button onClick={(e)=>deletePT(e,pt.id)}
                           style={{width:'28px',height:'28px',borderRadius:'7px',background:'#fee2e2',border:'1px solid #fca5a5',color:'#dc2626',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}
                           title="Wettkampf löschen">
@@ -7214,6 +7318,252 @@ export default function TrainingsApp() {
       </div>
     );
 
+    // ── KO Runde Detail ────────────────────────────────────────────────────
+    if (pt.type === 'ko_runde') {
+      const {resolved, graph} = resolveKoBracket(pt);
+      const {settings, players} = pt;
+      const maxSets = settings.winSets * 2 - 1;
+      const allM = [...graph.wbMatches, ...graph.lbMatches, ...(graph.grandFinal?[graph.grandFinal]:[])];
+      const gfDone = !!(pt.matchResults?.gf);
+
+      const saveKoResult = (matchId, result) => {
+        savePracticeTournaments({...practiceTournaments, [pt.id]: {...pt, matchResults:{...(pt.matchResults||{}), [matchId]:result}}});
+      };
+      const deleteKoResult = (matchId) => {
+        const upd={...(pt.matchResults||{})}; delete upd[matchId];
+        savePracticeTournaments({...practiceTournaments, [pt.id]: {...pt, matchResults:upd}});
+      };
+      const initKoDraft = (matchId) => {
+        const existing = pt.matchResults?.[matchId];
+        if (settings.trackSetScores) {
+          setPtMatchDraft({mode:'scores', scores:existing?.scores?.map(s=>({s1:String(s.s1),s2:String(s.s2)}))||[{s1:'',s2:''}]});
+        } else {
+          setPtMatchDraft({mode:'simple', sets1:existing?.sets1||0, sets2:existing?.sets2||0});
+        }
+        setPtMatchEditing(matchId);
+      };
+      const isDraftValidKo = () => {
+        if(!ptMatchDraft) return false;
+        if(ptMatchDraft.mode==='scores'){
+          const valid=ptMatchDraft.scores.filter(r=>r.s1!==''&&r.s2!==''&&Number(r.s1)!==Number(r.s2));
+          const s1=valid.filter(r=>Number(r.s1)>Number(r.s2)).length, s2=valid.filter(r=>Number(r.s2)>Number(r.s1)).length;
+          return s1===settings.winSets||s2===settings.winSets;
+        } else {
+          const {sets1,sets2}=ptMatchDraft;
+          return (sets1===settings.winSets||sets2===settings.winSets)&&sets1!==sets2;
+        }
+      };
+      const saveKoDraft = () => {
+        if(!ptMatchEditing||!ptMatchDraft) return;
+        let result;
+        if(ptMatchDraft.mode==='scores'){
+          const validScores=ptMatchDraft.scores.filter(r=>r.s1!==''&&r.s2!=='').map(r=>({s1:Number(r.s1),s2:Number(r.s2)}));
+          result={sets1:validScores.filter(r=>r.s1>r.s2).length, sets2:validScores.filter(r=>r.s2>r.s1).length, scores:validScores};
+        } else { result={sets1:ptMatchDraft.sets1,sets2:ptMatchDraft.sets2,scores:[]}; }
+        saveKoResult(ptMatchEditing, result);
+        setPtMatchEditing(null); setPtMatchDraft(null);
+      };
+
+      const archiveKo = () => {
+        const gfR = resolved['gf'] || resolved[graph.wbFinal?.id];
+        const standings = players.map((p,i)=>({childId:p.childId,name:p.name,seed:p.seed,place:99}));
+        if(gfR?.result){
+          const winner = gfR.result.sets1>gfR.result.sets2 ? gfR.p1 : gfR.p2;
+          const loser  = gfR.result.sets1>gfR.result.sets2 ? gfR.p2 : gfR.p1;
+          if(winner!=null) standings[winner].place=1;
+          if(loser!=null)  standings[loser].place=2;
+        }
+        const finalStandings = standings.sort((a,b)=>a.place-b.place).map((s,i)=>({...s,place:s.place===99?i+3:s.place}));
+        const archivedPT={...pt,status:'archived',archivedAt:new Date().toISOString(),finalStandings};
+        const newActive={...practiceTournaments}; delete newActive[pt.id];
+        savePracticeTournaments(newActive);
+        saveArchivedPracticeTournaments({...archivedPracticeTournaments,[pt.id]:archivedPT});
+        setActivePracticeId(null); navTo('practiceTournaments');
+      };
+      const deleteKoTournament = () => {
+        if(!window.confirm('KO Turnier wirklich löschen?')) return;
+        const upd={...practiceTournaments}; delete upd[pt.id];
+        savePracticeTournaments(upd); setActivePracticeId(null); navTo('practiceTournaments');
+      };
+
+      const inpStyleKo = {background:'rgba(255,255,255,0.09)',border:'1px solid rgba(167,139,250,0.25)',borderRadius:'8px',color:'white',fontSize:'20px',fontWeight:'900',textAlign:'center',width:'58px',height:'44px',outline:'none'};
+      const placeEmoji=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣'];
+      const wbTotalRounds = graph.wbMatches.length>0?Math.max(...graph.wbMatches.map(m=>m.round)):1;
+      const wbRoundLabel = (r) => { const rem=wbTotalRounds-r; if(rem===0)return'WB Finale'; if(rem===1)return'WB Halbfinale'; if(rem===2)return'WB Viertelfinale'; return`WB Runde ${r}`; };
+      const wbRoundsNums = [...new Set(graph.wbMatches.map(m=>m.round))];
+      const lbRoundsNums = [...new Set(graph.lbMatches.map(m=>m.round))];
+
+      const KoMatchCard = ({matchId, isFinal=false}) => {
+        const rm = resolved[matchId]; if(!rm) return null;
+        const p1=rm.p1, p2=rm.p2;
+        // Skip pure bye matches
+        if(p1===null&&p2===null) return null;
+        const p1Name = p1===null?'Freilos':p1===undefined?'Wird ermittelt…':players[p1]?.name||'?';
+        const p2Name = p2===null?'Freilos':p2===undefined?'Wird ermittelt…':players[p2]?.name||'?';
+        const isEditing = ptMatchEditing===matchId;
+        const res = rm.result;
+        const p1Won = res&&res.sets1>res.sets2, p2Won = res&&res.sets2>res.sets1;
+        const isBye = p1===null||p2===null;
+        const canPlay = p1!==null&&p1!==undefined&&p2!==null&&p2!==undefined&&!isBye;
+        const borderCol = isEditing?'rgba(167,139,250,0.6)':res?'rgba(74,222,128,0.25)':isBye?'rgba(255,255,255,0.06)':'rgba(255,255,255,0.1)';
+        const hcap = rm.handicap;
+
+        return (
+          <div style={{background:isFinal?'rgba(253,230,138,0.05)':isBye?'rgba(255,255,255,0.01)':'rgba(255,255,255,0.04)',border:`1.5px solid ${borderCol}`,borderRadius:'14px',overflow:'hidden',opacity:isBye?0.5:1}}>
+            <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'11px 14px'}}>
+              <div style={{flex:1,textAlign:'right',minWidth:0}}>
+                <p style={{margin:0,fontWeight:'800',fontSize:'14px',color:p1Won?'#4ade80':res&&!p1Won?'rgba(255,255,255,0.3)':p1===undefined?'rgba(255,255,255,0.25)':'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p1Name}</p>
+                {p1!=null&&p1!==undefined&&<p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.2)'}}>#{players[p1]?.seed}{hcap?.b==='p1'?<span style={{color:'#fde68a',fontWeight:'700'}}> +{hcap.pts}P</span>:null}</p>}
+              </div>
+              <div style={{minWidth:'60px',textAlign:'center',flexShrink:0}}>
+                {isBye?<span style={{fontSize:'11px',color:'rgba(251,191,36,0.6)',fontWeight:'700'}}>Freilos</span>
+                  :res?<span style={{fontSize:'19px',fontWeight:'900',color:'white',letterSpacing:'2px'}}>{res.sets1}:{res.sets2}</span>
+                  :<span style={{fontSize:'12px',color:'rgba(255,255,255,0.2)',fontWeight:'600'}}>vs</span>}
+                {hcap&&!isBye&&<p style={{margin:'2px 0 0',fontSize:'10px',color:'rgba(253,230,138,0.6)',fontWeight:'600'}}>{hcap.pts}P Vorgabe</p>}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <p style={{margin:0,fontWeight:'800',fontSize:'14px',color:p2Won?'#4ade80':res&&!p2Won?'rgba(255,255,255,0.3)':p2===undefined?'rgba(255,255,255,0.25)':'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p2Name}</p>
+                {p2!=null&&p2!==undefined&&<p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.2)'}}>#{players[p2]?.seed}{hcap?.b==='p2'?<span style={{color:'#fde68a',fontWeight:'700'}}> +{hcap.pts}P</span>:null}</p>}
+              </div>
+              {canPlay&&!isEditing&&(
+                <button onClick={()=>initKoDraft(matchId)} style={{flexShrink:0,padding:'6px 10px',background:res?'rgba(255,255,255,0.06)':'rgba(167,139,250,0.12)',border:`1px solid ${res?'rgba(255,255,255,0.1)':'rgba(167,139,250,0.3)'}`,borderRadius:'8px',cursor:'pointer',color:res?'rgba(255,255,255,0.45)':'#c4b5fd',fontSize:'12px',fontWeight:'700'}}>
+                  {res?'✏️':'Eintragen'}
+                </button>
+              )}
+            </div>
+            {!isEditing&&res?.scores?.length>0&&(
+              <div style={{padding:'4px 14px 10px',display:'flex',gap:'10px',flexWrap:'wrap'}}>
+                {res.scores.map((sc,si)=><span key={si} style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',fontWeight:'700'}}>{si===maxSets-1?'⚡':''}S{si+1}: {sc.s1}:{sc.s2}</span>)}
+              </div>
+            )}
+            {isEditing&&ptMatchDraft&&(
+              <div style={{padding:'14px',borderTop:'1px solid rgba(167,139,250,0.15)',background:'rgba(167,139,250,0.05)'}}>
+                {ptMatchDraft.mode==='scores'?(
+                  <>
+                    <p style={{margin:'0 0 10px',fontSize:'12px',fontWeight:'700',color:'rgba(167,139,250,0.7)'}}>Satzergebnisse · {settings.setLength}/{settings.deciderLength}</p>
+                    <div style={{display:'grid',gap:'7px',marginBottom:'10px'}}>
+                      {ptMatchDraft.scores.map((row,si)=>{
+                        const isD=si===maxSets-1;
+                        return (<div key={si} style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                          <span style={{fontSize:'11px',fontWeight:'700',color:isD?'#fde68a':'rgba(255,255,255,0.3)',minWidth:'68px'}}>{isD?'⚡ Entscheid.':`Satz ${si+1}`}</span>
+                          <input type="number" min="0" max="99" value={row.s1} onChange={e=>{const sc=[...ptMatchDraft.scores];sc[si]={...sc[si],s1:e.target.value===''?'':e.target.value};setPtMatchDraft(d=>({...d,scores:sc}));}} style={inpStyleKo} placeholder="0"/>
+                          <span style={{color:'rgba(255,255,255,0.3)',fontWeight:'900',fontSize:'18px'}}>:</span>
+                          <input type="number" min="0" max="99" value={row.s2} onChange={e=>{const sc=[...ptMatchDraft.scores];sc[si]={...sc[si],s2:e.target.value===''?'':e.target.value};setPtMatchDraft(d=>({...d,scores:sc}));}} style={inpStyleKo} placeholder="0"/>
+                          {ptMatchDraft.scores.length>1&&<button onClick={()=>setPtMatchDraft(d=>({...d,scores:d.scores.filter((_,j)=>j!==si)}))} style={{width:'28px',height:'28px',borderRadius:'6px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',fontSize:'16px',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>}
+                        </div>);
+                      })}
+                      {ptMatchDraft.scores.length<maxSets&&<button onClick={()=>setPtMatchDraft(d=>({...d,scores:[...d.scores,{s1:'',s2:''}]}))} style={{padding:'6px 12px',background:'rgba(255,255,255,0.04)',border:'1px dashed rgba(167,139,250,0.3)',borderRadius:'8px',color:'rgba(167,139,250,0.6)',cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>+ Satz</button>}
+                    </div>
+                  </>
+                ):(
+                  <>
+                    <p style={{margin:'0 0 12px',fontSize:'12px',fontWeight:'700',color:'rgba(167,139,250,0.7)'}}>Gewonnene Sätze (Best of {settings.winSets*2-1})</p>
+                    <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'10px',flexWrap:'wrap'}}>
+                      {[{key:'sets1',name:p1Name},{key:'sets2',name:p2Name}].map(side=>(
+                        <div key={side.key} style={{flex:1,minWidth:'120px',textAlign:'center'}}>
+                          <p style={{margin:'0 0 7px',fontSize:'13px',fontWeight:'800',color:'white'}}>{side.name}</p>
+                          <div style={{display:'flex',gap:'5px',justifyContent:'center'}}>
+                            {Array.from({length:settings.winSets+1},(_,n)=>(
+                              <button key={n} onClick={()=>setPtMatchDraft(d=>({...d,[side.key]:n}))}
+                                style={{width:'38px',height:'38px',borderRadius:'9px',border:`2px solid ${ptMatchDraft[side.key]===n?'#a78bfa':'rgba(255,255,255,0.1)'}`,background:ptMatchDraft[side.key]===n?'rgba(167,139,250,0.25)':'rgba(255,255,255,0.04)',color:ptMatchDraft[side.key]===n?'white':'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'900',fontSize:'17px'}}>
+                                {n}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+                <div style={{display:'flex',gap:'8px',marginTop:'4px'}}>
+                  {res&&<button onClick={()=>{deleteKoResult(matchId);setPtMatchEditing(null);setPtMatchDraft(null);}} style={{padding:'8px 10px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',borderRadius:'8px',cursor:'pointer',color:'#f87171',fontWeight:'700',fontSize:'12px'}}>🗑️</button>}
+                  <button onClick={()=>{setPtMatchEditing(null);setPtMatchDraft(null);}} style={{flex:1,padding:'9px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>Abbrechen</button>
+                  <button onClick={saveKoDraft} disabled={!isDraftValidKo()} style={{flex:2,padding:'9px',background:isDraftValidKo()?'linear-gradient(135deg,#7c3aed,#6d28d9)':'rgba(255,255,255,0.06)',border:'none',borderRadius:'8px',color:'white',cursor:isDraftValidKo()?'pointer':'not-allowed',fontWeight:'800',fontSize:'13px',opacity:isDraftValidKo()?1:0.45}}>✓ Speichern</button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      return (
+        <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+          <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
+            {/* Header */}
+            <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',gap:'14px',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 24px':'0 -24px 28px'}}>
+              <button onClick={()=>{setPtMatchEditing(null);setPtMatchDraft(null);navTo('practiceTournaments');}} style={{width:'38px',height:'38px',borderRadius:'10px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',color:'#4ade80',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><ArrowLeft size={18}/></button>
+              <div style={{flex:1,minWidth:0}}>
+                <p style={{margin:'0 0 1px',color:'rgba(167,139,250,0.5)',fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>
+                  🏆 KO Runde · {settings.winSets} GS · {settings.setLength}/{settings.deciderLength} · {pt.players.length} Spieler · Größe {pt.bracketSize}
+                </p>
+                <h2 style={{margin:0,color:'white',fontWeight:'800',fontSize:isMobile?'14px':'17px',letterSpacing:'-0.2px'}}>
+                  {new Date(pt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})} · {pt.createdBy}
+                </h2>
+              </div>
+              <button onClick={deleteKoTournament} style={{width:'34px',height:'34px',borderRadius:'8px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}><Trash2 size={14}/></button>
+            </div>
+
+            {/* Setzung */}
+            <div style={{marginBottom:'24px',padding:'14px 16px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(167,139,250,0.12)',borderRadius:'14px'}}>
+              <p style={{margin:'0 0 10px',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.45)',textTransform:'uppercase',letterSpacing:'2px'}}>Setzung · {pt.bracketSize-pt.players.length} Freilos{pt.bracketSize-pt.players.length!==1?'e':''}</p>
+              <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+                {players.map((p,i)=>(
+                  <span key={i} style={{fontSize:'12px',fontWeight:'700',background:'rgba(167,139,250,0.1)',border:'1px solid rgba(167,139,250,0.2)',color:'#c4b5fd',padding:'3px 10px',borderRadius:'10px'}}>
+                    {p.seed}. {p.name}{p.maxTTR>0?` (TTR ${p.maxTTR})`:''}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Winners Bracket */}
+            <div style={{marginBottom:'28px'}}>
+              <p style={{margin:'0 0 12px',fontSize:'10px',fontWeight:'800',color:'rgba(74,222,128,0.5)',textTransform:'uppercase',letterSpacing:'2px'}}>🏆 Winners Bracket</p>
+              {wbRoundsNums.map(r=>(
+                <div key={r} style={{marginBottom:'14px'}}>
+                  <p style={{margin:'0 0 8px',fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'1px'}}>{wbRoundLabel(r)}</p>
+                  <div style={{display:'grid',gap:'8px'}}>
+                    {graph.wbMatches.filter(m=>m.round===r).map(m=><KoMatchCard key={m.id} matchId={m.id} isFinal={r===wbTotalRounds}/>)}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Verlierer Bracket */}
+            {graph.lbMatches.length>0&&(
+              <div style={{marginBottom:'28px'}}>
+                <p style={{margin:'0 0 12px',fontSize:'10px',fontWeight:'800',color:'rgba(248,113,113,0.5)',textTransform:'uppercase',letterSpacing:'2px'}}>📉 Verlierer Bracket</p>
+                {lbRoundsNums.map(r=>(
+                  <div key={r} style={{marginBottom:'14px'}}>
+                    <p style={{margin:'0 0 8px',fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'1px'}}>VB Runde {r}</p>
+                    <div style={{display:'grid',gap:'8px'}}>
+                      {graph.lbMatches.filter(m=>m.round===r).map(m=><KoMatchCard key={m.id} matchId={m.id}/>)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Großes Finale */}
+            {graph.grandFinal&&graph.grandFinal.id!==graph.wbFinal?.id&&(
+              <div style={{marginBottom:'28px'}}>
+                <p style={{margin:'0 0 12px',fontSize:'10px',fontWeight:'800',color:'rgba(253,230,138,0.6)',textTransform:'uppercase',letterSpacing:'2px'}}>🏟️ Großes Finale</p>
+                <KoMatchCard matchId="gf" isFinal={true}/>
+              </div>
+            )}
+
+            {/* Abschluss */}
+            {gfDone&&(
+              <div style={{padding:'18px 20px',background:'rgba(74,222,128,0.07)',border:'1px solid rgba(74,222,128,0.22)',borderRadius:'16px',textAlign:'center'}}>
+                <p style={{margin:'0 0 6px',fontSize:'17px',fontWeight:'900',color:'#4ade80'}}>🏆 KO Turnier abgeschlossen!</p>
+                {(()=>{const gfR=resolved['gf'];const wIdx=gfR?.result?.sets1>gfR?.result?.sets2?gfR.p1:gfR?.p2;return wIdx!=null&&<p style={{margin:'0 0 14px',fontSize:'13px',color:'rgba(255,255,255,0.45)'}}>Sieger: <strong style={{color:'#fde68a'}}>{players[wIdx]?.name}</strong></p>;})()}
+                <button onClick={archiveKo} style={{padding:'12px 28px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'800',fontSize:'14px',display:'inline-flex',alignItems:'center',gap:'8px'}}><Archive size={16}/> Archivieren</button>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+    // ── Rundenturnier Detail (existing) ────────────────────────────────────
     const { settings, players, matches } = pt;
     const maxSets = settings.winSets * 2 - 1;
     const numRoundsTotal = players.length % 2 === 0 ? players.length - 1 : players.length;
