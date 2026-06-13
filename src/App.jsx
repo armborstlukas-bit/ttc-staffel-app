@@ -3801,7 +3801,7 @@ export default function TrainingsApp() {
     );
   }
 
-  if (['eltern','jugendlich'].includes(userRole)) {
+  if (['eltern','jugendlich'].includes(userRole) && view === 'home') {
     const myChild=getMyChild();
     const sub=myChild?subgroups[myChild.subgroupId]:null;
     const grp=sub?FIXED_GROUPS.find(g=>g.id===sub.groupId):null;
