@@ -3872,12 +3872,12 @@ export default function TrainingsApp() {
 
     // ── Sub-View: eigene Seite mit Trainer-ähnlichem Header ──
     const subViewMeta = {
-      benachrichtigungen: { label:'Benachrichtigungen', icon:'🔔', color:'rgba(167,139,250,0.5)' },
-      trainingsverlauf:   { label:'Trainingsverlauf',   icon:'📋', color:'rgba(103,232,249,0.5)' },
-      mannschaft:         { label:'Mannschaft',          icon:'🏓', color:'rgba(45,212,191,0.5)'  },
-      turniere:           { label:'Turniere',            icon:'🏆', color:'rgba(253,230,138,0.5)' },
-      rangliste:          { label:'Rangliste',           icon:'📊', color:'rgba(251,191,36,0.5)'  },
-      errungenschaften:   { label:'Errungenschaften',    icon:'🏅', color:'rgba(134,239,172,0.5)' },
+      benachrichtigungen: { label:'Benachrichtigungen', icon:'🔔', color:'#c4b5fd', colorFaint:'rgba(167,139,250,0.5)', border:'rgba(167,139,250,0.15)', bg:'linear-gradient(170deg,#0d0a1f 0%,#150d2e 45%,#0a0818 100%)', hdrBg:'rgba(13,10,31,0.97)' },
+      trainingsverlauf:   { label:'Trainingsverlauf',   icon:'📋', color:'#67e8f9', colorFaint:'rgba(103,232,249,0.5)', border:'rgba(103,232,249,0.15)', bg:'linear-gradient(170deg,#051a20 0%,#082d38 45%,#041520 100%)', hdrBg:'rgba(5,26,32,0.97)'  },
+      mannschaft:         { label:'Mannschaft',          icon:'🏓', color:'#2dd4bf', colorFaint:'rgba(45,212,191,0.5)',  border:'rgba(45,212,191,0.15)',  bg:'linear-gradient(170deg,#041a1a 0%,#072d2a 45%,#041816 100%)', hdrBg:'rgba(4,26,26,0.97)'  },
+      turniere:           { label:'Turniere',            icon:'🏆', color:'#fde68a', colorFaint:'rgba(253,230,138,0.5)', border:'rgba(253,230,138,0.15)', bg:'linear-gradient(170deg,#1a1500 0%,#2d2200 45%,#1a1200 100%)', hdrBg:'rgba(26,21,0,0.97)'  },
+      rangliste:          { label:'Rangliste',           icon:'📊', color:'#fbbf24', colorFaint:'rgba(251,191,36,0.5)',  border:'rgba(251,191,36,0.15)',  bg:'linear-gradient(170deg,#1a1200 0%,#2d1e00 45%,#1a1000 100%)', hdrBg:'rgba(26,18,0,0.97)'  },
+      errungenschaften:   { label:'Errungenschaften',    icon:'🏅', color:'#86efac', colorFaint:'rgba(134,239,172,0.5)', border:'rgba(134,239,172,0.15)', bg:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)', hdrBg:'rgba(2,26,10,0.97)'  },
     };
 
     if (elternSubView && subViewMeta[elternSubView]) {
@@ -4139,7 +4139,7 @@ export default function TrainingsApp() {
       };
 
       return (
-        <div className="ttc-view-enter" key={`${viewKey}-sub-${elternSubView}`} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-view-enter" key={`${viewKey}-sub-${elternSubView}`} style={{minHeight:'100vh',background:meta.bg,fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
           <AchievementPopup data={achievementPopup} onClose={()=>setAchievementPopup(null)}/>
           {ptDetailModal&&(()=>{
             const mpt=ptDetailModal;const mPlayers=mpt.players||[];const mMatches=mpt.matches||[];const isArchived=!!mpt.archivedAt;
@@ -4151,20 +4151,19 @@ export default function TrainingsApp() {
             const roundsM=Array.from({length:numRoundsM},(_,i)=>i+1);
             return(<div onClick={()=>setPtDetailModal(null)} style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',zIndex:9000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}><div onClick={e=>e.stopPropagation()} style={{background:'linear-gradient(170deg,#021a0a 0%,#042d12 100%)',borderRadius:'24px 24px 0 0',width:'100%',maxWidth:'520px',maxHeight:'85vh',overflowY:'auto',padding:'20px 16px 36px',border:'1px solid rgba(167,139,250,0.2)',borderBottom:'none'}}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px'}}><span style={{fontWeight:'800',color:'white',fontSize:'17px'}}>{mPlayers.length}er Gruppe</span><button onClick={()=>setPtDetailModal(null)} style={{width:'32px',height:'32px',borderRadius:'8px',background:'rgba(255,255,255,0.08)',border:'none',color:'rgba(255,255,255,0.7)',cursor:'pointer',fontSize:'18px',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button></div><div style={{display:'grid',gap:'4px',marginBottom:'20px'}}>{mStandings.map(s=>(<div key={s.childId||s.name} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',background:'rgba(255,255,255,0.04)',borderRadius:'10px'}}><span style={{fontSize:'18px',flexShrink:0}}>{placeEmojiM[s.place-1]||(s.place+'.')}</span><div><p style={{margin:0,fontWeight:'800',color:'white',fontSize:'13px'}}>{s.name}</p><p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{s.wins}S {s.losses}N</p></div></div>))}</div></div></div>);
           })()}
-          <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
-            {/* ── Top-Bar ── */}
-            <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',gap:'14px',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 24px':'0 -24px 28px'}}>
-              <button onClick={()=>setElternSubView(null)} style={{width:'38px',height:'38px',borderRadius:'10px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',color:'#4ade80',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                <ArrowLeft size={18}/>
-              </button>
-              <div style={{flex:1,minWidth:0}}>
-                <h2 style={{margin:0,color:'white',fontWeight:'800',fontSize:'20px',letterSpacing:'-0.3px'}}>{meta.icon} {meta.label}</h2>
-                <p style={{margin:0,color:meta.color,fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>{myChild?.name||''} · {userRole==='eltern'?'Eltern-Portal':'Jugend-Portal'}</p>
-              </div>
-              <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{padding:'8px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.6)',fontSize:isMobile?'16px':'12px',fontWeight:'600',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'⚙️':'⚙️ Profil'}</button>
-              <button onClick={()=>signOut(auth)} style={{padding:'8px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',color:'#fca5a5',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'🚪':'Abmelden'}</button>
+          {/* ── Top-Bar (volle Breite, farbig sticky) ── */}
+          <div className="ttc-sticky-hdr" style={{background:meta.hdrBg,borderBottom:`1px solid ${meta.border}`,padding:isMobile?'12px 16px':'16px 28px',display:'flex',alignItems:'center',gap:'12px'}}>
+            <button onClick={()=>setElternSubView(null)} style={{width:'36px',height:'36px',borderRadius:'10px',background:`rgba(255,255,255,0.08)`,border:`1px solid ${meta.border}`,color:meta.color,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+              <ArrowLeft size={18}/>
+            </button>
+            <div style={{flex:1,minWidth:0}}>
+              <h2 style={{margin:0,color:'white',fontWeight:'800',fontSize:'18px',letterSpacing:'-0.3px'}}>{meta.icon} {meta.label}</h2>
+              <p style={{margin:0,color:meta.colorFaint,fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>{myChild?.name||''} · {userRole==='eltern'?'Eltern-Portal':'Jugend-Portal'}</p>
             </div>
-            {/* ── Sub-Content ── */}
+            <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{padding:'8px',background:'rgba(255,255,255,0.06)',border:`1px solid ${meta.border}`,borderRadius:'10px',color:'rgba(255,255,255,0.5)',fontSize:isMobile?'16px':'12px',fontWeight:'600',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'⚙️':'⚙️ Profil'}</button>
+            <button onClick={()=>signOut(auth)} style={{padding:'8px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',color:'#fca5a5',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'🚪':'Abmelden'}</button>
+          </div>
+          <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'20px 14px 40px':'24px 24px 60px'}}>
             {renderSubContent()}
           </div>
           {/* Profil-Modal */}
