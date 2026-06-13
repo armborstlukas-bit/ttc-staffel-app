@@ -4277,7 +4277,7 @@ export default function TrainingsApp() {
                         {sessGrpNames.length>0&&<p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>📂 {sessGrpNames.join(', ')}</p>}
                       </div>
                       <button onClick={()=>respondToSession(session.id,'missing')} style={{flexShrink:0,padding:'10px 16px',border:`1.5px solid ${isMissing?'#dc2626':'rgba(248,113,113,0.4)'}`,background:isMissing?'#dc2626':'transparent',color:isMissing?'white':'#f87171',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px',whiteSpace:'nowrap'}}>
-                        {isMissing?'✓ Abgemeldet':'Ich fehle'}
+                        {isMissing?'✕ Abgemeldet':'Ich fehle'}
                       </button>
                     </div>
                   );
