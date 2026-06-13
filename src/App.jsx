@@ -3419,6 +3419,44 @@ export default function TrainingsApp() {
     );
   }
 
+  // ── MEINE GRUPPEN (Trainer/Admin) ─────────────────────────────────────
+  if (view==='meingruppen' && canEdit()) {
+    const groups = FIXED_GROUPS.filter(g=>canAccessGroup(g.id));
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr" style={{background:'rgba(2,26,10,0.97)',borderBottom:'1px solid rgba(110,231,183,0.15)',padding:'18px 22px 14px',display:'flex',alignItems:'center',gap:'12px'}}>
+          <button onClick={()=>navTo('home')} style={{background:'rgba(110,231,183,0.1)',border:'1px solid rgba(110,231,183,0.25)',borderRadius:'12px',padding:'8px 14px',color:'#6ee7b7',cursor:'pointer',fontSize:'14px',fontWeight:'700',display:'flex',alignItems:'center',gap:'6px'}}><ArrowLeft size={18}/>Zurück</button>
+          <div style={{flex:1}}><h2 style={{margin:0,fontSize:'20px',fontWeight:'800',color:'white'}}>👥 Meine Gruppen</h2></div>
+        </div>
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:'28px 16px'}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(230px,1fr))',gap:'12px'}}>
+            {groups.map(group=>{
+              const subs=getSubgroupsForGroup(group.id);
+              const totalKids=subs.reduce((s2,sub)=>s2+getChildrenForSubgroup(sub.id).length,0);
+              const isJugend=group.id==='jugend';
+              const gradBg    = isJugend ? 'linear-gradient(135deg,#052e16 0%,#0f5a28 100%)' : 'linear-gradient(135deg,#0c2340 0%,#1a4070 100%)';
+              const gradBorder= isJugend ? 'rgba(74,222,128,0.3)' : 'rgba(96,165,250,0.3)';
+              const gradSub   = isJugend ? 'rgba(134,239,172,0.5)' : 'rgba(147,197,253,0.5)';
+              const gradArrow = isJugend ? 'rgba(74,222,128,0.35)' : 'rgba(96,165,250,0.35)';
+              return (
+                <div key={group.id} onClick={()=>{setActiveGroup(group);navTo('group');}}
+                  style={{borderRadius:'20px',padding:'22px 20px',cursor:'pointer',position:'relative',overflow:'hidden',transition:'transform 0.15s,box-shadow 0.15s',background:gradBg,border:'1px solid '+gradBorder,boxShadow:'inset 0 1px 0 rgba(255,255,255,0.07)'}}
+                  onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-3px)';e.currentTarget.style.boxShadow='0 16px 48px rgba(0,0,0,0.5)';}}
+                  onMouseLeave={e=>{e.currentTarget.style.transform='translateY(0)';e.currentTarget.style.boxShadow='inset 0 1px 0 rgba(255,255,255,0.07)';}}>
+                  <div style={{position:'absolute',bottom:'-10px',right:'-8px',fontSize:'86px',opacity:0.06,lineHeight:1,userSelect:'none',pointerEvents:'none'}}>{group.emoji}</div>
+                  <p style={{margin:'0 0 10px',fontSize:'30px',lineHeight:1}}>{group.emoji}</p>
+                  <h2 style={{margin:'0 0 5px',color:'white',fontSize:'19px',fontWeight:'800',letterSpacing:'-0.3px'}}>{group.name}</h2>
+                  <p style={{margin:0,color:gradSub,fontSize:'13px',fontWeight:'500'}}>{subs.length} {subs.length===1?'Gruppe':'Gruppen'} · {totalKids} {totalKids===1?'Kind':'Kinder'}</p>
+                  <ChevronRight size={15} color={gradArrow} style={{position:'absolute',top:'22px',right:'18px'}}/>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── STARTSEITE (Trainer/Admin Dashboard) ───────────────────────────────
   if (view==='home' && canEdit()) {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -3449,6 +3487,7 @@ export default function TrainingsApp() {
       {label:'Rangliste',        icon:'📊', color:'#fcd34d', bg:'rgba(252,211,77,0.1)',   border:'rgba(252,211,77,0.25)',  action:()=>navTo('rangliste')},
       {label:'Errungenschaften', icon:'🏅', color:'#d9f99d', bg:'rgba(217,249,157,0.1)',  border:'rgba(217,249,157,0.25)', action:()=>navTo('achievements')},
       {label:'Mannschaften', icon:'🏓', color:'#6ee7b7', bg:'rgba(110,231,183,0.1)', border:'rgba(110,231,183,0.25)', action:()=>navTo('mannschaften')},
+      {label:'Meine Gruppen', icon:'👥', color:'#6ee7b7', bg:'rgba(110,231,183,0.1)', border:'rgba(110,231,183,0.25)', action:()=>navTo('meingruppen')},
       ...(userRole==='admin'?[
         {label:'Admin',         icon:'🛡️', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('admin')},
         {label:'Gegnerlogbuch', icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.1)',   border:'rgba(8,145,178,0.25)',   action:()=>navTo('gegnerlogbuch')},
@@ -3613,79 +3652,7 @@ export default function TrainingsApp() {
             ))}
           </div>
 
-          {/* ── 3. Kommende Turniere ─────────────────────────────── */}
-          <p style={{color:'rgba(253,230,138,0.45)',fontSize:'10px',fontWeight:'800',textTransform:'uppercase',letterSpacing:'2px',margin:'0 0 12px'}}>Kommende Turniere</p>
-          <div style={{background:'rgba(253,230,138,0.025)',border:'1px solid rgba(253,230,138,0.12)',borderRadius:'20px',overflow:'hidden',marginBottom:'32px',boxShadow:'inset 0 1px 0 rgba(253,230,138,0.06)'}}>
-            <div style={{padding:'16px 22px',borderBottom:'1px solid rgba(253,230,138,0.08)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-              <span style={{fontWeight:'800',color:'white',fontSize:'16px',letterSpacing:'-0.3px'}}>🏆 Kommende Turniere</span>
-              <button onClick={()=>navTo('turniere')} style={{background:'rgba(253,230,138,0.12)',border:'1px solid rgba(253,230,138,0.25)',color:'#fde68a',borderRadius:'10px',padding:'6px 14px',fontSize:'12px',cursor:'pointer',fontWeight:'700'}}>Alle Turniere →</button>
-            </div>
-            <div style={{padding:'14px 18px',display:'flex',flexDirection:'column',gap:'8px'}}>
-              {tourneys.length===0
-                ? <p style={{color:'rgba(255,255,255,0.2)',fontSize:'13px',textAlign:'center',padding:'32px 0',margin:0}}>Kein Turnier in den nächsten 3 Monaten.</p>
-                : tourneys.map(t=>{
-                  const from=t.dateFrom||t.date||''; const to=t.dateTo||from;
-                  const dl2=to!==from
-                    ? new Date(from+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'long'})+' – '+new Date(to+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'})
-                    : new Date(from+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
-                  const total=getTournamentParticipantIds(t).length;
-                  const coming=Object.values(t.responses||{}).filter(r=>r==='coming').length;
-                  const missing=Object.values(t.responses||{}).filter(r=>r==='missing').length;
-                  const open=total-coming-missing;
-                  const canArchive=isTournamentArchivable(t);
-                  return (
-                    <div key={t.id} style={{padding:'14px 16px',background:'rgba(253,230,138,0.04)',border:'1px solid rgba(253,230,138,0.12)',borderRadius:'14px',cursor:'pointer',transition:'background 0.12s'}}
-                      onMouseEnter={e=>e.currentTarget.style.background='rgba(253,230,138,0.09)'}
-                      onMouseLeave={e=>e.currentTarget.style.background='rgba(253,230,138,0.04)'}
-                      onClick={()=>{setScrollToTournId(t.id);navTo('turniere');}}>
-                      <div style={{display:'flex',alignItems:'flex-start',gap:'14px'}}>
-                        <div style={{width:'40px',height:'40px',borderRadius:'12px',background:'rgba(253,230,138,0.1)',border:'1px solid rgba(253,230,138,0.22)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'20px'}}>🏆</div>
-                        <div style={{flex:1,minWidth:0}}>
-                          <p style={{margin:'0 0 3px',fontWeight:'800',color:'#fde68a',fontSize:'15px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.name}</p>
-                          <p style={{margin:'0 0 10px',fontSize:'12px',color:'rgba(255,255,255,0.4)',fontWeight:'500'}}>{dl2}{t.location?' · 📍 '+t.location:''}</p>
-                          <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-                            <span style={{fontSize:'12px',fontWeight:'700',color:'#4ade80',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',padding:'3px 11px',borderRadius:'20px'}}>✓ {coming} dabei</span>
-                            <span style={{fontSize:'12px',fontWeight:'700',color:'#f87171',background:'rgba(248,113,113,0.1)',border:'1px solid rgba(248,113,113,0.2)',padding:'3px 11px',borderRadius:'20px'}}>✗ {missing} fehlen</span>
-                            {open>0&&<span style={{fontSize:'12px',fontWeight:'600',color:'rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.05)',padding:'3px 11px',borderRadius:'20px'}}>– {open} offen</span>}
-                          </div>
-                        </div>
-                        <ChevronRight size={16} color="rgba(253,230,138,0.3)" style={{marginTop:'4px',flexShrink:0}}/>
-                      </div>
-                      {canArchive&&<div style={{marginTop:'12px',paddingTop:'12px',borderTop:'1px solid rgba(253,230,138,0.08)'}} onClick={e=>e.stopPropagation()}>
-                        <button onClick={e=>{e.stopPropagation();openArchiveTournDialog(t);}} style={{width:'100%',padding:'7px',background:'rgba(55,65,81,0.35)',border:'1px solid rgba(255,255,255,0.08)',color:'rgba(255,255,255,0.4)',borderRadius:'9px',cursor:'pointer',fontSize:'12px',fontWeight:'600'}}>📦 Turnier archivieren</button>
-                      </div>}
-                    </div>
-                  );
-                })
-              }
-            </div>
-          </div>
-
-          {/* ── 4. Gruppen ───────────────────────────────────────── */}
-          <p style={{color:'rgba(74,222,128,0.45)',fontSize:'10px',fontWeight:'800',textTransform:'uppercase',letterSpacing:'2px',margin:'0 0 12px'}}>Meine Gruppen</p>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(230px,1fr))',gap:'12px'}}>
-            {groups.map(group=>{
-              const subs=getSubgroupsForGroup(group.id);
-              const totalKids=subs.reduce((s2,sub)=>s2+getChildrenForSubgroup(sub.id).length,0);
-              const isJugend=group.id==='jugend';
-              const gradBg    = isJugend ? 'linear-gradient(135deg,#052e16 0%,#0f5a28 100%)' : 'linear-gradient(135deg,#0c2340 0%,#1a4070 100%)';
-              const gradBorder= isJugend ? 'rgba(74,222,128,0.3)' : 'rgba(96,165,250,0.3)';
-              const gradSub   = isJugend ? 'rgba(134,239,172,0.5)' : 'rgba(147,197,253,0.5)';
-              const gradArrow = isJugend ? 'rgba(74,222,128,0.35)' : 'rgba(96,165,250,0.35)';
-              return (
-                <div key={group.id} onClick={()=>{setActiveGroup(group);navTo('group');}}
-                  style={{borderRadius:'20px',padding:'22px 20px',cursor:'pointer',position:'relative',overflow:'hidden',transition:'transform 0.15s,box-shadow 0.15s',background:gradBg,border:'1px solid '+gradBorder,boxShadow:'inset 0 1px 0 rgba(255,255,255,0.07)'}}
-                  onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-3px)';e.currentTarget.style.boxShadow='0 16px 48px rgba(0,0,0,0.5)';}}
-                  onMouseLeave={e=>{e.currentTarget.style.transform='translateY(0)';e.currentTarget.style.boxShadow='inset 0 1px 0 rgba(255,255,255,0.07)';}}>
-                  <div style={{position:'absolute',bottom:'-10px',right:'-8px',fontSize:'86px',opacity:0.06,lineHeight:1,userSelect:'none',pointerEvents:'none'}}>{group.emoji}</div>
-                  <p style={{margin:'0 0 10px',fontSize:'30px',lineHeight:1}}>{group.emoji}</p>
-                  <h2 style={{margin:'0 0 5px',color:'white',fontSize:'19px',fontWeight:'800',letterSpacing:'-0.3px'}}>{group.name}</h2>
-                  <p style={{margin:0,color:gradSub,fontSize:'13px',fontWeight:'500'}}>{subs.length} {subs.length===1?'Gruppe':'Gruppen'} · {totalKids} {totalKids===1?'Kind':'Kinder'}</p>
-                  <ChevronRight size={15} color={gradArrow} style={{position:'absolute',top:'22px',right:'18px'}}/>
-                </div>
-              );
-            })}
-          </div>
+          {/* ── 3. Meine Gruppen (via navTo meingruppen) ─────────── */}
 
         </div>
       </div>
@@ -4301,11 +4268,13 @@ export default function TrainingsApp() {
                 { label:'Rangliste',        icon:'📊', desc: rangliste.length>0?`${rangliste.length} Spieler`:'Noch keine Daten', color:'#fbbf24', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)', sub:'rangliste' },
                 { label:'Errungenschaften', icon:'🏅', desc:'Abzeichen & Meilensteine', color:'#86efac', bg:'rgba(134,239,172,0.08)', border:'rgba(134,239,172,0.25)', sub:'errungenschaften' },
               ] : []),
+              { label:'TTC News',     icon:'📰', desc:'Neuigkeiten vom Verein', color:'#86efac', bg:'rgba(134,239,172,0.08)', border:'rgba(134,239,172,0.25)', action:()=>{navTo('ttcnews');fetchTtcNews();} },
+              { label:'MyTischtennis',icon:'🏓', desc:'Click-TT & Ergebnisse',  color:'#fcd34d', bg:'rgba(252,211,77,0.08)',   border:'rgba(252,211,77,0.25)',   action:()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);} },
             ];
             return (
               <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'12px',marginBottom:'28px'}}>
-                {tiles.map(t=>(
-                  <button key={t.sub} onClick={()=>setElternSubView(t.sub)}
+                {tiles.map((t,ti)=>(
+                  <button key={t.sub||ti} onClick={t.action||(()=>setElternSubView(t.sub))}
                     style={{background:t.bg,border:`1px solid ${t.border}`,borderRadius:'16px',padding:'18px 16px',cursor:'pointer',textAlign:'left',transition:'transform 0.12s,opacity 0.12s'}}
                     onMouseEnter={e=>e.currentTarget.style.transform='scale(1.02)'}
                     onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
