@@ -110,6 +110,7 @@ const ROLE_CONFIG = {
   trainer:    { label: 'Trainer',      color: '#358941', bg: '#dcfce7' },
   eltern:     { label: 'Eltern',       color: '#2563eb', bg: '#dbeafe' },
   jugendlich: { label: 'Jugendliche',  color: '#d97706', bg: '#fef3c7' },
+  aktiver:    { label: 'Aktiver',      color: '#0891b2', bg: '#cffafe' },
 };
 
 const WEEKDAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
@@ -734,6 +735,10 @@ export default function TrainingsApp() {
   // Practice Tournaments
   const [practiceTournaments, setPracticeTournaments]               = useState({});
   const [archivedPracticeTournaments, setArchivedPracticeTournaments] = useState({});
+  const [gegnerLogbuch, setGegnerLogbuch] = useState([]);
+  const [gegnerForm, setGegnerForm] = useState({date:'', verein:'', taktik:''});
+  const [gegnerAdding, setGegnerAdding] = useState(false);
+  const [gegnerEditId, setGegnerEditId] = useState(null);
   const [activePracticeId, setActivePracticeId]                     = useState(null);
   const [ptCreating, setPtCreating]                                 = useState(false);
   const [ptCreateStep, setPtCreateStep]                             = useState(1);
@@ -839,6 +844,7 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','ranglisteAchievements'), s => setRanglisteAch(s.exists() ? s.data() : {})),
       onSnapshot(doc(db,'ttc','practiceTournaments'),          s => setPracticeTournaments(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','archivedPracticeTournaments'),  s => setArchivedPracticeTournaments(s.exists()?s.data():{})),
+      onSnapshot(doc(db,'ttc','gegnerLogbuch'), s => setGegnerLogbuch(s.exists()&&Array.isArray(s.data().entries)?s.data().entries:[])),
     ];
     if (userRole==='admin')
       unsubs.push(onSnapshot(doc(db,'ttc','users'), s => { const d=s.exists()?s.data():{};allUsersRef.current=d;setAllUsers(d); }));
@@ -1298,6 +1304,7 @@ export default function TrainingsApp() {
   };
   const savePracticeTournaments          = u => { setPracticeTournaments(u);          setDoc(doc(db,'ttc','practiceTournaments'),          u); };
   const saveArchivedPracticeTournaments  = u => { setArchivedPracticeTournaments(u);  setDoc(doc(db,'ttc','archivedPracticeTournaments'),  u); };
+  const saveGegnerLogbuch = entries => { setGegnerLogbuch(entries); setDoc(doc(db,'ttc','gegnerLogbuch'), {entries}); };
 
   // ── Trainer Unread Count (Eltern-Nachrichten + Registrierungen) ──────────
   const getTrainerUnreadCount = () => {
@@ -3656,6 +3663,185 @@ export default function TrainingsApp() {
   }
 
 
+
+  // ── AKTIVER DASHBOARD ────────────────────────────────────────────────────
+  if (userRole === 'aktiver') {
+    const dateLabel = new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
+    const greeting = new Date().getHours()<12?'Guten Morgen':new Date().getHours()<18?'Hallo':'Guten Abend';
+
+    const submitGegner = () => {
+      if (!gegnerForm.verein.trim() || !gegnerForm.date) return;
+      const entry = {
+        id: 'gl_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+        date: gegnerForm.date,
+        verein: gegnerForm.verein.trim(),
+        taktik: gegnerForm.taktik.trim(),
+        createdBy: userProfile?.name || user?.email || 'Unbekannt',
+        createdAt: new Date().toISOString(),
+      };
+      if (gegnerEditId) {
+        saveGegnerLogbuch(gegnerLogbuch.map(e=>e.id===gegnerEditId?{...e,...entry,id:gegnerEditId}:e));
+        setGegnerEditId(null);
+      } else {
+        saveGegnerLogbuch([entry, ...gegnerLogbuch]);
+      }
+      setGegnerForm({date:'',verein:'',taktik:''});
+      setGegnerAdding(false);
+    };
+
+    const deleteGegner = id => { if(!window.confirm('Eintrag löschen?'))return; saveGegnerLogbuch(gegnerLogbuch.filter(e=>e.id!==id)); };
+
+    const accentColor = '#0891b2';
+    const accentMid   = 'rgba(8,145,178,0.55)';
+    const accentBg    = 'rgba(8,145,178,0.08)';
+    const accentBorder= 'rgba(8,145,178,0.2)';
+    const CARD = {background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'18px',padding:'20px',marginBottom:'20px'};
+
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#0c1a2e 0%,#0e2a3a 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+
+        {/* Profil-Modal */}
+        {showProfile&&(
+          <Modal>
+          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
+            <div style={{background:'#071520',border:'1px solid rgba(8,145,178,0.2)',borderRadius:'20px',padding:'28px',maxWidth:'400px',width:'100%'}}>
+              <h3 style={{margin:'0 0 2px',color:'white',fontSize:'20px',fontWeight:'800'}}>Mein Profil</h3>
+              <p style={{margin:'0 0 22px',color:'rgba(255,255,255,0.35)',fontSize:'13px'}}>{user?.email}</p>
+              <h4 style={{margin:'0 0 10px',color:accentColor,fontSize:'13px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.5px'}}>Passwort ändern</h4>
+              {pwSuccess&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(8,145,178,0.12)',border:'1px solid rgba(8,145,178,0.25)',borderRadius:'10px',fontSize:'13px',color:'#67e8f9',fontWeight:'600'}}>✅ Passwort geändert!</div>}
+              {pwError&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',fontSize:'13px',color:'#fca5a5'}}>{pwError}</div>}
+              <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'18px'}}>
+                <input type="password" placeholder="Aktuelles Passwort" value={pwCurrent} onChange={e=>setPwCurrent(e.target.value)} style={inputStyle}/>
+                <input type="password" placeholder="Neues Passwort (min. 6 Zeichen)" value={pwNew} onChange={e=>setPwNew(e.target.value)} style={inputStyle}/>
+                <input type="password" placeholder="Neues Passwort bestätigen" value={pwConfirm} onChange={e=>setPwConfirm(e.target.value)} style={inputStyle}/>
+                <button onClick={handleChangePassword} style={{padding:'11px',background:`linear-gradient(135deg,${accentColor},#0e7490)`,color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>Passwort ändern</button>
+              </div>
+              <button onClick={()=>{setShowProfile(false);setPwError('');setPwSuccess(false);setPwCurrent('');setPwNew('');setPwConfirm('');}}
+                style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.5)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button>
+            </div>
+          </div>
+          </Modal>
+        )}
+
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 20px 60px'}}>
+
+          {/* Top-Bar */}
+          <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:`1px solid ${accentBorder}`,padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 22px':'0 -24px 28px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+              <img src="/logo.png" alt="TTC Logo" style={{width:'55px',height:'55px',objectFit:'contain',borderRadius:'12px',flexShrink:0,filter:'drop-shadow(0 3px 12px rgba(0,0,0,0.5))'}}/>
+              <div>
+                <p style={{margin:0,color:'white',fontWeight:'800',fontSize:'16px',letterSpacing:'-0.3px'}}>TTC Grün-Weiß Staffel</p>
+                <p style={{margin:0,color:accentMid,fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>Aktiven-Portal</p>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
+              {(()=>{const sel=(userProfile?.roles||[userRole]).filter(r=>r!=='pending');return sel.length>1?<button onClick={()=>setShowRolePicker(true)} style={{padding:'8px',background:accentBg,border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'#67e8f9',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'👤':'👤 Rolle'}</button>:null;})()}
+              <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{padding:'8px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.6)',fontSize:isMobile?'16px':'12px',fontWeight:'600',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'⚙️':'⚙️ Profil'}</button>
+              <button onClick={()=>signOut(auth)} style={{padding:'8px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',color:'#fca5a5',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'🚪':'Abmelden'}</button>
+            </div>
+          </div>
+
+          {/* Greeting */}
+          <div style={{marginBottom:'32px'}}>
+            <p style={{margin:'0 0 6px',color:accentMid,fontSize:'12px',fontWeight:'700',letterSpacing:'1.5px',textTransform:'uppercase'}}>{dateLabel}</p>
+            <h1 style={{margin:0,color:'white',fontSize:isMobile?'26px':'32px',fontWeight:'800',letterSpacing:'-1px',lineHeight:1.1}}>
+              {greeting}, <span style={{color:'#67e8f9'}}>{(userProfile?.name||'').split(' ')[0]||'Spieler'}</span> 👋
+            </h1>
+          </div>
+
+          {/* ── Gegnerlogbuch ── */}
+          <span style={{display:'block',fontSize:'10px',fontWeight:'800',color:accentMid,textTransform:'uppercase',letterSpacing:'2px',marginBottom:'10px'}}>Gegnerlogbuch</span>
+          <div style={{...CARD,marginBottom:'0'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px',flexWrap:'wrap',gap:'10px'}}>
+              <div>
+                <h3 style={{margin:'0 0 2px',color:'white',fontWeight:'800',fontSize:'17px'}}>🎯 Gegnerlogbuch</h3>
+                <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>Gemeinsame Taktikdatenbank aller Aktiven · {gegnerLogbuch.length} {gegnerLogbuch.length===1?'Eintrag':'Einträge'}</p>
+              </div>
+              {!gegnerAdding&&<button onClick={()=>{setGegnerAdding(true);setGegnerEditId(null);setGegnerForm({date:TODAY,verein:'',taktik:''});}}
+                style={{padding:'8px 16px',background:`linear-gradient(135deg,${accentColor},#0e7490)`,color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'13px',display:'flex',alignItems:'center',gap:'6px'}}>
+                <Plus size={15}/> Eintrag hinzufügen
+              </button>}
+            </div>
+
+            {/* Formular */}
+            {gegnerAdding&&(
+              <div style={{background:'rgba(8,145,178,0.06)',border:`1px solid ${accentBorder}`,borderRadius:'14px',padding:'16px',marginBottom:'16px'}}>
+                <p style={{margin:'0 0 12px',fontSize:'12px',fontWeight:'800',color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px'}}>{gegnerEditId?'Eintrag bearbeiten':'Neuer Eintrag'}</p>
+                <div style={{display:'grid',gap:'10px'}}>
+                  <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'10px'}}>
+                    <div>
+                      <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Datum des Spiels</label>
+                      <input type="date" value={gegnerForm.date} onChange={e=>setGegnerForm(f=>({...f,date:e.target.value}))}
+                        style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
+                    </div>
+                    <div>
+                      <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Verein des Gegners</label>
+                      <input type="text" placeholder="z.B. TTC Musterstadt" value={gegnerForm.verein} onChange={e=>setGegnerForm(f=>({...f,verein:e.target.value}))}
+                        style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Taktikhinweise</label>
+                    <textarea placeholder="Wie spielt der Gegner? Was hat funktioniert? Schwächen, Stärken, Aufschläge..." value={gegnerForm.taktik} onChange={e=>setGegnerForm(f=>({...f,taktik:e.target.value}))}
+                      rows={4} style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',resize:'vertical',boxSizing:'border-box',fontFamily:'inherit'}}/>
+                  </div>
+                  <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>
+                    <button onClick={()=>{setGegnerAdding(false);setGegnerEditId(null);setGegnerForm({date:'',verein:'',taktik:''});}}
+                      style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
+                    <button onClick={submitGegner} disabled={!gegnerForm.verein.trim()||!gegnerForm.date}
+                      style={{padding:'9px 20px',background:gegnerForm.verein.trim()&&gegnerForm.date?`linear-gradient(135deg,${accentColor},#0e7490)`:'rgba(255,255,255,0.1)',color:'white',border:'none',borderRadius:'10px',cursor:gegnerForm.verein.trim()&&gegnerForm.date?'pointer':'not-allowed',fontWeight:'700',fontSize:'13px',opacity:gegnerForm.verein.trim()&&gegnerForm.date?1:0.5}}>
+                      {gegnerEditId?'Speichern':'Eintrag speichern'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Einträge */}
+            {gegnerLogbuch.length===0&&!gegnerAdding?(
+              <div style={{textAlign:'center',padding:'40px 20px',color:'rgba(255,255,255,0.2)'}}>
+                <div style={{fontSize:'40px',marginBottom:'10px'}}>📋</div>
+                <p style={{margin:0,fontWeight:'600'}}>Noch keine Einträge</p>
+                <p style={{margin:'4px 0 0',fontSize:'13px'}}>Füge den ersten Gegner hinzu!</p>
+              </div>
+            ):(
+              <div style={{display:'grid',gap:'10px'}}>
+                {gegnerLogbuch.map(e=>(
+                  <div key={e.id} style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'14px',padding:'14px 16px'}}>
+                    <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'10px',marginBottom:e.taktik?'10px':'0'}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <p style={{margin:'0 0 2px',fontWeight:'800',color:'white',fontSize:'15px'}}>{e.verein}</p>
+                        <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>
+                          {e.date?new Date(e.date+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):''}{e.createdBy?` · ${e.createdBy}`:''}
+                        </p>
+                      </div>
+                      <div style={{display:'flex',gap:'5px',flexShrink:0}}>
+                        <button onClick={()=>{setGegnerEditId(e.id);setGegnerForm({date:e.date,verein:e.verein,taktik:e.taktik||''});setGegnerAdding(true);}}
+                          style={{width:'28px',height:'28px',borderRadius:'7px',background:'rgba(8,145,178,0.1)',border:`1px solid ${accentBorder}`,color:'#67e8f9',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                          <Pencil size={12}/>
+                        </button>
+                        <button onClick={()=>deleteGegner(e.id)}
+                          style={{width:'28px',height:'28px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                          <Trash2 size={12}/>
+                        </button>
+                      </div>
+                    </div>
+                    {e.taktik&&(
+                      <div style={{background:'rgba(8,145,178,0.06)',border:`1px solid ${accentBorder}`,borderRadius:'10px',padding:'10px 12px'}}>
+                        <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'800',color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px'}}>Taktikhinweise</p>
+                        <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.75)',lineHeight:'1.6',whiteSpace:'pre-wrap'}}>{e.taktik}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+        </div>
+      </div>
+    );
+  }
 
   if (['eltern','jugendlich'].includes(userRole)) {
     const myChild=getMyChild();
