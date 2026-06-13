@@ -736,6 +736,7 @@ export default function TrainingsApp() {
   const [practiceTournaments, setPracticeTournaments]               = useState({});
   const [archivedPracticeTournaments, setArchivedPracticeTournaments] = useState({});
   const [gegnerLogbuch, setGegnerLogbuch] = useState([]);
+  const [elternSubView, setElternSubView] = useState(null);
   const [ttcNews, setTtcNews] = useState([]);
   const [ttcNewsLoading, setTtcNewsLoading] = useState(false);
   const [gegnerForm, setGegnerForm] = useState({date:'', verein:'', gegner:'', taktik:''});
@@ -1457,7 +1458,7 @@ export default function TrainingsApp() {
         setTtcNews(Array.isArray(d.items)?d.items:[]);
       }).catch(()=>{}).finally(()=>setTtcNewsLoading(false));
   };
-  const navTo = (v) => { setView(v); setViewKey(k => k + 1); setGegnerAdding(false); setGegnerEditId(null); setGegnerForm({date:'',verein:'',gegner:'',taktik:''}); };
+  const navTo = (v) => { setView(v); setViewKey(k => k + 1); setGegnerAdding(false); setGegnerEditId(null); setGegnerForm({date:'',verein:'',gegner:'',taktik:''}); setElternSubView(null); };
 
   const canEdit = () => ['admin','trainer'].includes(userRole);
 
@@ -3923,8 +3924,16 @@ export default function TrainingsApp() {
             </h1>
           </div>
 
+          {/* ── Back-Button wenn Sub-View aktiv ── */}
+          {elternSubView && (
+            <button onClick={()=>setElternSubView(null)}
+              style={{display:'flex',alignItems:'center',gap:'8px',background:'none',border:'none',color:'rgba(74,222,128,0.7)',cursor:'pointer',fontSize:'14px',fontWeight:'700',padding:'0 0 20px',marginTop:'-8px'}}>
+              <ArrowLeft size={16}/> Zurück zur Übersicht
+            </button>
+          )}
+
           {/* ── Kind-Info (kompakt) ── */}
-          {myChild && (
+          {myChild && !elternSubView && (
             <>
               <span style={SECTION_LABEL()}>Übersicht</span>
               <div style={{...DARK_CARD,marginBottom:'28px'}}>
@@ -3960,8 +3969,40 @@ export default function TrainingsApp() {
             </>
           )}
 
+          {/* ── Hub-Kacheln (nur wenn kein Sub-View) ── */}
+          {myChild && !elternSubView && (()=>{
+            const { active } = getCleanedNotifications(myChild.id);
+            const myTournaments = getMyUpcomingTournaments();
+            const myTeam = Object.values(teams).find(t=>(t.childIds||[]).includes(myChild.id));
+            const isJugend = grp?.id === 'jugend';
+            const tiles = [
+              { label:'Benachrichtigungen', icon:'🔔', desc: active.length>0?`${active.length} neue Nachricht${active.length>1?'en':''}` : 'Keine neuen Nachrichten', color:'#a78bfa', bg:'rgba(167,139,250,0.08)', border:'rgba(167,139,250,0.25)', sub:'benachrichtigungen' },
+              { label:'Trainingsverlauf',   icon:'📋', desc:`${dates.length} Einträge`, color:'#67e8f9', bg:'rgba(103,232,249,0.08)', border:'rgba(103,232,249,0.25)', sub:'trainingsverlauf' },
+              { label:'Mannschaft',         icon:'🏓', desc: myTeam ? myTeam.name : 'Keine Mannschaft', color:'#2dd4bf', bg:'rgba(45,212,191,0.08)', border:'rgba(45,212,191,0.25)', sub:'mannschaft' },
+              { label:'Turniere',           icon:'🏆', desc: myTournaments.length>0?`${myTournaments.length} kommend`:'Kein Turnier bald', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.25)', sub:'turniere' },
+              ...(isJugend ? [
+                { label:'Rangliste',        icon:'📊', desc: rangliste.length>0?`${rangliste.length} Spieler`:'Noch keine Daten', color:'#fbbf24', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)', sub:'rangliste' },
+                { label:'Errungenschaften', icon:'🏅', desc:'Abzeichen & Meilensteine', color:'#86efac', bg:'rgba(134,239,172,0.08)', border:'rgba(134,239,172,0.25)', sub:'errungenschaften' },
+              ] : []),
+            ];
+            return (
+              <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'12px',marginBottom:'28px'}}>
+                {tiles.map(t=>(
+                  <button key={t.sub} onClick={()=>setElternSubView(t.sub)}
+                    style={{background:t.bg,border:`1px solid ${t.border}`,borderRadius:'16px',padding:'18px 16px',cursor:'pointer',textAlign:'left',transition:'transform 0.12s,opacity 0.12s'}}
+                    onMouseEnter={e=>e.currentTarget.style.transform='scale(1.02)'}
+                    onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
+                    <div style={{fontSize:'28px',marginBottom:'8px'}}>{t.icon}</div>
+                    <p style={{margin:'0 0 4px',fontWeight:'800',color:'white',fontSize:'15px'}}>{t.label}</p>
+                    <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.4)',lineHeight:'1.3'}}>{t.desc}</p>
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+
           {/* ── Benachrichtigungen ── */}
-          {myChild && (()=>{
+          {myChild && elternSubView==='benachrichtigungen' && (()=>{
             const { active, trashed } = getCleanedNotifications(myChild.id);
             const showTrash = notifTab === 'trash';
             const items = showTrash ? trashed : active;
@@ -4039,8 +4080,9 @@ export default function TrainingsApp() {
               </div>
             : <>
 
-              {/* ── Kommende Trainings ── */}
-              <span style={SECTION_LABEL()}>Kommende Trainings</span>
+              {/* ── Kommende Trainings (sub: trainingsverlauf zeigt beides) ── */}
+              {elternSubView==='trainingsverlauf' && <span style={SECTION_LABEL()}>Kommende Trainings</span>}
+              {elternSubView==='trainingsverlauf' &&
               <div style={{...DARK_CARD,marginBottom:'28px',border:'1px solid rgba(74,222,128,0.18)'}}>
                 <h3 style={{margin:'0 0 16px',color:'#4ade80',display:'flex',alignItems:'center',gap:'8px',fontWeight:'800',fontSize:'16px'}}><Calendar size={18}/> Trainings diese Woche</h3>
                 {mySessions.length===0
@@ -4081,7 +4123,8 @@ export default function TrainingsApp() {
               </div>
 
               {/* ── Trainings-Verlauf ── */}
-              <span style={SECTION_LABEL()}>Verlauf</span>
+              {elternSubView==='trainingsverlauf' && <span style={SECTION_LABEL()}>Verlauf</span>}
+              {elternSubView==='trainingsverlauf' &&
               <div style={{...DARK_CARD,marginBottom:'28px'}}>
                 <button onClick={()=>setShowTrainingHistory(v=>!v)}
                   style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',background:'none',border:'none',cursor:'pointer',padding:0,margin:0}}>
@@ -4130,7 +4173,7 @@ export default function TrainingsApp() {
               </div>
 
               {/* ── Mannschaft & Liga ── */}
-              {(()=>{
+              {elternSubView==='mannschaft' && (()=>{
                 const myTeam = Object.values(teams).find(t=>(t.childIds||[]).includes(myChild.id));
                 if (!myTeam) return null;
                 const ld = myTeam.leagueData || {};
@@ -4207,7 +4250,7 @@ export default function TrainingsApp() {
               })()}
 
               {/* ── Kommende Turniere ── */}
-              {(()=>{
+              {elternSubView==='turniere' && (()=>{
                 const myTournaments = getMyUpcomingTournaments();
                 return (
                   <>
@@ -4332,7 +4375,7 @@ export default function TrainingsApp() {
           );
         })()}
         {/* PT-Ergebnisse im Eltern/Jugend-Profil */}
-        {myChild&&(()=>{
+        {myChild&&elternSubView==='trainingsverlauf'&&(()=>{
           const placeEmojiPD=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
           const myPTs=[
             ...Object.values(archivedPracticeTournaments),
@@ -4387,14 +4430,19 @@ export default function TrainingsApp() {
           );
         })()}
               {/* ── Rangliste Tile (nur Jugend) ── */}
-              {grp?.id === 'jugend' && rangliste.length > 0 && (
+              {elternSubView==='rangliste' && grp?.id === 'jugend' && rangliste.length > 0 && (
                 <>
                   <span style={SECTION_LABEL('rgba(251,191,36,0.5)')}>Rangliste</span>
                   <RanglisteTile rangliste={rangliste} myChildId={myChild.id} children={children} subgroups={subgroups} />
                 </>
               )}
+              {elternSubView==='rangliste' && grp?.id === 'jugend' && rangliste.length === 0 && (
+                <div style={{...DARK_CARD,textAlign:'center',padding:'40px'}}>
+                  <p style={{color:'rgba(255,255,255,0.3)',margin:0}}>Noch keine Ranglisten-Daten vorhanden.</p>
+                </div>
+              )}
               {/* ── Errungenschaften (nur Jugend) ── */}
-              {grp?.id === 'jugend' && (()=>{
+              {elternSubView==='errungenschaften' && grp?.id === 'jugend' && (()=>{
                 const ach = getAchievements(myChild.id);
                 const ttrUnlocked = ach.ttrUnlocked || [];
                 const currentMonth = new Date().toISOString().slice(0,7);
