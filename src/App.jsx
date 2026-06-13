@@ -7860,12 +7860,22 @@ export default function TrainingsApp() {
     const acBg = 'rgba(244,114,182,0.07)';
     const me = userProfile?.name || user?.email || '';
 
-    // Player list: everyone in allUsers with a name, excluding self
-    const registeredPlayers = Object.values(allUsers)
-      .map(u => u.name || u.email || u.displayName || '')
-      .filter(name => name && name !== me)
-      .sort((a,b)=>a.localeCompare(b,'de'))
-      .filter((v,i,a)=>a.indexOf(v)===i); // deduplicate
+    // Player list: registered Aktive + anyone who has played at least one match
+    const aktiveNames = new Set(
+      Object.values(allUsers)
+        .filter(u => {
+          const roles = Array.isArray(u.roles) ? u.roles : (u.role ? [u.role] : []);
+          return roles.includes('aktiver') || roles.includes('admin');
+        })
+        .map(u => u.name || u.email || u.displayName || '')
+        .filter(Boolean)
+    );
+    const matchNames = new Set(
+      trainingsmatches.flatMap(m => [m.player1, m.player2]).filter(Boolean)
+    );
+    const registeredPlayers = [...new Set([...aktiveNames, ...matchNames])]
+      .filter(name => name !== me)
+      .sort((a,b)=>a.localeCompare(b,'de'));
 
     const saveMatches = matches => { setTrainingsmatches(matches); setDoc(doc(db,'ttc','trainingsmatches'),{matches}); };
 
