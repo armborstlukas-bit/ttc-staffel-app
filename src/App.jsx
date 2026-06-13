@@ -737,7 +737,7 @@ export default function TrainingsApp() {
   const [activePracticeId, setActivePracticeId]                     = useState(null);
   const [ptCreating, setPtCreating]                                 = useState(false);
   const [ptCreateStep, setPtCreateStep]                             = useState(1);
-  const [ptCreateForm, setPtCreateForm]                             = useState({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPer100:1,handicapMax:10});
+  const [ptCreateForm, setPtCreateForm]                             = useState({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPer100:1,handicapMax:6});
   const [ptSelectedChildren, setPtSelectedChildren]                 = useState([]);
   const [ptSubgroupFilter, setPtSubgroupFilter]                     = useState('all');
   const [ptMatchEditing, setPtMatchEditing]                         = useState(null);
@@ -6329,7 +6329,7 @@ export default function TrainingsApp() {
             <button onClick={()=>{setArchiveTab('practiceTournaments');navTo('archiv');}} style={s.btn('#6d28d9')}>
               <Archive size={14}/> Archiv
             </button>
-            <button onClick={()=>{setPtCreating(true);setPtCreateStep(1);setPtSelectedChildren([]);setPtSubgroupFilter('all');setPtCreateForm({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPer100:1,handicapMax:10});}} style={s.btn('#16a34a')}>
+            <button onClick={()=>{setPtCreating(true);setPtCreateStep(1);setPtSelectedChildren([]);setPtSubgroupFilter('all');setPtCreateForm({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPer100:1,handicapMax:6});}} style={s.btn('#16a34a')}>
               <Plus size={15}/> Neuer Wettkampf
             </button>
           </div>)}
@@ -7306,6 +7306,10 @@ export default function TrainingsApp() {
                           ))}
                         </div>
                         <span style={{fontSize:'18px',color:'rgba(167,139,250,0.5)',transform:expanded?'rotate(90deg)':'rotate(0deg)',transition:'transform 0.2s',flexShrink:0,lineHeight:1}}>›</span>
+                        <button onClick={e=>{e.stopPropagation();if(!window.confirm('Übungswettkampf aus dem Archiv löschen?'))return;const upd={...archivedPracticeTournaments};delete upd[pt.id];saveArchivedPracticeTournaments(upd);}}
+                          style={{flexShrink:0,width:'28px',height:'28px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                          <Trash2 size={13}/>
+                        </button>
                       </div>
                       {expanded && (
                         <div style={{borderTop:'1px solid rgba(167,139,250,0.12)',padding:'12px 14px'}}>
@@ -7403,6 +7407,10 @@ export default function TrainingsApp() {
                           </p>
                           <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{date}</p>
                         </div>
+                        <button onClick={()=>{if(!window.confirm('Ranglistenspiel löschen?'))return;saveRanglistenspiele({...ranglistenspiele,archived:ranglistenspiele.archived.filter((_,j)=>j!==i)});}}
+                          style={{width:'30px',height:'30px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                          <Trash2 size={13}/>
+                        </button>
                         <div style={{background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'10px',padding:'6px 12px',flexShrink:0,textAlign:'center'}}>
                           <span style={{fontWeight:'900',fontSize:'20px',color:won?'#4ade80':'rgba(255,255,255,0.5)'}}>{spiel.sets1??spiel.challengerScore??'?'}</span>
                           <span style={{fontWeight:'700',color:'rgba(255,255,255,0.3)',fontSize:'14px',margin:'0 3px'}}>:</span>
