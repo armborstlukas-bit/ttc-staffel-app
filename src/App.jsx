@@ -3478,23 +3478,37 @@ export default function TrainingsApp() {
       borderRadius:'16px',cursor:'pointer',display:'flex',flexDirection:'column',
       alignItems:'center',gap:'8px',transition:'transform 0.12s',textAlign:'center'
     });
-    const quickLinks = [
-      {label:'Übungswettkämpfe',icon:'🎮', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)',  border:'rgba(196,181,253,0.25)', action:()=>navTo('practiceTournaments')},
-      {label:'Trainingsplan',    icon:'📅', color:'#86efac', bg:'rgba(134,239,172,0.1)',  border:'rgba(134,239,172,0.25)', action:()=>navTo('trainingsplan')},
-      {label:'Turniere',         icon:'🏆', color:'#fde68a', bg:'rgba(253,230,138,0.1)',  border:'rgba(253,230,138,0.25)', action:()=>navTo('turniere')},
-      {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>navTo('notifications'), badge: unreadCount},
-      {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
-      {label:'Rangliste',        icon:'📊', color:'#fcd34d', bg:'rgba(252,211,77,0.1)',   border:'rgba(252,211,77,0.25)',  action:()=>navTo('rangliste')},
-      {label:'Errungenschaften', icon:'🏅', color:'#d9f99d', bg:'rgba(217,249,157,0.1)',  border:'rgba(217,249,157,0.25)', action:()=>navTo('achievements')},
-      {label:'Mannschaften', icon:'🏓', color:'#6ee7b7', bg:'rgba(110,231,183,0.1)', border:'rgba(110,231,183,0.25)', action:()=>navTo('mannschaften')},
-      {label:'Meine Gruppen', icon:'👥', color:'#6ee7b7', bg:'rgba(110,231,183,0.1)', border:'rgba(110,231,183,0.25)', action:()=>navTo('meingruppen')},
-      ...(userRole==='admin'?[
-        {label:'Admin',         icon:'🛡️', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('admin')},
-        {label:'Gegnerlogbuch', icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.1)',   border:'rgba(8,145,178,0.25)',   action:()=>navTo('gegnerlogbuch')},
-        {label:'TTC News',        icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.1)',  border:'rgba(74,222,128,0.25)',  action:()=>{navTo('ttcnews');fetchTtcNews();}},
-        {label:'Trainingsmatches', icon:'⚔️', color:'#f9a8d4', bg:'rgba(244,114,182,0.1)', border:'rgba(244,114,182,0.25)', action:()=>navTo('trainingsmatches')},
-        {label:'MyTischtennis', icon:'🏓', color:'#fcd34d', bg:'rgba(251,191,36,0.1)',  border:'rgba(251,191,36,0.25)',  action:()=>(()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);})()},
-      ]:[]),
+    const quickCategories = [
+      {
+        label: 'Training',
+        color: 'rgba(134,239,172,0.45)',
+        links: [
+          {label:'Trainingsplan',    icon:'📅', color:'#86efac', bg:'rgba(134,239,172,0.1)',  border:'rgba(134,239,172,0.25)', action:()=>navTo('trainingsplan')},
+          {label:'Übungswettkämpfe',icon:'🎮', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)',  border:'rgba(196,181,253,0.25)', action:()=>navTo('practiceTournaments')},
+          {label:'Meine Gruppen',    icon:'👥', color:'#6ee7b7', bg:'rgba(110,231,183,0.1)',  border:'rgba(110,231,183,0.25)', action:()=>navTo('meingruppen')},
+        ],
+      },
+      {
+        label: 'Wettkampf',
+        color: 'rgba(253,230,138,0.45)',
+        links: [
+          {label:'Errungenschaften', icon:'🏅', color:'#d9f99d', bg:'rgba(217,249,157,0.1)',  border:'rgba(217,249,157,0.25)', action:()=>navTo('achievements')},
+          {label:'Rangliste',        icon:'📊', color:'#fcd34d', bg:'rgba(252,211,77,0.1)',   border:'rgba(252,211,77,0.25)',  action:()=>navTo('rangliste')},
+          {label:'Mannschaften',     icon:'🏓', color:'#6ee7b7', bg:'rgba(110,231,183,0.1)',  border:'rgba(110,231,183,0.25)', action:()=>navTo('mannschaften')},
+          {label:'Turniere',         icon:'🏆', color:'#fde68a', bg:'rgba(253,230,138,0.1)',  border:'rgba(253,230,138,0.25)', action:()=>navTo('turniere')},
+        ],
+      },
+      {
+        label: 'Sonstiges',
+        color: 'rgba(226,232,240,0.35)',
+        links: [
+          {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
+          {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>navTo('notifications'), badge: unreadCount},
+          ...(userRole==='admin'?[
+            {label:'Admin',          icon:'🛡️', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('admin')},
+          ]:[]),
+        ],
+      },
     ];
     const groups = FIXED_GROUPS.filter(g=>canAccessGroup(g.id));
 
@@ -3639,18 +3653,22 @@ export default function TrainingsApp() {
           </div>
 
           {/* ── 2. Schnellzugriff ────────────────────────────────── */}
-          <p style={{color:'rgba(74,222,128,0.45)',fontSize:'10px',fontWeight:'800',textTransform:'uppercase',letterSpacing:'2px',margin:'0 0 12px'}}>Schnellzugriff</p>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(110px,1fr))',gap:'8px',marginBottom:'32px'}}>
-            {quickLinks.map((ql,i)=>(
-              <button key={i} onClick={ql.action} style={QL_STYLE(ql.bg,ql.border)}
-                onMouseEnter={e=>e.currentTarget.style.transform='translateY(-2px)'}
-                onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
-                <span style={{fontSize:'24px',lineHeight:1}}>{ql.icon}</span>
-                <span style={{fontSize:'11px',fontWeight:'700',color:ql.color,lineHeight:'1.3'}}>{ql.label}</span>
-                {ql.badge>0&&<span style={{position:'absolute',top:'8px',right:'8px',background:'#dc2626',color:'white',borderRadius:'50%',width:'18px',height:'18px',fontSize:'10px',fontWeight:'800',display:'flex',alignItems:'center',justifyContent:'center'}}>{ql.badge}</span>}
-              </button>
-            ))}
-          </div>
+          {quickCategories.map(cat=>(
+            <div key={cat.label} style={{marginBottom:'24px'}}>
+              <p style={{color:cat.color,fontSize:'10px',fontWeight:'800',textTransform:'uppercase',letterSpacing:'2px',margin:'0 0 10px'}}>⬡ {cat.label}</p>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(110px,1fr))',gap:'8px'}}>
+                {cat.links.map((ql,i)=>(
+                  <button key={i} onClick={ql.action} style={QL_STYLE(ql.bg,ql.border)}
+                    onMouseEnter={e=>e.currentTarget.style.transform='translateY(-2px)'}
+                    onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
+                    <span style={{fontSize:'24px',lineHeight:1}}>{ql.icon}</span>
+                    <span style={{fontSize:'11px',fontWeight:'700',color:ql.color,lineHeight:'1.3'}}>{ql.label}</span>
+                    {ql.badge>0&&<span style={{position:'absolute',top:'8px',right:'8px',background:'#dc2626',color:'white',borderRadius:'50%',width:'18px',height:'18px',fontSize:'10px',fontWeight:'800',display:'flex',alignItems:'center',justifyContent:'center'}}>{ql.badge}</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
 
           {/* ── 3. Meine Gruppen (via navTo meingruppen) ─────────── */}
 
