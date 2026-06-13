@@ -4082,7 +4082,7 @@ export default function TrainingsApp() {
 
               {/* ── Kommende Trainings (sub: trainingsverlauf zeigt beides) ── */}
               {elternSubView==='trainingsverlauf' && <span style={SECTION_LABEL()}>Kommende Trainings</span>}
-              {elternSubView==='trainingsverlauf' &&
+              {elternSubView==='trainingsverlauf' && (
               <div style={{...DARK_CARD,marginBottom:'28px',border:'1px solid rgba(74,222,128,0.18)'}}>
                 <h3 style={{margin:'0 0 16px',color:'#4ade80',display:'flex',alignItems:'center',gap:'8px',fontWeight:'800',fontSize:'16px'}}><Calendar size={18}/> Trainings diese Woche</h3>
                 {mySessions.length===0
@@ -4121,10 +4121,11 @@ export default function TrainingsApp() {
                   </div>
                 }
               </div>
+              )}
 
               {/* ── Trainings-Verlauf ── */}
               {elternSubView==='trainingsverlauf' && <span style={SECTION_LABEL()}>Verlauf</span>}
-              {elternSubView==='trainingsverlauf' &&
+              {elternSubView==='trainingsverlauf' && (
               <div style={{...DARK_CARD,marginBottom:'28px'}}>
                 <button onClick={()=>setShowTrainingHistory(v=>!v)}
                   style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',background:'none',border:'none',cursor:'pointer',padding:0,margin:0}}>
@@ -4171,6 +4172,7 @@ export default function TrainingsApp() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* ── Mannschaft & Liga ── */}
               {elternSubView==='mannschaft' && (()=>{
