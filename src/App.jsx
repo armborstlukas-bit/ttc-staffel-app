@@ -3941,33 +3941,6 @@ export default function TrainingsApp() {
           if (!myChild) return null;
           return (
             <>
-              <h3 style={{margin:'0 0 16px',color:'#4ade80',display:'flex',alignItems:'center',gap:'8px',fontWeight:'800',fontSize:'16px'}}><Calendar size={18}/> Trainings diese Woche</h3>
-              <div style={{...DARK_CARD,marginBottom:'24px',border:'1px solid rgba(74,222,128,0.18)'}}>
-                {mySessions.length===0
-                  ? <p style={{color:'rgba(255,255,255,0.2)',fontSize:'13px',margin:0,textAlign:'center',padding:'20px 0'}}>Kein Training in den nächsten 7 Tagen.</p>
-                  : <div style={{display:'grid',gap:'10px'}}>
-                    {mySessions.map(session=>{
-                      const childId=myChild.id;
-                      const myResponseRaw=(session.responses||{})[childId];
-                      const myResponse=typeof myResponseRaw==='object'?myResponseRaw?.status:myResponseRaw;
-                      const sessSubIds=session.subgroupIds||[];
-                      const sessGrpNames=[...new Set(sessSubIds.map(sid=>{const sg=subgroups[sid];const fg=sg?FIXED_GROUPS.find(g=>g.id===sg.groupId):null;return fg?`${fg.emoji} ${fg.name}`:null;}).filter(Boolean))];
-                      const isComing=myResponse==='coming'; const isMissing=myResponse==='missing';
-                      return (
-                        <div key={session.id} style={{padding:'14px 16px',borderRadius:'14px',border:`1px solid ${isComing?'rgba(74,222,128,0.3)':isMissing?'rgba(248,113,113,0.3)':'rgba(255,255,255,0.08)'}`,background:isComing?'rgba(74,222,128,0.07)':isMissing?'rgba(248,113,113,0.07)':'rgba(255,255,255,0.025)'}}>
-                          <p style={{margin:'0 0 3px',fontWeight:'700',color:'white',fontSize:'15px'}}>{new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})} · {session.time} Uhr</p>
-                          {sessGrpNames.length>0&&<p style={{margin:'0 0 2px',fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>📂 {sessGrpNames.join(', ')}</p>}
-                          {session.trainer&&<p style={{margin:'0 0 8px',fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>👤 {session.trainer}</p>}
-                          {session.info&&<div style={{display:'flex',alignItems:'flex-start',gap:'6px',marginBottom:'8px',padding:'8px 10px',background:'rgba(96,165,250,0.08)',border:'1px solid rgba(96,165,250,0.2)',borderRadius:'8px'}}><Info size={14} color="#93c5fd" style={{marginTop:'2px',flexShrink:0}}/><p style={{margin:0,fontSize:'13px',color:'#93c5fd'}}>{session.info}</p></div>}
-                          <button onClick={()=>respondToSession(session.id,'missing')} style={{width:'100%',padding:'10px',border:`2px solid #dc2626`,background:isMissing?'#dc2626':'transparent',color:isMissing?'white':'#f87171',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>
-                            <X size={18}/> {isMissing?'Abgemeldet – Rückgängig':'Ich fehle'}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                }
-              </div>
               <h3 style={{margin:'0 0 12px',color:'white',fontWeight:'800',fontSize:'16px'}}>📋 Verlauf ({dates.length} Einträge)</h3>
               <div style={{display:'grid',gap:'8px',marginBottom:'24px'}}>
                 {dates.length===0
@@ -4297,13 +4270,14 @@ export default function TrainingsApp() {
                   const sessGrpNames=[...new Set(sessSubIds.map(sid=>{const sg=subgroups[sid];const fg=sg?FIXED_GROUPS.find(g=>g.id===sg.groupId):null;return fg?`${fg.emoji} ${fg.name}`:null;}).filter(Boolean))];
                   const isComing=myResponse==='coming'; const isMissing=myResponse==='missing';
                   return (
-                    <div key={session.id} style={{padding:'14px 16px',borderRadius:'14px',border:`1px solid ${isComing?'rgba(74,222,128,0.3)':isMissing?'rgba(248,113,113,0.3)':'rgba(255,255,255,0.08)'}`,background:isComing?'rgba(74,222,128,0.07)':isMissing?'rgba(248,113,113,0.07)':'rgba(255,255,255,0.025)'}}>
-                      <p style={{margin:'0 0 3px',fontWeight:'700',color:'white',fontSize:'15px'}}>{new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})} · {session.time} Uhr</p>
-                      {sessGrpNames.length>0&&<p style={{margin:'0 0 2px',fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>📂 {sessGrpNames.join(', ')}</p>}
-                      {session.trainer&&<p style={{margin:'0 0 8px',fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>👤 {session.trainer}</p>}
-                      {session.info&&<div style={{display:'flex',alignItems:'flex-start',gap:'6px',marginBottom:'8px',padding:'8px 10px',background:'rgba(96,165,250,0.08)',border:'1px solid rgba(96,165,250,0.2)',borderRadius:'8px'}}><Info size={14} color="#93c5fd" style={{marginTop:'2px',flexShrink:0}}/><p style={{margin:0,fontSize:'13px',color:'#93c5fd'}}>{session.info}</p></div>}
-                      <button onClick={()=>respondToSession(session.id,'missing')} style={{width:'100%',padding:'10px',border:`2px solid #dc2626`,background:isMissing?'#dc2626':'transparent',color:isMissing?'white':'#f87171',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>
-                        <X size={18}/> {isMissing?'Abgemeldet – Rückgängig':'Ich fehle'}
+                    <div key={session.id} style={{display:'flex',alignItems:'center',gap:'12px',padding:'10px 14px',borderRadius:'12px',border:`1px solid ${isComing?'rgba(74,222,128,0.25)':isMissing?'rgba(248,113,113,0.25)':'rgba(255,255,255,0.08)'}`,background:isComing?'rgba(74,222,128,0.06)':isMissing?'rgba(248,113,113,0.06)':'rgba(255,255,255,0.02)'}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <p style={{margin:'0 0 2px',fontWeight:'700',color:'white',fontSize:'14px',lineHeight:'1.3'}}>{new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})} · {session.time} Uhr</p>
+                        {session.trainer&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>👤 {session.trainer}</p>}
+                        {sessGrpNames.length>0&&<p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>📂 {sessGrpNames.join(', ')}</p>}
+                      </div>
+                      <button onClick={()=>respondToSession(session.id,'missing')} style={{flexShrink:0,padding:'7px 12px',border:`1.5px solid ${isMissing?'#dc2626':'rgba(248,113,113,0.4)'}`,background:isMissing?'#dc2626':'transparent',color:isMissing?'white':'#f87171',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'12px',whiteSpace:'nowrap'}}>
+                        {isMissing?'✓ Abgemeldet':'Ich fehle'}
                       </button>
                     </div>
                   );
