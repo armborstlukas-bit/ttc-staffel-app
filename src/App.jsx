@@ -3450,7 +3450,7 @@ export default function TrainingsApp() {
       ...(userRole==='admin'?[
         {label:'Admin',         icon:'🛡️', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('admin')},
         {label:'Gegnerlogbuch', icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.1)',   border:'rgba(8,145,178,0.25)',   action:()=>navTo('gegnerlogbuch')},
-        {label:'TTC News',        icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.1)',  border:'rgba(74,222,128,0.25)',  action:()=>navTo('ttcnews')},
+        {label:'TTC News',        icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.1)',  border:'rgba(74,222,128,0.25)',  action:()=>{navTo('ttcnews');fetchTtcNews();}},
         {label:'Trainingsmatches', icon:'⚔️', color:'#f9a8d4', bg:'rgba(244,114,182,0.1)', border:'rgba(244,114,182,0.25)', action:()=>navTo('trainingsmatches')},
         {label:'MyTischtennis', icon:'🏓', color:'#fcd34d', bg:'rgba(251,191,36,0.1)',  border:'rgba(251,191,36,0.25)',  action:()=>(()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);})()},
       ]:[]),
@@ -3811,7 +3811,7 @@ export default function TrainingsApp() {
           <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'12px',marginBottom:'0'}}>
             {[
               {label:'Gegnerlogbuch', icon:'🎯', desc:`${gegnerLogbuch.length} ${gegnerLogbuch.length===1?'Eintrag':'Einträge'} · Taktiken & Hinweise`, color:'#67e8f9', bg:'rgba(8,145,178,0.08)', border:'rgba(8,145,178,0.2)', action:()=>navTo('gegnerlogbuch')},
-              {label:'TTC News',        icon:'📰', desc:'Aktuelle Vereinsnachrichten',             color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',  action:()=>navTo('ttcnews')},
+              {label:'TTC News',        icon:'📰', desc:'Aktuelle Vereinsnachrichten',             color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',  action:()=>{navTo('ttcnews');fetchTtcNews();}},
               {label:'Trainingsmatches',icon:'⚔️', desc:'Duelle & Allzeittabelle',                  color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>navTo('trainingsmatches')},
               {label:'MyTischtennis', icon:'🏓', desc:'Vereinsübersicht auf MyTischtennis',                                                                  color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)',  action:()=>(()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);})()},
             ].map(t=>(
@@ -7814,12 +7814,7 @@ export default function TrainingsApp() {
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>📰 TTC News</h1>
         </div>
         <div style={{padding:'20px',maxWidth:'760px',margin:'0 auto'}}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px'}}>
-            <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.35)'}}>Aktuelle Beiträge von ttc-staffel.de</p>
-            <button onClick={fetchTtcNews} disabled={ttcNewsLoading} style={{background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'8px',color:'rgba(255,255,255,0.6)',fontSize:'12px',padding:'5px 12px',cursor:'pointer'}}>
-              {ttcNewsLoading?'…':'↻ Aktualisieren'}
-            </button>
-          </div>
+          <p style={{margin:'0 0 20px',fontSize:'13px',color:'rgba(255,255,255,0.35)'}}>Aktuelle Beiträge von ttc-staffel.de</p>
           {ttcNewsLoading?(
             <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.3)'}}>
               <div style={{fontSize:'36px',marginBottom:'12px'}}>⏳</div>
