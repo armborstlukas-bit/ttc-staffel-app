@@ -500,15 +500,16 @@ function MobileBottomNav({ view, navTo, userRole, canEdit, appSettings, unreadCo
   );
 }
 
-function RanglisteTile({ rangliste, myChildId, children: childMap, subgroups }) {
+function RanglisteTile({ rangliste, myChildId, children: childMap, subgroups, alwaysOpen=false }) {
   const [open, setOpen] = useState(false);
   const myPos = rangliste.indexOf(myChildId);
   if (myPos === -1) return null;
   const medal = myPos===0?'🥇':myPos===1?'🥈':myPos===2?'🥉':null;
+  const showList = alwaysOpen || open;
   return (
     <div style={{marginBottom:'12px'}}>
-      <div onClick={()=>setOpen(o=>!o)}
-        style={{background:'linear-gradient(135deg,rgba(252,211,77,0.12) 0%,rgba(217,119,6,0.08) 100%)',border:'1px solid rgba(252,211,77,0.25)',borderRadius:open?'16px 16px 0 0':'16px',padding:'14px 18px',display:'flex',alignItems:'center',gap:'12px',cursor:'pointer',userSelect:'none'}}>
+      <div onClick={alwaysOpen ? undefined : ()=>setOpen(o=>!o)}
+        style={{background:'linear-gradient(135deg,rgba(252,211,77,0.12) 0%,rgba(217,119,6,0.08) 100%)',border:'1px solid rgba(252,211,77,0.25)',borderRadius:showList?'16px 16px 0 0':'16px',padding:'14px 18px',display:'flex',alignItems:'center',gap:'12px',cursor:alwaysOpen?'default':'pointer',userSelect:'none'}}>
         <div style={{width:'44px',height:'44px',borderRadius:'50%',background:myPos===0?'rgba(251,191,36,0.25)':myPos===1?'rgba(209,213,219,0.25)':myPos===2?'rgba(217,119,6,0.25)':'rgba(252,211,77,0.12)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:medal?'24px':'18px',fontWeight:'900',color:'#fcd34d'}}>
           {medal || `#${myPos+1}`}
         </div>
@@ -518,10 +519,10 @@ function RanglisteTile({ rangliste, myChildId, children: childMap, subgroups }) 
             {medal?`${medal} Platz ${myPos+1} von ${rangliste.length}`:`Platz ${myPos+1} von ${rangliste.length}`}
           </p>
         </div>
-        <span style={{color:'rgba(252,211,77,0.6)',fontSize:'18px',display:'inline-block',transform:open?'rotate(180deg)':'none',transition:'transform 0.2s'}}>▼</span>
+        {!alwaysOpen && <span style={{color:'rgba(252,211,77,0.6)',fontSize:'18px',display:'inline-block',transform:open?'rotate(180deg)':'none',transition:'transform 0.2s'}}>▼</span>}
       </div>
-      {open && (
-        <div style={{background:'rgba(0,0,0,0.25)',border:'1px solid rgba(252,211,77,0.18)',borderTop:'none',borderRadius:'0 0 16px 16px',padding:'12px 14px',display:'flex',flexDirection:'column',gap:'6px',maxHeight:'340px',overflowY:'auto'}}>
+      {showList && (
+        <div style={{background:'rgba(0,0,0,0.25)',border:'1px solid rgba(252,211,77,0.18)',borderTop:'none',borderRadius:'0 0 16px 16px',padding:'12px 14px',display:'flex',flexDirection:'column',gap:'6px'}}>
           {rangliste.map((childId, idx) => {
             const child = childMap[childId];
             if (!child) return null;
@@ -4086,7 +4087,7 @@ export default function TrainingsApp() {
             <>
               {rangliste.length===0
                 ? <div style={{...DARK_CARD,textAlign:'center',padding:'40px'}}><p style={{color:'rgba(255,255,255,0.3)',margin:0}}>Noch keine Ranglisten-Daten vorhanden.</p></div>
-                : <RanglisteTile rangliste={rangliste} myChildId={myChild?.id} children={children} subgroups={subgroups}/>
+                : <RanglisteTile rangliste={rangliste} myChildId={myChild?.id} children={children} subgroups={subgroups} alwaysOpen={true}/>
               }
             </>
           );
@@ -4102,36 +4103,48 @@ export default function TrainingsApp() {
           const totalTrainings=getTotalTrainingsAttended(myChild.id);
           const streak=getLongestStreak(myChild.id);
           const tournParts=getTournamentParticipations(myChild.id);
+          const openCount=(icon,title,desc,count)=>setAchievementPopup({icon,title,desc,count});
           const Sec=({title,children:ch,mb=true})=>(
             <div style={{marginBottom:mb?'18px':0}}>
               <p style={{margin:'0 0 8px',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.35)',textTransform:'uppercase',letterSpacing:'0.5px',borderBottom:'1px solid rgba(255,255,255,0.06)',paddingBottom:'5px'}}>{title}</p>
               <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>{ch}</div>
             </div>
           );
-          const Tile2=({icon,iconGray='⬜',label,sub,has,activeBg='rgba(74,222,128,0.1)',activeBorder='rgba(74,222,128,0.3)',activeTextColor='#4ade80',onClick})=>(
-            <button onClick={onClick} style={{padding:'10px 12px',borderRadius:'12px',border:`2px solid ${has?activeBorder:'rgba(255,255,255,0.08)'}`,background:has?activeBg:'rgba(255,255,255,0.03)',cursor:'pointer',textAlign:'center',minWidth:'76px',maxWidth:'100px'}} onMouseEnter={e=>e.currentTarget.style.transform='scale(1.06)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
+          const TileA=({icon,iconGray='⬜',label,sub,has,activeBg='rgba(74,222,128,0.1)',activeBorder='rgba(74,222,128,0.3)',activeTextColor='#4ade80',onClick})=>(
+            <button onClick={onClick} style={{padding:'10px 12px',borderRadius:'12px',border:`2px solid ${has?activeBorder:'rgba(255,255,255,0.08)'}`,background:has?activeBg:'rgba(255,255,255,0.03)',cursor:'pointer',textAlign:'center',minWidth:'76px',maxWidth:'100px',transition:'transform 0.1s'}} onMouseEnter={e=>e.currentTarget.style.transform='scale(1.06)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
               <div style={{fontSize:'22px'}}>{has?icon:iconGray}</div>
               <div style={{fontSize:'11px',fontWeight:'700',color:has?activeTextColor:'rgba(255,255,255,0.2)',marginTop:'2px',lineHeight:'1.2'}}>{label}</div>
               {sub&&<div style={{fontSize:'12px',fontWeight:'700',color:has?activeTextColor:'rgba(255,255,255,0.2)'}}>{sub}</div>}
             </button>
           );
           return (
-            <div style={{...DARK_CARD}}>
-              <Sec title={`📅 Anwesenheit ${monthName}`}>
-                {[{key:'bronze',icon:'🥉',label:'Bronze',req:4},{key:'silver',icon:'🥈',label:'Silber',req:7},{key:'gold',icon:'🥇',label:'Gold',req:10}].map(({key,icon,label,req})=>(
-                  <Tile2 key={key} icon={icon} iconGray='⬜' label={label} sub={`${Math.min(currentLevel??0,req)}/${req}`} has={(currentLevel??0)>=req} onClick={()=>setAchievementPopup({icon,title:`${label} – ${monthName}`,desc:`${req} Trainings im Monat besucht. Aktuell: ${currentLevel??0} Trainings.`,count:currentLevel??0})}/>
-                ))}
+            <div style={DARK_CARD}>
+              <Sec title="🏓 TTR Meilensteine">
+                {TTR_MILESTONES.map((val,i)=>{const unlocked=ttrUnlocked.includes(val);const col=TTR_COLORS[i];return(<button key={val} onClick={()=>setAchievementPopup({icon:unlocked?'🏓':'🔒',title:`${val} TTR`,desc:unlocked?ACHIEVEMENT_DESCRIPTIONS.ttr(val):`Noch nicht erreicht. Erreiche ${val} TTR-Punkte!`})} style={{padding:'8px 10px',borderRadius:'10px',border:`2px solid ${unlocked?col.bg:'rgba(255,255,255,0.08)'}`,background:unlocked?col.bg:'rgba(255,255,255,0.03)',color:unlocked?col.text:'rgba(255,255,255,0.2)',fontWeight:'700',fontSize:'12px',cursor:'pointer',minWidth:'54px',transition:'transform 0.1s'}} onMouseEnter={e=>e.currentTarget.style.transform='scale(1.08)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>{unlocked?'🏓 ':''}{val}</button>);})}
               </Sec>
-              <Sec title="📈 Gesamt-Trainings">
-                {[{n:10,icon:'🌱'},{n:25,icon:'⭐'},{n:50,icon:'🔥'},{n:100,icon:'💎'}].map(({n,icon})=>(
-                  <Tile2 key={n} icon={icon} iconGray='⬜' label={`${n}x`} has={totalTrainings>=n} sub={totalTrainings>=n?'✓':undefined} onClick={()=>setAchievementPopup({icon,title:`${n} Trainings`,desc:`${n} Trainingseinheiten besucht. Aktuell: ${totalTrainings}.`,count:totalTrainings})}/>
-                ))}
+              <Sec title="📅 Trainings-Meilensteine">
+                {[10,25,50,100,200,500,1000].map(m=>{const has=totalTrainings>=m;return<TileA key={m} icon="🏋️" label={`${m} Trainings`} sub={has?'✓':`${totalTrainings}/${m}`} has={has} activeBg="rgba(74,222,128,0.1)" activeBorder="rgba(74,222,128,0.3)" activeTextColor="#4ade80" onClick={()=>setAchievementPopup({icon:'🏋️',title:`${m} Trainings`,desc:`Du hast insgesamt ${m} Trainingseinheiten absolviert! Aktuell: ${totalTrainings} Trainings.`})}/>;} )}
+                {[5,10,20,30,50].map(m=>{const has=streak>=m;return<TileA key={`str${m}`} icon="🔥" label={`${m}× Serie`} sub={has?'✓':`${streak}/${m}`} has={has} activeBg="rgba(251,146,60,0.1)" activeBorder="rgba(251,146,60,0.3)" activeTextColor="#fb923c" onClick={()=>setAchievementPopup({icon:'🔥',title:`${m}er Trainingsserie`,desc:`${m} Trainingseinheiten in Folge ohne Fehlzeit! Deine längste Serie: ${streak} Einheiten.`})}/>;} )}
               </Sec>
-              <Sec title="🏆 Turniere">
-                {[{n:1,icon:'🎯'},{n:3,icon:'🏅'},{n:5,icon:'🏆'},{n:10,icon:'👑'}].map(({n,icon})=>(
-                  <Tile2 key={n} icon={icon} iconGray='⬜' label={`${n}x`} has={tournParts>=n} onClick={()=>setAchievementPopup({icon,title:`${n} Turniere`,desc:`An ${n} Turnier${n>1?'en':''} teilgenommen. Aktuell: ${tournParts}.`,count:tournParts})}/>
-                ))}
+              <Sec title="🏆 Turnier-Teilnahmen">
+                {[1,5,10,20].map(m=>{const has=tournParts>=m;return<TileA key={m} icon="🏆" label={`${m} Turnier${m>1?'e':''}`} sub={has?'✓':`${tournParts}/${m}`} has={has} activeBg="rgba(253,230,138,0.1)" activeBorder="rgba(253,230,138,0.3)" activeTextColor="#fde68a" onClick={()=>setAchievementPopup({icon:'🏆',title:`${m} Turnier${m>1?'e':''}`,desc:`Du hast an ${m} Turnier${m>1?'en':''} teilgenommen! Bisher: ${tournParts}.`})}/>;} )}
               </Sec>
+              <Sec title="🥊 Turnierergebnisse Einzel">
+                {[{icon:'🥇',label:'1. Platz',field:'einzel1',desc:ACHIEVEMENT_DESCRIPTIONS.einzel1},{icon:'🥈',label:'2. Platz',field:'einzel2',desc:ACHIEVEMENT_DESCRIPTIONS.einzel2},{icon:'🥉',label:'3. Platz',field:'einzel3',desc:ACHIEVEMENT_DESCRIPTIONS.einzel3}].map(({icon,label,field,desc})=>{const count=ach[field]||0;return<TileA key={field} icon={icon} label={label} sub={count>0?`×${count}`:undefined} has={count>0} activeBg="rgba(253,230,138,0.1)" activeBorder="rgba(253,230,138,0.3)" activeTextColor="#fde68a" onClick={()=>openCount(icon,label,desc,count)}/>;} )}
+              </Sec>
+              <Sec title="🤝 Turnierergebnisse Doppel">
+                {[{icon:'🥇',label:'1. Platz',field:'doppel1',desc:ACHIEVEMENT_DESCRIPTIONS.doppel1},{icon:'🥈',label:'2. Platz',field:'doppel2',desc:ACHIEVEMENT_DESCRIPTIONS.doppel2},{icon:'🥉',label:'3. Platz',field:'doppel3',desc:ACHIEVEMENT_DESCRIPTIONS.doppel3}].map(({icon,label,field,desc})=>{const count=ach[field]||0;return<TileA key={field} icon={icon} label={label} sub={count>0?`×${count}`:undefined} has={count>0} activeBg="rgba(253,230,138,0.1)" activeBorder="rgba(253,230,138,0.3)" activeTextColor="#fde68a" onClick={()=>openCount(icon,label,desc,count)}/>;} )}
+              </Sec>
+              <Sec title="🏅 Mannschaft & Auszeichnungen">
+                {[{icon:'🏆',label:'Meisterschaft',field:'team',desc:ACHIEVEMENT_DESCRIPTIONS.team},{icon:'⭐',label:'Spieler d. M.',field:'spielerDesMonats',desc:'Du wurdest zum Spieler des Monats gewählt!'}].map(({icon,label,field,desc})=>{const count=ach[field]||0;return<TileA key={field} icon={icon} label={label} sub={count>0?`×${count}`:undefined} has={count>0} activeBg="rgba(253,230,138,0.1)" activeBorder="rgba(253,230,138,0.3)" activeTextColor="#fde68a" onClick={()=>openCount(icon,label,desc,count)}/>;} )}
+              </Sec>
+              <Sec title={`📆 Anwesenheit ${monthName}`}>
+                {(()=>{const attCfgMap={gold:{icon:'🥇',color:'#fde68a',bg:'rgba(253,230,138,0.15)',border:'rgba(253,230,138,0.4)',label:'Gold (100%)'},silver:{icon:'🥈',color:'rgba(255,255,255,0.6)',bg:'rgba(255,255,255,0.08)',border:'rgba(255,255,255,0.2)',label:'Silber (≥90%)'},bronze:{icon:'🥉',color:'#fb923c',bg:'rgba(251,146,60,0.12)',border:'rgba(251,146,60,0.3)',label:'Bronze (≥80%)'}};const cfg3=currentLevel?attCfgMap[currentLevel]:null;return(<button onClick={()=>setAchievementPopup({icon:cfg3?cfg3.icon:'📅',title:monthName,desc:cfg3?cfg3.label:'Noch nicht genug Trainings besucht (mind. 80% für Bronze).'})} style={{padding:'10px 14px',borderRadius:'12px',border:`2px solid ${cfg3?cfg3.border:'rgba(255,255,255,0.08)'}`,background:cfg3?cfg3.bg:'rgba(255,255,255,0.03)',cursor:'pointer',textAlign:'center',minWidth:'100px'}} onMouseEnter={e=>e.currentTarget.style.transform='scale(1.05)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}><div style={{fontSize:'26px'}}>{cfg3?cfg3.icon:'⬜'}</div><div style={{fontSize:'12px',fontWeight:'700',color:cfg3?cfg3.color:'rgba(255,255,255,0.2)',marginTop:'2px'}}>{cfg3?cfg3.label:'Kein Rang'}</div></button>);})()}
+              </Sec>
+              <Sec title="📊 Anwesenheits-Monate (Gesamt)">
+                {[{icon:'🥇',label:'Gold-Monate',count:cumul.gold,activeBg:'rgba(253,230,138,0.12)',activeBorder:'rgba(253,230,138,0.35)',activeTextColor:'#fde68a',desc:ACHIEVEMENT_DESCRIPTIONS.attendanceGold},{icon:'🥈',label:'Silber-Monate',count:cumul.silver,activeBg:'rgba(255,255,255,0.08)',activeBorder:'rgba(255,255,255,0.2)',activeTextColor:'rgba(255,255,255,0.7)',desc:ACHIEVEMENT_DESCRIPTIONS.attendanceSilver},{icon:'🥉',label:'Bronze-Monate',count:cumul.bronze,activeBg:'rgba(251,146,60,0.1)',activeBorder:'rgba(251,146,60,0.3)',activeTextColor:'#fb923c',desc:ACHIEVEMENT_DESCRIPTIONS.attendanceBronze}].map(({icon,label,count,activeBg,activeBorder,activeTextColor,desc})=>(<TileA key={label} icon={icon} label={label} sub={count>0?`${count}×`:undefined} has={count>0} activeBg={activeBg} activeBorder={activeBorder} activeTextColor={activeTextColor} onClick={()=>openCount(icon,label,desc,count)}/>))}
+              </Sec>
+              {rangliste.length>0&&rangliste.includes(myChild.id)&&(()=>{const rAch=getRanglisteAch(myChild.id);const myRank=rangliste.indexOf(myChild.id)+1;return(<><Sec title="📊 Rangliste – Erstmals erreicht">{RANK_TIERS.map(t=>{const has=!!rAch.reached?.[t.key];const date=rAch.reached?.[t.key];return(<TileA key={t.key} icon={t.icon} iconGray="⬜" label={t.label} sub={has&&date?new Date(date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'}):undefined} has={has} activeBg="rgba(252,211,77,0.12)" activeBorder="rgba(252,211,77,0.35)" activeTextColor="#fcd34d" onClick={()=>setAchievementPopup({icon:has?t.icon:'🔒',title:t.label,desc:has?`Du hast ${t.label} erstmals am ${new Date(date).toLocaleDateString('de-DE')} erreicht!`:`Noch nicht erreicht. Aktuell: Platz #${myRank}`})}/>);})}</Sec><Sec title="📅 Rangliste – Wochen im Tier" mb={false}>{RANK_TIERS.map(t=>{const wk=rAch.weeks?.[t.key]?.count||0;return(<TileA key={t.key} icon={t.icon} iconGray="⬜" label={t.label} sub={wk>0?`${wk}W`:undefined} has={wk>0} activeBg="rgba(252,211,77,0.08)" activeBorder="rgba(252,211,77,0.25)" activeTextColor="#fcd34d" onClick={()=>setAchievementPopup({icon:t.icon,title:`Wochen ${t.label}`,desc:`Du hast insgesamt ${wk} Woche${wk!==1?'n':''} in der ${t.label} verbracht.`,count:wk})}/>);})}</Sec></>);})()}
             </div>
           );
         }
@@ -4269,6 +4282,34 @@ export default function TrainingsApp() {
                 </div>
               </div>
             </>
+          )}
+
+          {/* ── Trainings diese Woche (direkt auf dem Dashboard) ── */}
+          {myChild && !elternSubView && mySessions.length > 0 && (
+            <div style={{marginBottom:'24px'}}>
+              <span style={SECTION_LABEL()}>Kommende Trainings</span>
+              <div style={{display:'grid',gap:'10px'}}>
+                {mySessions.map(session=>{
+                  const childId=myChild.id;
+                  const myResponseRaw=(session.responses||{})[childId];
+                  const myResponse=typeof myResponseRaw==='object'?myResponseRaw?.status:myResponseRaw;
+                  const sessSubIds=session.subgroupIds||[];
+                  const sessGrpNames=[...new Set(sessSubIds.map(sid=>{const sg=subgroups[sid];const fg=sg?FIXED_GROUPS.find(g=>g.id===sg.groupId):null;return fg?`${fg.emoji} ${fg.name}`:null;}).filter(Boolean))];
+                  const isComing=myResponse==='coming'; const isMissing=myResponse==='missing';
+                  return (
+                    <div key={session.id} style={{padding:'14px 16px',borderRadius:'14px',border:`1px solid ${isComing?'rgba(74,222,128,0.3)':isMissing?'rgba(248,113,113,0.3)':'rgba(255,255,255,0.08)'}`,background:isComing?'rgba(74,222,128,0.07)':isMissing?'rgba(248,113,113,0.07)':'rgba(255,255,255,0.025)'}}>
+                      <p style={{margin:'0 0 3px',fontWeight:'700',color:'white',fontSize:'15px'}}>{new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})} · {session.time} Uhr</p>
+                      {sessGrpNames.length>0&&<p style={{margin:'0 0 2px',fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>📂 {sessGrpNames.join(', ')}</p>}
+                      {session.trainer&&<p style={{margin:'0 0 8px',fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>👤 {session.trainer}</p>}
+                      {session.info&&<div style={{display:'flex',alignItems:'flex-start',gap:'6px',marginBottom:'8px',padding:'8px 10px',background:'rgba(96,165,250,0.08)',border:'1px solid rgba(96,165,250,0.2)',borderRadius:'8px'}}><Info size={14} color="#93c5fd" style={{marginTop:'2px',flexShrink:0}}/><p style={{margin:0,fontSize:'13px',color:'#93c5fd'}}>{session.info}</p></div>}
+                      <button onClick={()=>respondToSession(session.id,'missing')} style={{width:'100%',padding:'10px',border:`2px solid #dc2626`,background:isMissing?'#dc2626':'transparent',color:isMissing?'white':'#f87171',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>
+                        <X size={18}/> {isMissing?'Abgemeldet – Rückgängig':'Ich fehle'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           )}
 
           {/* ── Hub-Kacheln (nur wenn kein Sub-View) ── */}
