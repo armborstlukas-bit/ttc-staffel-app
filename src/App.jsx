@@ -853,26 +853,19 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','archivedPracticeTournaments'),  s => setArchivedPracticeTournaments(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','gegnerLogbuch'), s => setGegnerLogbuch(s.exists()&&Array.isArray(s.data().entries)?s.data().entries:[])),
     ];
-    // Fetch TTC News RSS
+    // Fetch TTC News via rss2json
     setTtcNewsLoading(true);
-    const ctrl = new AbortController();
-    const timer = setTimeout(()=>ctrl.abort(), 8000);
-    fetch('https://corsproxy.io/?url='+encodeURIComponent('https://ttc-staffel.de/index.php?format=feed&type=rss'), {signal:ctrl.signal})
-      .then(r=>r.text()).then(txt=>{
-        clearTimeout(timer);
-        const parser=new DOMParser();
-        const xml=parser.parseFromString(txt,'text/xml');
-        const items=[...xml.querySelectorAll('item')].slice(0,3).map(it=>{
-          const raw=(it.querySelector('description')?.textContent||'').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim();
-          return {
-            title:it.querySelector('title')?.textContent||'',
-            link:it.querySelector('guid')?.textContent||it.querySelector('link')?.textContent||'',
-            date:it.querySelector('pubDate')?.textContent||'',
-            desc:raw.slice(0,220),
-          };
-        });
+    fetch('https://api.rss2json.com/v1/api.json?rss_url='+encodeURIComponent('https://ttc-staffel.de/index.php?format=feed&type=rss'))
+      .then(r=>r.json()).then(d=>{
+        if(d.status!=='ok')return;
+        const items=(d.items||[]).slice(0,3).map(it=>({
+          title:it.title||'',
+          link:it.link||it.guid||'',
+          date:it.pubDate||'',
+          desc:(it.description||'').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim().slice(0,220),
+        }));
         setTtcNews(items);
-      }).catch(()=>{clearTimeout(timer);}).finally(()=>setTtcNewsLoading(false));
+      }).catch(()=>{}).finally(()=>setTtcNewsLoading(false));
     if (userRole==='admin')
       unsubs.push(onSnapshot(doc(db,'ttc','users'), s => { const d=s.exists()?s.data():{};allUsersRef.current=d;setAllUsers(d); }));
     return () => unsubs.forEach(u=>u());
