@@ -7860,11 +7860,14 @@ export default function TrainingsApp() {
     const acBg = 'rgba(244,114,182,0.07)';
     const me = userProfile?.name || user?.email || '';
 
-    // Player list: all aktiver + admin users, excluding self
+    // Player list: all registered users except self and pending-only accounts
     const registeredPlayers = Object.values(allUsers)
       .filter(u => {
+        const uName = u.name || u.email || '';
+        if (!uName || uName === me) return false;
         const roles = Array.isArray(u.roles) ? u.roles : (u.role ? [u.role] : []);
-        return roles.some(r=>['aktiver','admin'].includes(r)) && (u.name||u.email) !== me;
+        const nonPending = roles.filter(r => r !== 'pending');
+        return nonPending.length > 0 || roles.length === 0;
       })
       .map(u => u.name || u.email)
       .filter(Boolean)
@@ -7913,13 +7916,13 @@ export default function TrainingsApp() {
         <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
           <button onClick={()=>navTo('home')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'9px',color:'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:'600'}}><Home size={15}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>⚔️ Trainingsmatches</h1>
-          {!tmAdding&&<button onClick={()=>setTmAdding(true)}
-            style={{padding:'8px 14px',background:`linear-gradient(135deg,${ac},#db2777)`,border:'none',borderRadius:'10px',color:'white',fontWeight:'700',fontSize:'13px',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px'}}>
-            <Plus size={14}/> Neues Match
-          </button>}
         </div>
 
         <div style={{padding:'20px',maxWidth:'820px',margin:'0 auto'}}>
+          {!tmAdding&&<button onClick={()=>setTmAdding(true)}
+            style={{width:'100%',padding:'11px',background:`linear-gradient(135deg,${ac},#db2777)`,border:'none',borderRadius:'12px',color:'white',fontWeight:'700',fontSize:'14px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',marginBottom:'20px'}}>
+            <Plus size={16}/> Neues Match
+          </button>}
 
           {/* Neues Match Formular */}
           {tmAdding&&(
