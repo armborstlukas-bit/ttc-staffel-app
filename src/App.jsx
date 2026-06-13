@@ -1441,7 +1441,7 @@ export default function TrainingsApp() {
   };
 
   // Navigation helper – increments viewKey so CSS enter-animation fires
-  const navTo = (v) => { setView(v); setViewKey(k => k + 1); };
+  const navTo = (v) => { setView(v); setViewKey(k => k + 1); setGegnerAdding(false); setGegnerEditId(null); setGegnerForm({date:'',verein:'',gegner:'',taktik:''}); };
 
   const canEdit = () => ['admin','trainer'].includes(userRole);
 
