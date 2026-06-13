@@ -3733,7 +3733,7 @@ export default function TrainingsApp() {
         {showRolePicker&&(
           <Modal>
           <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.8)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
-            <div style={{background:'#071520',border:`1px solid ${accentBorder}`,borderRadius:'20px',padding:'28px',maxWidth:'400px',width:'100%'}}>
+            <div style={{background:'#071520',border:`1px solid ${accentBorder}`,borderRadius:'20px',padding:'28px',maxWidth:'400px',width:'100%',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
               <p style={{margin:'0 0 20px',color:'rgba(255,255,255,0.4)',fontSize:'14px',textAlign:'center',fontWeight:'500'}}>Mit welcher Rolle möchtest du fortfahren?</p>
               <div style={{display:'grid',gap:'10px'}}>
                 {(userProfile?.roles||[userRole]).filter(r=>r!=='pending').map(role=>{
