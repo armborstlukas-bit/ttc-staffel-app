@@ -737,7 +737,7 @@ export default function TrainingsApp() {
   const [activePracticeId, setActivePracticeId]                     = useState(null);
   const [ptCreating, setPtCreating]                                 = useState(false);
   const [ptCreateStep, setPtCreateStep]                             = useState(1);
-  const [ptCreateForm, setPtCreateForm]                             = useState({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPer100:1});
+  const [ptCreateForm, setPtCreateForm]                             = useState({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPer100:1,handicapMax:10});
   const [ptSelectedChildren, setPtSelectedChildren]                 = useState([]);
   const [ptSubgroupFilter, setPtSubgroupFilter]                     = useState('all');
   const [ptMatchEditing, setPtMatchEditing]                         = useState(null);
@@ -5116,10 +5116,20 @@ export default function TrainingsApp() {
                           <div style={{display:'grid',gap:'3px'}}>
                             {mMatches.filter(m=>m.round===round).map((m,mi)=>{
                               const p1=mPlayers[m.p1Idx];const p2=mPlayers[m.p2Idx];const res=m.result;
+                              const hcM=m.handicap;
                               return(<div key={mi} style={{display:'flex',alignItems:'center',gap:'8px',padding:'6px 10px',background:'rgba(255,255,255,0.03)',borderRadius:'7px'}}>
-                                <span style={{flex:1,fontSize:'12px',color:res&&res.sets1>res.sets2?'white':'rgba(255,255,255,0.45)',fontWeight:res&&res.sets1>res.sets2?'700':'400',textAlign:'right'}}>{p1?.name||'?'}</span>
-                                <span style={{fontSize:'13px',fontWeight:'800',color:res?'#a78bfa':'rgba(255,255,255,0.2)',minWidth:'34px',textAlign:'center',flexShrink:0}}>{res?`${res.sets1}:${res.sets2}`:'–:–'}</span>
-                                <span style={{flex:1,fontSize:'12px',color:res&&res.sets2>res.sets1?'white':'rgba(255,255,255,0.45)',fontWeight:res&&res.sets2>res.sets1?'700':'400'}}>{p2?.name||'?'}</span>
+                                <div style={{flex:1,textAlign:'right'}}>
+                                  <span style={{fontSize:'12px',color:res&&res.sets1>res.sets2?'white':'rgba(255,255,255,0.45)',fontWeight:res&&res.sets1>res.sets2?'700':'400'}}>{p1?.name||'?'}</span>
+                                  {hcM?.beneficiary===m.p1Idx&&<span style={{display:'block',fontSize:'10px',color:'#fde68a',fontWeight:'800'}}>+{hcM.points}P Vorgabe</span>}
+                                </div>
+                                <div style={{textAlign:'center',flexShrink:0}}>
+                                  <span style={{display:'block',fontSize:'13px',fontWeight:'800',color:res?'#a78bfa':'rgba(255,255,255,0.2)',minWidth:'34px'}}>{res?`${res.sets1}:${res.sets2}`:'–:–'}</span>
+                                  {hcM&&<span style={{fontSize:'9px',color:'rgba(253,230,138,0.5)',fontWeight:'700'}}>HCP {hcM.points}P</span>}
+                                </div>
+                                <div style={{flex:1}}>
+                                  <span style={{fontSize:'12px',color:res&&res.sets2>res.sets1?'white':'rgba(255,255,255,0.45)',fontWeight:res&&res.sets2>res.sets1?'700':'400'}}>{p2?.name||'?'}</span>
+                                  {hcM?.beneficiary===m.p2Idx&&<span style={{display:'block',fontSize:'10px',color:'#fde68a',fontWeight:'800'}}>+{hcM.points}P Vorgabe</span>}
+                                </div>
                               </div>);
                             })}
                           </div>
@@ -6267,7 +6277,7 @@ export default function TrainingsApp() {
         id, type:'4er_gruppe',
         createdAt: new Date().toISOString(),
         createdBy: userProfile?.name || user?.email || 'Trainer',
-        settings: { winSets:ptCreateForm.winSets, setLength:ptCreateForm.setLength, deciderLength:ptCreateForm.deciderCustom?ptCreateForm.deciderLength:ptCreateForm.setLength, trackSetScores:ptCreateForm.trackSetScores, handicap:ptCreateForm.handicap, handicapPer100:ptCreateForm.handicapPer100 },
+        settings: { winSets:ptCreateForm.winSets, setLength:ptCreateForm.setLength, deciderLength:ptCreateForm.deciderCustom?ptCreateForm.deciderLength:ptCreateForm.setLength, trackSetScores:ptCreateForm.trackSetScores, handicap:ptCreateForm.handicap, handicapPer100:ptCreateForm.handicapPer100, handicapMax:ptCreateForm.handicapMax },
         players: seeded.map((p,i) => ({...p, seed:i+1})),
         matches: (()=>{
           // Round-robin schedule: fix player 0, rotate rest; top 2 seeds always meet in last round
@@ -6286,7 +6296,8 @@ export default function TrainingsApp() {
                 if (ptCreateForm.handicap) {
                   const ttr1 = seeded[p1]?.maxTTR||0, ttr2 = seeded[p2]?.maxTTR||0;
                   const diff = ttr1 - ttr2;
-                  const pts = Math.round(Math.abs(diff) / 100) * ptCreateForm.handicapPer100;
+                  const raw = Math.round(Math.abs(diff) / 100) * ptCreateForm.handicapPer100;
+                  const pts = Math.min(raw, ptCreateForm.handicapMax);
                   if (pts > 0) handicap = diff > 0 ? {beneficiary: p2, points: pts} : {beneficiary: p1, points: pts};
                 }
                 allMatches.push({round:r+1, p1Idx:p1, p2Idx:p2, result:null, ...(handicap?{handicap}:{})});
@@ -6318,7 +6329,7 @@ export default function TrainingsApp() {
             <button onClick={()=>{setArchiveTab('practiceTournaments');navTo('archiv');}} style={s.btn('#6d28d9')}>
               <Archive size={14}/> Archiv
             </button>
-            <button onClick={()=>{setPtCreating(true);setPtCreateStep(1);setPtSelectedChildren([]);setPtSubgroupFilter('all');setPtCreateForm({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPer100:1});}} style={s.btn('#16a34a')}>
+            <button onClick={()=>{setPtCreating(true);setPtCreateStep(1);setPtSelectedChildren([]);setPtSubgroupFilter('all');setPtCreateForm({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPer100:1,handicapMax:10});}} style={s.btn('#16a34a')}>
               <Plus size={15}/> Neuer Wettkampf
             </button>
           </div>)}
@@ -6452,8 +6463,15 @@ export default function TrainingsApp() {
                             ))}
                           </div>
                           <p style={{margin:'6px 0 0',fontSize:'11px',color:'#9ca3af'}}>
-                            Beispiel: TTR-Differenz 250 → {Math.round(250/100)*ptCreateForm.handicapPer100} Vorgabepunkte
+                            Beispiel: TTR-Differenz 250 → {Math.min(Math.round(250/100)*ptCreateForm.handicapPer100, ptCreateForm.handicapMax)} Vorgabepunkte
                           </p>
+                          <p style={{margin:'10px 0 6px',fontSize:'11px',fontWeight:'700',color:'#555'}}>Maximale Vorgabe: <span style={{color:'#7c3aed',fontWeight:'900'}}>{ptCreateForm.handicapMax} Punkte</span></p>
+                          <input type="range" min="1" max="20" step="1" value={ptCreateForm.handicapMax}
+                            onChange={e=>setPtCreateForm(f=>({...f,handicapMax:Number(e.target.value)}))}
+                            style={{width:'100%',accentColor:'#7c3aed',height:'6px',cursor:'pointer'}}/>
+                          <div style={{display:'flex',justifyContent:'space-between',fontSize:'10px',color:'#9ca3af',marginTop:'2px'}}>
+                            <span>1</span><span>10</span><span>20</span>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -7321,10 +7339,22 @@ export default function TrainingsApp() {
                                   <div style={{display:'grid',gap:'3px'}}>
                                     {ptMatches.filter(m=>m.round===round).map((m,mi)=>{
                                       const p1=ptPlayers[m.p1Idx];const p2=ptPlayers[m.p2Idx];const res=m.result;
-                                      return(<div key={mi} style={{display:'flex',alignItems:'center',gap:'8px',padding:'5px 10px',background:'rgba(255,255,255,0.03)',borderRadius:'7px'}}>
-                                        <span style={{flex:1,fontSize:'11px',color:res&&res.sets1>res.sets2?'white':'rgba(255,255,255,0.4)',fontWeight:res&&res.sets1>res.sets2?'700':'400',textAlign:'right'}}>{p1?.name||'?'}</span>
-                                        <span style={{fontSize:'12px',fontWeight:'800',color:res?'#a78bfa':'rgba(255,255,255,0.15)',minWidth:'30px',textAlign:'center',flexShrink:0}}>{res?`${res.sets1}:${res.sets2}`:'–:–'}</span>
-                                        <span style={{flex:1,fontSize:'11px',color:res&&res.sets2>res.sets1?'white':'rgba(255,255,255,0.4)',fontWeight:res&&res.sets2>res.sets1?'700':'400'}}>{p2?.name||'?'}</span>
+                                      const hc=m.handicap;
+                                      const p1Gets=hc&&hc.beneficiary===m.p1Idx;
+                                      const p2Gets=hc&&hc.beneficiary===m.p2Idx;
+                                      return(<div key={mi} style={{display:'flex',alignItems:'center',gap:'8px',padding:'6px 10px',background:'rgba(255,255,255,0.03)',borderRadius:'7px'}}>
+                                        <div style={{flex:1,textAlign:'right'}}>
+                                          <span style={{fontSize:'11px',color:res&&res.sets1>res.sets2?'white':'rgba(255,255,255,0.4)',fontWeight:res&&res.sets1>res.sets2?'700':'400'}}>{p1?.name||'?'}</span>
+                                          {p1Gets&&<span style={{display:'block',fontSize:'10px',color:'#fde68a',fontWeight:'800'}}>+{hc.points}P Vorgabe</span>}
+                                        </div>
+                                        <div style={{textAlign:'center',flexShrink:0}}>
+                                          <span style={{display:'block',fontSize:'12px',fontWeight:'800',color:res?'#a78bfa':'rgba(255,255,255,0.15)',minWidth:'30px'}}>{res?`${res.sets1}:${res.sets2}`:'–:–'}</span>
+                                          {hc&&<span style={{fontSize:'9px',color:'rgba(253,230,138,0.5)',fontWeight:'700',whiteSpace:'nowrap'}}>HCP {hc.points}P</span>}
+                                        </div>
+                                        <div style={{flex:1}}>
+                                          <span style={{fontSize:'11px',color:res&&res.sets2>res.sets1?'white':'rgba(255,255,255,0.4)',fontWeight:res&&res.sets2>res.sets1?'700':'400'}}>{p2?.name||'?'}</span>
+                                          {p2Gets&&<span style={{display:'block',fontSize:'10px',color:'#fde68a',fontWeight:'800'}}>+{hc.points}P Vorgabe</span>}
+                                        </div>
                                       </div>);
                                     })}
                                   </div>
