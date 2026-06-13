@@ -859,18 +859,7 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','trainingsmatches'), s => setTrainingsmatches(s.exists()&&Array.isArray(s.data().matches)?s.data().matches:[])),
     ];
     // Fetch TTC News via rss2json
-    setTtcNewsLoading(true);
-    fetch('https://api.rss2json.com/v1/api.json?rss_url='+encodeURIComponent('https://ttc-staffel.de/index.php?format=feed&type=rss'))
-      .then(r=>r.json()).then(d=>{
-        if(d.status!=='ok')return;
-        const items=(d.items||[]).slice(0,3).map(it=>({
-          title:it.title||'',
-          link:it.link||it.guid||'',
-          date:it.pubDate||'',
-          desc:(it.description||'').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim().slice(0,220),
-        }));
-        setTtcNews(items);
-      }).catch(()=>{}).finally(()=>setTtcNewsLoading(false));
+    fetchTtcNews();
     if (['admin','aktiver'].includes(userRole))
       unsubs.push(onSnapshot(doc(db,'ttc','users'), s => { const d=s.exists()?s.data():{};allUsersRef.current=d;setAllUsers(d); }));
     return () => unsubs.forEach(u=>u());
@@ -1461,6 +1450,21 @@ export default function TrainingsApp() {
   };
 
   // Navigation helper – increments viewKey so CSS enter-animation fires
+  const fetchTtcNews = () => {
+    setTtcNewsLoading(true);
+    const bust = Date.now();
+    fetch('https://api.rss2json.com/v1/api.json?rss_url='+encodeURIComponent('https://ttc-staffel.de/index.php?format=feed&type=rss&_='+bust))
+      .then(r=>r.json()).then(d=>{
+        if(d.status!=='ok')return;
+        const items=(d.items||[]).slice(0,3).map(it=>({
+          title:it.title||'',
+          link:it.link||it.guid||'',
+          date:it.pubDate||'',
+          desc:(it.description||'').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim().slice(0,220),
+        }));
+        setTtcNews(items);
+      }).catch(()=>{}).finally(()=>setTtcNewsLoading(false));
+  };
   const navTo = (v) => { setView(v); setViewKey(k => k + 1); setGegnerAdding(false); setGegnerEditId(null); setGegnerForm({date:'',verein:'',gegner:'',taktik:''}); };
 
   const canEdit = () => ['admin','trainer'].includes(userRole);
@@ -7818,7 +7822,12 @@ export default function TrainingsApp() {
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>📰 TTC News</h1>
         </div>
         <div style={{padding:'20px',maxWidth:'760px',margin:'0 auto'}}>
-          <p style={{margin:'0 0 20px',fontSize:'13px',color:'rgba(255,255,255,0.35)'}}>Aktuelle Beiträge von ttc-staffel.de</p>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px'}}>
+            <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.35)'}}>Aktuelle Beiträge von ttc-staffel.de</p>
+            <button onClick={fetchTtcNews} disabled={ttcNewsLoading} style={{background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'8px',color:'rgba(255,255,255,0.6)',fontSize:'12px',padding:'5px 12px',cursor:'pointer'}}>
+              {ttcNewsLoading?'…':'↻ Aktualisieren'}
+            </button>
+          </div>
           {ttcNewsLoading?(
             <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.3)'}}>
               <div style={{fontSize:'36px',marginBottom:'12px'}}>⏳</div>
