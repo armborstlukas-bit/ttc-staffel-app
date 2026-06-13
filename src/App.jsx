@@ -736,6 +736,8 @@ export default function TrainingsApp() {
   const [practiceTournaments, setPracticeTournaments]               = useState({});
   const [archivedPracticeTournaments, setArchivedPracticeTournaments] = useState({});
   const [gegnerLogbuch, setGegnerLogbuch] = useState([]);
+  const [ttcNews, setTtcNews] = useState([]);
+  const [ttcNewsLoading, setTtcNewsLoading] = useState(false);
   const [gegnerForm, setGegnerForm] = useState({date:'', verein:'', gegner:'', taktik:''});
   const [gegnerAdding, setGegnerAdding] = useState(false);
   const [gegnerEditId, setGegnerEditId] = useState(null);
@@ -851,6 +853,20 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','archivedPracticeTournaments'),  s => setArchivedPracticeTournaments(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','gegnerLogbuch'), s => setGegnerLogbuch(s.exists()&&Array.isArray(s.data().entries)?s.data().entries:[])),
     ];
+    // Fetch TTC News RSS
+    setTtcNewsLoading(true);
+    fetch('https://api.allorigins.win/get?url='+encodeURIComponent('https://ttc-staffel.de/index.php?format=feed&type=rss'))
+      .then(r=>r.json()).then(d=>{
+        const parser=new DOMParser();
+        const xml=parser.parseFromString(d.contents,'text/xml');
+        const items=[...xml.querySelectorAll('item')].slice(0,3).map(it=>({
+          title:it.querySelector('title')?.textContent||'',
+          link:it.querySelector('link')?.textContent||it.querySelector('guid')?.textContent||'',
+          date:it.querySelector('pubDate')?.textContent||'',
+          desc:(it.querySelector('description')?.textContent||'').replace(/<[^>]+>/g,'').trim().slice(0,200),
+        }));
+        setTtcNews(items);
+      }).catch(()=>{}).finally(()=>setTtcNewsLoading(false));
     if (userRole==='admin')
       unsubs.push(onSnapshot(doc(db,'ttc','users'), s => { const d=s.exists()?s.data():{};allUsersRef.current=d;setAllUsers(d); }));
     return () => unsubs.forEach(u=>u());
@@ -3434,6 +3450,7 @@ export default function TrainingsApp() {
       ...(userRole==='admin'?[
         {label:'Admin',         icon:'🛡️', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('admin')},
         {label:'Gegnerlogbuch', icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.1)',   border:'rgba(8,145,178,0.25)',   action:()=>navTo('gegnerlogbuch')},
+        {label:'TTC News',      icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.1)',  border:'rgba(74,222,128,0.25)',  action:()=>navTo('ttcnews')},
       ]:[]),
     ];
     const groups = FIXED_GROUPS.filter(g=>canAccessGroup(g.id));
@@ -3780,164 +3797,31 @@ export default function TrainingsApp() {
           </div>
 
           {/* Greeting */}
-          <div style={{marginBottom:'32px'}}>
+          <div style={{marginBottom:'28px'}}>
             <p style={{margin:'0 0 6px',color:accentMid,fontSize:'12px',fontWeight:'700',letterSpacing:'1.5px',textTransform:'uppercase'}}>{dateLabel}</p>
             <h1 style={{margin:0,color:'white',fontSize:isMobile?'26px':'32px',fontWeight:'800',letterSpacing:'-1px',lineHeight:1.1}}>
               {greeting}, <span style={{color:'#67e8f9'}}>{(userProfile?.name||'').split(' ')[0]||'Spieler'}</span> 👋
             </h1>
           </div>
 
-          {/* ── Gegnerlogbuch ── */}
-          <span style={{display:'block',fontSize:'10px',fontWeight:'800',color:accentMid,textTransform:'uppercase',letterSpacing:'2px',marginBottom:'10px'}}>Gegnerlogbuch</span>
-          <div style={{...CARD,marginBottom:'0'}}>
-            <div style={{marginBottom:'14px'}}>
-              <h3 style={{margin:'0 0 2px',color:'white',fontWeight:'800',fontSize:'17px'}}>🎯 Gegnerlogbuch</h3>
-              <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>Gemeinsame Taktikdatenbank aller Aktiven · {gegnerLogbuch.length} {gegnerLogbuch.length===1?'Eintrag':'Einträge'}</p>
-            </div>
-
-            {/* Neuer Eintrag Button */}
-            {!gegnerAdding&&<button onClick={()=>{setGegnerAdding(true);setGegnerEditId(null);setGegnerForm({date:TODAY,verein:'',gegner:'',taktik:''});}}
-              style={{width:'100%',padding:'11px',background:`linear-gradient(135deg,${accentColor},#0e7490)`,color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',marginBottom:'14px'}}>
-              <Plus size={16}/> Neuer Eintrag
-            </button>}
-
-            {/* Formular */}
-            {gegnerAdding&&(
-              <div style={{background:'rgba(8,145,178,0.06)',border:`1px solid ${accentBorder}`,borderRadius:'14px',padding:'16px',marginBottom:'16px'}}>
-                <p style={{margin:'0 0 12px',fontSize:'12px',fontWeight:'800',color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px'}}>{gegnerEditId?'Eintrag bearbeiten':'Neuer Eintrag'}</p>
-                <div style={{display:'grid',gap:'10px'}}>
-                  <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'10px'}}>
-                    <div>
-                      <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Datum des Spiels</label>
-                      <input type="date" value={gegnerForm.date} onChange={e=>setGegnerForm(f=>({...f,date:e.target.value}))}
-                        style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
-                    </div>
-                    <div>
-                      <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Verein des Gegners</label>
-                      <input type="text" placeholder="z.B. TTC Musterstadt" value={gegnerForm.verein} onChange={e=>setGegnerForm(f=>({...f,verein:e.target.value}))}
-                        style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
-                    </div>
-                    <div style={{gridColumn:isMobile?'1':'1 / -1'}}>
-                      <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Name des Gegners</label>
-                      <input type="text" placeholder="z.B. Max Mustermann" value={gegnerForm.gegner} onChange={e=>setGegnerForm(f=>({...f,gegner:e.target.value}))}
-                        style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
-                      {!gegnerEditId&&gegnerForm.gegner.trim()&&gegnerLogbuch.some(x=>x.gegner?.toLowerCase()===gegnerForm.gegner.trim().toLowerCase())&&(
-                        <p style={{margin:'5px 0 0',fontSize:'11px',color:'#fbbf24',fontWeight:'600'}}>⚠️ Dieser Gegner ist bereits im Logbuch eingetragen.</p>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Taktikhinweise</label>
-                    <textarea placeholder="Wie spielt der Gegner? Was hat funktioniert? Schwächen, Stärken, Aufschläge..." value={gegnerForm.taktik} onChange={e=>setGegnerForm(f=>({...f,taktik:e.target.value}))}
-                      rows={4} style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',resize:'vertical',boxSizing:'border-box',fontFamily:'inherit'}}/>
-                  </div>
-                  <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>
-                    <button onClick={()=>{setGegnerAdding(false);setGegnerEditId(null);setGegnerForm({date:'',verein:'',gegner:'',taktik:''});}}
-                      style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
-                    <button onClick={submitGegner} disabled={!gegnerForm.verein.trim()||!gegnerForm.date}
-                      style={{padding:'9px 20px',background:gegnerForm.verein.trim()&&gegnerForm.date?`linear-gradient(135deg,${accentColor},#0e7490)`:'rgba(255,255,255,0.1)',color:'white',border:'none',borderRadius:'10px',cursor:gegnerForm.verein.trim()&&gegnerForm.date?'pointer':'not-allowed',fontWeight:'700',fontSize:'13px',opacity:gegnerForm.verein.trim()&&gegnerForm.date?1:0.5}}>
-                      {gegnerEditId?'Speichern':'Eintrag speichern'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Suche */}
-            {gegnerLogbuch.length>0&&(
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'12px'}}>
-                <div style={{position:'relative'}}>
-                  <span style={{position:'absolute',left:'10px',top:'50%',transform:'translateY(-50%)',fontSize:'13px',opacity:0.4}}>🔍</span>
-                  <input type="text" placeholder="Nach Spieler suchen..." value={gegnerSearchPlayer} onChange={e=>setGegnerSearchPlayer(e.target.value)}
-                    style={{width:'100%',boxSizing:'border-box',paddingLeft:'30px',paddingRight:'10px',paddingTop:'8px',paddingBottom:'8px',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'13px',outline:'none'}}/>
-                </div>
-                <div style={{position:'relative'}}>
-                  <span style={{position:'absolute',left:'10px',top:'50%',transform:'translateY(-50%)',fontSize:'13px',opacity:0.4}}>🏓</span>
-                  <input type="text" placeholder="Nach Verein suchen..." value={gegnerSearchVerein} onChange={e=>setGegnerSearchVerein(e.target.value)}
-                    style={{width:'100%',boxSizing:'border-box',paddingLeft:'30px',paddingRight:'10px',paddingTop:'8px',paddingBottom:'8px',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'13px',outline:'none'}}/>
-                </div>
-              </div>
-            )}
-
-            {/* Einträge */}
-            {gegnerLogbuch.length===0&&!gegnerAdding?(
-              <div style={{textAlign:'center',padding:'40px 20px',color:'rgba(255,255,255,0.2)'}}>
-                <div style={{fontSize:'40px',marginBottom:'10px'}}>📋</div>
-                <p style={{margin:0,fontWeight:'600'}}>Noch keine Einträge</p>
-                <p style={{margin:'4px 0 0',fontSize:'13px'}}>Füge den ersten Gegner hinzu!</p>
-              </div>
-            ):(
-              <div style={{display:'grid',gap:'6px'}}>
-                {[...gegnerLogbuch].sort((a,b)=>(a.gegner||a.verein||'').localeCompare(b.gegner||b.verein||'','de')).filter(e=>e.id!==gegnerEditId&&(!gegnerSearchPlayer||e.gegner?.toLowerCase().includes(gegnerSearchPlayer.toLowerCase()))&&(!gegnerSearchVerein||e.verein?.toLowerCase().includes(gegnerSearchVerein.toLowerCase()))).map(e=>{
-                  const meId = userProfile?.name||user?.email;
-                  const isOwnerG = e.createdBy && e.createdBy===meId;
-                  const canEditG = isOwnerG||userRole==='admin';
-                  const canDeleteG = userRole==='admin';
-                  const expanded = gegnerExpandedId===e.id;
-                  const dateStrG = e.date?new Date(e.date+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
-                  return (
-                    <div key={e.id} style={{background:'rgba(255,255,255,0.03)',border:`1px solid ${expanded?accentBorder:'rgba(255,255,255,0.07)'}`,borderRadius:'12px',overflow:'hidden'}}>
-                      {/* Header – immer sichtbar */}
-                      <button onClick={()=>setGegnerExpandedId(expanded?null:e.id)}
-                        style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',background:'none',border:'none',cursor:'pointer',gap:'10px'}}>
-                        <span style={{fontWeight:'700',color:'white',fontSize:'14px',textAlign:'left'}}>{e.gegner||e.verein||'—'}</span>
-                        <span style={{color:'rgba(255,255,255,0.3)',fontSize:'12px',transition:'transform 0.2s',display:'inline-block',transform:expanded?'rotate(180deg)':'rotate(0deg)'}}>▼</span>
-                      </button>
-                      {/* Aufgeklappter Inhalt */}
-                      {expanded&&(
-                        <div style={{padding:'0 14px 14px'}}>
-                          <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>
-                            {[e.verein,dateStrG,e.createdBy].filter(Boolean).join(' · ')}
-                          </p>
-                          {e.taktik&&(
-                            <div style={{background:'rgba(8,145,178,0.06)',border:`1px solid ${accentBorder}`,borderRadius:'10px',padding:'10px 12px',marginBottom:'10px'}}>
-                              <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'800',color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px'}}>Taktikhinweise</p>
-                              <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.75)',lineHeight:'1.6',whiteSpace:'pre-wrap'}}>{e.taktik}</p>
-                            </div>
-                          )}
-                          <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                            {canEditG&&<button onClick={()=>{setGegnerEditId(e.id);setGegnerForm({date:e.date,verein:e.verein,gegner:e.gegner||'',taktik:e.taktik||''});setGegnerAdding(true);setGegnerExpandedId(null);}}
-                              style={{display:'flex',alignItems:'center',gap:'5px',padding:'6px 12px',borderRadius:'8px',background:'rgba(8,145,178,0.1)',border:`1px solid ${accentBorder}`,color:'#67e8f9',cursor:'pointer',fontSize:'12px',fontWeight:'600'}}>
-                              <Pencil size={11}/> Bearbeiten
-                            </button>}
-                            {canDeleteG&&<button onClick={()=>deleteGegner(e.id)}
-                              style={{display:'flex',alignItems:'center',gap:'5px',padding:'6px 12px',borderRadius:'8px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',fontSize:'12px',fontWeight:'600'}}>
-                              <Trash2 size={11}/> Löschen
-                            </button>}
-                            <button onClick={()=>{setGegnerWeitereId(gegnerWeitereId===e.id?null:e.id);setGegnerWeitereText('');}}
-                              style={{padding:'6px 12px',borderRadius:'8px',background:'rgba(8,145,178,0.1)',border:`1px solid ${accentBorder}`,color:'#67e8f9',cursor:'pointer',fontSize:'12px',fontWeight:'600'}}>
-                              + Taktikhinweise
-                            </button>
-                          </div>
-                          {gegnerWeitereId===e.id&&(
-                            <div style={{marginTop:'10px'}}>
-                              <textarea value={gegnerWeitereText} onChange={ev=>setGegnerWeitereText(ev.target.value)} placeholder="Weitere Taktikhinweise..."
-                                style={{width:'100%',boxSizing:'border-box',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'8px',padding:'8px 10px',color:'white',fontSize:'13px',resize:'vertical',minHeight:'70px',outline:'none'}}/>
-                              <div style={{display:'flex',gap:'6px',marginTop:'6px'}}>
-                                <button onClick={()=>{
-                                  if(!gegnerWeitereText.trim())return;
-                                  const note=`\n\n[${meId}]: ${gegnerWeitereText.trim()}`;
-                                  saveGegnerLogbuch(gegnerLogbuch.map(x=>x.id===e.id?{...x,taktik:(x.taktik||'')+note}:x));
-                                  setGegnerWeitereId(null);setGegnerWeitereText('');
-                                }} disabled={!gegnerWeitereText.trim()}
-                                  style={{flex:1,padding:'6px',borderRadius:'7px',background:accentColor,border:'none',color:'white',fontSize:'12px',fontWeight:'700',cursor:'pointer',opacity:gegnerWeitereText.trim()?1:0.5}}>
-                                  Speichern
-                                </button>
-                                <button onClick={()=>{setGegnerWeitereId(null);setGegnerWeitereText('');}}
-                                  style={{padding:'6px 10px',borderRadius:'7px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.6)',fontSize:'12px',cursor:'pointer'}}>
-                                  Abbrechen
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+          {/* ── Hub-Kacheln ── */}
+          <span style={{display:'block',fontSize:'10px',fontWeight:'800',color:accentMid,textTransform:'uppercase',letterSpacing:'2px',marginBottom:'10px'}}>Bereiche</span>
+          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'12px',marginBottom:'0'}}>
+            {[
+              {label:'Gegnerlogbuch', icon:'🎯', desc:`${gegnerLogbuch.length} ${gegnerLogbuch.length===1?'Eintrag':'Einträge'} · Taktiken & Hinweise`, color:'#67e8f9', bg:'rgba(8,145,178,0.08)', border:'rgba(8,145,178,0.2)', action:()=>navTo('gegnerlogbuch')},
+              {label:'TTC News',      icon:'📰', desc:'Aktuelle Vereinsnachrichten',                                                                     color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',  action:()=>navTo('ttcnews')},
+            ].map(t=>(
+              <button key={t.label} onClick={t.action}
+                style={{background:t.bg,border:`1px solid ${t.border}`,borderRadius:'18px',padding:'22px 20px',cursor:'pointer',textAlign:'left',display:'flex',flexDirection:'column',gap:'8px',transition:'transform 0.15s'}}
+                onMouseEnter={e=>e.currentTarget.style.transform='translateY(-2px)'}
+                onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
+                <span style={{fontSize:'32px'}}>{t.icon}</span>
+                <p style={{margin:0,fontWeight:'800',fontSize:'17px',color:t.color}}>{t.label}</p>
+                <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)',lineHeight:'1.5'}}>{t.desc}</p>
+              </button>
+            ))}
           </div>
+
 
         </div>
       </div>
@@ -7903,6 +7787,54 @@ export default function TrainingsApp() {
                       </div>
                     )}
                   </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── TTC NEWS VIEW ─────────────────────────────────────────────────────────
+  if (view === 'ttcnews') {
+    const isAktiver = userRole === 'aktiver';
+    const accentColor = isAktiver ? '#0891b2' : '#4ade80';
+    const accentBorder = isAktiver ? 'rgba(8,145,178,0.2)' : 'rgba(74,222,128,0.2)';
+    const accentBg = isAktiver ? 'rgba(8,145,178,0.08)' : 'rgba(74,222,128,0.06)';
+    const bgGrad = isAktiver ? 'linear-gradient(135deg,#0c1a2e 0%,#0e2a3a 100%)' : 'linear-gradient(135deg,#0a1628 0%,#0d1f12 100%)';
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:bgGrad,fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
+          <button onClick={()=>navTo('home')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'9px',color:'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:'600'}}><Home size={15}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>📰 TTC News</h1>
+        </div>
+        <div style={{padding:'20px',maxWidth:'760px',margin:'0 auto'}}>
+          <p style={{margin:'0 0 20px',fontSize:'13px',color:'rgba(255,255,255,0.35)'}}>Aktuelle Beiträge von ttc-staffel.de</p>
+          {ttcNewsLoading?(
+            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.3)'}}>
+              <div style={{fontSize:'36px',marginBottom:'12px'}}>⏳</div>
+              <p style={{margin:0}}>Nachrichten werden geladen…</p>
+            </div>
+          ):ttcNews.length===0?(
+            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.2)'}}>
+              <div style={{fontSize:'36px',marginBottom:'12px'}}>📭</div>
+              <p style={{margin:0,fontWeight:'600'}}>Keine Nachrichten verfügbar</p>
+            </div>
+          ):(
+            <div style={{display:'grid',gap:'14px'}}>
+              {ttcNews.map((item,i)=>{
+                const pubDate = item.date ? new Date(item.date).toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'}) : '';
+                return (
+                  <a key={i} href={item.link} target="_blank" rel="noopener noreferrer"
+                    style={{display:'block',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'16px',padding:'20px',textDecoration:'none',color:'inherit',transition:'transform 0.15s,border-color 0.15s'}}
+                    onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.borderColor=accentColor;}}
+                    onMouseLeave={e=>{e.currentTarget.style.transform='translateY(0)';e.currentTarget.style.borderColor=accentBorder;}}>
+                    <p style={{margin:'0 0 6px',fontSize:'11px',color:'rgba(255,255,255,0.35)',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>{pubDate}</p>
+                    <h3 style={{margin:'0 0 10px',color:'white',fontSize:'16px',fontWeight:'800',lineHeight:'1.3'}}>{item.title}</h3>
+                    {item.desc&&<p style={{margin:'0 0 12px',fontSize:'13px',color:'rgba(255,255,255,0.55)',lineHeight:'1.6'}}>{item.desc}{item.desc.length>=200?'…':''}</p>}
+                    <span style={{fontSize:'12px',color:accentColor,fontWeight:'700'}}>Weiterlesen →</span>
+                  </a>
                 );
               })}
             </div>
