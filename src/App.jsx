@@ -3870,6 +3870,309 @@ export default function TrainingsApp() {
     const inputStyle = {padding:'10px 14px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(134,239,172,0.2)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',width:'100%',boxSizing:'border-box'};
     const SECTION_LABEL = (color='rgba(74,222,128,0.45)') => ({color,fontSize:'10px',fontWeight:'800',textTransform:'uppercase',letterSpacing:'2px',margin:'0 0 10px',display:'block'});
 
+    // ── Sub-View: eigene Seite mit Trainer-ähnlichem Header ──
+    const subViewMeta = {
+      benachrichtigungen: { label:'Benachrichtigungen', icon:'🔔', color:'rgba(167,139,250,0.5)' },
+      trainingsverlauf:   { label:'Trainingsverlauf',   icon:'📋', color:'rgba(103,232,249,0.5)' },
+      mannschaft:         { label:'Mannschaft',          icon:'🏓', color:'rgba(45,212,191,0.5)'  },
+      turniere:           { label:'Turniere',            icon:'🏆', color:'rgba(253,230,138,0.5)' },
+      rangliste:          { label:'Rangliste',           icon:'📊', color:'rgba(251,191,36,0.5)'  },
+      errungenschaften:   { label:'Errungenschaften',    icon:'🏅', color:'rgba(134,239,172,0.5)' },
+    };
+
+    if (elternSubView && subViewMeta[elternSubView]) {
+      const meta = subViewMeta[elternSubView];
+      const renderSubContent = () => {
+        if (elternSubView === 'benachrichtigungen') {
+          if (!myChild) return null;
+          const { active, trashed } = getCleanedNotifications(myChild.id);
+          const showTrash = notifTab === 'trash';
+          const items = showTrash ? trashed : active;
+          return (
+            <>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',marginBottom:'16px',gap:'8px',flexWrap:'wrap'}}>
+                <button onClick={()=>setNotifTab('inbox')} style={{padding:'6px 14px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:'12px',background:notifTab==='inbox'?'#16a34a':'rgba(255,255,255,0.07)',color:notifTab==='inbox'?'white':'rgba(255,255,255,0.5)'}}>Posteingang {active.length>0&&`(${active.length})`}</button>
+                <button onClick={()=>setNotifTab('trash')} style={{padding:'6px 14px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:'12px',background:notifTab==='trash'?'#374151':'rgba(255,255,255,0.07)',color:notifTab==='trash'?'white':'rgba(255,255,255,0.5)'}}>🗑️ Papierkorb {trashed.length>0&&`(${trashed.length})`}</button>
+                <button onClick={()=>setShowParentCompose(v=>!v)} style={{padding:'6px 14px',borderRadius:'20px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:'12px',background:showParentCompose?'#7c3aed':'rgba(255,255,255,0.07)',color:showParentCompose?'white':'rgba(255,255,255,0.5)'}}>✉️ Schreiben</button>
+              </div>
+              {showParentCompose&&(
+                <div style={{background:'rgba(124,58,237,0.1)',borderRadius:'12px',padding:'14px',marginBottom:'14px',border:'1px solid rgba(124,58,237,0.25)',display:'grid',gap:'8px'}}>
+                  <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'#c4b5fd'}}>✉️ Nachricht an Trainer schreiben</p>
+                  <input value={parentMsgTitle} onChange={e=>setParentMsgTitle(e.target.value)} placeholder="Betreff" style={inputStyle}/>
+                  <textarea value={parentMsgText} onChange={e=>setParentMsgText(e.target.value)} placeholder="Ihre Nachricht..." rows={3} style={{...inputStyle,resize:'vertical'}}/>
+                  <div style={{display:'flex',gap:'8px'}}>
+                    <button onClick={sendParentMessage} style={{flex:1,padding:'10px',background:'linear-gradient(135deg,#7c3aed,#6d28d9)',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}><Send size={14}/> Senden</button>
+                    <button onClick={()=>{setShowParentCompose(false);setParentMsgTitle('');setParentMsgText('');}} style={{flex:1,padding:'10px',background:'rgba(255,255,255,0.07)',color:'rgba(255,255,255,0.5)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Abbrechen</button>
+                  </div>
+                </div>
+              )}
+              {items.length === 0
+                ? <div style={{...DARK_CARD,textAlign:'center',padding:'40px'}}><p style={{color:'rgba(255,255,255,0.2)',margin:0}}>{showTrash?'Papierkorb ist leer.':'Keine Nachrichten.'}</p></div>
+                : <div style={{display:'grid',gap:'8px'}}>
+                    {items.map(n=>{
+                      const typeColors={achievement:{bg:'rgba(74,222,128,0.08)',border:'rgba(74,222,128,0.25)',icon:'🏅'},tournament_reminder:{bg:'rgba(253,230,138,0.08)',border:'rgba(253,230,138,0.25)',icon:'🏆'},training_reminder:{bg:'rgba(96,165,250,0.08)',border:'rgba(96,165,250,0.25)',icon:'📅'},unexcused_absences:{bg:'rgba(248,113,113,0.08)',border:'rgba(248,113,113,0.25)',icon:'❗'},trainer_message:{bg:'rgba(196,181,253,0.08)',border:'rgba(196,181,253,0.25)',icon:'💬'}};
+                      const cfg2=typeColors[n.type]||{bg:'rgba(255,255,255,0.04)',border:'rgba(255,255,255,0.1)',icon:'🔔'};
+                      const dateStr=new Date(n.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+                      return (
+                        <div key={n.id} style={{background:cfg2.bg,border:`1px solid ${cfg2.border}`,borderRadius:'12px',padding:'12px 14px',display:'flex',alignItems:'flex-start',gap:'10px'}}>
+                          <span style={{fontSize:'20px',flexShrink:0,marginTop:'1px'}}>{cfg2.icon}</span>
+                          <div style={{flex:1,minWidth:0}}>
+                            <p style={{margin:'0 0 3px',fontWeight:'700',fontSize:'14px',color:'white'}}>{n.title}</p>
+                            <p style={{margin:'0 0 5px',fontSize:'13px',color:'rgba(255,255,255,0.55)',lineHeight:'1.4'}}>{n.message}</p>
+                            <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>{dateStr}</p>
+                          </div>
+                          {showTrash
+                            ?<div style={{display:'flex',gap:'4px',flexShrink:0}}>
+                                <button onClick={()=>restoreNotification(n.id)} style={{padding:'5px 9px',background:'rgba(74,222,128,0.12)',border:'none',borderRadius:'8px',cursor:'pointer',color:'#4ade80',fontSize:'13px',fontWeight:'700'}}>↩</button>
+                                <button onClick={()=>deleteNotificationPermanently(n.id)} style={{padding:'5px',background:'rgba(220,38,38,0.12)',border:'none',borderRadius:'8px',cursor:'pointer',color:'#f87171'}}><Trash2 size={14}/></button>
+                              </div>
+                            :<button onClick={()=>trashNotification(n.id)} style={{padding:'5px',background:'rgba(255,255,255,0.06)',border:'none',borderRadius:'8px',cursor:'pointer',color:'rgba(255,255,255,0.3)',flexShrink:0}}><X size={16}/></button>
+                          }
+                        </div>
+                      );
+                    })}
+                  </div>
+              }
+            </>
+          );
+        }
+        if (elternSubView === 'trainingsverlauf') {
+          if (!myChild) return null;
+          return (
+            <>
+              <h3 style={{margin:'0 0 16px',color:'#4ade80',display:'flex',alignItems:'center',gap:'8px',fontWeight:'800',fontSize:'16px'}}><Calendar size={18}/> Trainings diese Woche</h3>
+              <div style={{...DARK_CARD,marginBottom:'24px',border:'1px solid rgba(74,222,128,0.18)'}}>
+                {mySessions.length===0
+                  ? <p style={{color:'rgba(255,255,255,0.2)',fontSize:'13px',margin:0,textAlign:'center',padding:'20px 0'}}>Kein Training in den nächsten 7 Tagen.</p>
+                  : <div style={{display:'grid',gap:'10px'}}>
+                    {mySessions.map(session=>{
+                      const childId=myChild.id;
+                      const myResponseRaw=(session.responses||{})[childId];
+                      const myResponse=typeof myResponseRaw==='object'?myResponseRaw?.status:myResponseRaw;
+                      const sessSubIds=session.subgroupIds||[];
+                      const sessGrpNames=[...new Set(sessSubIds.map(sid=>{const sg=subgroups[sid];const fg=sg?FIXED_GROUPS.find(g=>g.id===sg.groupId):null;return fg?`${fg.emoji} ${fg.name}`:null;}).filter(Boolean))];
+                      const isComing=myResponse==='coming'; const isMissing=myResponse==='missing';
+                      return (
+                        <div key={session.id} style={{padding:'14px 16px',borderRadius:'14px',border:`1px solid ${isComing?'rgba(74,222,128,0.3)':isMissing?'rgba(248,113,113,0.3)':'rgba(255,255,255,0.08)'}`,background:isComing?'rgba(74,222,128,0.07)':isMissing?'rgba(248,113,113,0.07)':'rgba(255,255,255,0.025)'}}>
+                          <p style={{margin:'0 0 3px',fontWeight:'700',color:'white',fontSize:'15px'}}>{new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})} · {session.time} Uhr</p>
+                          {sessGrpNames.length>0&&<p style={{margin:'0 0 2px',fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>📂 {sessGrpNames.join(', ')}</p>}
+                          {session.trainer&&<p style={{margin:'0 0 8px',fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>👤 {session.trainer}</p>}
+                          {session.info&&<div style={{display:'flex',alignItems:'flex-start',gap:'6px',marginBottom:'8px',padding:'8px 10px',background:'rgba(96,165,250,0.08)',border:'1px solid rgba(96,165,250,0.2)',borderRadius:'8px'}}><Info size={14} color="#93c5fd" style={{marginTop:'2px',flexShrink:0}}/><p style={{margin:0,fontSize:'13px',color:'#93c5fd'}}>{session.info}</p></div>}
+                          <button onClick={()=>respondToSession(session.id,'missing')} style={{width:'100%',padding:'10px',border:`2px solid #dc2626`,background:isMissing?'#dc2626':'transparent',color:isMissing?'white':'#f87171',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>
+                            <X size={18}/> {isMissing?'Abgemeldet – Rückgängig':'Ich fehle'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                }
+              </div>
+              <h3 style={{margin:'0 0 12px',color:'white',fontWeight:'800',fontSize:'16px'}}>📋 Verlauf ({dates.length} Einträge)</h3>
+              <div style={{display:'grid',gap:'8px',marginBottom:'24px'}}>
+                {dates.length===0
+                  ? <div style={{...DARK_CARD,textAlign:'center',padding:'32px'}}><p style={{color:'rgba(255,255,255,0.2)',margin:0}}>Noch keine Trainings erfasst.</p></div>
+                  : dates.map(date=>{
+                    const status=(myChild.attendance||{})[date];
+                    const cfg=STATUS_CONFIG[status];
+                    const sess2=dateToSession[date];
+                    const grpNames=[...new Set((sess2?.subgroupIds||[]).map(sid=>{const sg=subgroups[sid];const fg=sg?FIXED_GROUPS.find(g=>g.id===sg.groupId):null;return fg?`${fg.emoji} ${fg.name}`:null;}).filter(Boolean))];
+                    const statusBg=status==='present'?'rgba(74,222,128,0.08)':status==='absent_excused'?'rgba(148,163,184,0.07)':status==='absent_unexcused'?'rgba(239,68,68,0.08)':'rgba(255,255,255,0.03)';
+                    const statusBorder=status==='present'?'rgba(74,222,128,0.18)':status==='absent_excused'?'rgba(148,163,184,0.18)':status==='absent_unexcused'?'rgba(239,68,68,0.25)':'rgba(255,255,255,0.07)';
+                    return (
+                      <div key={date} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:statusBg,borderRadius:'10px',border:`1px solid ${statusBorder}`,gap:'8px',flexWrap:'wrap'}}>
+                        <div>
+                          <span style={{fontSize:'14px',color:'rgba(255,255,255,0.7)',fontWeight:'600'}}>{new Date(date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}</span>
+                          {grpNames.length>0&&<span style={{display:'block',fontSize:'11px',color:'rgba(255,255,255,0.3)',marginTop:'1px'}}>📂 {grpNames.join(', ')}</span>}
+                        </div>
+                        <div style={{display:'flex',gap:'8px',alignItems:'center',flexShrink:0}}>
+                          <span style={{fontSize:'13px',fontWeight:'700',color:cfg?.color||'rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.06)',padding:'4px 12px',borderRadius:'20px',border:'1px solid rgba(255,255,255,0.1)'}}>{cfg?.symbol||'–'} {cfg?.label||'Nicht erfasst'}</span>
+                          {status==='absent_unexcused'&&<button onClick={()=>excuseMyChild(date)} style={{padding:'6px 12px',background:'rgba(148,163,184,0.12)',border:'1px solid rgba(148,163,184,0.25)',borderRadius:'8px',cursor:'pointer',color:'#94a3b8',fontSize:'12px',fontWeight:'700',display:'flex',alignItems:'center',gap:'5px'}}><Clock size={13}/> Entschuldigen</button>}
+                        </div>
+                      </div>
+                    );
+                  })
+                }
+              </div>
+            </>
+          );
+        }
+        if (elternSubView === 'mannschaft') {
+          const myTeam=Object.values(teams).find(t=>(t.childIds||[]).includes(myChild?.id));
+          if (!myChild||!myTeam) return <div style={{...DARK_CARD,textAlign:'center',padding:'40px'}}><p style={{color:'rgba(255,255,255,0.3)',margin:0}}>Keine Mannschaft zugewiesen.</p></div>;
+          const ld=myTeam.leagueData||{};
+          const colSt=(i)=>({padding:'8px 10px',fontSize:'12px',color:i===0?'white':'rgba(255,255,255,0.7)',fontWeight:i<2?'700':'400',textAlign:i>1?'center':'left',whiteSpace:'nowrap',borderBottom:'1px solid rgba(255,255,255,0.05)'});
+          const hSt=(i)=>({...colSt(i),color:'rgba(255,255,255,0.35)',fontWeight:'700',fontSize:'10px',textTransform:'uppercase',letterSpacing:'0.5px',background:'rgba(255,255,255,0.03)',borderBottom:'1px solid rgba(255,255,255,0.1)'});
+          const spSt=(i)=>({padding:'8px 10px',fontSize:'12px',color:i===3?'#86efac':'rgba(255,255,255,0.7)',fontWeight:i===3?'700':'400',textAlign:i===3?'center':'left',whiteSpace:'nowrap',borderBottom:'1px solid rgba(255,255,255,0.05)'});
+          const spH=(i)=>({...spSt(i),color:'rgba(255,255,255,0.35)',fontWeight:'700',fontSize:'10px',textTransform:'uppercase',letterSpacing:'0.5px',background:'rgba(255,255,255,0.03)',borderBottom:'1px solid rgba(255,255,255,0.1)'});
+          const fetchedStr=ld.fetchedAt?new Date(ld.fetchedAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
+          return (
+            <>
+              <div style={{...DARK_CARD_TEAL,marginBottom:'20px'}}>
+                <p style={{margin:'0 0 4px',fontWeight:'800',color:'white',fontSize:'18px'}}>🏓 {myTeam.name}</p>
+                {myTeam.liga&&<p style={{margin:0,fontSize:'14px',color:'rgba(45,212,191,0.7)',fontWeight:'600'}}>{myTeam.liga}</p>}
+              </div>
+              {(myTeam.childIds||[]).length>0&&(
+                <div style={{...DARK_CARD,marginBottom:'20px'}}>
+                  <p style={{margin:'0 0 10px',fontSize:'12px',fontWeight:'800',color:'rgba(45,212,191,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Mannschaftskollegen</p>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+                    {(myTeam.childIds||[]).map(id=>{const c2=children[id];return c2?<span key={id} style={{fontSize:'12px',background:'rgba(45,212,191,0.15)',border:'1px solid rgba(45,212,191,0.3)',color:'#2dd4bf',borderRadius:'20px',padding:'3px 10px',fontWeight:'600'}}>{c2.name}</span>:null;})}
+                  </div>
+                </div>
+              )}
+              {ld.table&&(
+                <div style={{...DARK_CARD,marginBottom:'20px'}}>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
+                    <p style={{margin:0,fontSize:'12px',fontWeight:'800',color:'rgba(45,212,191,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Tabelle</p>
+                    {fetchedStr&&<span style={{fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>Stand: {fetchedStr}</span>}
+                  </div>
+                  <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',borderRadius:'8px',background:'rgba(0,0,0,0.2)'}}>
+                    <table style={{borderCollapse:'collapse',minWidth:'420px'}}>
+                      {ld.table.headers?.length>0&&<thead><tr>{ld.table.headers.map((h,i)=><th key={i} style={hSt(i)}>{h}</th>)}</tr></thead>}
+                      <tbody>{(ld.table.rows||[]).map((row,ri)=>{const cells=row.c||row;return<tr key={ri} style={{background:ri%2===0?'transparent':'rgba(255,255,255,0.02)'}}>{cells.map((cell,ci)=><td key={ci} style={colSt(ci)}>{cell}</td>)}</tr>;})}</tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              {ld.schedule&&(
+                <div style={{...DARK_CARD,marginBottom:'20px'}}>
+                  <p style={{margin:'0 0 10px',fontSize:'12px',fontWeight:'800',color:'rgba(45,212,191,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Spielplan</p>
+                  <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',borderRadius:'8px',background:'rgba(0,0,0,0.2)'}}>
+                    <table style={{borderCollapse:'collapse',minWidth:'520px'}}>
+                      {ld.schedule.headers?.length>0&&<thead><tr>{ld.schedule.headers.map((h,i)=><th key={i} style={spH(i)}>{h}</th>)}</tr></thead>}
+                      <tbody>{(ld.schedule.rows||[]).map((row,ri)=>{const cells=row.c||row;return<tr key={ri} style={{background:ri%2===0?'transparent':'rgba(255,255,255,0.02)'}}>{cells.map((cell,ci)=><td key={ci} style={spSt(ci)}>{cell}</td>)}</tr>;})}</tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              {!ld.table&&!ld.schedule&&<p style={{color:'rgba(255,255,255,0.3)',textAlign:'center',padding:'20px',margin:0}}>Noch keine Liga-Daten geladen.</p>}
+            </>
+          );
+        }
+        if (elternSubView === 'turniere') {
+          const myTournaments=getMyUpcomingTournaments();
+          return (
+            <>
+              {myTournaments.length===0
+                ? <div style={{...DARK_CARD,textAlign:'center',padding:'40px'}}><p style={{color:'rgba(255,255,255,0.2)',margin:0}}>Kein Turnier in den nächsten 3 Monaten.</p></div>
+                : <div style={{display:'grid',gap:'12px'}}>
+                  {myTournaments.map(t=>{
+                    const childId=myChild?.id;
+                    const myResponse=(t.responses||{})[childId];
+                    const myKonkurrenzen=(t.konkurrenzen||[]).filter(k=>(k.participantIds||[]).includes(childId));
+                    const borderCol=myResponse==='coming'?'rgba(74,222,128,0.4)':myResponse==='missing'?'rgba(248,113,113,0.4)':'rgba(253,230,138,0.25)';
+                    const bgCol=myResponse==='coming'?'rgba(74,222,128,0.07)':myResponse==='missing'?'rgba(248,113,113,0.07)':'rgba(253,230,138,0.04)';
+                    return (
+                      <div key={t.id} style={{borderRadius:'14px',border:`2px solid ${borderCol}`,background:bgCol,overflow:'hidden'}}>
+                        <div style={{padding:'14px 16px',borderBottom:'1px solid rgba(253,230,138,0.1)'}}>
+                          <p style={{margin:'0 0 3px',fontWeight:'800',color:'#fde68a',fontSize:'16px'}}>🏆 {t.name}</p>
+                          <p style={{margin:'0 0 3px',fontSize:'14px',color:'rgba(255,255,255,0.6)',fontWeight:'600'}}>{(()=>{const from=t.dateFrom||t.date||'';const to=t.dateTo||from;if(!from)return'';const f=new Date(from+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'});if(to===from)return f;return`${f} – ${new Date(to+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'})}`;})()}</p>
+                          {t.location&&<p style={{margin:0,fontSize:'13px',color:'rgba(253,230,138,0.5)'}}>📍 {t.location}</p>}
+                        </div>
+                        {myKonkurrenzen.length>0&&<div style={{padding:'10px 16px',borderBottom:'1px solid rgba(253,230,138,0.1)',display:'grid',gap:'6px'}}>{myKonkurrenzen.map(konk=>{const dep=konk.departureTimes?.[childId];return(<div key={konk.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 10px',background:'rgba(253,230,138,0.07)',borderRadius:'8px'}}><span style={{fontWeight:'700',color:'#fde68a',fontSize:'14px'}}>{konk.name||'Konkurrenz'}</span><div style={{display:'flex',gap:'12px',alignItems:'center'}}><span style={{fontSize:'13px',color:'rgba(253,230,138,0.6)',display:'inline-flex',alignItems:'center',gap:'3px'}}><Clock size={12}/> {konk.time} Uhr</span>{dep&&<span style={{fontSize:'13px',color:'#fde68a',fontWeight:'700',display:'inline-flex',alignItems:'center',gap:'3px'}}>🚗 {dep} Uhr</span>}</div></div>);})}</div>}
+                        <div style={{padding:'12px 16px',display:'flex',gap:'8px'}}>
+                          <button onClick={()=>respondToTournament(t.id,'coming')} style={{flex:1,padding:'10px',border:'2px solid #16a34a',background:myResponse==='coming'?'#16a34a':'transparent',color:myResponse==='coming'?'white':'#4ade80',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}><Check size={18}/> Ich bin dabei</button>
+                          <button onClick={()=>respondToTournament(t.id,'missing')} style={{flex:1,padding:'10px',border:'2px solid #dc2626',background:myResponse==='missing'?'#dc2626':'transparent',color:myResponse==='missing'?'white':'#f87171',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}><X size={18}/> Ich fehle</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              }
+            </>
+          );
+        }
+        if (elternSubView === 'rangliste') {
+          return (
+            <>
+              {rangliste.length===0
+                ? <div style={{...DARK_CARD,textAlign:'center',padding:'40px'}}><p style={{color:'rgba(255,255,255,0.3)',margin:0}}>Noch keine Ranglisten-Daten vorhanden.</p></div>
+                : <RanglisteTile rangliste={rangliste} myChildId={myChild?.id} children={children} subgroups={subgroups}/>
+              }
+            </>
+          );
+        }
+        if (elternSubView === 'errungenschaften') {
+          if (!myChild||grp?.id!=='jugend') return <div style={{...DARK_CARD,textAlign:'center',padding:'40px'}}><p style={{color:'rgba(255,255,255,0.3)',margin:0}}>Nicht verfügbar.</p></div>;
+          const ach=getAchievements(myChild.id);
+          const ttrUnlocked=ach.ttrUnlocked||[];
+          const currentMonth=new Date().toISOString().slice(0,7);
+          const currentLevel=getMonthlyAttendanceLevel(myChild.id,currentMonth);
+          const cumul=getAttendanceCumulatives(myChild.id);
+          const monthName=new Date().toLocaleDateString('de-DE',{month:'long',year:'numeric'});
+          const totalTrainings=getTotalTrainingsAttended(myChild.id);
+          const streak=getLongestStreak(myChild.id);
+          const tournParts=getTournamentParticipations(myChild.id);
+          const Sec=({title,children:ch,mb=true})=>(
+            <div style={{marginBottom:mb?'18px':0}}>
+              <p style={{margin:'0 0 8px',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.35)',textTransform:'uppercase',letterSpacing:'0.5px',borderBottom:'1px solid rgba(255,255,255,0.06)',paddingBottom:'5px'}}>{title}</p>
+              <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>{ch}</div>
+            </div>
+          );
+          const Tile2=({icon,iconGray='⬜',label,sub,has,activeBg='rgba(74,222,128,0.1)',activeBorder='rgba(74,222,128,0.3)',activeTextColor='#4ade80',onClick})=>(
+            <button onClick={onClick} style={{padding:'10px 12px',borderRadius:'12px',border:`2px solid ${has?activeBorder:'rgba(255,255,255,0.08)'}`,background:has?activeBg:'rgba(255,255,255,0.03)',cursor:'pointer',textAlign:'center',minWidth:'76px',maxWidth:'100px'}} onMouseEnter={e=>e.currentTarget.style.transform='scale(1.06)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
+              <div style={{fontSize:'22px'}}>{has?icon:iconGray}</div>
+              <div style={{fontSize:'11px',fontWeight:'700',color:has?activeTextColor:'rgba(255,255,255,0.2)',marginTop:'2px',lineHeight:'1.2'}}>{label}</div>
+              {sub&&<div style={{fontSize:'12px',fontWeight:'700',color:has?activeTextColor:'rgba(255,255,255,0.2)'}}>{sub}</div>}
+            </button>
+          );
+          return (
+            <div style={{...DARK_CARD}}>
+              <Sec title={`📅 Anwesenheit ${monthName}`}>
+                {[{key:'bronze',icon:'🥉',label:'Bronze',req:4},{key:'silver',icon:'🥈',label:'Silber',req:7},{key:'gold',icon:'🥇',label:'Gold',req:10}].map(({key,icon,label,req})=>(
+                  <Tile2 key={key} icon={icon} iconGray='⬜' label={label} sub={`${Math.min(currentLevel??0,req)}/${req}`} has={(currentLevel??0)>=req} onClick={()=>setAchievementPopup({icon,title:`${label} – ${monthName}`,desc:`${req} Trainings im Monat besucht. Aktuell: ${currentLevel??0} Trainings.`,count:currentLevel??0})}/>
+                ))}
+              </Sec>
+              <Sec title="📈 Gesamt-Trainings">
+                {[{n:10,icon:'🌱'},{n:25,icon:'⭐'},{n:50,icon:'🔥'},{n:100,icon:'💎'}].map(({n,icon})=>(
+                  <Tile2 key={n} icon={icon} iconGray='⬜' label={`${n}x`} has={totalTrainings>=n} sub={totalTrainings>=n?'✓':undefined} onClick={()=>setAchievementPopup({icon,title:`${n} Trainings`,desc:`${n} Trainingseinheiten besucht. Aktuell: ${totalTrainings}.`,count:totalTrainings})}/>
+                ))}
+              </Sec>
+              <Sec title="🏆 Turniere">
+                {[{n:1,icon:'🎯'},{n:3,icon:'🏅'},{n:5,icon:'🏆'},{n:10,icon:'👑'}].map(({n,icon})=>(
+                  <Tile2 key={n} icon={icon} iconGray='⬜' label={`${n}x`} has={tournParts>=n} onClick={()=>setAchievementPopup({icon,title:`${n} Turniere`,desc:`An ${n} Turnier${n>1?'en':''} teilgenommen. Aktuell: ${tournParts}.`,count:tournParts})}/>
+                ))}
+              </Sec>
+            </div>
+          );
+        }
+        return null;
+      };
+
+      return (
+        <div className="ttc-view-enter" key={`${viewKey}-sub-${elternSubView}`} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+          <AchievementPopup data={achievementPopup} onClose={()=>setAchievementPopup(null)}/>
+          {ptDetailModal&&(()=>{
+            const mpt=ptDetailModal;const mPlayers=mpt.players||[];const mMatches=mpt.matches||[];const isArchived=!!mpt.archivedAt;
+            const placeEmojiM=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
+            const mStats=mPlayers.map((_,i)=>({idx:i,wins:0,losses:0,setsWon:0,setsLost:0}));
+            mMatches.forEach(m=>{if(!m.result)return;const{sets1,sets2}=m.result;mStats[m.p1Idx].setsWon+=sets1;mStats[m.p1Idx].setsLost+=sets2;mStats[m.p2Idx].setsWon+=sets2;mStats[m.p2Idx].setsLost+=sets1;if(sets1>sets2){mStats[m.p1Idx].wins++;mStats[m.p2Idx].losses++;}else{mStats[m.p2Idx].wins++;mStats[m.p1Idx].losses++;}});
+            const mStandings=(mpt.finalStandings||(()=>[...mStats].sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:(b.setsWon-b.setsLost)-(a.setsWon-a.setsLost)).map((s,place)=>({place:place+1,childId:mPlayers[s.idx]?.childId,name:mPlayers[s.idx]?.name||'?',wins:s.wins,losses:s.losses,setsWon:s.setsWon,setsLost:s.setsLost})))());
+            const numRoundsM=mPlayers.length%2===0?mPlayers.length-1:mPlayers.length;
+            const roundsM=Array.from({length:numRoundsM},(_,i)=>i+1);
+            return(<div onClick={()=>setPtDetailModal(null)} style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',zIndex:9000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}><div onClick={e=>e.stopPropagation()} style={{background:'linear-gradient(170deg,#021a0a 0%,#042d12 100%)',borderRadius:'24px 24px 0 0',width:'100%',maxWidth:'520px',maxHeight:'85vh',overflowY:'auto',padding:'20px 16px 36px',border:'1px solid rgba(167,139,250,0.2)',borderBottom:'none'}}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px'}}><span style={{fontWeight:'800',color:'white',fontSize:'17px'}}>{mPlayers.length}er Gruppe</span><button onClick={()=>setPtDetailModal(null)} style={{width:'32px',height:'32px',borderRadius:'8px',background:'rgba(255,255,255,0.08)',border:'none',color:'rgba(255,255,255,0.7)',cursor:'pointer',fontSize:'18px',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button></div><div style={{display:'grid',gap:'4px',marginBottom:'20px'}}>{mStandings.map(s=>(<div key={s.childId||s.name} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',background:'rgba(255,255,255,0.04)',borderRadius:'10px'}}><span style={{fontSize:'18px',flexShrink:0}}>{placeEmojiM[s.place-1]||(s.place+'.')}</span><div><p style={{margin:0,fontWeight:'800',color:'white',fontSize:'13px'}}>{s.name}</p><p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{s.wins}S {s.losses}N</p></div></div>))}</div></div></div>);
+          })()}
+          <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
+            {/* ── Top-Bar ── */}
+            <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',gap:'14px',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 24px':'0 -24px 28px'}}>
+              <button onClick={()=>setElternSubView(null)} style={{width:'38px',height:'38px',borderRadius:'10px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',color:'#4ade80',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <ArrowLeft size={18}/>
+              </button>
+              <div style={{flex:1,minWidth:0}}>
+                <h2 style={{margin:0,color:'white',fontWeight:'800',fontSize:'20px',letterSpacing:'-0.3px'}}>{meta.icon} {meta.label}</h2>
+                <p style={{margin:0,color:meta.color,fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>{myChild?.name||''} · {userRole==='eltern'?'Eltern-Portal':'Jugend-Portal'}</p>
+              </div>
+              <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{padding:'8px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.6)',fontSize:isMobile?'16px':'12px',fontWeight:'600',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'⚙️':'⚙️ Profil'}</button>
+              <button onClick={()=>signOut(auth)} style={{padding:'8px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',color:'#fca5a5',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'🚪':'Abmelden'}</button>
+            </div>
+            {/* ── Sub-Content ── */}
+            {renderSubContent()}
+          </div>
+          {/* Profil-Modal */}
+          {showProfile&&(<Modal><div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}><div style={{background:'#0a2210',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'20px',padding:'28px',maxWidth:'400px',width:'100%',boxShadow:'0 32px 80px rgba(0,0,0,0.7)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}><h3 style={{margin:'0 0 2px',color:'white',fontSize:'20px',fontWeight:'800'}}>Mein Profil</h3><p style={{margin:'0 0 22px',color:'rgba(255,255,255,0.35)',fontSize:'13px'}}>{user?.email}</p><h4 style={{margin:'0 0 10px',color:'#4ade80',fontSize:'13px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.5px'}}>Passwort ändern</h4>{pwSuccess&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(74,222,128,0.12)',border:'1px solid rgba(74,222,128,0.25)',borderRadius:'10px',fontSize:'13px',color:'#4ade80',fontWeight:'600'}}>✅ Passwort erfolgreich geändert!</div>}{pwError&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',fontSize:'13px',color:'#fca5a5'}}>{pwError}</div>}<div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'18px'}}><input type="password" placeholder="Aktuelles Passwort" value={pwCurrent} onChange={e=>setPwCurrent(e.target.value)} style={inputStyle}/><input type="password" placeholder="Neues Passwort (min. 6 Zeichen)" value={pwNew} onChange={e=>setPwNew(e.target.value)} style={inputStyle}/><input type="password" placeholder="Neues Passwort bestätigen" value={pwConfirm} onChange={e=>setPwConfirm(e.target.value)} onKeyPress={e=>e.key==='Enter'&&handleChangePassword()} style={inputStyle}/><button onClick={handleChangePassword} style={{padding:'11px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>Passwort ändern</button></div><button onClick={()=>{setShowProfile(false);setPwError('');setPwSuccess(false);setPwCurrent('');setPwNew('');setPwConfirm('');}} style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.5)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button></div></div></Modal>)}
+        </div>
+      );
+    }
+
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <AchievementPopup data={achievementPopup} onClose={()=>setAchievementPopup(null)}/>
