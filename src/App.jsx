@@ -3842,10 +3842,10 @@ export default function TrainingsApp() {
                             style={{width:'28px',height:'28px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
                             <Trash2 size={12}/>
                           </button>}
-                          {!canEditG&&!canDeleteG&&<button onClick={()=>{setGegnerWeitereId(gegnerWeitereId===e.id?null:e.id);setGegnerWeitereText('');}}
+                          <button onClick={()=>{setGegnerWeitereId(gegnerWeitereId===e.id?null:e.id);setGegnerWeitereText('');}}
                             style={{padding:'4px 10px',height:'28px',borderRadius:'7px',background:'rgba(8,145,178,0.1)',border:`1px solid ${accentBorder}`,color:'#67e8f9',cursor:'pointer',fontSize:'11px',fontWeight:'600',whiteSpace:'nowrap'}}>
                             + Taktikhinweise
-                          </button>}
+                          </button>
                         </div>
                       </div>
                       {e.taktik&&(
@@ -7786,12 +7786,38 @@ export default function TrainingsApp() {
                           style={{width:'28px',height:'28px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
                           <Trash2 size={12}/>
                         </button>
+                        <button onClick={()=>{setGegnerWeitereId(gegnerWeitereId===e.id?null:e.id);setGegnerWeitereText('');}}
+                          style={{padding:'4px 10px',height:'28px',borderRadius:'7px',background:accentBg,border:`1px solid ${accentBorder}`,color:'#67e8f9',cursor:'pointer',fontSize:'11px',fontWeight:'600',whiteSpace:'nowrap'}}>
+                          + Taktikhinweise
+                        </button>
                       </div>
                     </div>
                     {e.taktik&&(
-                      <div style={{background:accentBg,border:`1px solid ${accentBorder}`,borderRadius:'10px',padding:'10px 12px'}}>
+                      <div style={{background:accentBg,border:`1px solid ${accentBorder}`,borderRadius:'10px',padding:'10px 12px',marginBottom:gegnerWeitereId===e.id?'8px':'0'}}>
                         <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'800',color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px'}}>Taktikhinweise</p>
                         <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.75)',lineHeight:'1.6',whiteSpace:'pre-wrap'}}>{e.taktik}</p>
+                      </div>
+                    )}
+                    {gegnerWeitereId===e.id&&(
+                      <div>
+                        <textarea value={gegnerWeitereText} onChange={ev=>setGegnerWeitereText(ev.target.value)} placeholder="Weitere Taktikhinweise..."
+                          style={{width:'100%',boxSizing:'border-box',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'8px',padding:'8px 10px',color:'white',fontSize:'13px',resize:'vertical',minHeight:'70px',outline:'none'}}/>
+                        <div style={{display:'flex',gap:'6px',marginTop:'6px'}}>
+                          <button onClick={()=>{
+                            if(!gegnerWeitereText.trim())return;
+                            const meIdA=userProfile?.name||user?.email;
+                            const note=`\n\n[${meIdA}]: ${gegnerWeitereText.trim()}`;
+                            saveGegnerLogbuch(gegnerLogbuch.map(x=>x.id===e.id?{...x,taktik:(x.taktik||'')+note}:x));
+                            setGegnerWeitereId(null);setGegnerWeitereText('');
+                          }} disabled={!gegnerWeitereText.trim()}
+                            style={{flex:1,padding:'6px',borderRadius:'7px',background:accentColor,border:'none',color:'white',fontSize:'12px',fontWeight:'700',cursor:'pointer',opacity:gegnerWeitereText.trim()?1:0.5}}>
+                            Speichern
+                          </button>
+                          <button onClick={()=>{setGegnerWeitereId(null);setGegnerWeitereText('');}}
+                            style={{padding:'6px 10px',borderRadius:'7px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.6)',fontSize:'12px',cursor:'pointer'}}>
+                            Abbrechen
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
