@@ -737,7 +737,7 @@ export default function TrainingsApp() {
   const [activePracticeId, setActivePracticeId]                     = useState(null);
   const [ptCreating, setPtCreating]                                 = useState(false);
   const [ptCreateStep, setPtCreateStep]                             = useState(1);
-  const [ptCreateForm, setPtCreateForm]                             = useState({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false});
+  const [ptCreateForm, setPtCreateForm]                             = useState({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPer100:1});
   const [ptSelectedChildren, setPtSelectedChildren]                 = useState([]);
   const [ptSubgroupFilter, setPtSubgroupFilter]                     = useState('all');
   const [ptMatchEditing, setPtMatchEditing]                         = useState(null);
@@ -6267,7 +6267,7 @@ export default function TrainingsApp() {
         id, type:'4er_gruppe',
         createdAt: new Date().toISOString(),
         createdBy: userProfile?.name || user?.email || 'Trainer',
-        settings: { winSets:ptCreateForm.winSets, setLength:ptCreateForm.setLength, deciderLength:ptCreateForm.deciderCustom?ptCreateForm.deciderLength:ptCreateForm.setLength, trackSetScores:ptCreateForm.trackSetScores },
+        settings: { winSets:ptCreateForm.winSets, setLength:ptCreateForm.setLength, deciderLength:ptCreateForm.deciderCustom?ptCreateForm.deciderLength:ptCreateForm.setLength, trackSetScores:ptCreateForm.trackSetScores, handicap:ptCreateForm.handicap, handicapPer100:ptCreateForm.handicapPer100 },
         players: seeded.map((p,i) => ({...p, seed:i+1})),
         matches: (()=>{
           // Round-robin schedule: fix player 0, rotate rest; top 2 seeds always meet in last round
@@ -6281,7 +6281,16 @@ export default function TrainingsApp() {
             const all = [circle[0], ...rotating];
             for (let j = 0; j < N/2; j++) {
               const p1 = all[j], p2 = all[N-1-j];
-              if (p1 !== -1 && p2 !== -1) allMatches.push({round:r+1, p1Idx:p1, p2Idx:p2, result:null});
+              if (p1 !== -1 && p2 !== -1) {
+                let handicap = null;
+                if (ptCreateForm.handicap) {
+                  const ttr1 = seeded[p1]?.maxTTR||0, ttr2 = seeded[p2]?.maxTTR||0;
+                  const diff = ttr1 - ttr2;
+                  const pts = Math.round(Math.abs(diff) / 100) * ptCreateForm.handicapPer100;
+                  if (pts > 0) handicap = diff > 0 ? {beneficiary: p2, points: pts} : {beneficiary: p1, points: pts};
+                }
+                allMatches.push({round:r+1, p1Idx:p1, p2Idx:p2, result:null, ...(handicap?{handicap}:{})});
+              }
             }
             rotating.unshift(rotating.pop());
           }
@@ -6309,7 +6318,7 @@ export default function TrainingsApp() {
             <button onClick={()=>{setArchiveTab('practiceTournaments');navTo('archiv');}} style={s.btn('#6d28d9')}>
               <Archive size={14}/> Archiv
             </button>
-            <button onClick={()=>{setPtCreating(true);setPtCreateStep(1);setPtSelectedChildren([]);setPtSubgroupFilter('all');setPtCreateForm({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false});}} style={s.btn('#16a34a')}>
+            <button onClick={()=>{setPtCreating(true);setPtCreateStep(1);setPtSelectedChildren([]);setPtSubgroupFilter('all');setPtCreateForm({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPer100:1});}} style={s.btn('#16a34a')}>
               <Plus size={15}/> Neuer Wettkampf
             </button>
           </div>)}
@@ -6413,6 +6422,38 @@ export default function TrainingsApp() {
                           <span style={{fontSize:'22px',fontWeight:'900',color:'#d97706',minWidth:'32px',textAlign:'center'}}>{ptCreateForm.deciderLength}</span>
                           <button onClick={()=>setPtCreateForm(f=>({...f,deciderLength:Math.min(21,f.deciderLength+1)}))} style={smBtn(false)}>+</button>
                           <span style={{fontSize:'12px',color:'#9ca3af'}}>Punkte</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Vorgabe */}
+                  <div style={{display:'flex',alignItems:'flex-start',gap:'12px',marginBottom:'20px',padding:'12px 14px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'12px'}}>
+                    <button onClick={()=>setPtCreateForm(f=>({...f,handicap:!f.handicap}))}
+                      style={{width:'22px',height:'22px',borderRadius:'6px',border:`2px solid ${ptCreateForm.handicap?'#7c3aed':'#d1d5db'}`,background:ptCreateForm.handicap?'rgba(124,58,237,0.1)':'transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginTop:'1px'}}>
+                      {ptCreateForm.handicap&&<span style={{fontSize:'14px',color:'#7c3aed',lineHeight:1}}>✓</span>}
+                    </button>
+                    <div style={{flex:1}}>
+                      <p style={{margin:'0 0 2px',fontSize:'13px',fontWeight:'700',color:ptCreateForm.handicap?'#7c3aed':'#555',cursor:'pointer'}} onClick={()=>setPtCreateForm(f=>({...f,handicap:!f.handicap}))}>
+                        Vorgabe (Handicap)
+                      </p>
+                      <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>
+                        {ptCreateForm.handicap?'TTR-Differenz wird in Vorgabepunkte umgerechnet':'Schwächere Spieler erhalten Punkte basierend auf TTR-Unterschied'}
+                      </p>
+                      {ptCreateForm.handicap&&(
+                        <div style={{marginTop:'10px'}}>
+                          <p style={{margin:'0 0 6px',fontSize:'11px',fontWeight:'700',color:'#555'}}>Punkte pro 100 TTR Differenz:</p>
+                          <div style={{display:'flex',gap:'6px'}}>
+                            {[1,2].map(n=>(
+                              <button key={n} onClick={()=>setPtCreateForm(f=>({...f,handicapPer100:n}))}
+                                style={{...ptBtn(ptCreateForm.handicapPer100===n),flex:'none',padding:'8px 20px',fontSize:'14px'}}>
+                                {n} {n===1?'Punkt':'Punkte'}
+                              </button>
+                            ))}
+                          </div>
+                          <p style={{margin:'6px 0 0',fontSize:'11px',color:'#9ca3af'}}>
+                            Beispiel: TTR-Differenz 250 → {Math.round(250/100)*ptCreateForm.handicapPer100} Vorgabepunkte
+                          </p>
                         </div>
                       )}
                     </div>
@@ -6816,7 +6857,7 @@ export default function TrainingsApp() {
                         {/* Spieler 1 */}
                         <div style={{flex:1,textAlign:'right',minWidth:0}}>
                           <p style={{margin:0,fontWeight:'800',fontSize:isMobile?'13px':'15px',color:p1Won?'#4ade80':res?'rgba(255,255,255,0.35)':'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p1.name}</p>
-                          <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>#{p1.seed}</p>
+                          <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>#{p1.seed}{match.handicap?.beneficiary===match.p1Idx?<span style={{color:'#fde68a',fontWeight:'700'}}> +{match.handicap.points}P</span>:null}</p>
                         </div>
 
                         {/* Ergebnis */}
@@ -6825,12 +6866,13 @@ export default function TrainingsApp() {
                             ? <span style={{fontSize:'20px',fontWeight:'900',color:'white',letterSpacing:'2px'}}>{res.sets1}:{res.sets2}</span>
                             : <span style={{fontSize:'13px',color:'rgba(255,255,255,0.2)',fontWeight:'600'}}>vs</span>
                           }
+                          {match.handicap&&<p style={{margin:'2px 0 0',fontSize:'10px',color:'rgba(253,230,138,0.6)',fontWeight:'600'}}>Vorgabe {match.handicap.points}P</p>}
                         </div>
 
                         {/* Spieler 2 */}
                         <div style={{flex:1,minWidth:0}}>
                           <p style={{margin:0,fontWeight:'800',fontSize:isMobile?'13px':'15px',color:p2Won?'#4ade80':res?'rgba(255,255,255,0.35)':'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p2.name}</p>
-                          <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>#{p2.seed}</p>
+                          <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>#{p2.seed}{match.handicap?.beneficiary===match.p2Idx?<span style={{color:'#fde68a',fontWeight:'700'}}> +{match.handicap.points}P</span>:null}</p>
                         </div>
 
                         {/* Eintragen-Button */}
