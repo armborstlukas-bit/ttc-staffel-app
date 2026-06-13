@@ -3450,6 +3450,7 @@ export default function TrainingsApp() {
         {label:'Admin',         icon:'🛡️', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('admin')},
         {label:'Gegnerlogbuch', icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.1)',   border:'rgba(8,145,178,0.25)',   action:()=>navTo('gegnerlogbuch')},
         {label:'TTC News',      icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.1)',  border:'rgba(74,222,128,0.25)',  action:()=>navTo('ttcnews')},
+        {label:'MyTischtennis', icon:'🏓', color:'#fcd34d', bg:'rgba(251,191,36,0.1)',  border:'rgba(251,191,36,0.25)',  action:()=>window.open('https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953','_blank')},
       ]:[]),
     ];
     const groups = FIXED_GROUPS.filter(g=>canAccessGroup(g.id));
@@ -3809,6 +3810,7 @@ export default function TrainingsApp() {
             {[
               {label:'Gegnerlogbuch', icon:'🎯', desc:`${gegnerLogbuch.length} ${gegnerLogbuch.length===1?'Eintrag':'Einträge'} · Taktiken & Hinweise`, color:'#67e8f9', bg:'rgba(8,145,178,0.08)', border:'rgba(8,145,178,0.2)', action:()=>navTo('gegnerlogbuch')},
               {label:'TTC News',      icon:'📰', desc:'Aktuelle Vereinsnachrichten',                                                                     color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',  action:()=>navTo('ttcnews')},
+              {label:'MyTischtennis', icon:'🏓', desc:'Vereinsübersicht auf MyTischtennis',                                                                  color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)',  action:()=>window.open('https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953','_blank')},
             ].map(t=>(
               <button key={t.label} onClick={t.action}
                 style={{background:t.bg,border:`1px solid ${t.border}`,borderRadius:'18px',padding:'22px 20px',cursor:'pointer',textAlign:'left',display:'flex',flexDirection:'column',gap:'8px',transition:'transform 0.15s'}}
