@@ -7860,18 +7860,12 @@ export default function TrainingsApp() {
     const acBg = 'rgba(244,114,182,0.07)';
     const me = userProfile?.name || user?.email || '';
 
-    // Player list: all registered users except self and pending-only accounts
+    // Player list: everyone in allUsers with a name, excluding self
     const registeredPlayers = Object.values(allUsers)
-      .filter(u => {
-        const uName = u.name || u.email || '';
-        if (!uName || uName === me) return false;
-        const roles = Array.isArray(u.roles) ? u.roles : (u.role ? [u.role] : []);
-        const nonPending = roles.filter(r => r !== 'pending');
-        return nonPending.length > 0 || roles.length === 0;
-      })
-      .map(u => u.name || u.email)
-      .filter(Boolean)
-      .sort((a,b)=>a.localeCompare(b,'de'));
+      .map(u => u.name || u.email || u.displayName || '')
+      .filter(name => name && name !== me)
+      .sort((a,b)=>a.localeCompare(b,'de'))
+      .filter((v,i,a)=>a.indexOf(v)===i); // deduplicate
 
     const saveMatches = matches => { setTrainingsmatches(matches); setDoc(doc(db,'ttc','trainingsmatches'),{matches}); };
 
