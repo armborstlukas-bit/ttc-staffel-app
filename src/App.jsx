@@ -855,18 +855,24 @@ export default function TrainingsApp() {
     ];
     // Fetch TTC News RSS
     setTtcNewsLoading(true);
-    fetch('https://api.allorigins.win/get?url='+encodeURIComponent('https://ttc-staffel.de/index.php?format=feed&type=rss'))
-      .then(r=>r.json()).then(d=>{
+    const ctrl = new AbortController();
+    const timer = setTimeout(()=>ctrl.abort(), 8000);
+    fetch('https://corsproxy.io/?url='+encodeURIComponent('https://ttc-staffel.de/index.php?format=feed&type=rss'), {signal:ctrl.signal})
+      .then(r=>r.text()).then(txt=>{
+        clearTimeout(timer);
         const parser=new DOMParser();
-        const xml=parser.parseFromString(d.contents,'text/xml');
-        const items=[...xml.querySelectorAll('item')].slice(0,3).map(it=>({
-          title:it.querySelector('title')?.textContent||'',
-          link:it.querySelector('link')?.textContent||it.querySelector('guid')?.textContent||'',
-          date:it.querySelector('pubDate')?.textContent||'',
-          desc:(it.querySelector('description')?.textContent||'').replace(/<[^>]+>/g,'').trim().slice(0,200),
-        }));
+        const xml=parser.parseFromString(txt,'text/xml');
+        const items=[...xml.querySelectorAll('item')].slice(0,3).map(it=>{
+          const raw=(it.querySelector('description')?.textContent||'').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim();
+          return {
+            title:it.querySelector('title')?.textContent||'',
+            link:it.querySelector('guid')?.textContent||it.querySelector('link')?.textContent||'',
+            date:it.querySelector('pubDate')?.textContent||'',
+            desc:raw.slice(0,220),
+          };
+        });
         setTtcNews(items);
-      }).catch(()=>{}).finally(()=>setTtcNewsLoading(false));
+      }).catch(()=>{clearTimeout(timer);}).finally(()=>setTtcNewsLoading(false));
     if (userRole==='admin')
       unsubs.push(onSnapshot(doc(db,'ttc','users'), s => { const d=s.exists()?s.data():{};allUsersRef.current=d;setAllUsers(d); }));
     return () => unsubs.forEach(u=>u());
@@ -3691,7 +3697,7 @@ export default function TrainingsApp() {
 
 
   // ── AKTIVER DASHBOARD ────────────────────────────────────────────────────
-  if (userRole === 'aktiver') {
+  if (userRole === 'aktiver' && !['gegnerlogbuch','ttcnews'].includes(view)) {
     const dateLabel = new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
     const greeting = new Date().getHours()<12?'Guten Morgen':new Date().getHours()<18?'Hallo':'Guten Abend';
 
