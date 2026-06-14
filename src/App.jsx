@@ -3496,6 +3496,7 @@ export default function TrainingsApp() {
           {label:'Rangliste',        icon:'📊', color:'#fcd34d', bg:'rgba(252,211,77,0.1)',   border:'rgba(252,211,77,0.25)',  action:()=>navTo('rangliste')},
           {label:'Mannschaften',     icon:'🏓', color:'#6ee7b7', bg:'rgba(110,231,183,0.1)',  border:'rgba(110,231,183,0.25)', action:()=>navTo('mannschaften')},
           {label:'Turniere',         icon:'🏆', color:'#fde68a', bg:'rgba(253,230,138,0.1)',  border:'rgba(253,230,138,0.25)', action:()=>navTo('turniere')},
+          {label:'Gegnerlogbuch',    icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.08)',   border:'rgba(8,145,178,0.25)',   action:()=>navTo('gegnerlogbuch')},
         ],
       },
       {
