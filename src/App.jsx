@@ -3523,7 +3523,12 @@ export default function TrainingsApp() {
           {label:'Materialverwaltung',icon:'🏓', color:'#fb923c', bg:'rgba(251,146,60,0.08)', border:'rgba(251,146,60,0.25)',  action:()=>navTo('materialverwaltung')},
           ...(userRole==='admin'?[
             {label:'Admin',          icon:'🛡️', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('admin')},
-            {label:'TTR-Import',     icon:'📈', color:'#6ee7b7', bg:'rgba(110,231,183,0.08)', border:'rgba(110,231,183,0.25)', action:()=>navTo('ttrImport')},
+            {label:'TTR-Import',     icon:'📈',
+              color: new Date().getDate()<=3 ? '#ef4444' : '#6ee7b7',
+              bg:    new Date().getDate()<=3 ? 'rgba(239,68,68,0.12)' : 'rgba(110,231,183,0.08)',
+              border:new Date().getDate()<=3 ? 'rgba(239,68,68,0.4)'  : 'rgba(110,231,183,0.25)',
+              badge: new Date().getDate()<=3 ? '!' : null,
+              action:()=>navTo('ttrImport')},
           ]:[]),
         ],
       },
@@ -3681,7 +3686,7 @@ export default function TrainingsApp() {
                     onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
                     <span style={{fontSize:'24px',lineHeight:1}}>{ql.icon}</span>
                     <span style={{fontSize:'11px',fontWeight:'700',color:ql.color,lineHeight:'1.3'}}>{ql.label}</span>
-                    {ql.badge>0&&<span style={{position:'absolute',top:'8px',right:'8px',background:'#dc2626',color:'white',borderRadius:'50%',width:'18px',height:'18px',fontSize:'10px',fontWeight:'800',display:'flex',alignItems:'center',justifyContent:'center'}}>{ql.badge}</span>}
+                    {(ql.badge>0||ql.badge==='!')&&<span style={{position:'absolute',top:'8px',right:'8px',background:'#dc2626',color:'white',borderRadius:'50%',width:'18px',height:'18px',fontSize:'10px',fontWeight:'800',display:'flex',alignItems:'center',justifyContent:'center'}}>{ql.badge==='!'?'!':ql.badge>9?'9+':ql.badge}</span>}
                   </button>
                 ))}
               </div>
@@ -9028,17 +9033,99 @@ export default function TrainingsApp() {
 
           {/* Erfolg */}
           {ttrImportDone && (
-            <div style={{textAlign:'center',padding:'48px 24px'}}>
+            <div style={{textAlign:'center',padding:'40px 24px'}}>
               <p style={{fontSize:'48px',margin:'0 0 16px'}}>🎉</p>
               <p style={{margin:'0 0 8px',fontWeight:'800',fontSize:'20px',color:'#4ade80'}}>Import erfolgreich!</p>
               <p style={{margin:'0 0 28px',fontSize:'13px',color:'rgba(255,255,255,0.45)'}}>
                 {ttrImportState?.matches.length} Kinder · TTR-Verlauf gespeichert
               </p>
-              <button onClick={()=>navTo('home')} style={{padding:'12px 28px',background:'rgba(74,222,128,0.15)',border:'1px solid rgba(74,222,128,0.3)',borderRadius:'12px',color:'#4ade80',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>
-                Zurück zum Dashboard
+              <button onClick={()=>{setTtrImportState(null);setTtrImportDone(false);}} style={{padding:'12px 28px',background:'rgba(74,222,128,0.15)',border:'1px solid rgba(74,222,128,0.3)',borderRadius:'12px',color:'#4ade80',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>
+                Weiterer Import / Manuelle Eingabe ↓
               </button>
             </div>
           )}
+
+          {/* Kinder ohne TTR-Daten */}
+          {(()=>{
+            const allCh = Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+            const noTtr = allCh.filter(c=>!ttrHistory[c.id]?.entries?.length);
+            if(noTtr.length===0) return null;
+            return(
+            <div style={{marginTop:'32px',padding:'16px',background:'rgba(251,191,36,0.05)',border:'1px solid rgba(251,191,36,0.15)',borderRadius:'14px'}}>
+              <p style={{margin:'0 0 10px',fontSize:'13px',fontWeight:'800',color:'#fbbf24'}}>
+                📋 {noTtr.length} Kinder noch ohne TTR-Daten
+              </p>
+              <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+                {noTtr.map(c=>(
+                  <span key={c.id} style={{fontSize:'12px',color:'rgba(251,191,36,0.7)',background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.15)',borderRadius:'8px',padding:'3px 10px'}}>{c.name}</span>
+                ))}
+              </div>
+            </div>
+          );})()}
+
+          {/* Manuelle Monatseingabe */}
+          {(()=>{
+            const [manChild, setManChild] = React.useState('');
+            const [manMonth, setManMonth] = React.useState(()=>{
+              const d=new Date(); d.setDate(1);
+              return d.toISOString().slice(0,7);
+            });
+            const [manTtr, setManTtr] = React.useState('');
+            const [manSaved, setManSaved] = React.useState(false);
+            const allCh = Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+            const doManual = () => {
+              const ttr = parseInt(manTtr,10);
+              if(!manChild||!manMonth||isNaN(ttr)||ttr<100||ttr>3000) return;
+              const existing = ttrHistory[manChild]?.entries||[];
+              const withoutMonth = existing.filter(e=>e.month!==manMonth);
+              const merged = [...withoutMonth, {month:manMonth, ttr}].sort((a,b)=>a.month.localeCompare(b.month));
+              saveTtrHistory({...ttrHistory, [manChild]:{entries:merged}});
+              setManTtr(''); setManSaved(true); setTimeout(()=>setManSaved(false),2500);
+            };
+            return(
+            <div style={{marginTop:'32px',paddingTop:'28px',borderTop:'1px solid rgba(255,255,255,0.07)'}}>
+              <p style={{margin:'0 0 4px',fontSize:'14px',fontWeight:'800',color:'white'}}>✏️ Manuelle Monatseingabe</p>
+              <p style={{margin:'0 0 18px',fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>Einzelne TTR-Werte nachträglich eintragen oder korrigieren.</p>
+              <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'2fr 1fr 1fr auto',gap:'10px',alignItems:'end'}}>
+                <div>
+                  <p style={{margin:'0 0 5px',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.4)',textTransform:'uppercase'}}>Kind</p>
+                  <select value={manChild} onChange={e=>setManChild(e.target.value)} className="dark-select"
+                    style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(110,231,183,0.2)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none'}}>
+                    <option value="">— Kind wählen —</option>
+                    {allCh.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <p style={{margin:'0 0 5px',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.4)',textTransform:'uppercase'}}>Monat</p>
+                  <input type="month" value={manMonth} onChange={e=>setManMonth(e.target.value)}
+                    style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(110,231,183,0.2)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box',colorScheme:'dark'}}/>
+                </div>
+                <div>
+                  <p style={{margin:'0 0 5px',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.4)',textTransform:'uppercase'}}>TTR-Wert</p>
+                  <input type="number" min="100" max="3000" placeholder="z.B. 1050" value={manTtr} onChange={e=>setManTtr(e.target.value)}
+                    onKeyDown={e=>e.key==='Enter'&&doManual()}
+                    style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(110,231,183,0.2)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
+                </div>
+                <div>
+                  <p style={{margin:'0 0 5px',fontSize:'11px',fontWeight:'700',color:'transparent',textTransform:'uppercase'}}>-</p>
+                  <button onClick={doManual} disabled={!manChild||!manMonth||!manTtr}
+                    style={{padding:'10px 18px',background:manSaved?'rgba(74,222,128,0.2)':'linear-gradient(135deg,#16a34a,#15803d)',color:manSaved?'#4ade80':'white',border:manSaved?'1px solid rgba(74,222,128,0.4)':'none',borderRadius:'10px',cursor:'pointer',fontWeight:'800',fontSize:'14px',whiteSpace:'nowrap',opacity:!manChild||!manMonth||!manTtr?0.4:1}}>
+                    {manSaved?'✓ Gespeichert':'Speichern'}
+                  </button>
+                </div>
+              </div>
+              {manChild&&ttrHistory[manChild]?.entries?.length>0&&(
+                <div style={{marginTop:'14px',padding:'10px 14px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'10px'}}>
+                  <p style={{margin:'0 0 6px',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.3)',textTransform:'uppercase'}}>Vorhandene Einträge</p>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:'5px'}}>
+                    {ttrHistory[manChild].entries.map(e=>(
+                      <span key={e.month} style={{fontSize:'11px',color:'rgba(255,255,255,0.5)',background:'rgba(255,255,255,0.05)',borderRadius:'6px',padding:'2px 7px'}}>{e.month}: <strong style={{color:'#fbbf24'}}>{e.ttr}</strong></span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );})()}
         </div>
       </div>
     );
