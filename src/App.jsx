@@ -8956,7 +8956,7 @@ export default function TrainingsApp() {
           });
           matches.sort((a,b)=>a.appName.localeCompare(b.appName,'de'));
           unmatched.sort((a,b)=>a.localeCompare(b,'de'));
-          setTtrImportState({matches, unmatched, total: Object.keys(excelMap).length});
+          setTtrImportState({matches, unmatched, total: Object.keys(excelMap).length, detectedMonths: months.map(m=>m.label)});
           setTtrImportDone(false);
         } catch(err) {
           alert('Fehler beim Lesen der Datei: ' + err.message);
@@ -9046,6 +9046,16 @@ export default function TrainingsApp() {
                     ↺ Alle ersetzen
                   </button>
                 </div>
+              </div>
+
+              {/* Diagnose: erkannte Monatsspalten */}
+              <div style={{padding:'10px 14px',marginBottom:'16px',background:(ttrImportState.detectedMonths?.length||0)>2?'rgba(110,231,183,0.06)':'rgba(239,68,68,0.08)',border:`1px solid ${(ttrImportState.detectedMonths?.length||0)>2?'rgba(110,231,183,0.15)':'rgba(239,68,68,0.3)'}`,borderRadius:'10px'}}>
+                <p style={{margin:'0 0 4px',fontSize:'11px',fontWeight:'700',color:(ttrImportState.detectedMonths?.length||0)>2?accent:'#f87171',textTransform:'uppercase'}}>
+                  {ttrImportState.detectedMonths?.length||0} Monatsspalten erkannt
+                </p>
+                <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.5)',lineHeight:1.5,wordBreak:'break-word'}}>
+                  {ttrImportState.detectedMonths?.join(' · ')||'—'}
+                </p>
               </div>
 
               <div style={{display:'flex',flexDirection:'column',gap:'8px',marginBottom:'16px'}}>
