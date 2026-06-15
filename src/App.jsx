@@ -740,6 +740,7 @@ export default function TrainingsApp() {
   const [materialverwaltung, setMaterialverwaltung] = useState({});
   const [materialEdit, setMaterialEdit] = useState(null);
   const [materialSearch, setMaterialSearch] = useState('');
+  const [materialExpanded, setMaterialExpanded] = useState(null);
   const [elternSubView, setElternSubView] = useState(null);
   const [ttcNews, setTtcNews] = useState([]);
   const [ttcNewsLoading, setTtcNewsLoading] = useState(false);
@@ -8453,67 +8454,31 @@ export default function TrainingsApp() {
 
   // ── MATERIALVERWALTUNG VIEW ──────────────────────────────────────────────
   if (view === 'materialverwaltung' && canEdit()) {
-    const DICKEN = ['OX','1,5','1,6','1,7','1,8','1,9','2,0','2,1','MAX'];
+    const DICKEN_OPTS = ['OX','1,0 mm','1,5 mm','1,8 mm','2,0 mm','2,1 mm','2,3 mm','max'];
     const allChildren = Object.values(children).sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
     const q = materialSearch.trim().toLowerCase();
     const visChildren = q ? allChildren.filter(c=>(c.name||'').toLowerCase().includes(q)) : allChildren;
     const uniqBelag = (field) => [...new Set(Object.values(materialverwaltung).map(m=>m[field]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de'));
+    const saveMat = (childId, field, val) => saveMaterialverwaltung({...materialverwaltung,[childId]:{...(materialverwaltung[childId]||{}),[field]:val}});
+    const fmtDate = (iso) => { if(!iso)return''; try{return new Date(iso).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});}catch{return iso;} };
 
-    const saveMat = (childId, field, val) => {
-      saveMaterialverwaltung({...materialverwaltung, [childId]:{...(materialverwaltung[childId]||{}), [field]:val}});
-    };
+    // Shared input/select style for dark background
+    const fldStyle = {width:'100%',boxSizing:'border-box',padding:'9px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',colorScheme:'dark'};
 
-    const fmtDate = (iso) => { if(!iso) return ''; try { return new Date(iso).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'}); } catch { return iso; } };
-
-    const belagBlock = (childId, side, label, color) => {
-      const mat = materialverwaltung[childId]||{};
-      const val = mat[side]||'';
-      const dicke = mat[`${side}_dicke`]||'';
-      const datum = mat[`${side}_datum`]||'';
-      const isEditing = materialEdit === `${childId}_${side}`;
-      const listId = `dl_${side}_${childId}`;
-      const opts = uniqBelag(side);
-      return (
-        <div key={side} style={{flex:1,minWidth:'180px',background:'rgba(255,255,255,0.03)',border:`1px solid ${val?color+'30':'rgba(255,255,255,0.06)'}`,borderRadius:'10px',padding:'10px 12px'}}>
-          <p style={{margin:'0 0 6px',fontSize:'10px',fontWeight:'800',color,textTransform:'uppercase',letterSpacing:'0.8px'}}>{label}</p>
-          {/* Belag name */}
-          {isEditing ? (
-            <div style={{display:'flex',gap:'4px',marginBottom:'8px'}}>
-              <input autoFocus list={listId} defaultValue={val}
-                onBlur={e=>{saveMat(childId,side,e.target.value.trim());setMaterialEdit(null);}}
-                onKeyDown={e=>{if(e.key==='Enter'){saveMat(childId,side,e.target.value.trim());setMaterialEdit(null);}if(e.key==='Escape')setMaterialEdit(null);}}
-                style={{flex:1,padding:'5px 8px',background:'rgba(255,255,255,0.1)',border:`1px solid ${color}55`,borderRadius:'7px',color:'white',fontSize:'13px',outline:'none',minWidth:0}}/>
-              <datalist id={listId}>{opts.map(o=><option key={o} value={o}/>)}</datalist>
-            </div>
-          ) : (
-            <button onClick={()=>setMaterialEdit(`${childId}_${side}`)}
-              style={{width:'100%',textAlign:'left',padding:'5px 8px',marginBottom:'8px',background:val?`${color}10`:'rgba(255,255,255,0.02)',border:`1px solid ${val?color+'28':'rgba(255,255,255,0.07)'}`,borderRadius:'7px',color:val?'rgba(255,255,255,0.9)':'rgba(255,255,255,0.22)',fontSize:'13px',fontWeight:val?'600':'400',fontStyle:val?'normal':'italic',cursor:'pointer'}}>
-              {val||'– Belag eintragen'}
-            </button>
-          )}
-          {/* Schwammdicke */}
-          <div style={{display:'flex',flexWrap:'wrap',gap:'3px',marginBottom:'8px'}}>
-            {DICKEN.map(d=>(
-              <button key={d} onClick={()=>saveMat(childId,`${side}_dicke`, dicke===d?'':d)}
-                style={{padding:'2px 6px',borderRadius:'5px',border:`1px solid ${dicke===d?color:color+'30'}`,background:dicke===d?`${color}20`:'transparent',color:dicke===d?color:'rgba(255,255,255,0.3)',fontSize:'10px',fontWeight:'700',cursor:'pointer',transition:'all 0.1s'}}>
-                {d}
-              </button>
-            ))}
-          </div>
-          {/* Datum letzter Wechsel */}
-          <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
-            <span style={{fontSize:'10px',color:'rgba(255,255,255,0.3)',fontWeight:'600',whiteSpace:'nowrap'}}>Gewechselt:</span>
-            <input type="date" value={datum}
-              onChange={e=>saveMat(childId,`${side}_datum`,e.target.value)}
-              style={{flex:1,padding:'2px 6px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'6px',color:datum?'rgba(255,255,255,0.6)':'rgba(255,255,255,0.2)',fontSize:'10px',outline:'none',minWidth:0,colorScheme:'dark'}}/>
-          </div>
-        </div>
-      );
+    // Build compact summary line for collapsed card
+    const matSummary = (mat) => {
+      const parts = [];
+      if(mat.vh){let s=mat.vh;if(mat.vh_dicke)s+=` ${mat.vh_dicke}`;parts.push(`VH: ${s}`);}
+      if(mat.rh){let s=mat.rh;if(mat.rh_dicke)s+=` ${mat.rh_dicke}`;parts.push(`RH: ${s}`);}
+      if(mat.holz)parts.push(`Holz: ${mat.holz}`);
+      return parts.join(' · ');
     };
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#1a0a00 0%,#2d1500 45%,#150800 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
+
+          {/* Header */}
           <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',gap:'14px',borderBottom:'1px solid rgba(251,146,60,0.1)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 20px':'0 -24px 24px'}}>
             <button onClick={()=>navTo('home')} style={{width:'38px',height:'38px',borderRadius:'10px',background:'rgba(251,146,60,0.1)',border:'1px solid rgba(251,146,60,0.2)',color:'#fb923c',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><ArrowLeft size={18}/></button>
             <div style={{flex:1}}>
@@ -8524,52 +8489,113 @@ export default function TrainingsApp() {
           </div>
 
           {/* Suche */}
-          <div style={{marginBottom:'20px',position:'relative'}}>
-            <span style={{position:'absolute',left:'12px',top:'50%',transform:'translateY(-50%)',fontSize:'15px',pointerEvents:'none'}}>🔍</span>
-            <input
-              type="text" placeholder="Kind suchen…" value={materialSearch}
-              onChange={e=>setMaterialSearch(e.target.value)}
-              style={{width:'100%',boxSizing:'border-box',padding:'10px 12px 10px 36px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(251,146,60,0.2)',borderRadius:'12px',color:'white',fontSize:'14px',outline:'none'}}
-            />
-            {materialSearch&&<button onClick={()=>setMaterialSearch('')} style={{position:'absolute',right:'10px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'rgba(255,255,255,0.4)',cursor:'pointer',fontSize:'16px',lineHeight:1}}>✕</button>}
+          <div style={{marginBottom:'16px',position:'relative'}}>
+            <span style={{position:'absolute',left:'13px',top:'50%',transform:'translateY(-50%)',fontSize:'15px',pointerEvents:'none'}}>🔍</span>
+            <input type="text" placeholder="Kind suchen…" value={materialSearch} onChange={e=>setMaterialSearch(e.target.value)}
+              style={{...fldStyle,paddingLeft:'38px',border:'1px solid rgba(251,146,60,0.22)'}}/>
+            {materialSearch&&<button onClick={()=>setMaterialSearch('')} style={{position:'absolute',right:'12px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'rgba(255,255,255,0.35)',cursor:'pointer',fontSize:'16px',lineHeight:1,padding:0}}>✕</button>}
           </div>
 
-          {visChildren.length === 0 && (
+          {visChildren.length===0&&(
             <p style={{color:'rgba(255,255,255,0.35)',textAlign:'center',marginTop:'60px'}}>{q?`Kein Kind gefunden für „${materialSearch}"`:'Keine Kinder vorhanden.'}</p>
           )}
 
-          <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+          {/* Accordion-Liste */}
+          <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
             {visChildren.map(child=>{
               const mat = materialverwaltung[child.id]||{};
               const hasAny = mat.vh||mat.rh||mat.holz;
+              const isOpen = materialExpanded===child.id;
+              const summary = matSummary(mat);
               return (
-                <div key={child.id} style={{background:'rgba(255,255,255,0.04)',border:`1px solid ${hasAny?'rgba(251,146,60,0.2)':'rgba(255,255,255,0.07)'}`,borderRadius:'14px',padding:'14px 16px'}}>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px'}}>
-                    <p style={{margin:0,fontWeight:'800',fontSize:'14px',color:'white'}}>{child.name}</p>
-                    {!hasAny&&<span style={{fontSize:'10px',color:'rgba(255,255,255,0.2)',fontStyle:'italic'}}>kein Material</span>}
-                  </div>
-                  <div style={{display:'flex',gap:'10px',flexWrap:'wrap',marginBottom:'10px'}}>
-                    {belagBlock(child.id,'vh','Vorhand','#67e8f9')}
-                    {belagBlock(child.id,'rh','Rückhand','#a78bfa')}
-                  </div>
-                  {/* Holz */}
-                  <div style={{flex:1}}>
-                    <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'800',color:'#86efac',textTransform:'uppercase',letterSpacing:'0.8px'}}>Holz</p>
-                    {materialEdit===`${child.id}_holz` ? (
-                      <div style={{display:'flex',gap:'4px'}}>
-                        <input autoFocus list={`dl_holz_${child.id}`} defaultValue={mat.holz||''}
-                          onBlur={e=>{saveMat(child.id,'holz',e.target.value.trim());setMaterialEdit(null);}}
-                          onKeyDown={e=>{if(e.key==='Enter'){saveMat(child.id,'holz',e.target.value.trim());setMaterialEdit(null);}if(e.key==='Escape')setMaterialEdit(null);}}
-                          style={{flex:1,padding:'5px 8px',background:'rgba(255,255,255,0.1)',border:'1px solid #86efac55',borderRadius:'7px',color:'white',fontSize:'13px',outline:'none',minWidth:0}}/>
+                <div key={child.id} style={{background:'rgba(255,255,255,0.04)',border:`1px solid ${isOpen?'rgba(251,146,60,0.3)':hasAny?'rgba(251,146,60,0.14)':'rgba(255,255,255,0.07)'}`,borderRadius:'14px',overflow:'hidden',transition:'border-color 0.2s'}}>
+
+                  {/* Kopfzeile — immer sichtbar, klickbar */}
+                  <button onClick={()=>setMaterialExpanded(isOpen?null:child.id)}
+                    style={{width:'100%',display:'flex',alignItems:'center',gap:'12px',padding:'13px 16px',background:'none',border:'none',cursor:'pointer',textAlign:'left'}}>
+                    <span style={{fontSize:'14px',color:'rgba(255,255,255,0.3)',transition:'transform 0.2s',transform:isOpen?'rotate(90deg)':'rotate(0deg)',flexShrink:0}}>▶</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <p style={{margin:0,fontWeight:'800',fontSize:'14px',color:'white'}}>{child.name}</p>
+                      {!isOpen&&(summary
+                        ? <p style={{margin:'2px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.35)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{summary}</p>
+                        : <p style={{margin:'2px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.18)',fontStyle:'italic'}}>kein Material eingetragen</p>
+                      )}
+                    </div>
+                    {hasAny&&!isOpen&&<span style={{width:'8px',height:'8px',borderRadius:'50%',background:'#fb923c',flexShrink:0}}/>}
+                  </button>
+
+                  {/* Ausgeklappter Inhalt */}
+                  {isOpen&&(
+                    <div style={{padding:'0 16px 16px',display:'flex',flexDirection:'column',gap:'14px'}}>
+
+                      {/* VH */}
+                      <div style={{background:'rgba(103,232,249,0.04)',border:'1px solid rgba(103,232,249,0.14)',borderRadius:'12px',padding:'12px 14px'}}>
+                        <p style={{margin:'0 0 10px',fontSize:'10px',fontWeight:'800',color:'#67e8f9',textTransform:'uppercase',letterSpacing:'1px'}}>🏓 Vorhand</p>
+                        <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+                          <div>
+                            <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>Belag</p>
+                            <input list={`dl_vh_${child.id}`} value={mat.vh||''}
+                              onChange={e=>saveMat(child.id,'vh',e.target.value)}
+                              placeholder="z. B. Butterfly Tenergy 05"
+                              style={fldStyle}/>
+                            <datalist id={`dl_vh_${child.id}`}>{uniqBelag('vh').map(o=><option key={o} value={o}/>)}</datalist>
+                          </div>
+                          <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                            <div style={{flex:1,minWidth:'140px'}}>
+                              <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>Dicke</p>
+                              <select value={mat.vh_dicke||''} onChange={e=>saveMat(child.id,'vh_dicke',e.target.value)} style={{...fldStyle,cursor:'pointer'}}>
+                                <option value="">– keine Angabe –</option>
+                                {DICKEN_OPTS.map(d=><option key={d} value={d}>{d}</option>)}
+                              </select>
+                            </div>
+                            <div style={{flex:1,minWidth:'140px'}}>
+                              <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>Gewechselt am</p>
+                              <input type="date" value={mat.vh_datum||''} onChange={e=>saveMat(child.id,'vh_datum',e.target.value)} style={fldStyle}/>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* RH */}
+                      <div style={{background:'rgba(167,139,250,0.04)',border:'1px solid rgba(167,139,250,0.14)',borderRadius:'12px',padding:'12px 14px'}}>
+                        <p style={{margin:'0 0 10px',fontSize:'10px',fontWeight:'800',color:'#a78bfa',textTransform:'uppercase',letterSpacing:'1px'}}>🏓 Rückhand</p>
+                        <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+                          <div>
+                            <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>Belag</p>
+                            <input list={`dl_rh_${child.id}`} value={mat.rh||''}
+                              onChange={e=>saveMat(child.id,'rh',e.target.value)}
+                              placeholder="z. B. DHS Hurricane 3"
+                              style={fldStyle}/>
+                            <datalist id={`dl_rh_${child.id}`}>{uniqBelag('rh').map(o=><option key={o} value={o}/>)}</datalist>
+                          </div>
+                          <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                            <div style={{flex:1,minWidth:'140px'}}>
+                              <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>Dicke</p>
+                              <select value={mat.rh_dicke||''} onChange={e=>saveMat(child.id,'rh_dicke',e.target.value)} style={{...fldStyle,cursor:'pointer'}}>
+                                <option value="">– keine Angabe –</option>
+                                {DICKEN_OPTS.map(d=><option key={d} value={d}>{d}</option>)}
+                              </select>
+                            </div>
+                            <div style={{flex:1,minWidth:'140px'}}>
+                              <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>Gewechselt am</p>
+                              <input type="date" value={mat.rh_datum||''} onChange={e=>saveMat(child.id,'rh_datum',e.target.value)} style={fldStyle}/>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Holz */}
+                      <div>
+                        <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'800',color:'#86efac',textTransform:'uppercase',letterSpacing:'1px'}}>🪵 Holz</p>
+                        <input list={`dl_holz_${child.id}`} value={mat.holz||''}
+                          onChange={e=>saveMat(child.id,'holz',e.target.value)}
+                          placeholder="z. B. Stiga Clipper"
+                          style={fldStyle}/>
                         <datalist id={`dl_holz_${child.id}`}>{uniqBelag('holz').map(o=><option key={o} value={o}/>)}</datalist>
                       </div>
-                    ) : (
-                      <button onClick={()=>setMaterialEdit(`${child.id}_holz`)}
-                        style={{padding:'5px 8px',background:mat.holz?'rgba(134,239,172,0.08)':'rgba(255,255,255,0.02)',border:`1px solid ${mat.holz?'rgba(134,239,172,0.22)':'rgba(255,255,255,0.07)'}`,borderRadius:'7px',color:mat.holz?'rgba(255,255,255,0.85)':'rgba(255,255,255,0.22)',fontSize:'13px',fontWeight:mat.holz?'600':'400',fontStyle:mat.holz?'normal':'italic',cursor:'pointer'}}>
-                        {mat.holz||'– Holz eintragen'}
-                      </button>
-                    )}
-                  </div>
+
+                    </div>
+                  )}
                 </div>
               );
             })}
