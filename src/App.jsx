@@ -60,6 +60,8 @@ if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styl
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: rgba(74,222,128,0.25); border-radius: 99px; }
     input, textarea, button { font-family: inherit; }
+    select.dark-select option { background: #1c1008; color: #fff; }
+    select.dark-select { color-scheme: dark; }
     @media (max-width: 600px) {
       .ttc-hide-mobile { display: none !important; }
       .ttc-mobile-full { width: 100% !important; }
@@ -8543,7 +8545,7 @@ export default function TrainingsApp() {
                           <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
                             <div style={{flex:1,minWidth:'140px'}}>
                               <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>Dicke</p>
-                              <select value={mat.vh_dicke||''} onChange={e=>saveMat(child.id,'vh_dicke',e.target.value)} style={{...fldStyle,cursor:'pointer'}}>
+                              <select className="dark-select" value={mat.vh_dicke||''} onChange={e=>saveMat(child.id,'vh_dicke',e.target.value)} style={{...fldStyle,cursor:'pointer'}}>
                                 <option value="">– keine Angabe –</option>
                                 {DICKEN_OPTS.map(d=><option key={d} value={d}>{d}</option>)}
                               </select>
@@ -8571,7 +8573,7 @@ export default function TrainingsApp() {
                           <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
                             <div style={{flex:1,minWidth:'140px'}}>
                               <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>Dicke</p>
-                              <select value={mat.rh_dicke||''} onChange={e=>saveMat(child.id,'rh_dicke',e.target.value)} style={{...fldStyle,cursor:'pointer'}}>
+                              <select className="dark-select" value={mat.rh_dicke||''} onChange={e=>saveMat(child.id,'rh_dicke',e.target.value)} style={{...fldStyle,cursor:'pointer'}}>
                                 <option value="">– keine Angabe –</option>
                                 {DICKEN_OPTS.map(d=><option key={d} value={d}>{d}</option>)}
                               </select>
