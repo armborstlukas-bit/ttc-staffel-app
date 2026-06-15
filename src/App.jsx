@@ -737,6 +737,8 @@ export default function TrainingsApp() {
   const [practiceTournaments, setPracticeTournaments]               = useState({});
   const [archivedPracticeTournaments, setArchivedPracticeTournaments] = useState({});
   const [gegnerLogbuch, setGegnerLogbuch] = useState([]);
+  const [materialverwaltung, setMaterialverwaltung] = useState({});
+  const [materialEdit, setMaterialEdit] = useState(null); // childId being edited
   const [elternSubView, setElternSubView] = useState(null);
   const [ttcNews, setTtcNews] = useState([]);
   const [ttcNewsLoading, setTtcNewsLoading] = useState(false);
@@ -858,6 +860,7 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','practiceTournaments'),          s => setPracticeTournaments(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','archivedPracticeTournaments'),  s => setArchivedPracticeTournaments(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','gegnerLogbuch'), s => setGegnerLogbuch(s.exists()&&Array.isArray(s.data().entries)?s.data().entries:[])),
+      onSnapshot(doc(db,'ttc','materialverwaltung'), s => setMaterialverwaltung(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','trainingsmatches'), s => setTrainingsmatches(s.exists()&&Array.isArray(s.data().matches)?s.data().matches:[])),
     ];
     // Fetch TTC News via rss2json
@@ -1321,6 +1324,7 @@ export default function TrainingsApp() {
   const savePracticeTournaments          = u => { setPracticeTournaments(u);          setDoc(doc(db,'ttc','practiceTournaments'),          u); };
   const saveArchivedPracticeTournaments  = u => { setArchivedPracticeTournaments(u);  setDoc(doc(db,'ttc','archivedPracticeTournaments'),  u); };
   const saveGegnerLogbuch = entries => { setGegnerLogbuch(entries); setDoc(doc(db,'ttc','gegnerLogbuch'), {entries}); };
+  const saveMaterialverwaltung = data => { setMaterialverwaltung(data); setDoc(doc(db,'ttc','materialverwaltung'), data); };
 
   // ── Trainer Unread Count (Eltern-Nachrichten + Registrierungen) ──────────
   const getTrainerUnreadCount = () => {
@@ -3505,6 +3509,7 @@ export default function TrainingsApp() {
         links: [
           {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
           {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>navTo('notifications'), badge: unreadCount},
+          {label:'Materialverwaltung',icon:'🏓', color:'#fb923c', bg:'rgba(251,146,60,0.08)', border:'rgba(251,146,60,0.25)',  action:()=>navTo('materialverwaltung')},
           ...(userRole==='admin'?[
             {label:'Admin',          icon:'🛡️', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('admin')},
           ]:[]),
@@ -4239,6 +4244,16 @@ export default function TrainingsApp() {
                     <div style={{width:`${stats.percent}%`,height:'100%',background:stats.percent>=80?'linear-gradient(90deg,#16a34a,#4ade80)':stats.percent>=60?'linear-gradient(90deg,#d97706,#fde68a)':'linear-gradient(90deg,#dc2626,#f87171)',borderRadius:'99px',transition:'width 0.6s ease'}}/>
                   </div>
                 </div>
+                {(()=>{const mat=materialverwaltung[myChild.id];if(!mat||(!mat.vh&&!mat.rh&&!mat.holz))return null;return(
+                  <div style={{marginTop:'14px',paddingTop:'12px',borderTop:'1px solid rgba(255,255,255,0.06)',display:'flex',flexWrap:'wrap',gap:'8px'}}>
+                    {[{label:'VH',val:mat.vh,color:'#67e8f9'},{label:'RH',val:mat.rh,color:'#a78bfa'},{label:'Holz',val:mat.holz,color:'#86efac'}].filter(x=>x.val).map(x=>(
+                      <div key={x.label} style={{display:'flex',alignItems:'center',gap:'6px',background:'rgba(255,255,255,0.04)',border:`1px solid ${x.color}22`,borderRadius:'8px',padding:'4px 10px'}}>
+                        <span style={{fontSize:'10px',fontWeight:'800',color:x.color,textTransform:'uppercase',letterSpacing:'0.5px'}}>{x.label}</span>
+                        <span style={{fontSize:'12px',fontWeight:'600',color:'rgba(255,255,255,0.75)'}}>{x.val}</span>
+                      </div>
+                    ))}
+                  </div>
+                );})()}
               </div>
             </>
           )}
@@ -8424,6 +8439,81 @@ export default function TrainingsApp() {
         </div>
       </div>
       </>
+    );
+  }
+
+  // ── MATERIALVERWALTUNG VIEW ──────────────────────────────────────────────
+  if (view === 'materialverwaltung' && canEdit()) {
+    const allChildren = Object.values(children).sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
+    const uniqVals = (field) => [...new Set(Object.values(materialverwaltung).map(m=>m[field]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de'));
+
+    const saveMat = (childId, field, val) => {
+      const updated = {...materialverwaltung, [childId]:{...(materialverwaltung[childId]||{}), [field]:val}};
+      saveMaterialverwaltung(updated);
+    };
+
+    const matField = (childId, field, label, color, listId) => {
+      const val = materialverwaltung[childId]?.[field] || '';
+      const opts = uniqVals(field);
+      const isEditing = materialEdit === `${childId}_${field}`;
+      return (
+        <div key={field} style={{flex:1,minWidth:'120px'}}>
+          <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'800',color,textTransform:'uppercase',letterSpacing:'0.8px'}}>{label}</p>
+          {isEditing ? (
+            <div style={{display:'flex',gap:'4px'}}>
+              <input
+                autoFocus
+                list={listId}
+                defaultValue={val}
+                onBlur={e=>{saveMat(childId,field,e.target.value.trim());setMaterialEdit(null);}}
+                onKeyDown={e=>{if(e.key==='Enter'){saveMat(childId,field,e.target.value.trim());setMaterialEdit(null);}if(e.key==='Escape')setMaterialEdit(null);}}
+                style={{flex:1,padding:'5px 8px',background:'rgba(255,255,255,0.09)',border:`1px solid ${color}55`,borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',minWidth:0}}
+              />
+              <datalist id={listId}>{opts.map(o=><option key={o} value={o}/>)}</datalist>
+            </div>
+          ) : (
+            <button onClick={()=>setMaterialEdit(`${childId}_${field}`)}
+              style={{width:'100%',textAlign:'left',padding:'5px 8px',background:val?`${color}11`:'rgba(255,255,255,0.03)',border:`1px solid ${val?color+'33':'rgba(255,255,255,0.08)'}`,borderRadius:'7px',color:val?'rgba(255,255,255,0.85)':'rgba(255,255,255,0.25)',fontSize:'12px',cursor:'pointer',fontWeight:val?'600':'400',fontStyle:val?'normal':'italic'}}>
+              {val||'– eintragen'}
+            </button>
+          )}
+        </div>
+      );
+    };
+
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#1a0a00 0%,#2d1500 45%,#150800 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
+          <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',gap:'14px',borderBottom:'1px solid rgba(251,146,60,0.1)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 28px':'0 -24px 32px'}}>
+            <button onClick={()=>navTo('home')} style={{width:'38px',height:'38px',borderRadius:'10px',background:'rgba(251,146,60,0.1)',border:'1px solid rgba(251,146,60,0.2)',color:'#fb923c',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><ArrowLeft size={18}/></button>
+            <div>
+              <p style={{margin:'0 0 1px',color:'rgba(251,146,60,0.5)',fontSize:'11px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px'}}>🏓 Materialverwaltung</p>
+              <h2 style={{margin:0,color:'white',fontWeight:'800',fontSize:isMobile?'15px':'18px'}}>Material der Kinder</h2>
+            </div>
+          </div>
+
+          {allChildren.length === 0 && (
+            <p style={{color:'rgba(255,255,255,0.35)',textAlign:'center',marginTop:'60px'}}>Keine Kinder gefunden.</p>
+          )}
+
+          <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
+            {allChildren.map(child=>{
+              const mat = materialverwaltung[child.id]||{};
+              const hasAny = mat.vh||mat.rh||mat.holz;
+              return (
+                <div key={child.id} style={{background:'rgba(255,255,255,0.04)',border:`1px solid ${hasAny?'rgba(251,146,60,0.18)':'rgba(255,255,255,0.07)'}`,borderRadius:'14px',padding:'14px 16px'}}>
+                  <p style={{margin:'0 0 12px',fontWeight:'800',fontSize:'14px',color:'white'}}>{child.name}</p>
+                  <div style={{display:'flex',gap:'10px',flexWrap:'wrap'}}>
+                    {matField(child.id,'vh','Vorhand','#67e8f9',`dl_vh_${child.id}`)}
+                    {matField(child.id,'rh','Rückhand','#a78bfa',`dl_rh_${child.id}`)}
+                    {matField(child.id,'holz','Holz','#86efac',`dl_holz_${child.id}`)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
     );
   }
 
