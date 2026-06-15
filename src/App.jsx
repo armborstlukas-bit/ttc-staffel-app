@@ -8865,7 +8865,7 @@ export default function TrainingsApp() {
           const wb = XLSX.read(e.target.result, {type:'array'});
           const ws = wb.Sheets['Tabelle1'];
           if (!ws) { alert('Sheet "Tabelle1" nicht gefunden.'); return; }
-          const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+          const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:true});
 
           // Parse header row → decode actual date serials per column
           // Handles: gaps (missing months), typos (year off by 1), string dates
