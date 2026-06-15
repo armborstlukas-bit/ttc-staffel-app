@@ -8862,7 +8862,7 @@ export default function TrainingsApp() {
         try {
           const XLSX = window._XLSX;
           if (!XLSX) { alert('XLSX-Bibliothek nicht geladen. Bitte Seite neu laden.'); return; }
-          const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+          const wb = XLSX.read(e.target.result, {type:'array'});
           const ws = wb.Sheets['Tabelle1'];
           if (!ws) { alert('Sheet "Tabelle1" nicht gefunden.'); return; }
           const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
