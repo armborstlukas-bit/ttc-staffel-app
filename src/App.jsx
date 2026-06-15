@@ -8886,16 +8886,23 @@ export default function TrainingsApp() {
             if (entries.length > 0) excelMap[name] = entries;
           }
 
-          // Match against app children
+          // Match against app children (case-insensitive, trim whitespace)
+          const norm = s => (s||'').trim().toLowerCase().replace(/\s+/g,' ');
+          const excelNorm = {};
+          Object.entries(excelMap).forEach(([k,v]) => { excelNorm[norm(k)] = {excelName:k, entries:v}; });
           const appChildren = Object.values(children);
-          const matches = [];
+          const matches = [], unmatched = [];
           appChildren.forEach(child => {
-            if (excelMap[child.name]) {
-              matches.push({childId: child.id, appName: child.name, excelName: child.name, entries: excelMap[child.name]});
+            const hit = excelNorm[norm(child.name)];
+            if (hit) {
+              matches.push({childId: child.id, appName: child.name, excelName: hit.excelName, entries: hit.entries});
+            } else {
+              unmatched.push(child.name);
             }
           });
           matches.sort((a,b)=>a.appName.localeCompare(b.appName,'de'));
-          setTtrImportState({matches, total: Object.keys(excelMap).length});
+          unmatched.sort((a,b)=>a.localeCompare(b,'de'));
+          setTtrImportState({matches, unmatched, total: Object.keys(excelMap).length});
           setTtrImportDone(false);
         } catch(err) {
           alert('Fehler beim Lesen der Datei: ' + err.message);
@@ -8977,18 +8984,20 @@ export default function TrainingsApp() {
                 </button>
               </div>
 
-              <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+              <div style={{display:'flex',flexDirection:'column',gap:'8px',marginBottom:'16px'}}>
                 {ttrImportState.matches.map(m=>{
                   const first = m.entries[0]?.month;
                   const last  = m.entries[m.entries.length-1]?.month;
                   const lastTtr = m.entries[m.entries.length-1]?.ttr;
                   const firstTtr = m.entries[0]?.ttr;
                   const diff = lastTtr - firstTtr;
+                  const nameDiffers = m.appName !== m.excelName;
                   return (
                     <div key={m.childId} style={{display:'flex',alignItems:'center',gap:'14px',padding:'12px 16px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(110,231,183,0.15)',borderRadius:'12px'}}>
                       <span style={{fontSize:'20px'}}>✅</span>
                       <div style={{flex:1,minWidth:0}}>
-                        <p style={{margin:'0 0 2px',fontWeight:'800',fontSize:'13px',color:'white'}}>{m.appName}</p>
+                        <p style={{margin:'0 0 1px',fontWeight:'800',fontSize:'13px',color:'white'}}>{m.appName}</p>
+                        {nameDiffers&&<p style={{margin:'0 0 2px',fontSize:'10px',color:'rgba(251,191,36,0.6)'}}>Excel: „{m.excelName}"</p>}
                         <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>
                           {m.entries.length} Monate · {first} bis {last}
                         </p>
@@ -9001,6 +9010,19 @@ export default function TrainingsApp() {
                   );
                 })}
               </div>
+
+              {ttrImportState.unmatched?.length>0&&(
+                <div style={{padding:'14px 16px',background:'rgba(248,113,113,0.05)',border:'1px solid rgba(248,113,113,0.15)',borderRadius:'12px'}}>
+                  <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'800',color:'#f87171'}}>
+                    ⚠️ {ttrImportState.unmatched.length} App-Kinder ohne Excel-Treffer (Name prüfen):
+                  </p>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+                    {ttrImportState.unmatched.map(n=>(
+                      <span key={n} style={{fontSize:'11px',color:'rgba(248,113,113,0.8)',background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.15)',borderRadius:'6px',padding:'2px 8px'}}>{n}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           )}
 
