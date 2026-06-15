@@ -3525,14 +3525,14 @@ export default function TrainingsApp() {
           {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
           {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>navTo('notifications'), badge: unreadCount},
           {label:'Materialverwaltung',icon:'🏓', color:'#fb923c', bg:'rgba(251,146,60,0.08)', border:'rgba(251,146,60,0.25)',  action:()=>navTo('materialverwaltung')},
+          {label:'TTR-Import', icon:'📈',
+            color: new Date().getDate()<=3 ? '#ef4444' : '#6ee7b7',
+            bg:    new Date().getDate()<=3 ? 'rgba(239,68,68,0.12)' : 'rgba(110,231,183,0.08)',
+            border:new Date().getDate()<=3 ? 'rgba(239,68,68,0.4)'  : 'rgba(110,231,183,0.25)',
+            badge: new Date().getDate()<=3 ? '!' : null,
+            action:()=>navTo('ttrImport')},
           ...(userRole==='admin'?[
             {label:'Admin',          icon:'🛡️', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('admin')},
-            {label:'TTR-Import',     icon:'📈',
-              color: new Date().getDate()<=3 ? '#ef4444' : '#6ee7b7',
-              bg:    new Date().getDate()<=3 ? 'rgba(239,68,68,0.12)' : 'rgba(110,231,183,0.08)',
-              border:new Date().getDate()<=3 ? 'rgba(239,68,68,0.4)'  : 'rgba(110,231,183,0.25)',
-              badge: new Date().getDate()<=3 ? '!' : null,
-              action:()=>navTo('ttrImport')},
           ]:[]),
         ],
       },
@@ -8773,7 +8773,7 @@ export default function TrainingsApp() {
   // ── TTR WERTE VIEW ──────────────────────────────────────────────────────
   if (view === 'ttrWerte' && canEdit()) {
     const accent = '#fbbf24';
-    const allChildren = Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+    const allChildren = Object.values(children).filter(c=>subgroups[c.subgroupId]?.groupId==='jugend').sort((a,b)=>a.name.localeCompare(b.name,'de'));
     const withTtr = allChildren.map(c=>{
       const hist=ttrHistory[c.id]?.entries||[];
       const last=hist.length?hist[hist.length-1]:null;
@@ -8802,7 +8802,7 @@ export default function TrainingsApp() {
             <div style={{textAlign:'center',padding:'60px 20px'}}>
               <p style={{fontSize:'40px',margin:'0 0 12px'}}>📊</p>
               <p style={{color:'rgba(255,255,255,0.35)',fontSize:'15px'}}>Noch keine TTR-Daten importiert.</p>
-              {userRole==='admin'&&<button onClick={()=>navTo('ttrImport')} style={{marginTop:'16px',padding:'11px 22px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'12px',color:'#fbbf24',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>→ TTR-Import öffnen</button>}
+              <button onClick={()=>navTo('ttrImport')} style={{marginTop:'16px',padding:'11px 22px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'12px',color:'#fbbf24',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>→ TTR-Import öffnen</button>
             </div>
           )}
 
@@ -8853,7 +8853,7 @@ export default function TrainingsApp() {
   }
 
   // ── TTR IMPORT VIEW ─────────────────────────────────────────────────────
-  if (view === 'ttrImport' && userRole === 'admin') {
+  if (view === 'ttrImport' && canEdit()) {
     const accent = '#6ee7b7';
 
     const parseExcel = (file) => {
@@ -8899,7 +8899,7 @@ export default function TrainingsApp() {
           const norm = s => (s||'').trim().toLowerCase().replace(/\s+/g,' ');
           const excelNorm = {};
           Object.entries(excelMap).forEach(([k,v]) => { excelNorm[norm(k)] = {excelName:k, entries:v}; });
-          const appChildren = Object.values(children);
+          const appChildren = Object.values(children).filter(c=>subgroups[c.subgroupId]?.groupId==='jugend');
           const matches = [], unmatched = [];
           appChildren.forEach(child => {
             const hit = excelNorm[norm(child.name)];
@@ -9051,7 +9051,7 @@ export default function TrainingsApp() {
 
           {/* Kinder ohne TTR-Daten */}
           {(()=>{
-            const allCh = Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+            const allCh = Object.values(children).filter(c=>subgroups[c.subgroupId]?.groupId==='jugend').sort((a,b)=>a.name.localeCompare(b.name,'de'));
             const noTtr = allCh.filter(c=>!ttrHistory[c.id]?.entries?.length);
             if(noTtr.length===0) return null;
             return(
@@ -9069,7 +9069,7 @@ export default function TrainingsApp() {
 
           {/* Manuelle Monatseingabe */}
           {(()=>{
-            const allCh = Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+            const allCh = Object.values(children).filter(c=>subgroups[c.subgroupId]?.groupId==='jugend').sort((a,b)=>a.name.localeCompare(b.name,'de'));
             const doManual = () => {
               const ttr = parseInt(ttrManTtr,10);
               if(!ttrManChild||!ttrManMonth||isNaN(ttr)||ttr<100||ttr>3000) return;
