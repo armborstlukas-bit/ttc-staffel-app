@@ -8867,34 +8867,46 @@ export default function TrainingsApp() {
           if (!ws) { alert('Sheet "Tabelle1" nicht gefunden.'); return; }
           const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:true});
 
-          // Parse header row → decode actual date serials per column
-          // Handles: gaps (missing months), typos (year off by 1), string dates
+          // Parse header row → decode date per column, robust to ALL cell types
+          // Handles: Date objects, numeric serials, numeric strings, "DD.MM.YYYY" strings;
+          // plus gaps (missing months) and year-typos (year written as next year)
           const headerRow = raw[0] || [];
           const months = []; // [{col, label:'YYYY-MM'}]
-          const excelSerial = v => new Date(Math.round((v - 25569) * 86400 * 1000));
+          const excelSerial = n => new Date(Math.round((n - 25569) * 86400 * 1000));
+          // Returns {yr, mo} from a header cell of any type, or null
+          const decodeCell = (v) => {
+            if (v instanceof Date && !isNaN(v))            return { yr: v.getFullYear(),    mo: v.getMonth() + 1 };
+            if (typeof v === 'number' && v > 40000 && v < 60000) {
+              const d = excelSerial(v);                    return { yr: d.getUTCFullYear(), mo: d.getUTCMonth() + 1 };
+            }
+            if (typeof v === 'string') {
+              const s = v.trim();
+              if (!s || s.includes('Differenz') || s.includes('Jahr')) return null;
+              // numeric string serial e.g. "45230"
+              if (/^\d{4,6}$/.test(s)) {
+                const n = Number(s);
+                if (n > 40000 && n < 60000) { const d = excelSerial(n); return { yr: d.getUTCFullYear(), mo: d.getUTCMonth() + 1 }; }
+              }
+              // "DD.MM.YYYY" (year may be malformed → take last 4 digits)
+              const m = s.match(/(\d{1,2})\.(\d{1,2})\.(\d+)/);
+              if (m) return { yr: Number(m[3].slice(-4)), mo: Number(m[2]) };
+            }
+            return null;
+          };
           let prevLabel = null;
           for (let c = 2; c < headerRow.length; c++) {
-            const v = headerRow[c];
-            let label = null;
-            if (typeof v === 'number' && v > 40000 && v < 60000) {
-              const d = excelSerial(v);
-              let yr = d.getUTCFullYear(), mo = d.getUTCMonth() + 1;
-              // If this date is ~12 months ahead of previous (year typo), subtract 1 year
-              if (prevLabel) {
-                const [py, pm] = prevLabel.split('-').map(Number);
-                const diff = (yr - py) * 12 + (mo - pm);
-                if (diff >= 10 && diff <= 14) yr -= 1; // typo: year written as next year
-              }
-              label = `${yr}-${String(mo).padStart(2,'0')}`;
-            } else if (typeof v === 'string' && v.trim()) {
-              // e.g. "01.11.202024" → extract day.month.year (last 4 digits of year)
-              const m = v.match(/(\d{1,2})\.(\d{1,2})\.(\d+)/);
-              if (m) label = `${m[3].slice(-4)}-${m[2].padStart(2,'0')}`;
-              // Skip summary columns like "Differenz" or "Jahr"
-              if (v.includes('Differenz') || v.includes('Jahr')) break;
+            const dec = decodeCell(headerRow[c]);
+            if (!dec) continue;
+            let { yr, mo } = dec;
+            // Year-typo correction: if ~12 months ahead of previous column, drop a year
+            if (prevLabel) {
+              const [py, pm] = prevLabel.split('-').map(Number);
+              const diff = (yr - py) * 12 + (mo - pm);
+              if (diff >= 10 && diff <= 14) yr -= 1;
             }
-            if (label && /^\d{4}-\d{2}$/.test(label)) {
-              months.push({col: c, label});
+            const label = `${yr}-${String(mo).padStart(2, '0')}`;
+            if (/^\d{4}-\d{2}$/.test(label)) {
+              months.push({ col: c, label });
               prevLabel = label;
             }
           }
