@@ -743,6 +743,9 @@ export default function TrainingsApp() {
   const [materialEdit, setMaterialEdit] = useState(null);
   const [materialSearch, setMaterialSearch] = useState('');
   const [materialExpanded, setMaterialExpanded] = useState(null);
+  const [ttrHistory, setTtrHistory] = useState({});
+  const [ttrImportState, setTtrImportState] = useState(null); // {matches:[],raw:{}}
+  const [ttrImportDone, setTtrImportDone] = useState(false);
   const [elternSubView, setElternSubView] = useState(null);
   const [ttcNews, setTtcNews] = useState([]);
   const [ttcNewsLoading, setTtcNewsLoading] = useState(false);
@@ -865,6 +868,7 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','archivedPracticeTournaments'),  s => setArchivedPracticeTournaments(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','gegnerLogbuch'), s => setGegnerLogbuch(s.exists()&&Array.isArray(s.data().entries)?s.data().entries:[])),
       onSnapshot(doc(db,'ttc','materialverwaltung'), s => setMaterialverwaltung(s.exists()?s.data():{})),
+      onSnapshot(doc(db,'ttc','ttrHistory'), s => setTtrHistory(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','trainingsmatches'), s => setTrainingsmatches(s.exists()&&Array.isArray(s.data().matches)?s.data().matches:[])),
     ];
     // Fetch TTC News via rss2json
@@ -1329,6 +1333,7 @@ export default function TrainingsApp() {
   const saveArchivedPracticeTournaments  = u => { setArchivedPracticeTournaments(u);  setDoc(doc(db,'ttc','archivedPracticeTournaments'),  u); };
   const saveGegnerLogbuch = entries => { setGegnerLogbuch(entries); setDoc(doc(db,'ttc','gegnerLogbuch'), {entries}); };
   const saveMaterialverwaltung = data => { setMaterialverwaltung(data); setDoc(doc(db,'ttc','materialverwaltung'), data); };
+  const saveTtrHistory = data => { setTtrHistory(data); setDoc(doc(db,'ttc','ttrHistory'), data); };
 
   // ── Trainer Unread Count (Eltern-Nachrichten + Registrierungen) ──────────
   const getTrainerUnreadCount = () => {
@@ -3516,6 +3521,7 @@ export default function TrainingsApp() {
           {label:'Materialverwaltung',icon:'🏓', color:'#fb923c', bg:'rgba(251,146,60,0.08)', border:'rgba(251,146,60,0.25)',  action:()=>navTo('materialverwaltung')},
           ...(userRole==='admin'?[
             {label:'Admin',          icon:'🛡️', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('admin')},
+            {label:'TTR-Import',     icon:'📈', color:'#6ee7b7', bg:'rgba(110,231,183,0.08)', border:'rgba(110,231,183,0.25)', action:()=>navTo('ttrImport')},
           ]:[]),
         ],
       },
@@ -8602,6 +8608,185 @@ export default function TrainingsApp() {
               );
             })}
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── TTR IMPORT VIEW ─────────────────────────────────────────────────────
+  if (view === 'ttrImport' && userRole === 'admin') {
+    const accent = '#6ee7b7';
+
+    const parseExcel = (file) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const XLSX = window._XLSX;
+          if (!XLSX) { alert('XLSX-Bibliothek nicht geladen. Bitte Seite neu laden.'); return; }
+          const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+          const ws = wb.Sheets['Tabelle1'];
+          if (!ws) { alert('Sheet "Tabelle1" nicht gefunden.'); return; }
+          const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+
+          // Parse header row (row 0) → month labels for cols 2..N-2 (skip last 2: Differenz, Jahr)
+          const headerRow = raw[0] || [];
+          const months = []; // [{col, label:'YYYY-MM'}]
+          // Use column sequence to assign months starting Oct 2023
+          const startDate = new Date(2023, 9, 1); // Oct 2023
+          let monthCursor = new Date(startDate);
+          for (let c = 2; c < headerRow.length - 2; c++) {
+            const label = `${monthCursor.getFullYear()}-${String(monthCursor.getMonth()+1).padStart(2,'0')}`;
+            months.push({col:c, label});
+            monthCursor.setMonth(monthCursor.getMonth()+1);
+          }
+
+          // Build name→entries map from Excel
+          const excelMap = {};
+          for (let r = 1; r < raw.length; r++) {
+            const row = raw[r];
+            const name = (row[0]||'').trim();
+            if (!name) continue;
+            const entries = [];
+            months.forEach(({col, label}) => {
+              const v = row[col];
+              if (v !== '' && v !== null && v !== undefined && !isNaN(Number(v))) {
+                entries.push({month: label, ttr: Number(v)});
+              }
+            });
+            if (entries.length > 0) excelMap[name] = entries;
+          }
+
+          // Match against app children
+          const appChildren = Object.values(children);
+          const matches = [];
+          appChildren.forEach(child => {
+            if (excelMap[child.name]) {
+              matches.push({childId: child.id, appName: child.name, excelName: child.name, entries: excelMap[child.name]});
+            }
+          });
+          matches.sort((a,b)=>a.appName.localeCompare(b.appName,'de'));
+          setTtrImportState({matches, total: Object.keys(excelMap).length});
+          setTtrImportDone(false);
+        } catch(err) {
+          alert('Fehler beim Lesen der Datei: ' + err.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    };
+
+    const doImport = () => {
+      if (!ttrImportState) return;
+      const updated = {...ttrHistory};
+      ttrImportState.matches.forEach(({childId, entries}) => {
+        const existing = updated[childId]?.entries || [];
+        const existingMonths = new Set(existing.map(e=>e.month));
+        const merged = [...existing, ...entries.filter(e=>!existingMonths.has(e.month))];
+        merged.sort((a,b)=>a.month.localeCompare(b.month));
+        updated[childId] = {entries: merged};
+      });
+      saveTtrHistory(updated);
+      setTtrImportDone(true);
+    };
+
+    // Load XLSX lib on demand
+    if (typeof window !== 'undefined' && !window._XLSX) {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+      s.onload = () => { window._XLSX = window.XLSX; };
+      document.head.appendChild(s);
+    }
+
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
+
+          <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',gap:'14px',borderBottom:'1px solid rgba(110,231,183,0.1)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 28px':'0 -24px 32px'}}>
+            <button onClick={()=>navTo('home')} style={{width:'38px',height:'38px',borderRadius:'10px',background:'rgba(110,231,183,0.1)',border:'1px solid rgba(110,231,183,0.2)',color:accent,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><ArrowLeft size={18}/></button>
+            <div>
+              <p style={{margin:'0 0 1px',color:'rgba(110,231,183,0.5)',fontSize:'11px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px'}}>📈 Einmaliger Import</p>
+              <h2 style={{margin:0,color:'white',fontWeight:'800',fontSize:isMobile?'15px':'18px'}}>TTR-Verlauf importieren</h2>
+            </div>
+          </div>
+
+          {/* Info */}
+          <div style={{padding:'14px 16px',background:'rgba(110,231,183,0.05)',border:'1px solid rgba(110,231,183,0.15)',borderRadius:'14px',marginBottom:'24px'}}>
+            <p style={{margin:'0 0 6px',fontWeight:'700',fontSize:'13px',color:accent}}>So funktioniert der Import</p>
+            <p style={{margin:'0 0 4px',fontSize:'12px',color:'rgba(255,255,255,0.5)',lineHeight:1.6}}>1. Excel-Datei „Spieler des Monats.xlsx" auswählen</p>
+            <p style={{margin:'0 0 4px',fontSize:'12px',color:'rgba(255,255,255,0.5)',lineHeight:1.6}}>2. App erkennt automatisch alle Kinder die in App <strong style={{color:'rgba(255,255,255,0.7)'}}>und</strong> Excel vorhanden sind</p>
+            <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.5)',lineHeight:1.6}}>3. Vorschau prüfen → Importieren</p>
+          </div>
+
+          {/* File Picker */}
+          {!ttrImportState && (
+            <label style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'12px',padding:'40px 24px',background:'rgba(255,255,255,0.03)',border:'2px dashed rgba(110,231,183,0.3)',borderRadius:'16px',cursor:'pointer',textAlign:'center'}}>
+              <span style={{fontSize:'40px'}}>📂</span>
+              <span style={{fontWeight:'700',fontSize:'15px',color:'white'}}>Excel-Datei auswählen</span>
+              <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>Spieler des Monats.xlsx</span>
+              <input type="file" accept=".xlsx,.xls" style={{display:'none'}} onChange={e=>{if(e.target.files[0]) parseExcel(e.target.files[0]);}}/>
+            </label>
+          )}
+
+          {/* Preview */}
+          {ttrImportState && !ttrImportDone && (
+            <>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px',flexWrap:'wrap',gap:'8px'}}>
+                <div>
+                  <p style={{margin:'0 0 2px',fontWeight:'800',fontSize:'16px',color:'white'}}>
+                    {ttrImportState.matches.length} Kinder erkannt
+                  </p>
+                  <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
+                    von {ttrImportState.total} Excel-Einträgen · Datei neu wählen?
+                    <label style={{marginLeft:'6px',color:accent,cursor:'pointer',fontWeight:'700'}}>
+                      Andere Datei<input type="file" accept=".xlsx,.xls" style={{display:'none'}} onChange={e=>{setTtrImportState(null);if(e.target.files[0])setTimeout(()=>parseExcel(e.target.files[0]),50);}}/>
+                    </label>
+                  </p>
+                </div>
+                <button onClick={doImport}
+                  style={{padding:'11px 24px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'800',fontSize:'14px'}}>
+                  ✓ Jetzt importieren
+                </button>
+              </div>
+
+              <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+                {ttrImportState.matches.map(m=>{
+                  const first = m.entries[0]?.month;
+                  const last  = m.entries[m.entries.length-1]?.month;
+                  const lastTtr = m.entries[m.entries.length-1]?.ttr;
+                  const firstTtr = m.entries[0]?.ttr;
+                  const diff = lastTtr - firstTtr;
+                  return (
+                    <div key={m.childId} style={{display:'flex',alignItems:'center',gap:'14px',padding:'12px 16px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(110,231,183,0.15)',borderRadius:'12px'}}>
+                      <span style={{fontSize:'20px'}}>✅</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <p style={{margin:'0 0 2px',fontWeight:'800',fontSize:'13px',color:'white'}}>{m.appName}</p>
+                        <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>
+                          {m.entries.length} Monate · {first} bis {last}
+                        </p>
+                      </div>
+                      <div style={{textAlign:'right',flexShrink:0}}>
+                        <p style={{margin:'0 0 1px',fontWeight:'800',fontSize:'14px',color:'white'}}>{lastTtr}</p>
+                        <p style={{margin:0,fontSize:'11px',color:diff>=0?'#4ade80':'#f87171',fontWeight:'700'}}>{diff>=0?'+':''}{diff}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {/* Erfolg */}
+          {ttrImportDone && (
+            <div style={{textAlign:'center',padding:'48px 24px'}}>
+              <p style={{fontSize:'48px',margin:'0 0 16px'}}>🎉</p>
+              <p style={{margin:'0 0 8px',fontWeight:'800',fontSize:'20px',color:'#4ade80'}}>Import erfolgreich!</p>
+              <p style={{margin:'0 0 28px',fontSize:'13px',color:'rgba(255,255,255,0.45)'}}>
+                {ttrImportState?.matches.length} Kinder · TTR-Verlauf gespeichert
+              </p>
+              <button onClick={()=>navTo('home')} style={{padding:'12px 28px',background:'rgba(74,222,128,0.15)',border:'1px solid rgba(74,222,128,0.3)',borderRadius:'12px',color:'#4ade80',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>
+                Zurück zum Dashboard
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
