@@ -8867,35 +8867,46 @@ export default function TrainingsApp() {
           if (!ws) { alert('Sheet "Tabelle1" nicht gefunden.'); return; }
           const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:true});
 
-          // Parse header row → decode date per column, robust to ALL cell types
-          // Handles: Date objects, numeric serials, numeric strings, "DD.MM.YYYY" strings;
-          // plus gaps (missing months) and year-typos (year written as next year)
-          const headerRow = raw[0] || [];
+          // Parse header row by reading cells DIRECTLY from the worksheet.
+          // This bypasses sheet_to_json's type conversions (which were turning
+          // date serials into Date objects/strings inconsistently across builds).
+          // Each cell object: .t = type ('n' number, 's'/'str' string, 'd' date),
+          // .v = raw value, .w = formatted display text (e.g. "01.12.2025").
           const months = []; // [{col, label:'YYYY-MM'}]
           const excelSerial = n => new Date(Math.round((n - 25569) * 86400 * 1000));
-          // Returns {yr, mo} from a header cell of any type, or null
-          const decodeCell = (v) => {
-            if (v instanceof Date && !isNaN(v))            return { yr: v.getFullYear(),    mo: v.getMonth() + 1 };
-            if (typeof v === 'number' && v > 40000 && v < 60000) {
-              const d = excelSerial(v);                    return { yr: d.getUTCFullYear(), mo: d.getUTCMonth() + 1 };
+          const wsRange = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+          const colCount = Math.max((raw[0] || []).length, wsRange.e.c + 1);
+          // Returns {yr, mo} from a header cell object, or null
+          const decodeCell = (cell) => {
+            if (!cell) return null;
+            // Date type → .v is a Date
+            if (cell.t === 'd' && cell.v instanceof Date && !isNaN(cell.v))
+              return { yr: cell.v.getFullYear(), mo: cell.v.getMonth() + 1 };
+            // Number type → .v is the Excel serial
+            if (cell.t === 'n' && typeof cell.v === 'number' && cell.v > 40000 && cell.v < 60000) {
+              const d = excelSerial(cell.v);
+              return { yr: d.getUTCFullYear(), mo: d.getUTCMonth() + 1 };
             }
-            if (typeof v === 'string') {
-              const s = v.trim();
-              if (!s || s.includes('Differenz') || s.includes('Jahr')) return null;
-              // numeric string serial e.g. "45230"
-              if (/^\d{4,6}$/.test(s)) {
-                const n = Number(s);
-                if (n > 40000 && n < 60000) { const d = excelSerial(n); return { yr: d.getUTCFullYear(), mo: d.getUTCMonth() + 1 }; }
-              }
-              // "DD.MM.YYYY" (year may be malformed → take last 4 digits)
-              const m = s.match(/(\d{1,2})\.(\d{1,2})\.(\d+)/);
-              if (m) return { yr: Number(m[3].slice(-4)), mo: Number(m[2]) };
+            // Fallback: parse the formatted display text or raw string value
+            const txt = String(cell.w != null ? cell.w : cell.v || '').trim();
+            if (!txt || txt.includes('Differenz') || txt.includes('Jahr')) return null;
+            // Pure numeric serial as text e.g. "45230"
+            if (/^\d{4,6}$/.test(txt)) {
+              const n = Number(txt);
+              if (n > 40000 && n < 60000) { const d = excelSerial(n); return { yr: d.getUTCFullYear(), mo: d.getUTCMonth() + 1 }; }
             }
+            // "DD.MM.YYYY" — year may be malformed (e.g. "202024") → take last 4 digits
+            const m = txt.match(/(\d{1,2})\.(\d{1,2})\.(\d+)/);
+            if (m) return { yr: Number(m[3].slice(-4)), mo: Number(m[2]) };
+            // "YYYY-MM-DD" or "M/D/YY"
+            const iso = txt.match(/(\d{4})-(\d{1,2})-\d{1,2}/);
+            if (iso) return { yr: Number(iso[1]), mo: Number(iso[2]) };
             return null;
           };
           let prevLabel = null;
-          for (let c = 2; c < headerRow.length; c++) {
-            const dec = decodeCell(headerRow[c]);
+          for (let c = 2; c < colCount; c++) {
+            const cellRef = XLSX.utils.encode_cell({ r: 0, c });
+            const dec = decodeCell(ws[cellRef]);
             if (!dec) continue;
             let { yr, mo } = dec;
             // Year-typo correction: if ~12 months ahead of previous column, drop a year
@@ -8910,6 +8921,8 @@ export default function TrainingsApp() {
               prevLabel = label;
             }
           }
+
+          console.log('[TTR-Import] Erkannte Monate:', months.map(m=>m.label).join(', '));
 
           // Build name→entries map from Excel
           const excelMap = {};
