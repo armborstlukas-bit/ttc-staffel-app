@@ -746,6 +746,7 @@ export default function TrainingsApp() {
   const [ttrHistory, setTtrHistory] = useState({});
   const [ttrImportState, setTtrImportState] = useState(null); // {matches:[],raw:{}}
   const [ttrImportDone, setTtrImportDone] = useState(false);
+  const [ttrVerlaufChild, setTtrVerlaufChild] = useState(null);
   const [elternSubView, setElternSubView] = useState(null);
   const [ttcNews, setTtcNews] = useState([]);
   const [ttcNewsLoading, setTtcNewsLoading] = useState(false);
@@ -3510,6 +3511,7 @@ export default function TrainingsApp() {
           {label:'Mannschaften',     icon:'🏓', color:'#6ee7b7', bg:'rgba(110,231,183,0.1)',  border:'rgba(110,231,183,0.25)', action:()=>navTo('mannschaften')},
           {label:'Turniere',         icon:'🏆', color:'#fde68a', bg:'rgba(253,230,138,0.1)',  border:'rgba(253,230,138,0.25)', action:()=>navTo('turniere')},
           {label:'Gegnerlogbuch',    icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.08)',   border:'rgba(8,145,178,0.25)',   action:()=>navTo('gegnerlogbuch')},
+          {label:'TTR Werte',        icon:'📈', color:'#fbbf24', bg:'rgba(251,191,36,0.08)',  border:'rgba(251,191,36,0.25)',  action:()=>navTo('ttrWerte')},
         ],
       },
       {
@@ -4270,6 +4272,24 @@ export default function TrainingsApp() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                );})()}
+                {(()=>{const hist=ttrHistory[myChild.id]?.entries;if(!hist||hist.length===0)return null;
+                  const last=hist[hist.length-1];const prev=hist.length>1?hist[hist.length-2]:null;
+                  const diff=prev?last.ttr-prev.ttr:null;
+                  return(
+                  <div style={{marginTop:'14px',paddingTop:'12px',borderTop:'1px solid rgba(255,255,255,0.06)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                    <div>
+                      <p style={{margin:'0 0 1px',fontSize:'10px',fontWeight:'700',color:'rgba(251,191,36,0.6)',textTransform:'uppercase',letterSpacing:'0.5px'}}>TTR {last.month}</p>
+                      <div style={{display:'flex',alignItems:'baseline',gap:'6px'}}>
+                        <span style={{fontSize:'22px',fontWeight:'900',color:'#fbbf24'}}>{last.ttr}</span>
+                        {diff!==null&&<span style={{fontSize:'12px',fontWeight:'700',color:diff>=0?'#4ade80':'#f87171'}}>{diff>=0?'+':''}{diff}</span>}
+                      </div>
+                    </div>
+                    <button onClick={()=>{setTtrVerlaufChild(myChild);navTo('ttrVerlauf');}}
+                      style={{padding:'8px 14px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'10px',color:'#fbbf24',cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>
+                      📈 Verlauf
+                    </button>
                   </div>
                 );})()}
               </div>
@@ -5138,13 +5158,22 @@ export default function TrainingsApp() {
               : kids.map(child=>{
                 const stats=getAttendanceStats(child.id,sub.id);
                 const pct=stats.percent;
+                const childTtr=ttrHistory[child.id]?.entries;
+                const lastTtr=childTtr&&childTtr.length>0?childTtr[childTtr.length-1]:null;
+                const prevTtr=childTtr&&childTtr.length>1?childTtr[childTtr.length-2]:null;
+                const ttrDiff=lastTtr&&prevTtr?lastTtr.ttr-prevTtr.ttr:null;
                 return (
-                  <div key={child.id} onClick={()=>{setActiveChild(child);navTo('childHistory');}}
-                    style={{display:'flex',alignItems:'center',gap:'14px',padding:'14px 16px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(74,222,128,0.1)',borderRadius:'14px',cursor:'pointer',transition:'all 0.12s'}}
+                  <div key={child.id}
+                    style={{display:'flex',alignItems:'center',gap:'14px',padding:'14px 16px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(74,222,128,0.1)',borderRadius:'14px',transition:'all 0.12s'}}
                     onMouseEnter={e=>{e.currentTarget.style.background='rgba(74,222,128,0.07)';e.currentTarget.style.borderColor='rgba(74,222,128,0.22)';}}
                     onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,0.04)';e.currentTarget.style.borderColor='rgba(74,222,128,0.1)';}}>
-                    <div style={{flex:1,minWidth:0}}>
-                      <p style={{margin:'0 0 7px',fontWeight:'700',color:'white',fontSize:'15px'}}>{child.name}</p>
+                    <div style={{flex:1,minWidth:0,cursor:'pointer'}} onClick={()=>{setActiveChild(child);navTo('childHistory');}}>
+                      <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'7px'}}>
+                        <p style={{margin:0,fontWeight:'700',color:'white',fontSize:'15px'}}>{child.name}</p>
+                        {lastTtr&&<span style={{fontSize:'11px',fontWeight:'800',color:'#fbbf24',background:'rgba(251,191,36,0.12)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'6px',padding:'1px 6px'}}>
+                          TTR {lastTtr.ttr}{ttrDiff!==null&&<span style={{color:ttrDiff>=0?'#4ade80':'#f87171',marginLeft:'3px'}}>{ttrDiff>=0?'+':''}{ttrDiff}</span>}
+                        </span>}
+                      </div>
                       <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
                         <div style={{flex:1,background:'rgba(255,255,255,0.08)',borderRadius:'99px',height:'7px',overflow:'hidden'}}>
                           <div style={{width:`${pct}%`,height:'100%',background:pct>=80?'linear-gradient(90deg,#16a34a,#4ade80)':pct>=60?'linear-gradient(90deg,#d97706,#fde68a)':'linear-gradient(90deg,#dc2626,#f87171)',borderRadius:'99px'}}/>
@@ -5155,7 +5184,12 @@ export default function TrainingsApp() {
                         {stats.present}/{stats.total} · {stats.excused}x entsch. · {stats.unexcused}x unentsch.
                       </p>
                     </div>
-                    <ChevronRight size={16} color="rgba(74,222,128,0.3)"/>
+                    <div style={{display:'flex',alignItems:'center',gap:'6px',flexShrink:0}}>
+                      {lastTtr&&<button onClick={e=>{e.stopPropagation();setTtrVerlaufChild(child);navTo('ttrVerlauf');}}
+                        style={{width:'34px',height:'34px',borderRadius:'8px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.25)',color:'#fbbf24',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'15px'}}
+                        title="TTR-Verlauf">📈</button>}
+                      <ChevronRight size={16} color="rgba(74,222,128,0.3)" style={{cursor:'pointer'}} onClick={()=>{setActiveChild(child);navTo('childHistory');}}/>
+                    </div>
                   </div>
                 );
               })
@@ -8608,6 +8642,202 @@ export default function TrainingsApp() {
               );
             })}
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── TTR VERLAUF VIEW ────────────────────────────────────────────────────
+  if (view === 'ttrVerlauf' && ttrVerlaufChild) {
+    const child = ttrVerlaufChild;
+    const hist = ttrHistory[child.id]?.entries || [];
+    const W=340,H=200,PL=48,PR=14,PT=18,PB=38;
+    const iW=W-PL-PR,iH=H-PT-PB;
+    const ttrs=hist.map(e=>e.ttr);
+    const minV=ttrs.length?Math.min(...ttrs)-30:0;
+    const maxV=ttrs.length?Math.max(...ttrs)+30:100;
+    const xOf=(i)=>PL+(hist.length<2?iW/2:i/(hist.length-1)*iW);
+    const yOf=(v)=>PT+iH-(v-minV)/(maxV-minV||1)*iH;
+    const pts=hist.map((e,i)=>({x:xOf(i),y:yOf(e.ttr),e}));
+    const path=pts.map((p,i)=>(i===0?`M${p.x},${p.y}`:`L${p.x},${p.y}`)).join(' ');
+    const area=pts.length?`M${pts[0].x},${H-PB} `+pts.map(p=>`L${p.x},${p.y}`).join(' ')+` L${pts[pts.length-1].x},${H-PB} Z`:'';
+    const last=hist[hist.length-1];
+    const first=hist[0];
+    const totalDiff=last&&first?last.ttr-first.ttr:0;
+    const prevEntry=hist.length>1?hist[hist.length-2]:null;
+    const lastDiff=last&&prevEntry?last.ttr-prevEntry.ttr:null;
+    const backView=canEdit()?'subgroup':'home';
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#0a0e00 0%,#1a1600 45%,#0a0c00 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div style={{maxWidth:'600px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
+          <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',gap:'14px',borderBottom:'1px solid rgba(251,191,36,0.12)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 28px':'0 -24px 32px'}}>
+            <button onClick={()=>navTo(backView)} style={{width:'38px',height:'38px',borderRadius:'10px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.2)',color:'#fbbf24',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><ArrowLeft size={18}/></button>
+            <div>
+              <p style={{margin:'0 0 1px',color:'rgba(251,191,36,0.5)',fontSize:'11px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px'}}>📈 TTR-Verlauf</p>
+              <h2 style={{margin:0,color:'white',fontWeight:'800',fontSize:isMobile?'16px':'19px'}}>{child.name}</h2>
+            </div>
+          </div>
+
+          {hist.length===0?(
+            <div style={{textAlign:'center',padding:'60px 20px'}}>
+              <p style={{fontSize:'40px',margin:'0 0 12px'}}>📊</p>
+              <p style={{color:'rgba(255,255,255,0.35)',fontSize:'15px'}}>Noch keine TTR-Daten vorhanden.</p>
+              {canEdit()&&<p style={{color:'rgba(255,255,255,0.2)',fontSize:'12px',marginTop:'8px'}}>Über TTR-Import → Admin importieren.</p>}
+            </div>
+          ):(
+            <>
+              {/* Stats */}
+              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'10px',marginBottom:'24px'}}>
+                {[
+                  {label:'Aktuell',value:last?.ttr,sub:last?.month,color:'#fbbf24',bg:'rgba(251,191,36,0.08)',border:'rgba(251,191,36,0.2)'},
+                  {label:'Letzter Monat',value:lastDiff!==null?(lastDiff>=0?'+':'')+lastDiff:'–',color:lastDiff>=0?'#4ade80':'#f87171',bg:lastDiff>=0?'rgba(74,222,128,0.08)':'rgba(248,113,113,0.08)',border:lastDiff>=0?'rgba(74,222,128,0.2)':'rgba(248,113,113,0.2)'},
+                  {label:'Gesamt',value:(totalDiff>=0?'+':'')+totalDiff,sub:first?.month+' bis heute',color:totalDiff>=0?'#4ade80':'#f87171',bg:totalDiff>=0?'rgba(74,222,128,0.08)':'rgba(248,113,113,0.08)',border:totalDiff>=0?'rgba(74,222,128,0.2)':'rgba(248,113,113,0.2)'},
+                ].map(({label,value,sub,color,bg,border})=>(
+                  <div key={label} style={{background:bg,border:`1px solid ${border}`,borderRadius:'14px',padding:'14px 10px',textAlign:'center'}}>
+                    <p style={{margin:'0 0 2px',fontSize:'22px',fontWeight:'900',color,letterSpacing:'-0.5px'}}>{value}</p>
+                    <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.35)',fontWeight:'700',textTransform:'uppercase'}}>{label}</p>
+                    {sub&&<p style={{margin:'2px 0 0',fontSize:'10px',color:'rgba(255,255,255,0.2)'}}>{sub}</p>}
+                  </div>
+                ))}
+              </div>
+
+              {/* Chart */}
+              <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(251,191,36,0.1)',borderRadius:'16px',padding:'16px',marginBottom:'24px'}}>
+                <p style={{margin:'0 0 12px',fontSize:'12px',color:'rgba(255,255,255,0.35)',fontWeight:'600'}}>{hist.length} Monate · {first?.month} – {last?.month}</p>
+                <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block'}}>
+                  <defs>
+                    <linearGradient id="ttrGrad2" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.25"/>
+                      <stop offset="100%" stopColor="#fbbf24" stopOpacity="0.01"/>
+                    </linearGradient>
+                  </defs>
+                  {[0.2,0.4,0.6,0.8,1].map(f=>{
+                    const y=PT+iH*f;
+                    const v=Math.round(maxV-(maxV-minV)*f);
+                    return(<g key={f}>
+                      <line x1={PL} y1={y} x2={W-PR} y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth="1"/>
+                      <text x={PL-4} y={y+4} textAnchor="end" fill="rgba(255,255,255,0.2)" fontSize="9">{v}</text>
+                    </g>);
+                  })}
+                  {area&&<path d={area} fill="url(#ttrGrad2)"/>}
+                  {path&&<path d={path} fill="none" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>}
+                  {pts.map((p,i)=>{
+                    const isLast=i===pts.length-1;
+                    const showLabel=hist.length<=10||i===0||isLast||i%Math.ceil(hist.length/6)===0;
+                    return(<g key={i}>
+                      <circle cx={p.x} cy={p.y} r={isLast?5:3} fill={isLast?'#fbbf24':'rgba(251,191,36,0.6)'} stroke={isLast?'rgba(0,0,0,0.5)':'none'} strokeWidth={isLast?2:0}/>
+                      {isLast&&<text x={p.x} y={p.y-10} textAnchor="middle" fill="#fbbf24" fontSize="10" fontWeight="bold">{p.e.ttr}</text>}
+                      {showLabel&&<text x={p.x} y={H-PB+14} textAnchor="middle" fill="rgba(255,255,255,0.25)" fontSize="8">{p.e.month.slice(5)}/{p.e.month.slice(2,4)}</text>}
+                    </g>);
+                  })}
+                </svg>
+              </div>
+
+              {/* Tabelle */}
+              <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'14px',overflow:'hidden'}}>
+                <div style={{padding:'12px 16px',borderBottom:'1px solid rgba(255,255,255,0.06)',display:'flex',justifyContent:'space-between'}}>
+                  <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.3)',textTransform:'uppercase'}}>Monat</span>
+                  <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.3)',textTransform:'uppercase'}}>TTR</span>
+                </div>
+                <div style={{maxHeight:'260px',overflowY:'auto'}}>
+                  {[...hist].reverse().map((e,i,arr)=>{
+                    const prev=arr[i+1];
+                    const d=prev?e.ttr-prev.ttr:null;
+                    return(
+                    <div key={e.month} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 16px',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                      <span style={{fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>{e.month}</span>
+                      <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                        {d!==null&&<span style={{fontSize:'11px',fontWeight:'700',color:d>=0?'#4ade80':'#f87171'}}>{d>=0?'+':''}{d}</span>}
+                        <span style={{fontSize:'14px',fontWeight:'800',color:i===0?'#fbbf24':'white'}}>{e.ttr}</span>
+                      </div>
+                    </div>
+                  );})}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── TTR WERTE VIEW ──────────────────────────────────────────────────────
+  if (view === 'ttrWerte' && canEdit()) {
+    const accent = '#fbbf24';
+    const allChildren = Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+    const withTtr = allChildren.map(c=>{
+      const hist=ttrHistory[c.id]?.entries||[];
+      const last=hist.length?hist[hist.length-1]:null;
+      const prev=hist.length>1?hist[hist.length-2]:null;
+      const diff=last&&prev?last.ttr-prev.ttr:null;
+      const total=last&&hist[0]?last.ttr-hist[0].ttr:null;
+      return{...c,hist,last,prev,diff,total};
+    }).sort((a,b)=>(b.last?.ttr||0)-(a.last?.ttr||0));
+    const withData=withTtr.filter(c=>c.last);
+    const withoutData=withTtr.filter(c=>!c.last);
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#0a0e00 0%,#1a1600 45%,#0a0c00 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
+          <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',gap:'14px',borderBottom:'1px solid rgba(251,191,36,0.12)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 28px':'0 -24px 32px'}}>
+            <button onClick={()=>navTo('home')} style={{width:'38px',height:'38px',borderRadius:'10px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.2)',color:'#fbbf24',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><ArrowLeft size={18}/></button>
+            <div>
+              <p style={{margin:'0 0 1px',color:'rgba(251,191,36,0.5)',fontSize:'11px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px'}}>📈 Wettkampf</p>
+              <h2 style={{margin:0,color:'white',fontWeight:'800',fontSize:isMobile?'16px':'19px'}}>TTR Werte</h2>
+            </div>
+            <div style={{marginLeft:'auto',display:'flex',gap:'8px',alignItems:'center'}}>
+              <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)',fontWeight:'600'}}>{withData.length} Kinder mit TTR</span>
+            </div>
+          </div>
+
+          {withData.length===0&&(
+            <div style={{textAlign:'center',padding:'60px 20px'}}>
+              <p style={{fontSize:'40px',margin:'0 0 12px'}}>📊</p>
+              <p style={{color:'rgba(255,255,255,0.35)',fontSize:'15px'}}>Noch keine TTR-Daten importiert.</p>
+              {userRole==='admin'&&<button onClick={()=>navTo('ttrImport')} style={{marginTop:'16px',padding:'11px 22px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'12px',color:'#fbbf24',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>→ TTR-Import öffnen</button>}
+            </div>
+          )}
+
+          {withData.length>0&&(
+            <div style={{display:'flex',flexDirection:'column',gap:'8px',marginBottom:'28px'}}>
+              {withData.map((c,rank)=>{
+                const barW=c.last?Math.round((c.last.ttr-500)/10):0;
+                return(
+                <div key={c.id} style={{display:'flex',alignItems:'center',gap:'14px',padding:'13px 16px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(251,191,36,0.1)',borderRadius:'14px',cursor:'pointer',transition:'all 0.12s'}}
+                  onMouseEnter={e=>{e.currentTarget.style.background='rgba(251,191,36,0.06)';e.currentTarget.style.borderColor='rgba(251,191,36,0.2)';}}
+                  onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,0.04)';e.currentTarget.style.borderColor='rgba(251,191,36,0.1)';}}
+                  onClick={()=>{setTtrVerlaufChild(c);navTo('ttrVerlauf');}}>
+                  <div style={{width:'28px',height:'28px',borderRadius:'8px',background:rank<3?'rgba(251,191,36,0.15)':'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                    <span style={{fontSize:'12px',fontWeight:'800',color:rank<3?'#fbbf24':'rgba(255,255,255,0.3)'}}>{rank+1}</span>
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'5px'}}>
+                      <span style={{fontWeight:'700',color:'white',fontSize:'14px'}}>{c.name}</span>
+                      {c.diff!==null&&<span style={{fontSize:'11px',fontWeight:'700',color:c.diff>=0?'#4ade80':'#f87171'}}>{c.diff>=0?'+':''}{c.diff}</span>}
+                    </div>
+                    <div style={{background:'rgba(255,255,255,0.06)',borderRadius:'99px',height:'5px',overflow:'hidden'}}>
+                      <div style={{width:`${Math.min(barW,100)}%`,height:'100%',background:'linear-gradient(90deg,#92400e,#fbbf24)',borderRadius:'99px'}}/>
+                    </div>
+                    <span style={{fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>{c.last?.month} · {c.hist.length} Monate</span>
+                  </div>
+                  <div style={{textAlign:'right',flexShrink:0}}>
+                    <p style={{margin:'0 0 2px',fontWeight:'900',fontSize:'20px',color:'#fbbf24'}}>{c.last?.ttr}</p>
+                    {c.total!==null&&<p style={{margin:0,fontSize:'11px',fontWeight:'700',color:c.total>=0?'#4ade80':'#f87171'}}>{c.total>=0?'▲':'▼'} {Math.abs(c.total)} gesamt</p>}
+                  </div>
+                </div>
+              );})}
+            </div>
+          )}
+
+          {withoutData.length>0&&(
+            <div>
+              <p style={{margin:'0 0 12px',fontSize:'12px',fontWeight:'700',color:'rgba(255,255,255,0.25)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Ohne TTR-Daten ({withoutData.length})</p>
+              <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+                {withoutData.map(c=>(
+                  <span key={c.id} style={{fontSize:'12px',color:'rgba(255,255,255,0.25)',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'8px',padding:'4px 10px'}}>{c.name}</span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
