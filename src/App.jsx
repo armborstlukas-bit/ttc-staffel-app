@@ -8867,16 +8867,36 @@ export default function TrainingsApp() {
           if (!ws) { alert('Sheet "Tabelle1" nicht gefunden.'); return; }
           const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
 
-          // Parse header row (row 0) → month labels for cols 2..N-2 (skip last 2: Differenz, Jahr)
+          // Parse header row → decode actual date serials per column
+          // Handles: gaps (missing months), typos (year off by 1), string dates
           const headerRow = raw[0] || [];
           const months = []; // [{col, label:'YYYY-MM'}]
-          // Use column sequence to assign months starting Oct 2023
-          const startDate = new Date(2023, 9, 1); // Oct 2023
-          let monthCursor = new Date(startDate);
-          for (let c = 2; c < headerRow.length - 2; c++) {
-            const label = `${monthCursor.getFullYear()}-${String(monthCursor.getMonth()+1).padStart(2,'0')}`;
-            months.push({col:c, label});
-            monthCursor.setMonth(monthCursor.getMonth()+1);
+          const excelSerial = v => new Date(Math.round((v - 25569) * 86400 * 1000));
+          let prevLabel = null;
+          for (let c = 2; c < headerRow.length; c++) {
+            const v = headerRow[c];
+            let label = null;
+            if (typeof v === 'number' && v > 40000 && v < 60000) {
+              const d = excelSerial(v);
+              let yr = d.getUTCFullYear(), mo = d.getUTCMonth() + 1;
+              // If this date is ~12 months ahead of previous (year typo), subtract 1 year
+              if (prevLabel) {
+                const [py, pm] = prevLabel.split('-').map(Number);
+                const diff = (yr - py) * 12 + (mo - pm);
+                if (diff >= 10 && diff <= 14) yr -= 1; // typo: year written as next year
+              }
+              label = `${yr}-${String(mo).padStart(2,'0')}`;
+            } else if (typeof v === 'string' && v.trim()) {
+              // e.g. "01.11.202024" → extract day.month.year (last 4 digits of year)
+              const m = v.match(/(\d{1,2})\.(\d{1,2})\.(\d+)/);
+              if (m) label = `${m[3].slice(-4)}-${m[2].padStart(2,'0')}`;
+              // Skip summary columns like "Differenz" or "Jahr"
+              if (v.includes('Differenz') || v.includes('Jahr')) break;
+            }
+            if (label && /^\d{4}-\d{2}$/.test(label)) {
+              months.push({col: c, label});
+              prevLabel = label;
+            }
           }
 
           // Build name→entries map from Excel
@@ -8920,15 +8940,19 @@ export default function TrainingsApp() {
       reader.readAsArrayBuffer(file);
     };
 
-    const doImport = () => {
+    const doImport = (overwrite=false) => {
       if (!ttrImportState) return;
       const updated = {...ttrHistory};
       ttrImportState.matches.forEach(({childId, entries}) => {
-        const existing = updated[childId]?.entries || [];
-        const existingMonths = new Set(existing.map(e=>e.month));
-        const merged = [...existing, ...entries.filter(e=>!existingMonths.has(e.month))];
-        merged.sort((a,b)=>a.month.localeCompare(b.month));
-        updated[childId] = {entries: merged};
+        if (overwrite) {
+          updated[childId] = {entries: [...entries].sort((a,b)=>a.month.localeCompare(b.month))};
+        } else {
+          const existing = updated[childId]?.entries || [];
+          const existingMonths = new Set(existing.map(e=>e.month));
+          const merged = [...existing, ...entries.filter(e=>!existingMonths.has(e.month))];
+          merged.sort((a,b)=>a.month.localeCompare(b.month));
+          updated[childId] = {entries: merged};
+        }
       });
       saveTtrHistory(updated);
       setTtrImportDone(true);
@@ -8987,10 +9011,16 @@ export default function TrainingsApp() {
                     </label>
                   </p>
                 </div>
-                <button onClick={doImport}
-                  style={{padding:'11px 24px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'800',fontSize:'14px'}}>
-                  ✓ Jetzt importieren
-                </button>
+                <div style={{display:'flex',flexDirection:'column',gap:'6px',alignItems:'flex-end'}}>
+                  <button onClick={()=>doImport(false)}
+                    style={{padding:'11px 20px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'800',fontSize:'13px',whiteSpace:'nowrap'}}>
+                    ✓ Ergänzen
+                  </button>
+                  <button onClick={()=>doImport(true)}
+                    style={{padding:'8px 20px',background:'rgba(239,68,68,0.15)',color:'#f87171',border:'1px solid rgba(239,68,68,0.3)',borderRadius:'12px',cursor:'pointer',fontWeight:'700',fontSize:'12px',whiteSpace:'nowrap'}}>
+                    ↺ Alle ersetzen
+                  </button>
+                </div>
               </div>
 
               <div style={{display:'flex',flexDirection:'column',gap:'8px',marginBottom:'16px'}}>
