@@ -908,6 +908,53 @@ export default function TrainingsApp() {
     saveRanglisteAch(ach);
   }, [rangliste.length > 0 && Object.keys(ranglisteAch).length === 0]);
 
+  // ── Auto: TTR-Errungenschaften aus TTR-Verlauf ableiten ──────────────
+  // Schaltet TTR-Meilensteine automatisch frei basierend auf dem persönlichen
+  // HÖCHSTWERT über die gesamte Historie. Einmal erreicht bleibt der Meilenstein
+  // bestehen, auch wenn der TTR-Wert später wieder fällt.
+  useEffect(() => {
+    if (!ttrHistory || Object.keys(ttrHistory).length === 0) return;
+    if (!children || Object.keys(children).length === 0) return;
+    const updated = { ...children };
+    let changed = false;
+    const newNotifs = {}; // id -> notif (für Meilensteine nach der Erst-Synchronisierung)
+    Object.entries(ttrHistory).forEach(([childId, data]) => {
+      const child = updated[childId];
+      if (!child) return;
+      const entries = (data && data.entries) || [];
+      if (entries.length === 0) return;
+      const personalMax = Math.max(...entries.map(e => Number(e.ttr) || 0));
+      const ach = child.achievements || {};
+      const prevUnlocked = ach.ttrUnlocked || [];
+      const isFirstSeed = ach.ttrAutoMax === undefined; // erstmaliges Ableiten → still
+      const earned = TTR_MILESTONES.filter(m => m <= personalMax);
+      const union = [...new Set([...prevUnlocked, ...earned])].sort((a, b) => a - b);
+      const unlockedChanged = union.length !== prevUnlocked.length;
+      const autoMaxChanged = (ach.ttrAutoMax || 0) !== personalMax;
+      if (!unlockedChanged && !autoMaxChanged) return;
+      updated[childId] = { ...child, achievements: { ...ach, ttrUnlocked: union, ttrAutoMax: personalMax } };
+      changed = true;
+      // Benachrichtigung nur für echte neue Meilensteine (nicht beim Erst-Seed)
+      if (!isFirstSeed) {
+        const newOnes = earned.filter(m => !prevUnlocked.includes(m));
+        newOnes.forEach(val => {
+          const key = `ttr_auto_${childId}_${val}`;
+          if (Object.values(notifications).some(n => n.key === key)) return;
+          const id = 'notif_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+          newNotifs[id] = { id, childId, type: 'achievement', title: '🏓 TTR-Meilenstein erreicht!',
+            message: `Glückwunsch ${child.name}! Du hast einen TTR-Wert von ${val} erreicht. ${ACHIEVEMENT_DESCRIPTIONS.ttr(val)}`,
+            createdAt: new Date().toISOString(), trashedAt: null, key, batchId: null, trainerTrashedAt: {}, trainerDeletedBy: {} };
+        });
+      }
+    });
+    if (changed) {
+      setChildren(updated);
+      setDoc(doc(db, 'ttc', 'children'), updated);
+      if (Object.keys(newNotifs).length > 0) saveNotifications({ ...notifications, ...newNotifs });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ttrHistory, children]);
+
   // Ref immer aktuell halten — ohne Auto-Notification-Effect neu auszulösen
   useEffect(() => { notificationsRef.current = notifications; }, [notifications]);
 
@@ -6269,22 +6316,34 @@ export default function TrainingsApp() {
                     </div>
 
                     {/* TTR Milestones */}
+                    {(()=>{
+                      const ttrEntries = ttrHistory[child.id]?.entries || [];
+                      const personalMax = ttrEntries.length ? Math.max(...ttrEntries.map(e=>Number(e.ttr)||0)) : null;
+                      return (
                     <div style={{marginBottom:'14px'}}>
-                      <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>TTR Errungenschaften</p>
+                      <div style={{display:'flex',alignItems:'center',gap:'8px',margin:'0 0 8px',flexWrap:'wrap'}}>
+                        <p style={{margin:0,fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>TTR Errungenschaften</p>
+                        {personalMax!==null
+                          ? <span style={{fontSize:'11px',fontWeight:'700',color:'#b45309',background:'#fef3c7',border:'1px solid #fde68a',borderRadius:'6px',padding:'1px 7px'}}>⚡ Auto · Bestwert {personalMax}</span>
+                          : <span style={{fontSize:'11px',fontWeight:'600',color:'#9ca3af',background:'#f3f4f6',borderRadius:'6px',padding:'1px 7px'}}>manuell (keine TTR-Daten)</span>}
+                      </div>
                       <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
                         {TTR_MILESTONES.map((val,i)=>{
                           const unlocked = ttrUnlocked.includes(val);
+                          const auto = personalMax!==null && val<=personalMax;
                           const col = TTR_COLORS[i];
                           return (
                             <button key={val} onClick={()=>toggleTTR(val)}
-                              title={`${val} TTR ${unlocked?'entfernen':'vergeben'}`}
-                              style={{padding:'5px 10px',borderRadius:'8px',border:`2px solid ${unlocked?col.bg:'#e5e7eb'}`,background:unlocked?col.bg:'#f9fafb',color:unlocked?col.text:'#9ca3af',fontWeight:'700',fontSize:'12px',cursor:'pointer',transition:'all 0.15s'}}>
-                              {val}
+                              title={auto?`${val} TTR automatisch erreicht (Bestwert ${personalMax})`:`${val} TTR ${unlocked?'entfernen':'vergeben'}`}
+                              style={{position:'relative',padding:'5px 10px',borderRadius:'8px',border:`2px solid ${unlocked?col.bg:'#e5e7eb'}`,background:unlocked?col.bg:'#f9fafb',color:unlocked?col.text:'#9ca3af',fontWeight:'700',fontSize:'12px',cursor:'pointer',transition:'all 0.15s'}}>
+                              {auto&&unlocked?'⚡ ':''}{val}
                             </button>
                           );
                         })}
                       </div>
                     </div>
+                      );
+                    })()}
 
                     {/* Tournament + Team */}
                     <div style={{display:'flex',gap:'16px',flexWrap:'wrap'}}>
