@@ -747,6 +747,10 @@ export default function TrainingsApp() {
   const [ttrImportState, setTtrImportState] = useState(null); // {matches:[],raw:{}}
   const [ttrImportDone, setTtrImportDone] = useState(false);
   const [ttrVerlaufChild, setTtrVerlaufChild] = useState(null);
+  const [ttrManChild, setTtrManChild] = useState('');
+  const [ttrManMonth, setTtrManMonth] = useState(()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;});
+  const [ttrManTtr, setTtrManTtr] = useState('');
+  const [ttrManSaved, setTtrManSaved] = useState(false);
   const [elternSubView, setElternSubView] = useState(null);
   const [ttcNews, setTtcNews] = useState([]);
   const [ttcNewsLoading, setTtcNewsLoading] = useState(false);
@@ -9065,22 +9069,15 @@ export default function TrainingsApp() {
 
           {/* Manuelle Monatseingabe */}
           {(()=>{
-            const [manChild, setManChild] = React.useState('');
-            const [manMonth, setManMonth] = React.useState(()=>{
-              const d=new Date(); d.setDate(1);
-              return d.toISOString().slice(0,7);
-            });
-            const [manTtr, setManTtr] = React.useState('');
-            const [manSaved, setManSaved] = React.useState(false);
             const allCh = Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
             const doManual = () => {
-              const ttr = parseInt(manTtr,10);
-              if(!manChild||!manMonth||isNaN(ttr)||ttr<100||ttr>3000) return;
-              const existing = ttrHistory[manChild]?.entries||[];
-              const withoutMonth = existing.filter(e=>e.month!==manMonth);
-              const merged = [...withoutMonth, {month:manMonth, ttr}].sort((a,b)=>a.month.localeCompare(b.month));
-              saveTtrHistory({...ttrHistory, [manChild]:{entries:merged}});
-              setManTtr(''); setManSaved(true); setTimeout(()=>setManSaved(false),2500);
+              const ttr = parseInt(ttrManTtr,10);
+              if(!ttrManChild||!ttrManMonth||isNaN(ttr)||ttr<100||ttr>3000) return;
+              const existing = ttrHistory[ttrManChild]?.entries||[];
+              const withoutMonth = existing.filter(e=>e.month!==ttrManMonth);
+              const merged = [...withoutMonth, {month:ttrManMonth, ttr}].sort((a,b)=>a.month.localeCompare(b.month));
+              saveTtrHistory({...ttrHistory, [ttrManChild]:{entries:merged}});
+              setTtrManTtr(''); setTtrManSaved(true); setTimeout(()=>setTtrManSaved(false),2500);
             };
             return(
             <div style={{marginTop:'32px',paddingTop:'28px',borderTop:'1px solid rgba(255,255,255,0.07)'}}>
@@ -9089,7 +9086,7 @@ export default function TrainingsApp() {
               <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'2fr 1fr 1fr auto',gap:'10px',alignItems:'end'}}>
                 <div>
                   <p style={{margin:'0 0 5px',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.4)',textTransform:'uppercase'}}>Kind</p>
-                  <select value={manChild} onChange={e=>setManChild(e.target.value)} className="dark-select"
+                  <select value={ttrManChild} onChange={e=>setTtrManChild(e.target.value)} className="dark-select"
                     style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(110,231,183,0.2)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none'}}>
                     <option value="">— Kind wählen —</option>
                     {allCh.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
@@ -9097,35 +9094,35 @@ export default function TrainingsApp() {
                 </div>
                 <div>
                   <p style={{margin:'0 0 5px',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.4)',textTransform:'uppercase'}}>Monat</p>
-                  <input type="month" value={manMonth} onChange={e=>setManMonth(e.target.value)}
+                  <input type="month" value={ttrManMonth} onChange={e=>setTtrManMonth(e.target.value)}
                     style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(110,231,183,0.2)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box',colorScheme:'dark'}}/>
                 </div>
                 <div>
                   <p style={{margin:'0 0 5px',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.4)',textTransform:'uppercase'}}>TTR-Wert</p>
-                  <input type="number" min="100" max="3000" placeholder="z.B. 1050" value={manTtr} onChange={e=>setManTtr(e.target.value)}
+                  <input type="number" min="100" max="3000" placeholder="z.B. 1050" value={ttrManTtr} onChange={e=>setTtrManTtr(e.target.value)}
                     onKeyDown={e=>e.key==='Enter'&&doManual()}
                     style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(110,231,183,0.2)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
                 </div>
                 <div>
                   <p style={{margin:'0 0 5px',fontSize:'11px',fontWeight:'700',color:'transparent',textTransform:'uppercase'}}>-</p>
-                  <button onClick={doManual} disabled={!manChild||!manMonth||!manTtr}
-                    style={{padding:'10px 18px',background:manSaved?'rgba(74,222,128,0.2)':'linear-gradient(135deg,#16a34a,#15803d)',color:manSaved?'#4ade80':'white',border:manSaved?'1px solid rgba(74,222,128,0.4)':'none',borderRadius:'10px',cursor:'pointer',fontWeight:'800',fontSize:'14px',whiteSpace:'nowrap',opacity:!manChild||!manMonth||!manTtr?0.4:1}}>
-                    {manSaved?'✓ Gespeichert':'Speichern'}
+                  <button onClick={doManual} disabled={!ttrManChild||!ttrManMonth||!ttrManTtr}
+                    style={{padding:'10px 18px',background:ttrManSaved?'rgba(74,222,128,0.2)':'linear-gradient(135deg,#16a34a,#15803d)',color:ttrManSaved?'#4ade80':'white',border:ttrManSaved?'1px solid rgba(74,222,128,0.4)':'none',borderRadius:'10px',cursor:'pointer',fontWeight:'800',fontSize:'14px',whiteSpace:'nowrap',opacity:!ttrManChild||!ttrManMonth||!ttrManTtr?0.4:1}}>
+                    {ttrManSaved?'✓ Gespeichert':'Speichern'}
                   </button>
                 </div>
               </div>
-              {manChild&&ttrHistory[manChild]?.entries?.length>0&&(
+              {ttrManChild&&ttrHistory[ttrManChild]?.entries?.length>0&&(
                 <div style={{marginTop:'14px',padding:'10px 14px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'10px'}}>
                   <p style={{margin:'0 0 6px',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.3)',textTransform:'uppercase'}}>Vorhandene Einträge</p>
                   <div style={{display:'flex',flexWrap:'wrap',gap:'5px'}}>
-                    {ttrHistory[manChild].entries.map(e=>(
+                    {ttrHistory[ttrManChild].entries.map(e=>(
                       <span key={e.month} style={{fontSize:'11px',color:'rgba(255,255,255,0.5)',background:'rgba(255,255,255,0.05)',borderRadius:'6px',padding:'2px 7px'}}>{e.month}: <strong style={{color:'#fbbf24'}}>{e.ttr}</strong></span>
                     ))}
                   </div>
                 </div>
               )}
             </div>
-          );})()}
+          );})()
         </div>
       </div>
     );
