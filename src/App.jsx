@@ -9122,7 +9122,7 @@ export default function TrainingsApp() {
                 </div>
               )}
             </div>
-          );})()
+          );})()}
         </div>
       </div>
     );
