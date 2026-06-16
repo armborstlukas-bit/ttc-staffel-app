@@ -8640,12 +8640,9 @@ export default function TrainingsApp() {
         <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
 
           {/* Header */}
-          <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',gap:'14px',borderBottom:'1px solid rgba(251,146,60,0.1)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 20px':'0 -24px 24px'}}>
-            <button onClick={()=>navTo('home')} style={{width:'38px',height:'38px',borderRadius:'10px',background:'rgba(251,146,60,0.1)',border:'1px solid rgba(251,146,60,0.2)',color:'#fb923c',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><ArrowLeft size={18}/></button>
-            <div style={{flex:1}}>
-              <p style={{margin:'0 0 1px',color:'rgba(251,146,60,0.5)',fontSize:'11px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px'}}>🏓 Materialverwaltung</p>
-              <h2 style={{margin:0,color:'white',fontWeight:'800',fontSize:isMobile?'15px':'18px'}}>Material der Kinder</h2>
-            </div>
+          <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+            <button onClick={()=>navTo('home')} style={s.btn('#fb923c')}><Home size={16}/></button>
+            <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>🏓 Materialverwaltung</h1>
             <span style={{fontSize:'12px',color:'rgba(255,255,255,0.25)',fontWeight:'600'}}>{allChildren.length} Kinder</span>
           </div>
 
@@ -8902,15 +8899,10 @@ export default function TrainingsApp() {
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#0a0e00 0%,#1a1600 45%,#0a0c00 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
-          <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',gap:'14px',borderBottom:'1px solid rgba(251,191,36,0.12)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 28px':'0 -24px 32px'}}>
-            <button onClick={()=>navTo('home')} style={{width:'38px',height:'38px',borderRadius:'10px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.2)',color:'#fbbf24',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><ArrowLeft size={18}/></button>
-            <div>
-              <p style={{margin:'0 0 1px',color:'rgba(251,191,36,0.5)',fontSize:'11px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px'}}>📈 Wettkampf</p>
-              <h2 style={{margin:0,color:'white',fontWeight:'800',fontSize:isMobile?'16px':'19px'}}>TTR Werte</h2>
-            </div>
-            <div style={{marginLeft:'auto',display:'flex',gap:'8px',alignItems:'center'}}>
-              <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)',fontWeight:'600'}}>{withData.length} Kinder mit TTR</span>
-            </div>
+          <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+            <button onClick={()=>navTo('home')} style={s.btn('#fbbf24')}><Home size={16}/></button>
+            <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>📈 TTR Werte</h1>
+            <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)',fontWeight:'600'}}>{withData.length} Kinder mit TTR</span>
           </div>
 
           {withData.length===0&&(
@@ -9110,12 +9102,9 @@ export default function TrainingsApp() {
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
 
-          <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',gap:'14px',borderBottom:'1px solid rgba(110,231,183,0.1)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 28px':'0 -24px 32px'}}>
-            <button onClick={()=>navTo('home')} style={{width:'38px',height:'38px',borderRadius:'10px',background:'rgba(110,231,183,0.1)',border:'1px solid rgba(110,231,183,0.2)',color:accent,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><ArrowLeft size={18}/></button>
-            <div>
-              <p style={{margin:'0 0 1px',color:'rgba(110,231,183,0.5)',fontSize:'11px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px'}}>📈 Einmaliger Import</p>
-              <h2 style={{margin:0,color:'white',fontWeight:'800',fontSize:isMobile?'15px':'18px'}}>TTR-Verlauf importieren</h2>
-            </div>
+          <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+            <button onClick={()=>navTo('home')} style={s.btn('#6ee7b7')}><Home size={16}/></button>
+            <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>📈 TTR-Import</h1>
           </div>
 
           {/* Info */}
