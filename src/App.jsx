@@ -751,6 +751,7 @@ export default function TrainingsApp() {
   const [ttrManMonth, setTtrManMonth] = useState(()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;});
   const [ttrManTtr, setTtrManTtr] = useState('');
   const [ttrManSaved, setTtrManSaved] = useState(false);
+  const [ttrFilter, setTtrFilter] = useState('all');
   const [rompelData, setRompelData] = useState({hours:[], expenses:[]});
   const [aktiveSpieler, setAktiveSpieler] = useState({});
   const [aktiverForm, setAktiverForm] = useState({name:'', ttr:'', spielernr:''});
@@ -3461,44 +3462,6 @@ export default function TrainingsApp() {
             );
           })()}
           {Object.keys(allUsers).length===0&&<p style={{color:'#999',textAlign:'center',padding:'20px'}}>Noch keine Nutzer.</p>}
-        </div>
-
-        {/* ── Aktive Spieler Datenbank ── */}
-        <div style={{...s.card,marginTop:'0'}}>
-          <p style={{margin:'0 0 12px',fontSize:'13px',fontWeight:'800',color:'#0891b2',textTransform:'uppercase',letterSpacing:'0.5px'}}>⚡ Aktive Spieler</p>
-          {/* Formular */}
-          <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'12px'}}>
-            <input placeholder="Name *" value={aktiverForm.name} onChange={e=>setAktiverForm(f=>({...f,name:e.target.value}))}
-              style={{...s.input,flex:'2',minWidth:'140px'}}/>
-            <input placeholder="TTR" type="number" value={aktiverForm.ttr} onChange={e=>setAktiverForm(f=>({...f,ttr:e.target.value}))}
-              style={{...s.input,flex:'1',minWidth:'80px'}}/>
-            <input placeholder="Spielernr." value={aktiverForm.spielernr} onChange={e=>setAktiverForm(f=>({...f,spielernr:e.target.value}))}
-              style={{...s.input,flex:'1',minWidth:'90px'}}/>
-            <button onClick={()=>{
-              const name=aktiverForm.name.trim();
-              if(!name)return;
-              const id='sp_'+Date.now();
-              saveAktiveSpieler({...aktiveSpieler,[id]:{id,name,ttr:aktiverForm.ttr?Number(aktiverForm.ttr):null,spielernr:aktiverForm.spielernr.trim()||null}});
-              setAktiverForm({name:'',ttr:'',spielernr:''});
-            }} style={s.btn('#0891b2')}>+ Hinzufügen</button>
-          </div>
-          {/* Liste */}
-          {Object.values(aktiveSpieler).length===0
-            ? <p style={{fontSize:'13px',color:'#9ca3af',textAlign:'center',padding:'10px'}}>Noch keine Spieler angelegt.</p>
-            : <div style={{display:'flex',flexDirection:'column',gap:'5px'}}>
-              {Object.values(aktiveSpieler).sort((a,b)=>a.name.localeCompare(b.name,'de')).map(sp=>(
-                <div key={sp.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',background:'#f0f9ff',border:'1px solid #bae6fd',borderRadius:'9px'}}>
-                  <span style={{flex:1,fontWeight:'700',fontSize:'13px',color:'#0c4a6e'}}>{sp.name}</span>
-                  {sp.ttr&&<span style={{fontSize:'12px',color:'#0891b2',fontWeight:'600',background:'#e0f2fe',borderRadius:'6px',padding:'2px 7px'}}>TTR {sp.ttr}</span>}
-                  {sp.spielernr&&<span style={{fontSize:'12px',color:'#64748b'}}>Nr. {sp.spielernr}</span>}
-                  <button onClick={()=>{if(!window.confirm(`"${sp.name}" löschen?`))return;const d={...aktiveSpieler};delete d[sp.id];saveAktiveSpieler(d);}}
-                    style={{padding:'3px 8px',background:'#fee2e2',border:'1px solid #fca5a5',borderRadius:'6px',cursor:'pointer',color:'#dc2626',fontSize:'11px',fontWeight:'600',flexShrink:0}}>
-                    🗑️
-                  </button>
-                </div>
-              ))}
-            </div>
-          }
         </div>
 
         {/* ── Datenlöschen ── */}
@@ -8962,20 +8925,49 @@ export default function TrainingsApp() {
       const prev=hist.length>1?hist[hist.length-2]:null;
       const diff=last&&prev?last.ttr-prev.ttr:null;
       const total=last&&hist[0]?last.ttr-hist[0].ttr:null;
-      return{...c,hist,last,prev,diff,total};
+      return{...c,hist,last,prev,diff,total,_type:'jugend'};
     }).sort((a,b)=>(b.last?.ttr||0)-(a.last?.ttr||0));
+
+    // Aktive Spieler with TTR history
+    const aktiveSpielerList = Object.values(aktiveSpieler).map(sp=>{
+      const hist=(ttrHistory[sp.id]?.entries||[]).slice().sort((a,b)=>a.month.localeCompare(b.month));
+      const last=hist[hist.length-1]||null;
+      const prev=hist[hist.length-2]||null;
+      const diff=last&&prev?last.ttr-prev.ttr:null;
+      const total=last&&hist[0]?last.ttr-hist[0].ttr:null;
+      return{...sp,hist,last,prev,diff,total,_type:'aktiv'};
+    }).filter(sp=>sp.last).sort((a,b)=>(b.last?.ttr||0)-(a.last?.ttr||0));
+
     const withData=withTtr.filter(c=>c.last);
     const withoutData=withTtr.filter(c=>!c.last);
+
+    const allWithData = [...withData, ...aktiveSpielerList].sort((a,b)=>(b.last?.ttr||0)-(a.last?.ttr||0));
+    const displayList = ttrFilter==='jugend' ? withData : ttrFilter==='aktive' ? aktiveSpielerList : allWithData;
+
+    const filterTabs = [
+      {id:'all', label:`Alle (${allWithData.length})`},
+      {id:'jugend', label:`Jugend (${withData.length})`},
+      {id:'aktive', label:`Aktive (${aktiveSpielerList.length})`},
+    ];
+
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#0a0e00 0%,#1a1600 45%,#0a0c00 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
           <button onClick={()=>navTo('home')} style={s.btn('#fbbf24')}><Home size={16}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>📈 TTR Werte</h1>
-          <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)',fontWeight:'600'}}>{withData.length} Kinder mit TTR</span>
         </div>
         <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
 
-          {withData.length===0&&(
+          <div style={{display:'flex',gap:'6px',marginBottom:'16px',flexWrap:'wrap'}}>
+            {filterTabs.map(tab=>(
+              <button key={tab.id} onClick={()=>setTtrFilter(tab.id)}
+                style={{padding:'7px 14px',borderRadius:'20px',border:`1px solid ${ttrFilter===tab.id?'rgba(251,191,36,0.5)':'rgba(255,255,255,0.1)'}`,background:ttrFilter===tab.id?'rgba(251,191,36,0.12)':'transparent',color:ttrFilter===tab.id?'#fbbf24':'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'700',fontSize:'12px',transition:'all 0.12s'}}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {displayList.length===0&&(
             <div style={{textAlign:'center',padding:'60px 20px'}}>
               <p style={{fontSize:'40px',margin:'0 0 12px'}}>📊</p>
               <p style={{color:'rgba(255,255,255,0.35)',fontSize:'15px'}}>Noch keine TTR-Daten importiert.</p>
@@ -8983,17 +8975,19 @@ export default function TrainingsApp() {
             </div>
           )}
 
-          {withData.length>0&&(
+          {displayList.length>0&&(
             <div style={{display:'flex',flexDirection:'column',gap:'8px',marginBottom:'28px'}}>
-              {withData.map((c,rank)=>{
+              {displayList.map((c,rank)=>{
                 const barW=c.last?Math.round((c.last.ttr-500)/10):0;
+                const isAktiv=c._type==='aktiv';
+                const accentCol=isAktiv?'#38bdf8':'#fbbf24';
                 return(
-                <div key={c.id} style={{display:'flex',alignItems:'center',gap:'14px',padding:'13px 16px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(251,191,36,0.1)',borderRadius:'14px',cursor:'pointer',transition:'all 0.12s'}}
-                  onMouseEnter={e=>{e.currentTarget.style.background='rgba(251,191,36,0.06)';e.currentTarget.style.borderColor='rgba(251,191,36,0.2)';}}
-                  onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,0.04)';e.currentTarget.style.borderColor='rgba(251,191,36,0.1)';}}
-                  onClick={()=>{setTtrVerlaufChild(c);navTo('ttrVerlauf');}}>
-                  <div style={{width:'28px',height:'28px',borderRadius:'8px',background:rank<3?'rgba(251,191,36,0.15)':'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                    <span style={{fontSize:'12px',fontWeight:'800',color:rank<3?'#fbbf24':'rgba(255,255,255,0.3)'}}>{rank+1}</span>
+                <div key={c.id} style={{display:'flex',alignItems:'center',gap:'14px',padding:'13px 16px',background:'rgba(255,255,255,0.04)',border:`1px solid ${isAktiv?'rgba(56,189,248,0.1)':'rgba(251,191,36,0.1)'}`,borderRadius:'14px',cursor:isAktiv?'default':'pointer',transition:'all 0.12s'}}
+                  onMouseEnter={e=>{if(!isAktiv){e.currentTarget.style.background=`rgba(251,191,36,0.06)`;e.currentTarget.style.borderColor=`rgba(251,191,36,0.2)`;}}}
+                  onMouseLeave={e=>{if(!isAktiv){e.currentTarget.style.background='rgba(255,255,255,0.04)';e.currentTarget.style.borderColor='rgba(251,191,36,0.1)';}}}
+                  onClick={()=>{if(!isAktiv){setTtrVerlaufChild(c);navTo('ttrVerlauf');}}}>
+                  <div style={{width:'28px',height:'28px',borderRadius:'8px',background:rank<3?`rgba(${isAktiv?'56,189,248':'251,191,36'},0.15)`:'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                    {isAktiv?<span style={{fontSize:'12px'}}>⚡</span>:<span style={{fontSize:'12px',fontWeight:'800',color:rank<3?'#fbbf24':'rgba(255,255,255,0.3)'}}>{rank+1}</span>}
                   </div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'5px'}}>
@@ -9001,12 +8995,12 @@ export default function TrainingsApp() {
                       {c.diff!==null&&<span style={{fontSize:'11px',fontWeight:'700',color:c.diff>=0?'#4ade80':'#f87171'}}>{c.diff>=0?'+':''}{c.diff}</span>}
                     </div>
                     <div style={{background:'rgba(255,255,255,0.06)',borderRadius:'99px',height:'5px',overflow:'hidden'}}>
-                      <div style={{width:`${Math.min(barW,100)}%`,height:'100%',background:'linear-gradient(90deg,#92400e,#fbbf24)',borderRadius:'99px'}}/>
+                      <div style={{width:`${Math.min(barW,100)}%`,height:'100%',background:`linear-gradient(90deg,#92400e,${accentCol})`,borderRadius:'99px'}}/>
                     </div>
                     <span style={{fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>{c.last?.month} · {c.hist.length} Monate</span>
                   </div>
                   <div style={{textAlign:'right',flexShrink:0}}>
-                    <p style={{margin:'0 0 2px',fontWeight:'900',fontSize:'20px',color:'#fbbf24'}}>{c.last?.ttr}</p>
+                    <p style={{margin:'0 0 2px',fontWeight:'900',fontSize:'20px',color:accentCol}}>{c.last?.ttr}</p>
                     {c.total!==null&&<p style={{margin:0,fontSize:'11px',fontWeight:'700',color:c.total>=0?'#4ade80':'#f87171'}}>{c.total>=0?'▲':'▼'} {Math.abs(c.total)} gesamt</p>}
                   </div>
                 </div>
@@ -9014,7 +9008,7 @@ export default function TrainingsApp() {
             </div>
           )}
 
-          {withoutData.length>0&&(
+          {(ttrFilter==='all'||ttrFilter==='jugend')&&withoutData.length>0&&(
             <div>
               <p style={{margin:'0 0 12px',fontSize:'12px',fontWeight:'700',color:'rgba(255,255,255,0.25)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Ohne TTR-Daten ({withoutData.length})</p>
               <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
@@ -9119,21 +9113,29 @@ export default function TrainingsApp() {
 
           // Match against app children (case-insensitive, trim whitespace)
           const norm = s => (s||'').trim().toLowerCase().replace(/\s+/g,' ');
+          const toSpielerId = name => 'aktiv_' + name.trim().toLowerCase().replace(/\s+/g,'_');
           const excelNorm = {};
           Object.entries(excelMap).forEach(([k,v]) => { excelNorm[norm(k)] = {excelName:k, entries:v}; });
           const appChildren = Object.values(children).filter(c=>subgroups[c.subgroupId]?.groupId==='jugend');
           const matches = [], unmatched = [];
+          const matchedExcelNorms = new Set();
           appChildren.forEach(child => {
             const hit = excelNorm[norm(child.name)];
             if (hit) {
               matches.push({childId: child.id, appName: child.name, excelName: hit.excelName, entries: hit.entries});
+              matchedExcelNorms.add(norm(hit.excelName));
             } else {
               unmatched.push(child.name);
             }
           });
           matches.sort((a,b)=>a.appName.localeCompare(b.appName,'de'));
           unmatched.sort((a,b)=>a.localeCompare(b,'de'));
-          setTtrImportState({matches, unmatched, total: Object.keys(excelMap).length, detectedMonths: months.map(m=>m.label)});
+          // Aktive: alle Excel-Einträge die NICHT zu Jugend-Kindern gehören
+          const aktivMatches = Object.entries(excelMap)
+            .filter(([name]) => !matchedExcelNorms.has(norm(name)))
+            .map(([name, entries]) => ({id: toSpielerId(name), name, entries}))
+            .sort((a,b)=>a.name.localeCompare(b.name,'de'));
+          setTtrImportState({matches, unmatched, aktivMatches, total: Object.keys(excelMap).length, detectedMonths: months.map(m=>m.label)});
           setTtrImportDone(false);
         } catch(err) {
           alert('Fehler beim Lesen der Datei: ' + err.message);
@@ -9156,7 +9158,22 @@ export default function TrainingsApp() {
           updated[childId] = {entries: merged};
         }
       });
+      const newAktiveSpieler = {...aktiveSpieler};
+      (ttrImportState.aktivMatches||[]).forEach(({id, name, entries}) => {
+        if (overwrite) {
+          updated[id] = {entries: [...entries].sort((a,b)=>a.month.localeCompare(b.month))};
+        } else {
+          const existing = updated[id]?.entries || [];
+          const existingMonths = new Set(existing.map(e=>e.month));
+          const merged = [...existing, ...entries.filter(e=>!existingMonths.has(e.month))];
+          merged.sort((a,b)=>a.month.localeCompare(b.month));
+          updated[id] = {entries: merged};
+        }
+        const latestEntry = [...entries].sort((a,b)=>b.month.localeCompare(a.month))[0];
+        newAktiveSpieler[id] = {id, name, ttr: latestEntry?.ttr||null, spielernr: newAktiveSpieler[id]?.spielernr||null};
+      });
       saveTtrHistory(updated);
+      saveAktiveSpieler(newAktiveSpieler);
       setTtrImportDone(true);
     };
 
@@ -9258,8 +9275,31 @@ export default function TrainingsApp() {
                 })}
               </div>
 
+              {ttrImportState.aktivMatches?.length>0&&(
+                <div style={{marginTop:'16px'}}>
+                  <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'800',color:'#38bdf8'}}>
+                    ⚡ {ttrImportState.aktivMatches.length} Aktive Spieler erkannt:
+                  </p>
+                  <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+                    {ttrImportState.aktivMatches.map(m=>{
+                      const latestEntry = [...m.entries].sort((a,b)=>b.month.localeCompare(a.month))[0];
+                      return (
+                        <div key={m.id} style={{display:'flex',alignItems:'center',gap:'12px',padding:'10px 14px',background:'rgba(56,189,248,0.05)',border:'1px solid rgba(56,189,248,0.15)',borderRadius:'10px'}}>
+                          <span style={{fontSize:'16px'}}>⚡</span>
+                          <div style={{flex:1,minWidth:0}}>
+                            <p style={{margin:0,fontWeight:'700',fontSize:'13px',color:'white'}}>{m.name}</p>
+                            <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>{m.entries.length} Monate</p>
+                          </div>
+                          {latestEntry&&<p style={{margin:0,fontWeight:'800',fontSize:'14px',color:'#38bdf8'}}>{latestEntry.ttr}</p>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {ttrImportState.unmatched?.length>0&&(
-                <div style={{padding:'14px 16px',background:'rgba(248,113,113,0.05)',border:'1px solid rgba(248,113,113,0.15)',borderRadius:'12px'}}>
+                <div style={{marginTop:'12px',padding:'14px 16px',background:'rgba(248,113,113,0.05)',border:'1px solid rgba(248,113,113,0.15)',borderRadius:'12px'}}>
                   <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'800',color:'#f87171'}}>
                     ⚠️ {ttrImportState.unmatched.length} App-Kinder ohne Excel-Treffer (Name prüfen):
                   </p>
@@ -9279,7 +9319,7 @@ export default function TrainingsApp() {
               <p style={{fontSize:'48px',margin:'0 0 16px'}}>🎉</p>
               <p style={{margin:'0 0 8px',fontWeight:'800',fontSize:'20px',color:'#4ade80'}}>Import erfolgreich!</p>
               <p style={{margin:'0 0 28px',fontSize:'13px',color:'rgba(255,255,255,0.45)'}}>
-                {ttrImportState?.matches.length} Kinder · TTR-Verlauf gespeichert
+                {ttrImportState?.matches.length} Jugend-Kinder · {ttrImportState?.aktivMatches?.length||0} Aktive · TTR-Verlauf gespeichert
               </p>
               <button onClick={()=>{setTtrImportState(null);setTtrImportDone(false);}} style={{padding:'12px 28px',background:'rgba(74,222,128,0.15)',border:'1px solid rgba(74,222,128,0.3)',borderRadius:'12px',color:'#4ade80',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>
                 Weiterer Import / Manuelle Eingabe ↓
