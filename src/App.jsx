@@ -771,6 +771,7 @@ export default function TrainingsApp() {
   const [trainingsmatches, setTrainingsmatches] = useState([]);
   const [tmSort, setTmSort] = useState('winrate');
   const [tmAdding, setTmAdding] = useState(false);
+  const [tmEditId, setTmEditId] = useState(null);
   const [tmForm, setTmForm] = useState({opponent:'',opponentCustom:'',useCustom:false,result:'3:0',vorgabe:false,vorgabePlayer:'',vorgabePoints:1,date:''});
   const [activePracticeId, setActivePracticeId]                     = useState(null);
   const [ptCreating, setPtCreating]                                 = useState(false);
@@ -3661,6 +3662,7 @@ export default function TrainingsApp() {
             {label:'Rompel Bereich', icon:{type:'img',src:'/rompel.jpg'}, color:'#fda4af', bg:'rgba(253,164,175,0.08)', border:'rgba(253,164,175,0.25)', action:()=>navTo('rompel')},
           ]:[]),
           ...(userRole==='admin'?[
+            {label:'Trainingsmatches',icon:'⚔️', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.25)', action:()=>navTo('trainingsmatches')},
             {label:'Admin',          icon:'🛡️', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('admin')},
           ]:[]),
         ],
@@ -3944,12 +3946,24 @@ export default function TrainingsApp() {
           </div>
 
           {/* Greeting */}
-          <div style={{marginBottom:'28px'}}>
-            <p style={{margin:'0 0 6px',color:accentMid,fontSize:'12px',fontWeight:'700',letterSpacing:'1.5px',textTransform:'uppercase'}}>{dateLabel}</p>
-            <h1 style={{margin:0,color:'white',fontSize:isMobile?'26px':'32px',fontWeight:'800',letterSpacing:'-1px',lineHeight:1.1}}>
-              {greeting}, <span style={{color:'#67e8f9'}}>{(userProfile?.name||'').split(' ')[0]||'Spieler'}</span> 👋
-            </h1>
-          </div>
+          {(()=>{
+            const linkedSp = userProfile?.linkedPlayerId ? aktiveSpieler[userProfile.linkedPlayerId] : null;
+            const linkedId = userProfile?.linkedPlayerId;
+            const hist = linkedId ? (ttrHistory[linkedId]?.entries||[]).slice().sort((a,b)=>a.month.localeCompare(b.month)) : [];
+            const lastTtr = hist[hist.length-1];
+            return (
+              <div style={{marginBottom:'28px'}}>
+                <p style={{margin:'0 0 6px',color:accentMid,fontSize:'12px',fontWeight:'700',letterSpacing:'1.5px',textTransform:'uppercase'}}>{dateLabel}</p>
+                <h1 style={{margin:0,color:'white',fontSize:isMobile?'26px':'32px',fontWeight:'800',letterSpacing:'-1px',lineHeight:1.1}}>
+                  {greeting}, <span style={{color:'#67e8f9'}}>{(userProfile?.name||'').split(' ')[0]||'Spieler'}</span> 👋
+                </h1>
+                {lastTtr&&<p style={{margin:'6px 0 0',fontSize:'14px',color:'rgba(255,255,255,0.45)',fontWeight:'500'}}>
+                  Dein TTR: <span style={{color:'#38bdf8',fontWeight:'800'}}>{lastTtr.ttr}</span>
+                  <span style={{color:'rgba(255,255,255,0.25)',fontSize:'12px',marginLeft:'6px'}}>({lastTtr.month})</span>
+                </p>}
+              </div>
+            );
+          })()}
 
           {/* ── Hub-Kacheln ── */}
           <span style={{display:'block',fontSize:'10px',fontWeight:'800',color:accentMid,textTransform:'uppercase',letterSpacing:'2px',marginBottom:'10px'}}>Bereiche</span>
@@ -9838,6 +9852,43 @@ export default function TrainingsApp() {
               {trainingsmatches.map(m=>{
                 const d = m.date?new Date(m.date+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
                 const p1wins = m.score1>m.score2;
+                const mDate = m.date ? new Date(m.date+'T23:59:59') : null;
+                const deadline = mDate ? new Date(mDate.getTime()+3*24*60*60*1000) : null;
+                const withinDeadline = deadline ? new Date() <= deadline : false;
+                const isMyMatch = m.player1===me||m.player2===me;
+                const canEdit = isAdmin || (isMyMatch && withinDeadline);
+                const isEditing = tmEditId===m.id;
+                if (isEditing) {
+                  const [es1,es2] = [m.score1,m.score2];
+                  return (
+                    <div key={m.id} style={{background:'rgba(244,114,182,0.07)',border:`1px solid ${acBorder}`,borderRadius:'12px',padding:'12px 14px'}}>
+                      <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:ac,textTransform:'uppercase'}}>Match bearbeiten</p>
+                      <div style={{display:'flex',gap:'8px',flexWrap:'wrap',alignItems:'center',marginBottom:'8px'}}>
+                        <span style={{fontSize:'13px',color:'rgba(255,255,255,0.6)',fontWeight:'600'}}>{m.player1} vs {m.player2}</span>
+                      </div>
+                      <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                        <select defaultValue={`${m.score1}:${m.score2}`} id={`score-${m.id}`}
+                          style={{padding:'8px 10px',background:'#1a0a1e',border:`1px solid ${acBorder}`,borderRadius:'8px',color:'white',fontSize:'14px'}}>
+                          {resultOptions.map(r=><option key={r} value={r}>{r}</option>)}
+                        </select>
+                        <input type="date" defaultValue={m.date||''} id={`date-${m.id}`}
+                          style={{padding:'8px 10px',background:'rgba(255,255,255,0.07)',border:`1px solid ${acBorder}`,borderRadius:'8px',color:'white',fontSize:'13px'}}/>
+                        <button onClick={()=>{
+                          const scoreEl=document.getElementById(`score-${m.id}`);
+                          const dateEl=document.getElementById(`date-${m.id}`);
+                          const [ns1,ns2]=(scoreEl?.value||`${m.score1}:${m.score2}`).split(':').map(Number);
+                          saveMatches(trainingsmatches.map(x=>x.id===m.id?{...x,score1:ns1,score2:ns2,date:dateEl?.value||m.date}:x));
+                          setTmEditId(null);
+                        }} style={{padding:'8px 14px',background:`linear-gradient(135deg,${ac},#db2777)`,border:'none',borderRadius:'8px',color:'white',fontWeight:'700',fontSize:'13px',cursor:'pointer'}}>
+                          Speichern
+                        </button>
+                        <button onClick={()=>setTmEditId(null)} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.5)',fontWeight:'600',fontSize:'13px',cursor:'pointer'}}>
+                          Abbrechen
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
                 return (
                   <div key={m.id} style={{background:'rgba(255,255,255,0.03)',border:`1px solid ${acBorder}`,borderRadius:'12px',padding:'12px 14px',display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>
                     <div style={{flex:1,minWidth:0}}>
@@ -9850,6 +9901,10 @@ export default function TrainingsApp() {
                         {d}{m.vorgabe?` · Vorgabe: ${m.vorgabe.player.split(' ')[0]} +${m.vorgabe.points}Pkt`:''}
                       </div>
                     </div>
+                    {canEdit&&<button onClick={()=>setTmEditId(m.id)}
+                      style={{width:'28px',height:'28px',borderRadius:'7px',background:'rgba(244,114,182,0.1)',border:'1px solid rgba(244,114,182,0.2)',color:ac,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                      <Pencil size={12}/>
+                    </button>}
                     {isAdmin&&<button onClick={()=>{if(!window.confirm('Match löschen?'))return;saveMatches(trainingsmatches.filter(x=>x.id!==m.id));}}
                       style={{width:'28px',height:'28px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                       <Trash2 size={12}/>
