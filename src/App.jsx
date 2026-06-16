@@ -752,6 +752,8 @@ export default function TrainingsApp() {
   const [ttrManTtr, setTtrManTtr] = useState('');
   const [ttrManSaved, setTtrManSaved] = useState(false);
   const [rompelData, setRompelData] = useState({hours:[], expenses:[]});
+  const [aktiveSpieler, setAktiveSpieler] = useState({});
+  const [aktiverForm, setAktiverForm] = useState({name:'', ttr:'', spielernr:''});
   const [rompelHoursForm, setRompelHoursForm] = useState({date:new Date().toISOString().split('T')[0], hours:'', desc:''});
   const [rompelExpForm, setRompelExpForm] = useState({date:new Date().toISOString().split('T')[0], amount:'', desc:''});
   const [elternSubView, setElternSubView] = useState(null);
@@ -869,6 +871,7 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','teams'),              s => setTeams(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','appSettings'),        s => setAppSettings(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','rompel'),             s => setRompelData(s.exists()?s.data():{hours:[],expenses:[]})),
+      onSnapshot(doc(db,'ttc','aktiveSpieler'),      s => setAktiveSpieler(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','leagueData'),         s => setLeagueData(s.exists()?s.data():{ table: null, schedule: null, fetchedAt: null })),
       onSnapshot(doc(db,'ttc','rangliste'), s => setRangliste(s.exists()&&s.data().entries ? s.data().entries : [])),
       onSnapshot(doc(db,'ttc','ranglistenspiele'), s => setRanglistenspiele(s.exists() ? { active: s.data().active||[], archived: s.data().archived||[] } : { active:[], archived:[] })),
@@ -1144,7 +1147,18 @@ export default function TrainingsApp() {
   const saveTeams = u => { const s=sanitizeTeams(u); setTeams(s); setDoc(doc(db,'ttc','teams'), s).catch(e=>console.error('saveTeams failed:',e)); };
   const saveAppSettings                  = u => { setAppSettings(u);                  setDoc(doc(db,'ttc','appSettings'),                  u); };
   const saveRompelData                   = u => { setRompelData(u);                   setDoc(doc(db,'ttc','rompel'),                        u); };
+  const saveAktiveSpieler                = d => { setAktiveSpieler(d);               setDoc(doc(db,'ttc','aktiveSpieler'),                  d); };
   const canAccessRompel = () => userRole === 'admin' || (canEdit() && (appSettings.rompelTrainers || []).includes(user?.uid));
+  const linkPlayerToUser = async (uid, spielerId) => {
+    const cur = allUsersRef.current;
+    const profile = cur[uid]||{};
+    const updatedProfile = {...profile, linkedPlayerId: spielerId||null};
+    const updated = {...cur, [uid]: updatedProfile};
+    allUsersRef.current = updated;
+    setAllUsers(updated);
+    await setDoc(doc(db,'ttc','users'), updated);
+    await setDoc(doc(db,'users',uid), updatedProfile);
+  };
   const saveLeagueData                   = u => { setLeagueData(u);                   setDoc(doc(db,'ttc','leagueData'),                   u); };
 
   // ── Liga-Daten via eigene Vercel Serverless Function laden ──────────────
@@ -3332,6 +3346,7 @@ export default function TrainingsApp() {
                             <span style={{fontWeight:'700',color:'#333',fontSize:'14px'}}>{u.name||u.email}</span>
                             <span style={{marginLeft:'8px',fontSize:'12px',color:'#9ca3af'}}>{roleLabels}</span>
                             {linkedChildIds.length>0&&<span style={{marginLeft:'8px',fontSize:'12px',color:'#16a34a',fontWeight:'600'}}>· {linkedChildIds.map(id=>children[id]?.name).filter(Boolean).join(', ')}</span>}
+                            {u.linkedPlayerId&&aktiveSpieler[u.linkedPlayerId]&&<span style={{marginLeft:'8px',fontSize:'12px',color:'#0891b2',fontWeight:'600'}}>⚡ {aktiveSpieler[u.linkedPlayerId].name}</span>}
                           </div>
                           <span style={{fontSize:'14px',color:'#9ca3af',transform:isOpen?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.15s',flexShrink:0}}>▾</span>
                         </button>
@@ -3362,27 +3377,46 @@ export default function TrainingsApp() {
                               </div>
                             </div>
 
-                            {/* Kinder zuordnen (Multi-Select) */}
-                            {userRoles.some(r=>['eltern','jugendlich'].includes(r))&&(
-                              <div style={{marginBottom:'10px'}}>
-                                <span style={{fontSize:'12px',color:'#555',fontWeight:'600',display:'block',marginBottom:'6px'}}>Kinder zuordnen:</span>
-                                <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
-                                  {allChildrenList.map(c=>{
-                                    const latestProfile=allUsers[u.uid]||u;
-                                    const curIds=(latestProfile.linkedChildIds?.length>0?latestProfile.linkedChildIds:(latestProfile.linkedChildId?[latestProfile.linkedChildId]:[]));
-                                    const assigned=curIds.includes(c.id);
-                                    return <button key={c.id} onClick={()=>{
-                                      const fresh=allUsersRef.current[u.uid]||u;
-                                      const freshIds=(fresh.linkedChildIds?.length>0?fresh.linkedChildIds:(fresh.linkedChildId?[fresh.linkedChildId]:[]));
-                                      const next=freshIds.includes(c.id)?freshIds.filter(id=>id!==c.id):[...freshIds,c.id];
-                                      linkChildrenToUser(u.uid,next);
-                                    }} style={{padding:'4px 10px',borderRadius:'20px',border:'2px solid #16a34a',background:assigned?'#16a34a':'white',color:assigned?'white':'#16a34a',cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>
-                                      {c.name}
-                                    </button>;
-                                  })}
+                            {/* Kinder zuordnen (Dropdown + Chips) */}
+                            {userRoles.some(r=>['eltern','jugendlich'].includes(r))&&(()=>{
+                              const latestProfile=allUsers[u.uid]||u;
+                              const curIds=(latestProfile.linkedChildIds?.length>0?latestProfile.linkedChildIds:(latestProfile.linkedChildId?[latestProfile.linkedChildId]:[]));
+                              const unassigned=allChildrenList.filter(c=>!curIds.includes(c.id));
+                              return (
+                                <div style={{marginBottom:'10px'}}>
+                                  <span style={{fontSize:'12px',color:'#555',fontWeight:'600',display:'block',marginBottom:'6px'}}>Kinder zuordnen:</span>
+                                  {curIds.length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:'4px',marginBottom:'6px'}}>
+                                    {curIds.map(id=>children[id]&&(
+                                      <span key={id} style={{display:'inline-flex',alignItems:'center',gap:'4px',padding:'3px 8px',background:'#dcfce7',border:'1px solid #16a34a',borderRadius:'20px',fontSize:'12px',fontWeight:'600',color:'#15803d'}}>
+                                        {children[id].name}
+                                        <button onClick={()=>{const fresh=allUsersRef.current[u.uid]||u;const freshIds=fresh.linkedChildIds?.length>0?fresh.linkedChildIds:(fresh.linkedChildId?[fresh.linkedChildId]:[]);linkChildrenToUser(u.uid,freshIds.filter(x=>x!==id));}} style={{background:'none',border:'none',cursor:'pointer',color:'#15803d',padding:'0 0 0 2px',lineHeight:1,fontSize:'15px',fontWeight:'700'}}>×</button>
+                                      </span>
+                                    ))}
+                                  </div>}
+                                  {unassigned.length>0&&<select defaultValue="" onChange={e=>{if(!e.target.value)return;const fresh=allUsersRef.current[u.uid]||u;const freshIds=fresh.linkedChildIds?.length>0?fresh.linkedChildIds:(fresh.linkedChildId?[fresh.linkedChildId]:[]);if(!freshIds.includes(e.target.value))linkChildrenToUser(u.uid,[...freshIds,e.target.value]);e.target.value='';}} style={{padding:'6px 10px',border:'1px solid #16a34a',borderRadius:'8px',fontSize:'13px',cursor:'pointer',color:'#15803d',background:'white',width:'100%'}}>
+                                    <option value="">+ Kind hinzufügen…</option>
+                                    {unassigned.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                                  </select>}
+                                  {curIds.length===0&&unassigned.length===0&&<p style={{fontSize:'12px',color:'#9ca3af',margin:0}}>Keine Kinder vorhanden.</p>}
                                 </div>
-                              </div>
-                            )}
+                              );
+                            })()}
+
+                            {/* Spieler zuordnen (Aktiver / Admin) */}
+                            {userRoles.some(r=>['aktiver','admin'].includes(r))&&(()=>{
+                              const spielerList=Object.values(aktiveSpieler).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+                              const curPlayer=allUsers[u.uid]?.linkedPlayerId||'';
+                              return (
+                                <div style={{marginBottom:'10px'}}>
+                                  <span style={{fontSize:'12px',color:'#555',fontWeight:'600',display:'block',marginBottom:'6px'}}>⚡ Spieler zuordnen:</span>
+                                  <select value={curPlayer} onChange={e=>linkPlayerToUser(u.uid,e.target.value||null)} style={{padding:'6px 10px',border:'1px solid #0891b2',borderRadius:'8px',fontSize:'13px',cursor:'pointer',color:'#0c4a6e',background:'white',width:'100%'}}>
+                                    <option value="">– kein Spieler –</option>
+                                    {spielerList.map(sp=><option key={sp.id} value={sp.id}>{sp.name}{sp.ttr?` (TTR ${sp.ttr})`:''}{sp.spielernr?` · Nr. ${sp.spielernr}`:''}</option>)}
+                                  </select>
+                                  {spielerList.length===0&&<p style={{fontSize:'11px',color:'#9ca3af',margin:'4px 0 0'}}>Erst Spieler in der Aktiven-Datenbank anlegen.</p>}
+                                </div>
+                              );
+                            })()}
 
                             {/* Gruppen (Trainer) */}
                             {userRoles.includes('trainer')&&(
@@ -3427,6 +3461,44 @@ export default function TrainingsApp() {
             );
           })()}
           {Object.keys(allUsers).length===0&&<p style={{color:'#999',textAlign:'center',padding:'20px'}}>Noch keine Nutzer.</p>}
+        </div>
+
+        {/* ── Aktive Spieler Datenbank ── */}
+        <div style={{...s.card,marginTop:'0'}}>
+          <p style={{margin:'0 0 12px',fontSize:'13px',fontWeight:'800',color:'#0891b2',textTransform:'uppercase',letterSpacing:'0.5px'}}>⚡ Aktive Spieler</p>
+          {/* Formular */}
+          <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'12px'}}>
+            <input placeholder="Name *" value={aktiverForm.name} onChange={e=>setAktiverForm(f=>({...f,name:e.target.value}))}
+              style={{...s.input,flex:'2',minWidth:'140px'}}/>
+            <input placeholder="TTR" type="number" value={aktiverForm.ttr} onChange={e=>setAktiverForm(f=>({...f,ttr:e.target.value}))}
+              style={{...s.input,flex:'1',minWidth:'80px'}}/>
+            <input placeholder="Spielernr." value={aktiverForm.spielernr} onChange={e=>setAktiverForm(f=>({...f,spielernr:e.target.value}))}
+              style={{...s.input,flex:'1',minWidth:'90px'}}/>
+            <button onClick={()=>{
+              const name=aktiverForm.name.trim();
+              if(!name)return;
+              const id='sp_'+Date.now();
+              saveAktiveSpieler({...aktiveSpieler,[id]:{id,name,ttr:aktiverForm.ttr?Number(aktiverForm.ttr):null,spielernr:aktiverForm.spielernr.trim()||null}});
+              setAktiverForm({name:'',ttr:'',spielernr:''});
+            }} style={s.btn('#0891b2')}>+ Hinzufügen</button>
+          </div>
+          {/* Liste */}
+          {Object.values(aktiveSpieler).length===0
+            ? <p style={{fontSize:'13px',color:'#9ca3af',textAlign:'center',padding:'10px'}}>Noch keine Spieler angelegt.</p>
+            : <div style={{display:'flex',flexDirection:'column',gap:'5px'}}>
+              {Object.values(aktiveSpieler).sort((a,b)=>a.name.localeCompare(b.name,'de')).map(sp=>(
+                <div key={sp.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',background:'#f0f9ff',border:'1px solid #bae6fd',borderRadius:'9px'}}>
+                  <span style={{flex:1,fontWeight:'700',fontSize:'13px',color:'#0c4a6e'}}>{sp.name}</span>
+                  {sp.ttr&&<span style={{fontSize:'12px',color:'#0891b2',fontWeight:'600',background:'#e0f2fe',borderRadius:'6px',padding:'2px 7px'}}>TTR {sp.ttr}</span>}
+                  {sp.spielernr&&<span style={{fontSize:'12px',color:'#64748b'}}>Nr. {sp.spielernr}</span>}
+                  <button onClick={()=>{if(!window.confirm(`"${sp.name}" löschen?`))return;const d={...aktiveSpieler};delete d[sp.id];saveAktiveSpieler(d);}}
+                    style={{padding:'3px 8px',background:'#fee2e2',border:'1px solid #fca5a5',borderRadius:'6px',cursor:'pointer',color:'#dc2626',fontSize:'11px',fontWeight:'600',flexShrink:0}}>
+                    🗑️
+                  </button>
+                </div>
+              ))}
+            </div>
+          }
         </div>
 
         {/* ── Datenlöschen ── */}
@@ -9528,7 +9600,8 @@ export default function TrainingsApp() {
     const ac = '#f472b6';
     const acBorder = 'rgba(244,114,182,0.2)';
     const acBg = 'rgba(244,114,182,0.07)';
-    const me = userProfile?.name || user?.email || '';
+    const linkedPlayer = userProfile?.linkedPlayerId ? aktiveSpieler[userProfile.linkedPlayerId] : null;
+    const me = linkedPlayer?.name || userProfile?.name || user?.email || '';
 
     // Player list: registered Aktive + anyone who has played at least one match
     const aktiveNames = new Set(
@@ -9587,9 +9660,10 @@ export default function TrainingsApp() {
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#1a0a1e 0%,#0d0a1f 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
-        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
-          <button onClick={()=>navTo('home')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'9px',color:'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:'600'}}><Home size={15}/></button>
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+          <button onClick={()=>navTo('home')} style={s.btn('#f472b6')}><Home size={16}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>⚔️ Trainingsmatches</h1>
+          {linkedPlayer&&<span style={{fontSize:'12px',color:'#f9a8d4',fontWeight:'600'}}>⚡ {linkedPlayer.name}</span>}
         </div>
 
         <div style={{padding:'20px',maxWidth:'820px',margin:'0 auto'}}>
