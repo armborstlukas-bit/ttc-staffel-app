@@ -8709,14 +8709,12 @@ export default function TrainingsApp() {
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#1a0a00 0%,#2d1500 45%,#150800 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+          <button onClick={()=>navTo('home')} style={s.btn('#fb923c')}><Home size={16}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>🏓 Materialverwaltung</h1>
+          <span style={{fontSize:'12px',color:'rgba(255,255,255,0.25)',fontWeight:'600'}}>{allChildren.length} Kinder</span>
+        </div>
         <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
-
-          {/* Header */}
-          <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-            <button onClick={()=>navTo('home')} style={s.btn('#fb923c')}><Home size={16}/></button>
-            <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>🏓 Materialverwaltung</h1>
-            <span style={{fontSize:'12px',color:'rgba(255,255,255,0.25)',fontWeight:'600'}}>{allChildren.length} Kinder</span>
-          </div>
 
           {/* Suche */}
           <div style={{marginBottom:'16px',position:'relative'}}>
@@ -8970,12 +8968,12 @@ export default function TrainingsApp() {
     const withoutData=withTtr.filter(c=>!c.last);
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#0a0e00 0%,#1a1600 45%,#0a0c00 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+          <button onClick={()=>navTo('home')} style={s.btn('#fbbf24')}><Home size={16}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>📈 TTR Werte</h1>
+          <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)',fontWeight:'600'}}>{withData.length} Kinder mit TTR</span>
+        </div>
         <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
-          <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-            <button onClick={()=>navTo('home')} style={s.btn('#fbbf24')}><Home size={16}/></button>
-            <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>📈 TTR Werte</h1>
-            <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)',fontWeight:'600'}}>{withData.length} Kinder mit TTR</span>
-          </div>
 
           {withData.length===0&&(
             <div style={{textAlign:'center',padding:'60px 20px'}}>
@@ -9172,12 +9170,11 @@ export default function TrainingsApp() {
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+          <button onClick={()=>navTo('home')} style={s.btn('#6ee7b7')}><Home size={16}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>📈 TTR-Import</h1>
+        </div>
         <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
-
-          <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-            <button onClick={()=>navTo('home')} style={s.btn('#6ee7b7')}><Home size={16}/></button>
-            <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>📈 TTR-Import</h1>
-          </div>
 
           {/* Info */}
           <div style={{padding:'14px 16px',background:'rgba(110,231,183,0.05)',border:'1px solid rgba(110,231,183,0.15)',borderRadius:'14px',marginBottom:'24px'}}>
