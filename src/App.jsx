@@ -8608,7 +8608,10 @@ export default function TrainingsApp() {
 
   // ── MATERIALVERWALTUNG VIEW ──────────────────────────────────────────────
   if (view === 'materialverwaltung' && canEdit()) {
-    const DICKEN_OPTS = ['OX','1,0 mm','1,5 mm','1,8 mm','2,0 mm','2,1 mm','2,3 mm','max'];
+    const DICKEN_OPTS = ['OX','0,5 mm','1,0 mm','1,5 mm','1,8 mm','2,0 mm','2,1 mm','2,3 mm','max'];
+    const now = Date.now();
+    const twelveMonthsMs = 365 * 24 * 60 * 60 * 1000;
+    const isMatOld = (mat) => !mat.last_wechsel || (now - new Date(mat.last_wechsel).getTime()) > twelveMonthsMs;
     const allChildren = Object.values(children).sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
     const q = materialSearch.trim().toLowerCase();
     const visChildren = q ? allChildren.filter(c=>(c.name||'').toLowerCase().includes(q)) : allChildren;
@@ -8660,9 +8663,11 @@ export default function TrainingsApp() {
               const mat = materialverwaltung[child.id]||{};
               const hasAny = mat.vh||mat.rh||mat.holz;
               const isOpen = materialExpanded===child.id;
+              const isOld = isMatOld(mat);
               const summary = matSummary(mat);
+              const warnBorder = isOld ? 'rgba(251,191,36,0.5)' : isOpen ? 'rgba(251,146,60,0.3)' : hasAny ? 'rgba(251,146,60,0.14)' : 'rgba(255,255,255,0.07)';
               return (
-                <div key={child.id} style={{background:'rgba(255,255,255,0.04)',border:`1px solid ${isOpen?'rgba(251,146,60,0.3)':hasAny?'rgba(251,146,60,0.14)':'rgba(255,255,255,0.07)'}`,borderRadius:'14px',overflow:'hidden',transition:'border-color 0.2s'}}>
+                <div key={child.id} style={{background: isOld&&!isOpen ? 'rgba(251,191,36,0.03)' : 'rgba(255,255,255,0.04)',border:`1px solid ${warnBorder}`,borderRadius:'14px',overflow:'hidden',transition:'border-color 0.2s'}}>
 
                   {/* Kopfzeile — immer sichtbar, klickbar */}
                   <button onClick={()=>setMaterialExpanded(isOpen?null:child.id)}
@@ -8675,7 +8680,8 @@ export default function TrainingsApp() {
                         : <p style={{margin:'2px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.18)',fontStyle:'italic'}}>kein Material eingetragen</p>
                       )}
                     </div>
-                    {hasAny&&!isOpen&&<span style={{width:'8px',height:'8px',borderRadius:'50%',background:'#fb923c',flexShrink:0}}/>}
+                    {isOld&&!isOpen&&<span title="Materialwechsel fällig" style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 8px',background:'rgba(251,191,36,0.15)',border:'1px solid rgba(251,191,36,0.35)',borderRadius:'20px',color:'#fbbf24',fontSize:'11px',fontWeight:'800',flexShrink:0,whiteSpace:'nowrap'}}>⚠️ {mat.last_wechsel?'Wechsel fällig':'Kein Datum'}</span>}
+                    {hasAny&&!isOpen&&!isOld&&<span style={{width:'8px',height:'8px',borderRadius:'50%',background:'#fb923c',flexShrink:0}}/>}
                   </button>
 
                   {/* Ausgeklappter Inhalt */}
@@ -8746,6 +8752,18 @@ export default function TrainingsApp() {
                           placeholder="z. B. Stiga Clipper"
                           style={fldStyle}/>
                         <datalist id={`dl_holz_${child.id}`}>{uniqBelag('holz').map(o=><option key={o} value={o}/>)}</datalist>
+                      </div>
+
+                      {/* Letzter Materialwechsel */}
+                      <div style={{background: isOld ? 'rgba(251,191,36,0.06)' : 'rgba(255,255,255,0.02)', border:`1px solid ${isOld?'rgba(251,191,36,0.3)':'rgba(255,255,255,0.08)'}`,borderRadius:'12px',padding:'12px 14px'}}>
+                        <p style={{margin:'0 0 6px',fontSize:'10px',fontWeight:'800',color:isOld?'#fbbf24':'rgba(255,255,255,0.4)',textTransform:'uppercase',letterSpacing:'1px'}}>
+                          {isOld?'⚠️ ':'🗓️ '}Letzter Materialwechsel
+                        </p>
+                        <input type="date" value={mat.last_wechsel||''} onChange={e=>saveMat(child.id,'last_wechsel',e.target.value)}
+                          style={{...fldStyle, borderColor: isOld ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.12)'}}/>
+                        {mat.last_wechsel && <p style={{margin:'5px 0 0',fontSize:'11px',color: isOld?'#fbbf24':'rgba(255,255,255,0.3)',fontWeight:'600'}}>
+                          {isOld ? `Letzter Wechsel: ${fmtDate(mat.last_wechsel)} — über 12 Monate her` : `Letzter Wechsel: ${fmtDate(mat.last_wechsel)}`}
+                        </p>}
                       </div>
 
                     </div>
