@@ -8839,7 +8839,7 @@ export default function TrainingsApp() {
     const totalDiff=last&&first?last.ttr-first.ttr:0;
     const prevEntry=hist.length>1?hist[hist.length-2]:null;
     const lastDiff=last&&prevEntry?last.ttr-prevEntry.ttr:null;
-    const backView=canEdit()?'subgroup':'home';
+    const backView='ttrWerte';
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#0a0e00 0%,#1a1600 45%,#0a0c00 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <div style={{maxWidth:'600px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
@@ -9001,10 +9001,10 @@ export default function TrainingsApp() {
                 const isAktiv=c._type==='aktiv';
                 const accentCol=isAktiv?'#38bdf8':'#fbbf24';
                 return(
-                <div key={c.id} style={{display:'flex',alignItems:'center',gap:'14px',padding:'13px 16px',background:'rgba(255,255,255,0.04)',border:`1px solid ${isAktiv?'rgba(56,189,248,0.1)':'rgba(251,191,36,0.1)'}`,borderRadius:'14px',cursor:isAktiv?'default':'pointer',transition:'all 0.12s'}}
-                  onMouseEnter={e=>{if(!isAktiv){e.currentTarget.style.background=`rgba(251,191,36,0.06)`;e.currentTarget.style.borderColor=`rgba(251,191,36,0.2)`;}}}
-                  onMouseLeave={e=>{if(!isAktiv){e.currentTarget.style.background='rgba(255,255,255,0.04)';e.currentTarget.style.borderColor='rgba(251,191,36,0.1)';}}}
-                  onClick={()=>{if(!isAktiv){setTtrVerlaufChild(c);navTo('ttrVerlauf');}}}>
+                <div key={c.id} style={{display:'flex',alignItems:'center',gap:'14px',padding:'13px 16px',background:'rgba(255,255,255,0.04)',border:`1px solid ${isAktiv?'rgba(56,189,248,0.1)':'rgba(251,191,36,0.1)'}`,borderRadius:'14px',cursor:'pointer',transition:'all 0.12s'}}
+                  onMouseEnter={e=>{e.currentTarget.style.background=isAktiv?'rgba(56,189,248,0.06)':'rgba(251,191,36,0.06)';e.currentTarget.style.borderColor=isAktiv?'rgba(56,189,248,0.2)':'rgba(251,191,36,0.2)';}}
+                  onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,0.04)';e.currentTarget.style.borderColor=isAktiv?'rgba(56,189,248,0.1)':'rgba(251,191,36,0.1)';}}
+                  onClick={()=>{setTtrVerlaufChild(c);navTo('ttrVerlauf');}}>
                   <div style={{width:'28px',height:'28px',borderRadius:'8px',background:rank<3?`rgba(${isAktiv?'56,189,248':'251,191,36'},0.15)`:'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                     {isAktiv?<span style={{fontSize:'12px'}}>⚡</span>:<span style={{fontSize:'12px',fontWeight:'800',color:rank<3?'#fbbf24':'rgba(255,255,255,0.3)'}}>{rank+1}</span>}
                   </div>
