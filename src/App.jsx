@@ -3668,12 +3668,6 @@ export default function TrainingsApp() {
           {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
           {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>navTo('notifications'), badge: unreadCount},
           {label:'Materialverwaltung',icon:'🏓', color:'#fb923c', bg:'rgba(251,146,60,0.08)', border:'rgba(251,146,60,0.25)',  action:()=>navTo('materialverwaltung')},
-          {label:'TTR-Import', icon:'📈',
-            color: new Date().getDate()<=3 ? '#ef4444' : '#6ee7b7',
-            bg:    new Date().getDate()<=3 ? 'rgba(239,68,68,0.12)' : 'rgba(110,231,183,0.08)',
-            border:new Date().getDate()<=3 ? 'rgba(239,68,68,0.4)'  : 'rgba(110,231,183,0.25)',
-            badge: new Date().getDate()<=3 ? '!' : null,
-            action:()=>navTo('ttrImport')},
           ...(canAccessRompel()?[
             {label:'Rompel Bereich', icon:{type:'img',src:'/rompel.jpg'}, color:'#fda4af', bg:'rgba(253,164,175,0.08)', border:'rgba(253,164,175,0.25)', action:()=>navTo('rompel')},
           ]:[]),
@@ -9053,14 +9047,14 @@ export default function TrainingsApp() {
                       {!isEhemalig&&c.diff!==null&&(
                         <span style={{display:'inline-flex',alignItems:'center',gap:'2px',fontSize:'11px',fontWeight:'700',color:c.diff>=0?'#4ade80':'#f87171',background:c.diff>=0?'rgba(74,222,128,0.08)':'rgba(248,113,113,0.08)',borderRadius:'6px',padding:'1px 5px'}}>
                           {c.diff>=0?'+':''}{c.diff}
-                          <span style={{fontSize:'9px',fontWeight:'500',color:'rgba(255,255,255,0.3)',marginLeft:'1px'}}>ggü. Vm.</span>
+                          <span style={{fontSize:'9px',fontWeight:'500',color:'rgba(255,255,255,0.3)',marginLeft:'1px'}}>Vormonat</span>
                         </span>
                       )}
                     </div>
                     <div style={{background:'rgba(255,255,255,0.06)',borderRadius:'99px',height:'5px',overflow:'hidden'}}>
                       <div style={{width:`${Math.min(barW,100)}%`,height:'100%',background:`linear-gradient(90deg,#92400e,${accentCol})`,borderRadius:'99px'}}/>
                     </div>
-                    <span style={{fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>{c.last?.month} · {c.hist.length} Monate</span>
+                    <span style={{fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>{c.hist.length} Monate</span>
                   </div>
                   <div style={{textAlign:'right',flexShrink:0}}>
                     <p style={{margin:0,fontWeight:'900',fontSize:'20px',color:accentCol}}>{c.last?.ttr}</p>
