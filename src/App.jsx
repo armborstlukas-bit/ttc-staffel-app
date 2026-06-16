@@ -772,6 +772,8 @@ export default function TrainingsApp() {
   const [tmSort, setTmSort] = useState('winrate');
   const [tmAdding, setTmAdding] = useState(false);
   const [tmEditId, setTmEditId] = useState(null);
+  const [tmSearch, setTmSearch] = useState('');
+  const [tmSearchFocus, setTmSearchFocus] = useState(false);
   const [tmForm, setTmForm] = useState({opponent:'',opponentCustom:'',useCustom:false,result:'3:0',vorgabe:false,vorgabePlayer:'',vorgabePoints:1,date:''});
   const [activePracticeId, setActivePracticeId]                     = useState(null);
   const [ptCreating, setPtCreating]                                 = useState(false);
@@ -9682,8 +9684,6 @@ export default function TrainingsApp() {
       .filter(name=>name!==me)
       .sort((a,b)=>a.localeCompare(b,'de'));
 
-    const [tmSearch, setTmSearch] = React.useState('');
-    const [tmSearchFocus, setTmSearchFocus] = React.useState(false);
     const tmSuggestions = tmSearch.trim().length>0
       ? registeredPlayers.filter(p=>p.toLowerCase().includes(tmSearch.toLowerCase()))
       : registeredPlayers;
