@@ -8609,12 +8609,12 @@ export default function TrainingsApp() {
   // ── MATERIALVERWALTUNG VIEW ──────────────────────────────────────────────
   if (view === 'materialverwaltung' && canEdit()) {
     const DICKEN_OPTS = ['OX','0,5 mm','1,0 mm','1,5 mm','1,8 mm','2,0 mm','2,1 mm','2,3 mm','max'];
-    const now = Date.now();
-    const twelveMonthsMs = 365 * 24 * 60 * 60 * 1000;
-    const isMatOld = (mat) => {
-      const dates = [mat.vh_datum, mat.rh_datum].filter(Boolean).map(d => new Date(d).getTime()).filter(n => !isNaN(n));
-      if (dates.length === 0) return true;
-      return (now - Math.max(...dates)) > twelveMonthsMs;
+    const missingFields = (mat) => {
+      const missing = [];
+      if (!mat.vh) missing.push('VH');
+      if (!mat.rh) missing.push('RH');
+      if (!mat.holz) missing.push('Holz');
+      return missing;
     };
     const allChildren = Object.values(children).sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
     const q = materialSearch.trim().toLowerCase();
@@ -8667,11 +8667,12 @@ export default function TrainingsApp() {
               const mat = materialverwaltung[child.id]||{};
               const hasAny = mat.vh||mat.rh||mat.holz;
               const isOpen = materialExpanded===child.id;
-              const isOld = isMatOld(mat);
+              const missing = missingFields(mat);
+              const hasWarn = missing.length > 0;
               const summary = matSummary(mat);
-              const warnBorder = isOld ? 'rgba(251,191,36,0.5)' : isOpen ? 'rgba(251,146,60,0.3)' : hasAny ? 'rgba(251,146,60,0.14)' : 'rgba(255,255,255,0.07)';
+              const borderColor = isOpen ? 'rgba(251,146,60,0.3)' : hasWarn ? 'rgba(251,191,36,0.4)' : hasAny ? 'rgba(251,146,60,0.14)' : 'rgba(255,255,255,0.07)';
               return (
-                <div key={child.id} style={{background: isOld&&!isOpen ? 'rgba(251,191,36,0.03)' : 'rgba(255,255,255,0.04)',border:`1px solid ${warnBorder}`,borderRadius:'14px',overflow:'hidden',transition:'border-color 0.2s'}}>
+                <div key={child.id} style={{background: hasWarn&&!isOpen ? 'rgba(251,191,36,0.03)' : 'rgba(255,255,255,0.04)', border:`1px solid ${borderColor}`,borderRadius:'14px',overflow:'hidden',transition:'border-color 0.2s'}}>
 
                   {/* Kopfzeile — immer sichtbar, klickbar */}
                   <button onClick={()=>setMaterialExpanded(isOpen?null:child.id)}
@@ -8684,8 +8685,8 @@ export default function TrainingsApp() {
                         : <p style={{margin:'2px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.18)',fontStyle:'italic'}}>kein Material eingetragen</p>
                       )}
                     </div>
-                    {isOld&&!isOpen&&<span title="Materialwechsel fällig" style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 8px',background:'rgba(251,191,36,0.15)',border:'1px solid rgba(251,191,36,0.35)',borderRadius:'20px',color:'#fbbf24',fontSize:'11px',fontWeight:'800',flexShrink:0,whiteSpace:'nowrap'}}>⚠️ {mat.last_wechsel?'Wechsel fällig':'Kein Datum'}</span>}
-                    {hasAny&&!isOpen&&!isOld&&<span style={{width:'8px',height:'8px',borderRadius:'50%',background:'#fb923c',flexShrink:0}}/>}
+                    {hasWarn&&!isOpen&&<span style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 8px',background:'rgba(251,191,36,0.15)',border:'1px solid rgba(251,191,36,0.35)',borderRadius:'20px',color:'#fbbf24',fontSize:'11px',fontWeight:'800',flexShrink:0,whiteSpace:'nowrap'}}>⚠️ Fehlt: {missing.join(', ')}</span>}
+                    {hasAny&&!isOpen&&!hasWarn&&<span style={{width:'8px',height:'8px',borderRadius:'50%',background:'#fb923c',flexShrink:0}}/>}
                   </button>
 
                   {/* Ausgeklappter Inhalt */}
