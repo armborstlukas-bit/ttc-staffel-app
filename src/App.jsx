@@ -9034,7 +9034,7 @@ export default function TrainingsApp() {
                 const rankBg=rank<3?`rgba(${isAktiv?'56,189,248':'251,191,36'},0.15)`:'rgba(255,255,255,0.05)';
                 const rankCol=rank<3?(isAktiv?'#38bdf8':'#fbbf24'):'rgba(255,255,255,0.3)';
                 return(
-                <div key={c.id} style={{display:'flex',alignItems:'center',gap:'14px',padding:'13px 16px',background:'rgba(255,255,255,0.04)',border:`1px solid ${isEhemalig?'rgba(255,255,255,0.06)':isAktiv?'rgba(56,189,248,0.1)':'rgba(251,191,36,0.1)'}`,borderRadius:'14px',cursor:'pointer',transition:'all 0.12s'}}
+                <div key={c.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 12px',background:'rgba(255,255,255,0.04)',border:`1px solid ${isEhemalig?'rgba(255,255,255,0.06)':isAktiv?'rgba(56,189,248,0.1)':'rgba(251,191,36,0.1)'}`,borderRadius:'12px',cursor:'pointer',transition:'all 0.12s'}}
                   onMouseEnter={e=>{e.currentTarget.style.background=isAktiv?'rgba(56,189,248,0.06)':'rgba(251,191,36,0.06)';e.currentTarget.style.borderColor=isAktiv?'rgba(56,189,248,0.2)':'rgba(251,191,36,0.2)';}}
                   onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,0.04)';e.currentTarget.style.borderColor=isEhemalig?'rgba(255,255,255,0.06)':isAktiv?'rgba(56,189,248,0.1)':'rgba(251,191,36,0.1)';}}
                   onClick={()=>{setTtrVerlaufChild(c);navTo('ttrVerlauf');}}>
@@ -9054,7 +9054,6 @@ export default function TrainingsApp() {
                     <div style={{background:'rgba(255,255,255,0.06)',borderRadius:'99px',height:'5px',overflow:'hidden'}}>
                       <div style={{width:`${Math.min(barW,100)}%`,height:'100%',background:`linear-gradient(90deg,#92400e,${accentCol})`,borderRadius:'99px'}}/>
                     </div>
-                    <span style={{fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>{c.hist.length} Monate</span>
                   </div>
                   <div style={{textAlign:'right',flexShrink:0}}>
                     <p style={{margin:0,fontWeight:'900',fontSize:'20px',color:accentCol}}>{c.last?.ttr}</p>
