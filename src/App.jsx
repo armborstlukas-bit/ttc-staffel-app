@@ -3659,6 +3659,7 @@ export default function TrainingsApp() {
           {label:'Turniere',         icon:'🏆', color:'#fde68a', bg:'rgba(253,230,138,0.1)',  border:'rgba(253,230,138,0.25)', action:()=>navTo('turniere')},
           {label:'Gegnerlogbuch',    icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.08)',   border:'rgba(8,145,178,0.25)',   action:()=>navTo('gegnerlogbuch')},
           {label:'TTR Werte',        icon:'📈', color:'#fbbf24', bg:'rgba(251,191,36,0.08)',  border:'rgba(251,191,36,0.25)',  action:()=>navTo('ttrWerte')},
+          {label:'Spieler d. Monats',icon:'🥇', color:'#fcd34d', bg:'rgba(252,211,77,0.08)',  border:'rgba(252,211,77,0.25)',  action:()=>navTo('spielerDesMonats')},
         ],
       },
       {
@@ -8938,6 +8939,182 @@ export default function TrainingsApp() {
                 </div>
               </div>
             </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── SPIELER DES MONATS VIEW ─────────────────────────────────────────────
+  if (view === 'spielerDesMonats' && canEdit()) {
+    const jugendChildren = Object.values(children).filter(c=>subgroups[c.subgroupId]?.groupId==='jugend');
+
+    // Helper: get TTR entry closest to a given YYYY-MM (exact match preferred, else nearest before)
+    const getTtrAt = (entries, ym) => {
+      const sorted = [...entries].sort((a,b)=>a.month.localeCompare(b.month));
+      const exact = sorted.find(e=>e.month===ym);
+      if (exact) return exact;
+      // nearest entry at or before ym
+      const before = sorted.filter(e=>e.month<ym);
+      return before.length ? before[before.length-1] : null;
+    };
+
+    // DRY helper: compute winner(s) for a period comparison
+    // currentYM, prevYM: YYYY-MM strings
+    const calcWinners = (currentYM, prevYM) => {
+      const results = [];
+      jugendChildren.forEach(c => {
+        const entries = (ttrHistory[c.id]?.entries || []);
+        if (entries.length < 2) return;
+        const sorted = [...entries].sort((a,b)=>a.month.localeCompare(b.month));
+        const firstEntry = sorted[0];
+        const currEntry = getTtrAt(sorted, currentYM);
+        const prevEntry = getTtrAt(sorted, prevYM);
+        if (!currEntry || !prevEntry) return;
+        // Exclusion: prevEntry must not be the first ever entry
+        if (prevEntry.month === firstEntry.month) return;
+        const diff = currEntry.ttr - prevEntry.ttr;
+        results.push({child: c, currTtr: currEntry.ttr, prevTtr: prevEntry.ttr, diff, currYM: currEntry.month, prevYM: prevEntry.month});
+      });
+      if (!results.length) return null;
+      const maxDiff = Math.max(...results.map(r=>r.diff));
+      if (maxDiff <= 0) return null;
+      return results.filter(r=>r.diff===maxDiff);
+    };
+
+    // Current month & previous month (use latestImportMonth as "current")
+    const allMs = Object.values(ttrHistory).flatMap(h=>(h.entries||[]).map(e=>e.month));
+    const latestM = allMs.length ? allMs.reduce((a,b)=>a>b?a:b) : null;
+    const prevM = latestM ? (()=>{const [y,m]=latestM.split('-').map(Number);const d=new Date(y,m-2,1);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;})() : null;
+    const currentMonthWinners = latestM && prevM ? calcWinners(latestM, prevM) : null;
+
+    // Current year (compare Jan this year vs Jan last year)
+    const curYear = latestM ? latestM.slice(0,4) : String(new Date().getFullYear());
+    const curYearJan = `${curYear}-01`;
+    const prevYearJan = `${Number(curYear)-1}-01`;
+    const currentYearWinners = calcWinners(curYearJan, prevYearJan);
+
+    // Historical months: all YYYY-MM from earliest to latestM
+    const allEntryMonths = [...new Set(allMs)].sort();
+    const historicMonths = [];
+    if (allEntryMonths.length >= 2) {
+      const [fy, fm] = allEntryMonths[0].split('-').map(Number);
+      let y=fy, m=fm+1;
+      if (m>12) { m=1; y++; }
+      const [ly, lm] = (latestM||allEntryMonths[allEntryMonths.length-1]).split('-').map(Number);
+      while (y<ly || (y===ly&&m<=lm)) {
+        const curYM = `${y}-${String(m).padStart(2,'0')}`;
+        const prevD = new Date(y,m-2,1);
+        const prevYM = `${prevD.getFullYear()}-${String(prevD.getMonth()+1).padStart(2,'0')}`;
+        const winners = calcWinners(curYM, prevYM);
+        if (winners) historicMonths.push({period: curYM, winners});
+        m++; if (m>12){m=1;y++;}
+      }
+    }
+    historicMonths.reverse();
+
+    // Historical years
+    const historicYears = [];
+    const years = [...new Set(allMs.map(m=>m.slice(0,4)))].sort();
+    for (let i=1;i<years.length;i++) {
+      const cy=years[i], py=years[i-1];
+      const winners = calcWinners(`${cy}-01`, `${py}-01`);
+      if (winners) historicYears.push({period: cy, winners});
+    }
+    historicYears.reverse();
+
+    const fmtMonth = ym => { const [y,m]=ym.split('-'); return `${['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'][Number(m)-1]} ${y}`; };
+    const WinnerBadge = ({w,compact=false}) => (
+      <div style={{display:'flex',alignItems:'center',gap:compact?'8px':'12px'}}>
+        <div style={{width:compact?'32px':'48px',height:compact?'32px':'48px',borderRadius:'50%',background:'rgba(252,211,77,0.15)',border:'2px solid rgba(252,211,77,0.4)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:compact?'16px':'24px',flexShrink:0}}>🏅</div>
+        <div>
+          <p style={{margin:0,fontWeight:'800',fontSize:compact?'13px':'16px',color:'white'}}>{w.child.name}</p>
+          <p style={{margin:0,fontSize:compact?'11px':'12px',color:'rgba(255,255,255,0.45)'}}>
+            {w.prevTtr} → {w.currTtr} <span style={{color:'#4ade80',fontWeight:'700'}}>+{w.diff}</span>
+          </p>
+        </div>
+      </div>
+    );
+
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#0c0a00 0%,#1a1400 45%,#0c0a00 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+          <button onClick={()=>navTo('home')} style={s.btn('#fcd34d')}><Home size={16}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>🥇 Spieler des Monats</h1>
+        </div>
+        <div style={{maxWidth:'680px',margin:'0 auto',padding:isMobile?'16px 14px 48px':'20px 24px 60px',display:'flex',flexDirection:'column',gap:'16px'}}>
+
+          {/* Aktueller Spieler des Monats */}
+          <div style={{background:'rgba(252,211,77,0.06)',border:'1px solid rgba(252,211,77,0.25)',borderRadius:'18px',padding:'20px'}}>
+            <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'800',color:'rgba(252,211,77,0.5)',textTransform:'uppercase',letterSpacing:'1.5px'}}>
+              {latestM ? fmtMonth(latestM) : 'Aktuell'} · Spieler des Monats
+            </p>
+            {currentMonthWinners ? (
+              <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'16px'}}>
+                {currentMonthWinners.map((w,i)=><WinnerBadge key={i} w={w}/>)}
+              </div>
+            ) : (
+              <p style={{margin:'0 0 16px',fontSize:'14px',color:'rgba(255,255,255,0.35)'}}>Kein Gewinner diesen Monat</p>
+            )}
+
+            {/* Spieler des Jahres – kompakt eingebettet */}
+            <div style={{borderTop:'1px solid rgba(252,211,77,0.12)',paddingTop:'14px',marginTop:'4px'}}>
+              <p style={{margin:'0 0 10px',fontSize:'10px',fontWeight:'800',color:'rgba(252,211,77,0.4)',textTransform:'uppercase',letterSpacing:'1.5px'}}>
+                {curYear} · Spieler des Jahres
+              </p>
+              {currentYearWinners ? (
+                <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+                  {currentYearWinners.map((w,i)=><WinnerBadge key={i} w={w} compact/>)}
+                </div>
+              ) : (
+                <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.3)'}}>Kein Gewinner dieses Jahr</p>
+              )}
+            </div>
+          </div>
+
+          {/* Historische Monatsübersicht */}
+          {historicMonths.length>0&&(
+            <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'16px',overflow:'hidden'}}>
+              <p style={{margin:0,padding:'14px 16px',fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'1.5px',borderBottom:'1px solid rgba(255,255,255,0.06)'}}>Historische Monatssieger</p>
+              <div style={{maxHeight:'340px',overflowY:'auto'}}>
+                {historicMonths.map(({period,winners})=>(
+                  <div key={period} style={{display:'flex',alignItems:'center',gap:'12px',padding:'10px 16px',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                    <span style={{fontSize:'12px',color:'rgba(255,255,255,0.3)',fontWeight:'600',minWidth:'56px'}}>{fmtMonth(period)}</span>
+                    <div style={{flex:1}}>
+                      {winners.map((w,i)=>(
+                        <span key={i} style={{display:'block',fontWeight:'700',color:'white',fontSize:'13px'}}>{w.child.name}</span>
+                      ))}
+                    </div>
+                    <span style={{fontSize:'13px',fontWeight:'800',color:'#4ade80'}}>+{winners[0].diff}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Historische Jahresübersicht */}
+          {historicYears.length>0&&(
+            <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'16px',overflow:'hidden'}}>
+              <p style={{margin:0,padding:'14px 16px',fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'1.5px',borderBottom:'1px solid rgba(255,255,255,0.06)'}}>Historische Jahressieger</p>
+              {historicYears.map(({period,winners})=>(
+                <div key={period} style={{display:'flex',alignItems:'center',gap:'12px',padding:'10px 16px',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                  <span style={{fontSize:'12px',color:'rgba(255,255,255,0.3)',fontWeight:'600',minWidth:'36px'}}>{period}</span>
+                  <div style={{flex:1}}>
+                    {winners.map((w,i)=>(
+                      <span key={i} style={{display:'block',fontWeight:'700',color:'white',fontSize:'13px'}}>{w.child.name}</span>
+                    ))}
+                  </div>
+                  <span style={{fontSize:'13px',fontWeight:'800',color:'#4ade80'}}>+{winners[0].diff}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {historicMonths.length===0&&historicYears.length===0&&(
+            <div style={{textAlign:'center',padding:'48px 20px',color:'rgba(255,255,255,0.25)',fontSize:'14px'}}>
+              <p style={{fontSize:'36px',margin:'0 0 12px'}}>📊</p>
+              Noch nicht genug TTR-Daten für eine Auswertung.
+            </div>
           )}
         </div>
       </div>
