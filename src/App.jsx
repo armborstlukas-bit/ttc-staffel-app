@@ -774,7 +774,9 @@ export default function TrainingsApp() {
   const [tmEditId, setTmEditId] = useState(null);
   const [tmSearch, setTmSearch] = useState('');
   const [tmSearchFocus, setTmSearchFocus] = useState(false);
-  const [tmForm, setTmForm] = useState({opponent:'',opponentCustom:'',useCustom:false,result:'3:0',vorgabe:false,vorgabePlayer:'',vorgabePoints:1,date:''});
+  const [tmSearch2, setTmSearch2] = useState('');
+  const [tmSearchFocus2, setTmSearchFocus2] = useState(false);
+  const [tmForm, setTmForm] = useState({opponent:'',opponentCustom:'',useCustom:false,player1:'',result:'3:0',vorgabe:false,vorgabePlayer:'',vorgabePoints:1,date:'',otherMatch:false});
   const [activePracticeId, setActivePracticeId]                     = useState(null);
   const [ptCreating, setPtCreating]                                 = useState(false);
   const [ptCreateStep, setPtCreateStep]                             = useState(1);
@@ -9692,12 +9694,13 @@ export default function TrainingsApp() {
 
     const submitMatch = () => {
       const opponent = tmForm.useCustom ? tmForm.opponentCustom.trim() : (tmForm.opponent || tmSearch.trim());
-      if (!opponent || !tmForm.result) return;
+      const p1 = tmForm.otherMatch ? (tmForm.player1 || tmSearch2.trim()) : me;
+      if (!opponent || !p1 || !tmForm.result) return;
       const [s1,s2] = tmForm.result.split(':').map(Number);
       const entry = {
         id:'tm_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
         date: tmForm.date || TODAY,
-        player1: me,
+        player1: p1,
         player2: opponent,
         score1: s1,
         score2: s2,
@@ -9707,8 +9710,8 @@ export default function TrainingsApp() {
       };
       saveMatches([entry, ...trainingsmatches]);
       setTmAdding(false);
-      setTmSearch('');
-      setTmForm({opponent:'',opponentCustom:'',useCustom:false,result:'3:0',vorgabe:false,vorgabePlayer:'',vorgabePoints:1,date:''});
+      setTmSearch(''); setTmSearch2('');
+      setTmForm({opponent:'',opponentCustom:'',useCustom:false,player1:'',result:'3:0',vorgabe:false,vorgabePlayer:'',vorgabePoints:1,date:'',otherMatch:false});
     };
 
     // Build allzeit table (Vorgabe-Matches ausgeschlossen)
@@ -9746,9 +9749,51 @@ export default function TrainingsApp() {
             <div style={{background:acBg,border:`1px solid ${acBorder}`,borderRadius:'16px',padding:'18px',marginBottom:'20px'}}>
               <p style={{margin:'0 0 14px',fontSize:'12px',fontWeight:'800',color:ac,textTransform:'uppercase',letterSpacing:'0.5px'}}>Neues Trainingsmatch</p>
               <div style={{display:'grid',gap:'12px'}}>
+                {/* Toggle: Fremdes Match */}
+                <button onClick={()=>setTmForm(f=>({...f,otherMatch:!f.otherMatch,player1:''}))}
+                  style={{display:'flex',alignItems:'center',gap:'8px',background:'none',border:'none',cursor:'pointer',padding:0,color:tmForm.otherMatch?ac:'rgba(255,255,255,0.4)',fontSize:'13px',fontWeight:'700',justifyContent:'flex-start'}}>
+                  <span style={{width:'18px',height:'18px',borderRadius:'4px',border:`2px solid ${tmForm.otherMatch?ac:'rgba(255,255,255,0.2)'}`,background:tmForm.otherMatch?ac:'none',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',flexShrink:0}}>{tmForm.otherMatch?'✓':''}</span>
+                  Fremdes Match (zwei andere Spieler)
+                </button>
+
+                {/* Spieler 1 – nur bei fremdem Match */}
+                {tmForm.otherMatch&&(()=>{
+                  const sugg2 = tmSearch2.trim().length>0
+                    ? registeredPlayers.filter(p=>p.toLowerCase().includes(tmSearch2.toLowerCase()))
+                    : registeredPlayers;
+                  return (
+                  <div style={{position:'relative'}}>
+                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'6px',textTransform:'uppercase'}}>Spieler 1</label>
+                    <input type="text"
+                      placeholder="Name suchen…"
+                      value={tmForm.player1 || tmSearch2}
+                      onChange={e=>{setTmSearch2(e.target.value);setTmForm(f=>({...f,player1:''}));}}
+                      onFocus={()=>setTmSearchFocus2(true)}
+                      onBlur={()=>setTimeout(()=>setTmSearchFocus2(false),150)}
+                      style={{width:'100%',padding:'10px 12px',background:'#1a0a1e',border:`1px solid ${tmForm.player1?ac:acBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}
+                    />
+                    {tmForm.player1&&<span style={{position:'absolute',right:'10px',top:'34px',fontSize:'12px',color:'rgba(255,255,255,0.3)',cursor:'pointer'}}
+                      onMouseDown={()=>{setTmForm(f=>({...f,player1:''}));setTmSearch2('');}}>×</span>}
+                    {tmSearchFocus2&&(
+                      <div style={{position:'absolute',top:'100%',left:0,right:0,zIndex:50,background:'#1a0a1e',border:`1px solid ${acBorder}`,borderRadius:'10px',marginTop:'4px',maxHeight:'180px',overflowY:'auto',boxShadow:'0 8px 24px rgba(0,0,0,0.5)'}}>
+                        {sugg2.length===0&&<div style={{padding:'10px 12px',fontSize:'13px',color:'rgba(255,255,255,0.3)'}}>Kein Spieler gefunden</div>}
+                        {sugg2.map(p=>(
+                          <div key={p} onMouseDown={()=>{setTmForm(f=>({...f,player1:p}));setTmSearch2('');setTmSearchFocus2(false);}}
+                            style={{padding:'10px 12px',fontSize:'14px',color:'white',cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,0.05)'}}
+                            onMouseEnter={e=>e.currentTarget.style.background='rgba(244,114,182,0.1)'}
+                            onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                            {p}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  );
+                })()}
+
                 {/* Gegner Suchfeld */}
                 <div style={{position:'relative'}}>
-                  <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'6px',textTransform:'uppercase'}}>Gegner</label>
+                  <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'6px',textTransform:'uppercase'}}>{tmForm.otherMatch?'Spieler 2':'Gegner'}</label>
                   <input type="text"
                     placeholder="Name suchen…"
                     value={tmForm.opponent || tmSearch}
@@ -9793,7 +9838,7 @@ export default function TrainingsApp() {
                     <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'6px',textTransform:'uppercase'}}>Ergebnis (Sätze)</label>
                     <select value={tmForm.result} onChange={e=>setTmForm(f=>({...f,result:e.target.value}))}
                       style={{width:'100%',padding:'10px 12px',background:'#1a0a1e',border:`1px solid ${acBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}>
-                      {resultOptions.map(r=>{const [a,b]=r.split(':');return <option key={r} value={r}>{me.split(' ')[0]||'Ich'} {a}:{b} {(tmForm.useCustom?tmForm.opponentCustom:tmForm.opponent||'Gegner').split(' ')[0]}</option>;})}
+                      {resultOptions.map(r=>{const [a,b]=r.split(':');const p1n=(tmForm.otherMatch?(tmForm.player1||tmSearch2||'Spieler 1'):me).split(' ')[0]||'S1';const p2n=(tmForm.useCustom?tmForm.opponentCustom:tmForm.opponent||'Spieler 2').split(' ')[0]||'S2';return <option key={r} value={r}>{p1n} {a}:{b} {p2n}</option>;})}
                     </select>
                   </div>
                   <div>
@@ -9816,8 +9861,8 @@ export default function TrainingsApp() {
                         <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase'}}>Wer bekommt Vorgabe?</label>
                         <select value={tmForm.vorgabePlayer} onChange={e=>setTmForm(f=>({...f,vorgabePlayer:e.target.value}))}
                           style={{width:'100%',padding:'9px 12px',background:'#1a0a1e',border:`1px solid ${acBorder}`,borderRadius:'9px',color:'white',fontSize:'13px',outline:'none',boxSizing:'border-box'}}>
-                          <option value={me}>{me.split(' ')[0]||'Ich'} (ich)</option>
-                          <option value={vorgabeTarget}>{vorgabeTarget.split(' ')[0]||'Gegner'} (Gegner)</option>
+                          <option value={tmForm.otherMatch?(tmForm.player1||tmSearch2||me):me}>{(tmForm.otherMatch?(tmForm.player1||tmSearch2||me):me).split(' ')[0]||'S1'}</option>
+                          <option value={vorgabeTarget}>{vorgabeTarget.split(' ')[0]||'S2'}</option>
                         </select>
                       </div>
                       <div>
@@ -9833,9 +9878,9 @@ export default function TrainingsApp() {
 
                 {/* Buttons */}
                 <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>
-                  <button onClick={()=>setTmAdding(false)}
+                  <button onClick={()=>{setTmAdding(false);setTmSearch('');setTmSearch2('');}}
                     style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
-                  <button onClick={submitMatch} disabled={!(tmForm.useCustom?tmForm.opponentCustom.trim():tmForm.opponent)}
+                  <button onClick={submitMatch} disabled={!(tmForm.useCustom?tmForm.opponentCustom.trim():tmForm.opponent)||(tmForm.otherMatch&&!(tmForm.player1||tmSearch2.trim()))}
                     style={{padding:'9px 20px',background:(tmForm.useCustom?tmForm.opponentCustom.trim():tmForm.opponent)?`linear-gradient(135deg,${ac},#db2777)`:'rgba(255,255,255,0.1)',color:'white',border:'none',borderRadius:'10px',cursor:(tmForm.useCustom?tmForm.opponentCustom.trim():tmForm.opponent)?'pointer':'not-allowed',fontWeight:'700',fontSize:'13px',opacity:(tmForm.useCustom?tmForm.opponentCustom.trim():tmForm.opponent)?1:0.5}}>
                     Match speichern
                   </button>
