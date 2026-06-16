@@ -9005,6 +9005,14 @@ export default function TrainingsApp() {
         </div>
         <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
 
+          {/* TTR Import Button */}
+          <button onClick={()=>navTo('ttrImport')}
+            style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',padding:'12px',marginBottom:'16px',background:'rgba(110,231,183,0.07)',border:'1px solid rgba(110,231,183,0.2)',borderRadius:'14px',color:'#6ee7b7',cursor:'pointer',fontWeight:'700',fontSize:'14px',transition:'all 0.12s'}}
+            onMouseEnter={e=>{e.currentTarget.style.background='rgba(110,231,183,0.13)';e.currentTarget.style.borderColor='rgba(110,231,183,0.35)';}}
+            onMouseLeave={e=>{e.currentTarget.style.background='rgba(110,231,183,0.07)';e.currentTarget.style.borderColor='rgba(110,231,183,0.2)';}}>
+            <span style={{fontSize:'16px'}}>📥</span> TTR-Import
+          </button>
+
           <div style={{display:'flex',gap:'6px',marginBottom:'16px',flexWrap:'wrap'}}>
             {filterTabs.map(tab=>(
               <button key={tab.id} onClick={()=>setTtrFilter(tab.id)}
@@ -9040,9 +9048,14 @@ export default function TrainingsApp() {
                     <span style={{fontSize:'12px',fontWeight:'800',color:isEhemalig?'rgba(255,255,255,0.2)':rankCol}}>{rank+1}</span>
                   </div>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'5px'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'5px',flexWrap:'wrap'}}>
                       <span style={{fontWeight:'700',color:'white',fontSize:'14px'}}>{c.name}</span>
-                      {c.diff!==null&&<span style={{fontSize:'11px',fontWeight:'700',color:c.diff>=0?'#4ade80':'#f87171'}}>{c.diff>=0?'+':''}{c.diff}</span>}
+                      {!isEhemalig&&c.diff!==null&&(
+                        <span style={{display:'inline-flex',alignItems:'center',gap:'2px',fontSize:'11px',fontWeight:'700',color:c.diff>=0?'#4ade80':'#f87171',background:c.diff>=0?'rgba(74,222,128,0.08)':'rgba(248,113,113,0.08)',borderRadius:'6px',padding:'1px 5px'}}>
+                          {c.diff>=0?'+':''}{c.diff}
+                          <span style={{fontSize:'9px',fontWeight:'500',color:'rgba(255,255,255,0.3)',marginLeft:'1px'}}>ggü. Vm.</span>
+                        </span>
+                      )}
                     </div>
                     <div style={{background:'rgba(255,255,255,0.06)',borderRadius:'99px',height:'5px',overflow:'hidden'}}>
                       <div style={{width:`${Math.min(barW,100)}%`,height:'100%',background:`linear-gradient(90deg,#92400e,${accentCol})`,borderRadius:'99px'}}/>
@@ -9050,9 +9063,8 @@ export default function TrainingsApp() {
                     <span style={{fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>{c.last?.month} · {c.hist.length} Monate</span>
                   </div>
                   <div style={{textAlign:'right',flexShrink:0}}>
-                    <p style={{margin:'0 0 2px',fontWeight:'900',fontSize:'20px',color:accentCol}}>{c.last?.ttr}</p>
-                    {isEhemalig&&c.last?.month&&<p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.2)'}}>zuletzt {c.last.month}</p>}
-                    {!isEhemalig&&c.total!==null&&<p style={{margin:0,fontSize:'11px',fontWeight:'700',color:c.total>=0?'#4ade80':'#f87171'}}>{c.total>=0?'▲':'▼'} {Math.abs(c.total)} gesamt</p>}
+                    <p style={{margin:0,fontWeight:'900',fontSize:'20px',color:accentCol}}>{c.last?.ttr}</p>
+                    {isEhemalig&&c.last?.month&&<p style={{margin:'2px 0 0',fontSize:'10px',color:'rgba(255,255,255,0.2)'}}>zuletzt {c.last.month}</p>}
                   </div>
                 </div>
               );})}
