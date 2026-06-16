@@ -829,7 +829,7 @@ export default function TrainingsApp() {
           const data = snap.data();
           // Backwards compat: roles array or single role string
           const roles = data.roles && data.roles.length > 0 ? data.roles : [data.role];
-          const profile = { ...data, roles };
+          const profile = { ...data, uid: u.uid, roles };
           setUserProfile(profile);
           const selectableRoles = roles.filter(r => r !== 'pending');
           if (selectableRoles.length > 1) {
@@ -837,6 +837,14 @@ export default function TrainingsApp() {
             setShowRolePicker(true);
           } else {
             setUserRole(roles[0]);
+          }
+          // Admin in ttc/users eintragen falls noch nicht vorhanden
+          if (roles.includes('admin')) {
+            const ttcSnap = await getDoc(doc(db,'ttc','users'));
+            const ttcUsers = ttcSnap.exists() ? ttcSnap.data() : {};
+            if (!ttcUsers[u.uid]) {
+              await setDoc(doc(db,'ttc','users'), {...ttcUsers, [u.uid]: profile});
+            }
           }
         }
       } else { setUser(null); setUserRole(null); setUserProfile(null); setShowRolePicker(false); }
@@ -3330,7 +3338,11 @@ export default function TrainingsApp() {
 
           {/* Bestehende Nutzer — klappbare Liste */}
           {(()=>{
-            const active = Object.values(allUsers).filter(u=>u.role!=='pending').sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+            // Eigenen Account einmischen falls nicht in ttc/users
+            const usersMap = user && !allUsers[user.uid] && userProfile
+              ? {...allUsers, [user.uid]: {...userProfile, uid: user.uid}}
+              : allUsers;
+            const active = Object.values(usersMap).filter(u=>u.role!=='pending').sort((a,b)=>(a.name||'').localeCompare(b.name||''));
             if(active.length===0) return null;
             return (
               <div>
