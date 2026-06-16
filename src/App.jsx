@@ -9781,13 +9781,10 @@ export default function TrainingsApp() {
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#1a0812 0%,#2d0820 45%,#150610 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
-        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'12px'}}>
-          <button onClick={()=>navTo('home')} style={{padding:'8px 14px',background:'rgba(253,164,175,0.1)',border:'1px solid rgba(253,164,175,0.25)',borderRadius:'10px',color:accent,cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>← Home</button>
-          <img src="/rompel.jpg" alt="Rompel" style={{width:'38px',height:'38px',borderRadius:'50%',objectFit:'cover',objectPosition:'center top',border:`2px solid ${accent}`}}/>
-          <div>
-            <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',letterSpacing:'-0.3px'}}>Rompel Bereich</h1>
-            <p style={{margin:0,color:'rgba(255,255,255,0.4)',fontSize:'12px'}}>Fiktives Guthaben · Christian Rompel</p>
-          </div>
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+          <button onClick={()=>navTo('home')} style={s.btn('#fda4af')}><Home size={16}/></button>
+          <img src="/rompel.jpg" alt="Rompel" style={{width:'32px',height:'32px',borderRadius:'50%',objectFit:'cover',objectPosition:'center top',border:`2px solid ${accent}`,flexShrink:0}}/>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>Rompel Bereich</h1>
         </div>
         <div style={{padding:'20px',maxWidth:'700px',margin:'0 auto'}}>
 
