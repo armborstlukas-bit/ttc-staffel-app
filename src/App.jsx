@@ -9853,13 +9853,13 @@ export default function TrainingsApp() {
                   return (
                   <div key={row.name} style={{display:'grid',gridTemplateColumns:'28px 1fr 50px 50px 50px 56px',gap:'4px',padding:'10px 14px',borderBottom:i<tableData.length-1?'1px solid rgba(255,255,255,0.04)':'none',alignItems:'center',background:isMe?'rgba(244,114,182,0.07)':'transparent'}}>
                     <span style={{fontSize:'12px',fontWeight:'800',color:i===0?'#fbbf24':i===1?'rgba(255,255,255,0.5)':i===2?'#cd7c32':'rgba(255,255,255,0.25)'}}>{i+1}</span>
-                    <span style={{fontSize:'14px',fontWeight:'700',color:isMe?ac:'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{row.name}{isMe&&<span style={{fontSize:'10px',marginLeft:'5px',opacity:0.6}}>← ich</span>}</span>
+                    <span style={{fontSize:'14px',fontWeight:'700',color:isMe?ac:'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{row.name}{isMe&&<span style={{fontSize:'10px',marginLeft:'5px',opacity:0.6}}>» ich</span>}</span>
                     <span style={{textAlign:'center',fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>{row.matches}</span>
                     <span style={{textAlign:'center',fontSize:'13px',color:'#86efac',fontWeight:'700'}}>{row.wins}</span>
                     <span style={{textAlign:'center',fontSize:'13px',color:'#fca5a5'}}>{row.losses}</span>
                     <span style={{textAlign:'right',fontSize:'13px',fontWeight:'800',color:ac}}>{Math.round(row.winrate*100)}%</span>
                   </div>
-                );})
+                );})}
               </div>
             )}
           </div>
@@ -9910,7 +9910,6 @@ export default function TrainingsApp() {
                     </div>
                   );
                 }
-                const isMyMatch = m.player1===me||m.player2===me;
                 const myWin = isMyMatch&&((m.player1===me&&p1wins)||(m.player2===me&&!p1wins));
                 return (
                   <div key={m.id} style={{background:isMyMatch?(myWin?'rgba(74,222,128,0.05)':'rgba(248,113,113,0.05)'):'rgba(255,255,255,0.03)',border:`2px solid ${isMyMatch?(myWin?'rgba(74,222,128,0.35)':'rgba(248,113,113,0.35)'):acBorder}`,borderRadius:'12px',padding:'12px 14px',display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>
