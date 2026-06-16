@@ -751,6 +751,9 @@ export default function TrainingsApp() {
   const [ttrManMonth, setTtrManMonth] = useState(()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;});
   const [ttrManTtr, setTtrManTtr] = useState('');
   const [ttrManSaved, setTtrManSaved] = useState(false);
+  const [rompelData, setRompelData] = useState({hours:[], expenses:[]});
+  const [rompelHoursForm, setRompelHoursForm] = useState({date:new Date().toISOString().split('T')[0], hours:'', desc:''});
+  const [rompelExpForm, setRompelExpForm] = useState({date:new Date().toISOString().split('T')[0], amount:'', desc:''});
   const [elternSubView, setElternSubView] = useState(null);
   const [ttcNews, setTtcNews] = useState([]);
   const [ttcNewsLoading, setTtcNewsLoading] = useState(false);
@@ -865,6 +868,7 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','notifications'),      s => { setNotifications(s.exists()?s.data():{}); setNotificationsLoaded(true); }),
       onSnapshot(doc(db,'ttc','teams'),              s => setTeams(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','appSettings'),        s => setAppSettings(s.exists()?s.data():{})),
+      onSnapshot(doc(db,'ttc','rompel'),             s => setRompelData(s.exists()?s.data():{hours:[],expenses:[]})),
       onSnapshot(doc(db,'ttc','leagueData'),         s => setLeagueData(s.exists()?s.data():{ table: null, schedule: null, fetchedAt: null })),
       onSnapshot(doc(db,'ttc','rangliste'), s => setRangliste(s.exists()&&s.data().entries ? s.data().entries : [])),
       onSnapshot(doc(db,'ttc','ranglistenspiele'), s => setRanglistenspiele(s.exists() ? { active: s.data().active||[], archived: s.data().archived||[] } : { active:[], archived:[] })),
@@ -1139,6 +1143,8 @@ export default function TrainingsApp() {
   };
   const saveTeams = u => { const s=sanitizeTeams(u); setTeams(s); setDoc(doc(db,'ttc','teams'), s).catch(e=>console.error('saveTeams failed:',e)); };
   const saveAppSettings                  = u => { setAppSettings(u);                  setDoc(doc(db,'ttc','appSettings'),                  u); };
+  const saveRompelData                   = u => { setRompelData(u);                   setDoc(doc(db,'ttc','rompel'),                        u); };
+  const canAccessRompel = () => userRole === 'admin' || (canEdit() && (appSettings.rompelTrainers || []).includes(user?.uid));
   const saveLeagueData                   = u => { setLeagueData(u);                   setDoc(doc(db,'ttc','leagueData'),                   u); };
 
   // ── Liga-Daten via eigene Vercel Serverless Function laden ──────────────
@@ -3479,6 +3485,39 @@ export default function TrainingsApp() {
           );
         })()}
 
+          {/* Rompel Bereich Zugang */}
+          {(()=>{
+            const trainers = Object.values(allUsers).filter(u=>(u.roles||[u.role]).includes('trainer')).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+            const currentList = appSettings.rompelTrainers || [];
+            const toggle = uid => {
+              const next = currentList.includes(uid) ? currentList.filter(x=>x!==uid) : [...currentList, uid];
+              saveAppSettings({...appSettings, rompelTrainers: next});
+            };
+            return (
+              <div style={{...s.card,marginTop:'16px'}}>
+                <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'14px'}}>
+                  <img src="/rompel.jpg" alt="" style={{width:'32px',height:'32px',borderRadius:'50%',objectFit:'cover',objectPosition:'center top',border:'2px solid #fda4af'}}/>
+                  <span style={{fontWeight:'800',color:'#fda4af',fontSize:'14px'}}>Rompel Bereich — Trainer-Zugang</span>
+                </div>
+                <p style={{margin:'0 0 10px',fontSize:'12px',color:'#6b7280'}}>Admins haben immer Zugang. Wähle Trainer aus, die ebenfalls Zugriff erhalten:</p>
+                {trainers.length === 0
+                  ? <p style={{fontSize:'13px',color:'#9ca3af'}}>Keine Trainer registriert.</p>
+                  : <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
+                    {trainers.map(u=>{
+                      const on = currentList.includes(u.uid);
+                      return (
+                        <button key={u.uid} onClick={()=>toggle(u.uid)}
+                          style={{padding:'7px 14px',borderRadius:'20px',border:`1px solid ${on?'#fda4af':'#d1d5db'}`,background:on?'rgba(253,164,175,0.15)':'#f9fafb',color:on?'#be185d':'#374151',cursor:'pointer',fontWeight:'700',fontSize:'13px',transition:'all 0.15s'}}>
+                          {on?'✓ ':''}{u.name||u.email}
+                        </button>
+                      );
+                    })}
+                  </div>
+                }
+              </div>
+            );
+          })()}
+
         </div>
       </div>
     );
@@ -3578,6 +3617,9 @@ export default function TrainingsApp() {
             border:new Date().getDate()<=3 ? 'rgba(239,68,68,0.4)'  : 'rgba(110,231,183,0.25)',
             badge: new Date().getDate()<=3 ? '!' : null,
             action:()=>navTo('ttrImport')},
+          ...(canAccessRompel()?[
+            {label:'Rompel Bereich', icon:{type:'img',src:'/rompel.jpg'}, color:'#fda4af', bg:'rgba(253,164,175,0.08)', border:'rgba(253,164,175,0.25)', action:()=>navTo('rompel')},
+          ]:[]),
           ...(userRole==='admin'?[
             {label:'Admin',          icon:'🛡️', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('admin')},
           ]:[]),
@@ -3735,7 +3777,9 @@ export default function TrainingsApp() {
                   <button key={i} onClick={ql.action} style={QL_STYLE(ql.bg,ql.border)}
                     onMouseEnter={e=>e.currentTarget.style.transform='translateY(-2px)'}
                     onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
-                    <span style={{fontSize:'24px',lineHeight:1}}>{ql.icon}</span>
+                    {ql.icon&&typeof ql.icon==='object'&&ql.icon.type==='img'
+                      ? <img src={ql.icon.src} alt="" style={{width:'36px',height:'36px',borderRadius:'50%',objectFit:'cover',objectPosition:'center top',border:'2px solid rgba(253,164,175,0.4)'}}/>
+                      : <span style={{fontSize:'24px',lineHeight:1}}>{ql.icon}</span>}
                     <span style={{fontSize:'11px',fontWeight:'700',color:ql.color,lineHeight:'1.3'}}>{ql.label}</span>
                     {(ql.badge>0||ql.badge==='!')&&<span style={{position:'absolute',top:'8px',right:'8px',background:'#dc2626',color:'white',borderRadius:'50%',width:'18px',height:'18px',fontSize:'10px',fontWeight:'800',display:'flex',alignItems:'center',justifyContent:'center'}}>{ql.badge==='!'?'!':ql.badge>9?'9+':ql.badge}</span>}
                   </button>
@@ -9698,6 +9742,125 @@ export default function TrainingsApp() {
               })}
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── ROMPEL BEREICH ──────────────────────────────────────────────────────
+  if (view === 'rompel' && canAccessRompel()) {
+    const accent = '#fda4af';
+    const hours = rompelData.hours || [];
+    const expenses = rompelData.expenses || [];
+    const totalGuthaben = hours.reduce((s, h) => s + (Number(h.hours) || 0) * 7.5, 0);
+    const totalAusgaben = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+    const saldo = totalGuthaben - totalAusgaben;
+
+    const addHours = () => {
+      const h = Number(rompelHoursForm.hours);
+      if (!h || h <= 0) return;
+      const entry = {id:'h_'+Date.now(), date: rompelHoursForm.date, hours: h, desc: rompelHoursForm.desc.trim()};
+      const updated = {...rompelData, hours: [...hours, entry].sort((a,b)=>a.date.localeCompare(b.date))};
+      saveRompelData(updated);
+      setRompelHoursForm(f=>({...f, hours:'', desc:''}));
+    };
+    const deleteHours = id => saveRompelData({...rompelData, hours: hours.filter(h=>h.id!==id)});
+    const addExpense = () => {
+      const a = Number(rompelExpForm.amount);
+      if (!a || a <= 0) return;
+      const entry = {id:'e_'+Date.now(), date: rompelExpForm.date, amount: a, desc: rompelExpForm.desc.trim()};
+      const updated = {...rompelData, expenses: [...expenses, entry].sort((a,b)=>a.date.localeCompare(b.date))};
+      saveRompelData(updated);
+      setRompelExpForm(f=>({...f, amount:'', desc:''}));
+    };
+    const deleteExpense = id => saveRompelData({...rompelData, expenses: expenses.filter(e=>e.id!==id)});
+
+    const cardStyle = {background:'rgba(255,255,255,0.04)',border:'1px solid rgba(253,164,175,0.12)',borderRadius:'16px',padding:'18px',marginBottom:'16px'};
+    const inputS = {padding:'10px 13px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(253,164,175,0.2)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',flex:1,minWidth:0};
+    const btnS = (bg,col)=>({padding:'10px 18px',background:bg,border:'none',borderRadius:'10px',color:col||'white',cursor:'pointer',fontWeight:'700',fontSize:'14px',whiteSpace:'nowrap'});
+
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#1a0812 0%,#2d0820 45%,#150610 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'12px'}}>
+          <button onClick={()=>navTo('home')} style={{padding:'8px 14px',background:'rgba(253,164,175,0.1)',border:'1px solid rgba(253,164,175,0.25)',borderRadius:'10px',color:accent,cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>← Home</button>
+          <img src="/rompel.jpg" alt="Rompel" style={{width:'38px',height:'38px',borderRadius:'50%',objectFit:'cover',objectPosition:'center top',border:`2px solid ${accent}`}}/>
+          <div>
+            <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',letterSpacing:'-0.3px'}}>Rompel Bereich</h1>
+            <p style={{margin:0,color:'rgba(255,255,255,0.4)',fontSize:'12px'}}>Fiktives Guthaben · Christian Rompel</p>
+          </div>
+        </div>
+        <div style={{padding:'20px',maxWidth:'700px',margin:'0 auto'}}>
+
+          {/* Saldo-Übersicht */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'12px',marginBottom:'24px'}}>
+            {[
+              {label:'Trainingsguthaben',value:`${totalGuthaben.toFixed(2)} €`,color:'#4ade80'},
+              {label:'Offene Kosten',    value:`${totalAusgaben.toFixed(2)} €`,color:'#f87171'},
+              {label:'Saldo',            value:`${saldo>=0?'+':''}${saldo.toFixed(2)} €`,color:saldo>=0?'#4ade80':'#f87171',big:true},
+            ].map(({label,value,color,big})=>(
+              <div key={label} style={{background:'rgba(255,255,255,0.04)',border:`1px solid ${color}33`,borderRadius:'14px',padding:'14px',textAlign:'center'}}>
+                <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px',color:'rgba(255,255,255,0.4)'}}>{label}</p>
+                <p style={{margin:0,fontSize:big?'22px':'18px',fontWeight:'800',color}}>{value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Trainingsstunden */}
+          <div style={cardStyle}>
+            <h3 style={{margin:'0 0 14px',color:accent,fontSize:'15px',fontWeight:'800'}}>🕐 Trainingsstunden</h3>
+            <p style={{margin:'0 0 12px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>1 Stunde = 7,50 € · Gesamtguthaben: <strong style={{color:'#4ade80'}}>{totalGuthaben.toFixed(2)} €</strong></p>
+            <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'14px'}}>
+              <input type="date" value={rompelHoursForm.date} onChange={e=>setRompelHoursForm(f=>({...f,date:e.target.value}))} style={{...inputS,flex:'0 0 140px'}}/>
+              <input type="number" placeholder="Stunden" min="0.5" step="0.5" value={rompelHoursForm.hours} onChange={e=>setRompelHoursForm(f=>({...f,hours:e.target.value}))} style={{...inputS,flex:'0 0 100px'}}/>
+              <input type="text" placeholder="Beschreibung (optional)" value={rompelHoursForm.desc} onChange={e=>setRompelHoursForm(f=>({...f,desc:e.target.value}))} style={inputS}/>
+              <button onClick={addHours} style={btnS('rgba(74,222,128,0.15)')}>+ Hinzufügen</button>
+            </div>
+            {hours.length === 0 ? (
+              <p style={{color:'rgba(255,255,255,0.25)',fontSize:'13px',textAlign:'center',padding:'12px'}}>Noch keine Stunden eingetragen.</p>
+            ) : (
+              <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+                {[...hours].reverse().map(h=>(
+                  <div key={h.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 13px',background:'rgba(74,222,128,0.04)',border:'1px solid rgba(74,222,128,0.1)',borderRadius:'10px'}}>
+                    <span style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',flexShrink:0}}>{h.date}</span>
+                    <span style={{fontWeight:'700',color:'#4ade80',flexShrink:0}}>{h.hours}h = {(h.hours*7.5).toFixed(2)} €</span>
+                    <span style={{flex:1,fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>{h.desc}</span>
+                    <button onClick={()=>deleteHours(h.id)} style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                      <Trash2 size={11}/>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Ausgaben / Schulden */}
+          <div style={cardStyle}>
+            <h3 style={{margin:'0 0 14px',color:'#f87171',fontSize:'15px',fontWeight:'800'}}>💸 Offene Kosten / Schulden</h3>
+            <p style={{margin:'0 0 12px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>Gesamtschulden: <strong style={{color:'#f87171'}}>{totalAusgaben.toFixed(2)} €</strong></p>
+            <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'14px'}}>
+              <input type="date" value={rompelExpForm.date} onChange={e=>setRompelExpForm(f=>({...f,date:e.target.value}))} style={{...inputS,flex:'0 0 140px'}}/>
+              <input type="number" placeholder="Betrag €" min="0.01" step="0.01" value={rompelExpForm.amount} onChange={e=>setRompelExpForm(f=>({...f,amount:e.target.value}))} style={{...inputS,flex:'0 0 110px'}}/>
+              <input type="text" placeholder="Beschreibung" value={rompelExpForm.desc} onChange={e=>setRompelExpForm(f=>({...f,desc:e.target.value}))} style={inputS}/>
+              <button onClick={addExpense} style={btnS('rgba(248,113,113,0.15)')}>+ Hinzufügen</button>
+            </div>
+            {expenses.length === 0 ? (
+              <p style={{color:'rgba(255,255,255,0.25)',fontSize:'13px',textAlign:'center',padding:'12px'}}>Keine offenen Kosten.</p>
+            ) : (
+              <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+                {[...expenses].reverse().map(e=>(
+                  <div key={e.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 13px',background:'rgba(248,113,113,0.04)',border:'1px solid rgba(248,113,113,0.1)',borderRadius:'10px'}}>
+                    <span style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',flexShrink:0}}>{e.date}</span>
+                    <span style={{fontWeight:'700',color:'#f87171',flexShrink:0}}>{Number(e.amount).toFixed(2)} €</span>
+                    <span style={{flex:1,fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>{e.desc}</span>
+                    <button onClick={()=>deleteExpense(e.id)} style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                      <Trash2 size={11}/>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
     );
