@@ -8611,7 +8611,11 @@ export default function TrainingsApp() {
     const DICKEN_OPTS = ['OX','0,5 mm','1,0 mm','1,5 mm','1,8 mm','2,0 mm','2,1 mm','2,3 mm','max'];
     const now = Date.now();
     const twelveMonthsMs = 365 * 24 * 60 * 60 * 1000;
-    const isMatOld = (mat) => !mat.last_wechsel || (now - new Date(mat.last_wechsel).getTime()) > twelveMonthsMs;
+    const isMatOld = (mat) => {
+      const dates = [mat.vh_datum, mat.rh_datum].filter(Boolean).map(d => new Date(d).getTime()).filter(n => !isNaN(n));
+      if (dates.length === 0) return true;
+      return (now - Math.max(...dates)) > twelveMonthsMs;
+    };
     const allChildren = Object.values(children).sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
     const q = materialSearch.trim().toLowerCase();
     const visChildren = q ? allChildren.filter(c=>(c.name||'').toLowerCase().includes(q)) : allChildren;
@@ -8754,17 +8758,6 @@ export default function TrainingsApp() {
                         <datalist id={`dl_holz_${child.id}`}>{uniqBelag('holz').map(o=><option key={o} value={o}/>)}</datalist>
                       </div>
 
-                      {/* Letzter Materialwechsel */}
-                      <div style={{background: isOld ? 'rgba(251,191,36,0.06)' : 'rgba(255,255,255,0.02)', border:`1px solid ${isOld?'rgba(251,191,36,0.3)':'rgba(255,255,255,0.08)'}`,borderRadius:'12px',padding:'12px 14px'}}>
-                        <p style={{margin:'0 0 6px',fontSize:'10px',fontWeight:'800',color:isOld?'#fbbf24':'rgba(255,255,255,0.4)',textTransform:'uppercase',letterSpacing:'1px'}}>
-                          {isOld?'⚠️ ':'🗓️ '}Letzter Materialwechsel
-                        </p>
-                        <input type="date" value={mat.last_wechsel||''} onChange={e=>saveMat(child.id,'last_wechsel',e.target.value)}
-                          style={{...fldStyle, borderColor: isOld ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.12)'}}/>
-                        {mat.last_wechsel && <p style={{margin:'5px 0 0',fontSize:'11px',color: isOld?'#fbbf24':'rgba(255,255,255,0.3)',fontWeight:'600'}}>
-                          {isOld ? `Letzter Wechsel: ${fmtDate(mat.last_wechsel)} — über 12 Monate her` : `Letzter Wechsel: ${fmtDate(mat.last_wechsel)}`}
-                        </p>}
-                      </div>
 
                     </div>
                   )}
