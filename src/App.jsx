@@ -9659,27 +9659,23 @@ export default function TrainingsApp() {
     const linkedPlayer = userProfile?.linkedPlayerId ? aktiveSpieler[userProfile.linkedPlayerId] : null;
     const me = linkedPlayer?.name || userProfile?.name || user?.email || '';
 
-    // Player list: registered Aktive + anyone who has played at least one match
-    const aktiveNames = new Set(
-      Object.values(allUsers)
-        .filter(u => {
-          const roles = Array.isArray(u.roles) ? u.roles : (u.role ? [u.role] : []);
-          return roles.includes('aktiver') || roles.includes('admin');
-        })
-        .map(u => u.name || u.email || u.displayName || '')
-        .filter(Boolean)
-    );
-    const matchNames = new Set(
-      trainingsmatches.flatMap(m => [m.player1, m.player2]).filter(Boolean)
-    );
-    const registeredPlayers = [...new Set([...aktiveNames, ...matchNames])]
-      .filter(name => name !== me)
+    // Player list: alle aktiven Spieler (aus aktiveSpieler DB) + Match-Namen
+    const aktiveSpielerNames = new Set(Object.values(aktiveSpieler).map(sp=>sp.name).filter(Boolean));
+    const matchNames = new Set(trainingsmatches.flatMap(m=>[m.player1,m.player2]).filter(Boolean));
+    const registeredPlayers = [...new Set([...aktiveSpielerNames,...matchNames])]
+      .filter(name=>name!==me)
       .sort((a,b)=>a.localeCompare(b,'de'));
+
+    const [tmSearch, setTmSearch] = React.useState('');
+    const [tmSearchFocus, setTmSearchFocus] = React.useState(false);
+    const tmSuggestions = tmSearch.trim().length>0
+      ? registeredPlayers.filter(p=>p.toLowerCase().includes(tmSearch.toLowerCase()))
+      : registeredPlayers;
 
     const saveMatches = matches => { setTrainingsmatches(matches); setDoc(doc(db,'ttc','trainingsmatches'),{matches}); };
 
     const submitMatch = () => {
-      const opponent = tmForm.useCustom ? tmForm.opponentCustom.trim() : tmForm.opponent;
+      const opponent = tmForm.useCustom ? tmForm.opponentCustom.trim() : (tmForm.opponent || tmSearch.trim());
       if (!opponent || !tmForm.result) return;
       const [s1,s2] = tmForm.result.split(':').map(Number);
       const entry = {
@@ -9695,6 +9691,7 @@ export default function TrainingsApp() {
       };
       saveMatches([entry, ...trainingsmatches]);
       setTmAdding(false);
+      setTmSearch('');
       setTmForm({opponent:'',opponentCustom:'',useCustom:false,result:'3:0',vorgabe:false,vorgabePlayer:'',vorgabePoints:1,date:''});
     };
 
@@ -9733,19 +9730,41 @@ export default function TrainingsApp() {
             <div style={{background:acBg,border:`1px solid ${acBorder}`,borderRadius:'16px',padding:'18px',marginBottom:'20px'}}>
               <p style={{margin:'0 0 14px',fontSize:'12px',fontWeight:'800',color:ac,textTransform:'uppercase',letterSpacing:'0.5px'}}>Neues Trainingsmatch</p>
               <div style={{display:'grid',gap:'12px'}}>
-                {/* Gegner */}
-                <div>
+                {/* Gegner Suchfeld */}
+                <div style={{position:'relative'}}>
                   <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'6px',textTransform:'uppercase'}}>Gegner</label>
-                  <select value={tmForm.useCustom?'__custom__':tmForm.opponent}
+                  <input type="text"
+                    placeholder="Name suchen…"
+                    value={tmForm.opponent || tmSearch}
                     onChange={e=>{
-                      if(e.target.value==='__custom__') setTmForm(f=>({...f,useCustom:true,opponent:'__custom__'}));
-                      else setTmForm(f=>({...f,useCustom:false,opponent:e.target.value,opponentCustom:''}));
+                      setTmSearch(e.target.value);
+                      setTmForm(f=>({...f,opponent:'',useCustom:false}));
                     }}
-                    style={{width:'100%',padding:'10px 12px',background:'#1a0a1e',border:`1px solid ${acBorder}`,borderRadius:'10px',color:(tmForm.opponent&&!tmForm.useCustom)||tmForm.useCustom?'white':'rgba(255,255,255,0.4)',fontSize:'14px',outline:'none',boxSizing:'border-box'}}>
-                    <option value="">— Spieler auswählen —</option>
-                    {registeredPlayers.map(p=><option key={p} value={p}>{p}</option>)}
-                    <option value="__custom__">✏️ Manuell eingeben…</option>
-                  </select>
+                    onFocus={()=>setTmSearchFocus(true)}
+                    onBlur={()=>setTimeout(()=>setTmSearchFocus(false),150)}
+                    style={{width:'100%',padding:'10px 12px',background:'#1a0a1e',border:`1px solid ${tmForm.opponent?ac:acBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}
+                  />
+                  {tmForm.opponent&&<span style={{position:'absolute',right:'10px',top:'34px',fontSize:'12px',color:'rgba(255,255,255,0.3)',cursor:'pointer'}}
+                    onMouseDown={()=>{setTmForm(f=>({...f,opponent:'',useCustom:false}));setTmSearch('');}}>×</span>}
+                  {tmSearchFocus&&(
+                    <div style={{position:'absolute',top:'100%',left:0,right:0,zIndex:50,background:'#1a0a1e',border:`1px solid ${acBorder}`,borderRadius:'10px',marginTop:'4px',maxHeight:'200px',overflowY:'auto',boxShadow:'0 8px 24px rgba(0,0,0,0.5)'}}>
+                      {tmSuggestions.length===0&&<div style={{padding:'10px 12px',fontSize:'13px',color:'rgba(255,255,255,0.3)'}}>Kein Spieler gefunden</div>}
+                      {tmSuggestions.map(p=>(
+                        <div key={p} onMouseDown={()=>{setTmForm(f=>({...f,opponent:p,useCustom:false}));setTmSearch('');setTmSearchFocus(false);}}
+                          style={{padding:'10px 12px',fontSize:'14px',color:'white',cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,0.05)'}}
+                          onMouseEnter={e=>e.currentTarget.style.background='rgba(244,114,182,0.1)'}
+                          onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                          {p}
+                        </div>
+                      ))}
+                      <div onMouseDown={()=>{setTmForm(f=>({...f,opponent:'',useCustom:true}));setTmSearchFocus(false);}}
+                        style={{padding:'10px 12px',fontSize:'13px',color:'rgba(244,114,182,0.7)',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px'}}
+                        onMouseEnter={e=>e.currentTarget.style.background='rgba(244,114,182,0.07)'}
+                        onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                        ✏️ Manuell eingeben…
+                      </div>
+                    </div>
+                  )}
                   {tmForm.useCustom&&(
                     <input type="text" placeholder="Name des Gegners" value={tmForm.opponentCustom} onChange={e=>setTmForm(f=>({...f,opponentCustom:e.target.value}))}
                       style={{width:'100%',marginTop:'8px',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${acBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
@@ -9829,16 +9848,18 @@ export default function TrainingsApp() {
                 <div style={{display:'grid',gridTemplateColumns:'28px 1fr 50px 50px 50px 56px',gap:'4px',padding:'8px 14px',borderBottom:`1px solid ${acBorder}`,fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'0.5px'}}>
                   <span>#</span><span>Spieler</span><span style={{textAlign:'center'}}>M</span><span style={{textAlign:'center'}}>S</span><span style={{textAlign:'center'}}>N</span><span style={{textAlign:'right'}}>Quote</span>
                 </div>
-                {tableData.map((row,i)=>(
-                  <div key={row.name} style={{display:'grid',gridTemplateColumns:'28px 1fr 50px 50px 50px 56px',gap:'4px',padding:'10px 14px',borderBottom:i<tableData.length-1?'1px solid rgba(255,255,255,0.04)':'none',alignItems:'center'}}>
+                {tableData.map((row,i)=>{
+                  const isMe=row.name===me;
+                  return (
+                  <div key={row.name} style={{display:'grid',gridTemplateColumns:'28px 1fr 50px 50px 50px 56px',gap:'4px',padding:'10px 14px',borderBottom:i<tableData.length-1?'1px solid rgba(255,255,255,0.04)':'none',alignItems:'center',background:isMe?'rgba(244,114,182,0.07)':'transparent'}}>
                     <span style={{fontSize:'12px',fontWeight:'800',color:i===0?'#fbbf24':i===1?'rgba(255,255,255,0.5)':i===2?'#cd7c32':'rgba(255,255,255,0.25)'}}>{i+1}</span>
-                    <span style={{fontSize:'14px',fontWeight:'700',color:'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{row.name}</span>
+                    <span style={{fontSize:'14px',fontWeight:'700',color:isMe?ac:'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{row.name}{isMe&&<span style={{fontSize:'10px',marginLeft:'5px',opacity:0.6}}>← ich</span>}</span>
                     <span style={{textAlign:'center',fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>{row.matches}</span>
                     <span style={{textAlign:'center',fontSize:'13px',color:'#86efac',fontWeight:'700'}}>{row.wins}</span>
                     <span style={{textAlign:'center',fontSize:'13px',color:'#fca5a5'}}>{row.losses}</span>
                     <span style={{textAlign:'right',fontSize:'13px',fontWeight:'800',color:ac}}>{Math.round(row.winrate*100)}%</span>
                   </div>
-                ))}
+                );})
               </div>
             )}
           </div>
@@ -9889,13 +9910,15 @@ export default function TrainingsApp() {
                     </div>
                   );
                 }
+                const isMyMatch = m.player1===me||m.player2===me;
+                const myWin = isMyMatch&&((m.player1===me&&p1wins)||(m.player2===me&&!p1wins));
                 return (
-                  <div key={m.id} style={{background:'rgba(255,255,255,0.03)',border:`1px solid ${acBorder}`,borderRadius:'12px',padding:'12px 14px',display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>
+                  <div key={m.id} style={{background:isMyMatch?(myWin?'rgba(74,222,128,0.05)':'rgba(248,113,113,0.05)'):'rgba(255,255,255,0.03)',border:`2px solid ${isMyMatch?(myWin?'rgba(74,222,128,0.35)':'rgba(248,113,113,0.35)'):acBorder}`,borderRadius:'12px',padding:'12px 14px',display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
-                        <span style={{fontWeight:'700',color:p1wins?'#86efac':'rgba(255,255,255,0.6)',fontSize:'14px'}}>{m.player1}</span>
+                        <span style={{fontWeight:'700',color:m.player1===me?'#f9a8d4':p1wins?'#86efac':'rgba(255,255,255,0.6)',fontSize:'14px'}}>{m.player1}</span>
                         <span style={{fontWeight:'900',fontSize:'16px',color:'white'}}>{m.score1}:{m.score2}</span>
-                        <span style={{fontWeight:'700',color:!p1wins?'#86efac':'rgba(255,255,255,0.6)',fontSize:'14px'}}>{m.player2}</span>
+                        <span style={{fontWeight:'700',color:m.player2===me?'#f9a8d4':!p1wins?'#86efac':'rgba(255,255,255,0.6)',fontSize:'14px'}}>{m.player2}</span>
                       </div>
                       <div style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',marginTop:'3px'}}>
                         {d}{m.vorgabe?` · Vorgabe: ${m.vorgabe.player.split(' ')[0]} +${m.vorgabe.points}Pkt`:''}
