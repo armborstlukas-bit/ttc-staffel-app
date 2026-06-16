@@ -8937,6 +8937,11 @@ export default function TrainingsApp() {
   // ── TTR WERTE VIEW ──────────────────────────────────────────────────────
   if (view === 'ttrWerte' && canEdit()) {
     const accent = '#fbbf24';
+
+    // Aktuellster Importmonat = neuester Monat über alle ttrHistory-Einträge
+    const allMonths = Object.values(ttrHistory).flatMap(h=>(h.entries||[]).map(e=>e.month));
+    const latestImportMonth = allMonths.length ? allMonths.reduce((a,b)=>a>b?a:b) : null;
+
     const allChildren = Object.values(children).filter(c=>subgroups[c.subgroupId]?.groupId==='jugend').sort((a,b)=>a.name.localeCompare(b.name,'de'));
     const withTtr = allChildren.map(c=>{
       const hist=ttrHistory[c.id]?.entries||[];
@@ -8944,7 +8949,8 @@ export default function TrainingsApp() {
       const prev=hist.length>1?hist[hist.length-2]:null;
       const diff=last&&prev?last.ttr-prev.ttr:null;
       const total=last&&hist[0]?last.ttr-hist[0].ttr:null;
-      return{...c,hist,last,prev,diff,total,_type:'jugend'};
+      const isCurrent = latestImportMonth ? last?.month===latestImportMonth : !!last;
+      return{...c,hist,last,prev,diff,total,_type:'jugend',isCurrent};
     }).sort((a,b)=>(b.last?.ttr||0)-(a.last?.ttr||0));
 
     // Aktive Spieler with TTR history
@@ -8954,19 +8960,25 @@ export default function TrainingsApp() {
       const prev=hist[hist.length-2]||null;
       const diff=last&&prev?last.ttr-prev.ttr:null;
       const total=last&&hist[0]?last.ttr-hist[0].ttr:null;
-      return{...sp,hist,last,prev,diff,total,_type:'aktiv'};
+      const isCurrent = latestImportMonth ? last?.month===latestImportMonth : !!last;
+      return{...sp,hist,last,prev,diff,total,_type:'aktiv',isCurrent};
     }).filter(sp=>sp.last).sort((a,b)=>(b.last?.ttr||0)-(a.last?.ttr||0));
 
-    const withData=withTtr.filter(c=>c.last);
+    const withData=withTtr.filter(c=>c.last&&c.isCurrent);
     const withoutData=withTtr.filter(c=>!c.last);
+    const ehemalJugend=withTtr.filter(c=>c.last&&!c.isCurrent);
+    const aktiveActive=aktiveSpielerList.filter(sp=>sp.isCurrent);
+    const ehemalAktiv=aktiveSpielerList.filter(sp=>!sp.isCurrent);
+    const ehemals=[...ehemalJugend,...ehemalAktiv].sort((a,b)=>(b.last?.ttr||0)-(a.last?.ttr||0));
 
-    const allWithData = [...withData, ...aktiveSpielerList].sort((a,b)=>(b.last?.ttr||0)-(a.last?.ttr||0));
-    const displayList = ttrFilter==='jugend' ? withData : ttrFilter==='aktive' ? aktiveSpielerList : allWithData;
+    const allWithData = [...withData, ...aktiveActive].sort((a,b)=>(b.last?.ttr||0)-(a.last?.ttr||0));
+    const displayList = ttrFilter==='jugend' ? withData : ttrFilter==='aktive' ? aktiveActive : ttrFilter==='ehemalige' ? ehemals : allWithData;
 
     const filterTabs = [
       {id:'all', label:`Alle (${allWithData.length})`},
       {id:'jugend', label:`Jugend (${withData.length})`},
-      {id:'aktive', label:`Aktive (${aktiveSpielerList.length})`},
+      {id:'aktive', label:`Aktive (${aktiveActive.length})`},
+      {id:'ehemalige', label:`Ehemalige (${ehemals.length})`},
     ];
 
     return (
@@ -8999,14 +9011,17 @@ export default function TrainingsApp() {
               {displayList.map((c,rank)=>{
                 const barW=c.last?Math.round((c.last.ttr-500)/10):0;
                 const isAktiv=c._type==='aktiv';
-                const accentCol=isAktiv?'#38bdf8':'#fbbf24';
+                const isEhemalig=ttrFilter==='ehemalige';
+                const accentCol=isEhemalig?'rgba(255,255,255,0.4)':isAktiv?'#38bdf8':'#fbbf24';
+                const rankBg=rank<3?`rgba(${isAktiv?'56,189,248':'251,191,36'},0.15)`:'rgba(255,255,255,0.05)';
+                const rankCol=rank<3?(isAktiv?'#38bdf8':'#fbbf24'):'rgba(255,255,255,0.3)';
                 return(
-                <div key={c.id} style={{display:'flex',alignItems:'center',gap:'14px',padding:'13px 16px',background:'rgba(255,255,255,0.04)',border:`1px solid ${isAktiv?'rgba(56,189,248,0.1)':'rgba(251,191,36,0.1)'}`,borderRadius:'14px',cursor:'pointer',transition:'all 0.12s'}}
+                <div key={c.id} style={{display:'flex',alignItems:'center',gap:'14px',padding:'13px 16px',background:'rgba(255,255,255,0.04)',border:`1px solid ${isEhemalig?'rgba(255,255,255,0.06)':isAktiv?'rgba(56,189,248,0.1)':'rgba(251,191,36,0.1)'}`,borderRadius:'14px',cursor:'pointer',transition:'all 0.12s'}}
                   onMouseEnter={e=>{e.currentTarget.style.background=isAktiv?'rgba(56,189,248,0.06)':'rgba(251,191,36,0.06)';e.currentTarget.style.borderColor=isAktiv?'rgba(56,189,248,0.2)':'rgba(251,191,36,0.2)';}}
-                  onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,0.04)';e.currentTarget.style.borderColor=isAktiv?'rgba(56,189,248,0.1)':'rgba(251,191,36,0.1)';}}
+                  onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,0.04)';e.currentTarget.style.borderColor=isEhemalig?'rgba(255,255,255,0.06)':isAktiv?'rgba(56,189,248,0.1)':'rgba(251,191,36,0.1)';}}
                   onClick={()=>{setTtrVerlaufChild(c);navTo('ttrVerlauf');}}>
-                  <div style={{width:'28px',height:'28px',borderRadius:'8px',background:rank<3?`rgba(${isAktiv?'56,189,248':'251,191,36'},0.15)`:'rgba(255,255,255,0.05)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                    {isAktiv?<span style={{fontSize:'12px'}}>⚡</span>:<span style={{fontSize:'12px',fontWeight:'800',color:rank<3?'#fbbf24':'rgba(255,255,255,0.3)'}}>{rank+1}</span>}
+                  <div style={{width:'28px',height:'28px',borderRadius:'8px',background:isEhemalig?'rgba(255,255,255,0.04)':rankBg,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                    <span style={{fontSize:'12px',fontWeight:'800',color:isEhemalig?'rgba(255,255,255,0.2)':rankCol}}>{rank+1}</span>
                   </div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'5px'}}>
@@ -9020,7 +9035,8 @@ export default function TrainingsApp() {
                   </div>
                   <div style={{textAlign:'right',flexShrink:0}}>
                     <p style={{margin:'0 0 2px',fontWeight:'900',fontSize:'20px',color:accentCol}}>{c.last?.ttr}</p>
-                    {c.total!==null&&<p style={{margin:0,fontSize:'11px',fontWeight:'700',color:c.total>=0?'#4ade80':'#f87171'}}>{c.total>=0?'▲':'▼'} {Math.abs(c.total)} gesamt</p>}
+                    {isEhemalig&&c.last?.month&&<p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.2)'}}>zuletzt {c.last.month}</p>}
+                    {!isEhemalig&&c.total!==null&&<p style={{margin:0,fontSize:'11px',fontWeight:'700',color:c.total>=0?'#4ade80':'#f87171'}}>{c.total>=0?'▲':'▼'} {Math.abs(c.total)} gesamt</p>}
                   </div>
                 </div>
               );})}
