@@ -8616,7 +8616,7 @@ export default function TrainingsApp() {
       if (!mat.holz) missing.push('Holz');
       return missing;
     };
-    const allChildren = Object.values(children).sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
+    const allChildren = Object.values(children).filter(c=>subgroups[c.subgroupId]?.groupId==='jugend').sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
     const q = materialSearch.trim().toLowerCase();
     const visChildren = q ? allChildren.filter(c=>(c.name||'').toLowerCase().includes(q)) : allChildren;
     const uniqBelag = (field) => [...new Set(Object.values(materialverwaltung).map(m=>m[field]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de'));
