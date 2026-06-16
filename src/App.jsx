@@ -3405,16 +3405,21 @@ export default function TrainingsApp() {
 
                             {/* Spieler zuordnen (Aktiver / Admin) */}
                             {userRoles.some(r=>['aktiver','admin'].includes(r))&&(()=>{
-                              const spielerList=Object.values(aktiveSpieler).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+                              const aktivList=Object.values(aktiveSpieler).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+                              const jugendList=Object.values(children).filter(c=>subgroups[c.subgroupId]?.groupId==='jugend').sort((a,b)=>a.name.localeCompare(b.name,'de'));
                               const curPlayer=allUsers[u.uid]?.linkedPlayerId||'';
                               return (
                                 <div style={{marginBottom:'10px'}}>
                                   <span style={{fontSize:'12px',color:'#555',fontWeight:'600',display:'block',marginBottom:'6px'}}>⚡ Spieler zuordnen:</span>
                                   <select value={curPlayer} onChange={e=>linkPlayerToUser(u.uid,e.target.value||null)} style={{padding:'6px 10px',border:'1px solid #0891b2',borderRadius:'8px',fontSize:'13px',cursor:'pointer',color:'#0c4a6e',background:'white',width:'100%'}}>
                                     <option value="">– kein Spieler –</option>
-                                    {spielerList.map(sp=><option key={sp.id} value={sp.id}>{sp.name}{sp.ttr?` (TTR ${sp.ttr})`:''}{sp.spielernr?` · Nr. ${sp.spielernr}`:''}</option>)}
+                                    {aktivList.length>0&&<optgroup label="Aktive">
+                                      {aktivList.map(sp=><option key={sp.id} value={sp.id}>{sp.name}{sp.ttr?` (TTR ${sp.ttr})`:''}</option>)}
+                                    </optgroup>}
+                                    {jugendList.length>0&&<optgroup label="Nachwuchs">
+                                      {jugendList.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                                    </optgroup>}
                                   </select>
-                                  {spielerList.length===0&&<p style={{fontSize:'11px',color:'#9ca3af',margin:'4px 0 0'}}>Erst Spieler in der Aktiven-Datenbank anlegen.</p>}
                                 </div>
                               );
                             })()}
