@@ -76,7 +76,7 @@ if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styl
 }
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
-import { getFirestore, doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, updateDoc, deleteField, arrayUnion, onSnapshot, getDoc } from 'firebase/firestore';
 import { Check, X, Plus, Trash2, Download, LogOut, ArrowLeft, Clock, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save, Trophy, Home, Archive, MessageSquare, Bell, Send, Pencil } from 'lucide-react';
 
 const firebaseConfig = {
@@ -10904,19 +10904,16 @@ export default function TrainingsApp() {
     const ANZAHLEN = [1,2,3];
 
     const saveTrikot = (id, field, val) => {
-      const updated = {...trikotDaten, [id]: {...(trikotDaten[id]||{}), [field]: val}};
-      setTrikotDaten(updated);
-      setDoc(doc(db,'ttc','trikotDaten'), updated);
+      setTrikotDaten(prev => ({...prev, [id]: {...(prev[id]||{}), [field]: val}}));
+      updateDoc(doc(db,'ttc','trikotDaten'), { [`${id}.${field}`]: val === null ? deleteField() : val })
+        .catch(() => setDoc(doc(db,'ttc','trikotDaten'), {[id]: {[field]: val === null ? null : val}}, {merge: true}));
     };
 
     const deleteTrikotSpieler = (id) => {
       if (!window.confirm('Spieler aus der Trikotliste entfernen?')) return;
-      const updated = {...trikotDaten};
-      delete updated[id];
-      // Mark as explicitly removed so they don't re-appear from auto-list
-      updated['__removed__'] = [...(updated['__removed__']||[]), id];
-      setTrikotDaten(updated);
-      setDoc(doc(db,'ttc','trikotDaten'), updated);
+      setTrikotDaten(prev => { const u = {...prev}; delete u[id]; return u; });
+      updateDoc(doc(db,'ttc','trikotDaten'), { [id]: deleteField(), '__removed__': arrayUnion(id) })
+        .catch(() => {});
     };
 
     const removedIds = new Set(trikotDaten['__removed__']||[]);
@@ -11081,10 +11078,12 @@ export default function TrainingsApp() {
                             <FBtn val="Hose" current={d.unterseite} onSet={v=>saveTrikot(spieler.id,'unterseite',v)}/>
                             <FBtn val="Rock" current={d.unterseite} onSet={v=>saveTrikot(spieler.id,'unterseite',v)}/>
                             <FBtn val="Keine" current={d.unterseite} onSet={v=>{
-                              const merged = {...(trikotDaten[spieler.id]||{}), unterseite: v, anzahlUnterseite: null};
-                              const updated = {...trikotDaten, [spieler.id]: merged};
-                              setTrikotDaten(updated);
-                              setDoc(doc(db,'ttc','trikotDaten'), updated);
+                              setTrikotDaten(prev => ({...prev, [spieler.id]: {...(prev[spieler.id]||{}), unterseite: v, anzahlUnterseite: null, groesseUnterseite: null}}));
+                              updateDoc(doc(db,'ttc','trikotDaten'), {
+                                [`${spieler.id}.unterseite`]: v,
+                                [`${spieler.id}.anzahlUnterseite`]: deleteField(),
+                                [`${spieler.id}.groesseUnterseite`]: deleteField(),
+                              }).catch(()=>{});
                             }}/>
                           </div>
                           {d.unterseite && d.unterseite !== 'Keine' && (<>
