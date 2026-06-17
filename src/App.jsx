@@ -10943,7 +10943,7 @@ export default function TrainingsApp() {
 
     const isComplete = (id) => {
       const d = trikotDaten[id];
-      const unterseiteOk = d?.unterseite === 'Keine' || (d?.unterseite && d?.anzahlUnterseite);
+      const unterseiteOk = d?.unterseite === 'Keine' || (d?.unterseite && d?.anzahlUnterseite && d?.groesseUnterseite);
       return d?.groesse && d?.schnitt && d?.anzahlTrikot && unterseiteOk;
     };
 
@@ -10953,10 +10953,10 @@ export default function TrainingsApp() {
       const esc = v => String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       const th = v => `<th style="background:#1d4ed8;color:white;font-weight:bold;padding:6px 10px;border:1px solid #93c5fd">${esc(v)}</th>`;
       const td = v => `<td style="padding:5px 10px;border:1px solid #cbd5e1">${esc(v)}</td>`;
-      const header = ['Name','Typ','Trikotgröße','Trikotschnitt','Anzahl Trikots','Unterseite','Anzahl Unterseite'];
+      const header = ['Name','Typ','Trikotgröße','Trikotschnitt','Anzahl Trikots','Unterseite','Größe Unterseite','Anzahl Unterseite'];
       const rows = alleUngefiltert.map(p => {
         const d = trikotDaten[p.id]||{};
-        return [p.name, p.typ==='jugend'?'Jugend':'Aktiv', d.groesse||'–', d.schnitt||'–', d.anzahlTrikot||'–', d.unterseite||'–', d.anzahlUnterseite||'–'];
+        return [p.name, p.typ==='jugend'?'Jugend':'Aktiv', d.groesse||'–', d.schnitt||'–', d.anzahlTrikot||'–', d.unterseite||'–', d.unterseite==='Keine'?'–':(d.groesseUnterseite||'–'), d.unterseite==='Keine'?'–':(d.anzahlUnterseite||'–')];
       });
       const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Trikotgrößen</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table border="1" style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:13px"><thead><tr>${header.map(th).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(td).join('')}</tr>`).join('')}</tbody></table></body></html>`;
       const blob = new Blob(['﻿'+html], {type:'application/vnd.ms-excel;charset=utf-8'});
@@ -11087,14 +11087,22 @@ export default function TrainingsApp() {
                               setDoc(doc(db,'ttc','trikotDaten'), updated);
                             }}/>
                           </div>
-                          {d.unterseite && d.unterseite !== 'Keine' && (
+                          {d.unterseite && d.unterseite !== 'Keine' && (<>
+                            <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                              <span style={{fontSize:'11px',color:'rgba(255,255,255,0.4)',minWidth:'50px'}}>Größe</span>
+                              <select value={d.groesseUnterseite||''} onChange={e=>saveTrikot(spieler.id,'groesseUnterseite',e.target.value)}
+                                style={{flex:1,padding:'5px 8px',borderRadius:'7px',border:'1px solid rgba(147,197,253,0.2)',background:'rgba(15,30,60,0.8)',color:'white',fontSize:'13px',fontWeight:'700',outline:'none'}}>
+                                <option value="" style={{color:'#94a3b8'}}>— wählen —</option>
+                                {(d.schnitt==='Damen'?GROESSEN_DAMEN:GROESSEN_HERREN).map(g=><option key={g} value={g} style={{color:'white',background:'#1e3a5f'}}>{g}</option>)}
+                              </select>
+                            </div>
                             <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
                               <span style={{fontSize:'11px',color:'rgba(255,255,255,0.4)',minWidth:'50px'}}>Anzahl</span>
                               <div style={{display:'flex',gap:'5px'}}>
                                 {ANZAHLEN.map(n=><FBtn key={n} val={n} current={d.anzahlUnterseite} onSet={v=>saveTrikot(spieler.id,'anzahlUnterseite',v)}/>)}
                               </div>
                             </div>
-                          )}
+                          </>)}
                         </div>
                       </div>
                     </div>
