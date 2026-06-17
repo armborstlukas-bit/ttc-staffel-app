@@ -77,7 +77,7 @@ if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styl
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
-import { Check, X, Plus, Trash2, Download, ChevronDown, LogOut, ArrowLeft, Clock, BarChart2, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save, Trophy, Home, Archive, MessageSquare, Bell, Send, Pencil } from 'lucide-react';
+import { Check, X, Plus, Trash2, Download, LogOut, ArrowLeft, Clock, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save, Trophy, Home, Archive, MessageSquare, Bell, Send, Pencil } from 'lucide-react';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCrx34HEgaHnRE187Cja4JNAtbexvrA6Vg",
@@ -675,8 +675,18 @@ export default function TrainingsApp() {
   const [rangliste, setRangliste] = useState([]); // ordered array of childIds
   const [ranglistenspiele, setRanglistenspiele] = useState({ active: [], archived: [] });
   const [newSpielForm, setNewSpielForm] = useState({ open: false, challengerId: '', defenderId: '' });
+  const [rangSelectionMode, setRangSelectionMode] = useState(false);
+  const [rangSelection, setRangSelection] = useState([]);
+  const [rangAddOpen, setRangAddOpen] = useState(false);
   const [ranglisteAch, setRanglisteAch] = useState({}); // { [childId]: { reached:{}, weeks:{}, lastCheck, lastRank } }
   const [rlAchEditChild, setRlAchEditChild] = useState(''); // trainer override: selected child
+  const [achExpandedChild, setAchExpandedChild] = useState(null);
+  const [karriereConfirmChild, setKarriereConfirmChild] = useState(null);
+  const [achSearch, setAchSearch] = useState('');
+  const [trikotDaten, setTrikotDaten] = useState({});
+  const [trikotFilter, setTrikotFilter] = useState('alle');
+  const [trikotSearch, setTrikotSearch] = useState('');
+  const [trikotExpanded, setTrikotExpanded] = useState(null);
   const [editingSession, setEditingSession]     = useState(null); // session being edited
   const [editForm, setEditForm]                 = useState({});
   const [deleteDialog, setDeleteDialog]         = useState(null);
@@ -728,6 +738,7 @@ export default function TrainingsApp() {
   const [editingChildName, setEditingChildName]             = useState(null); // childId being renamed
   const [editingChildNameVal, setEditingChildNameVal]       = useState('');
   const [stayLoggedIn, setStayLoggedIn]                     = useState(false);
+  const [showLoginPassword, setShowLoginPassword]            = useState(false);
   const [registerIsParent, setRegisterIsParent]             = useState(false);
   // Mannschaft form states
   const [teamForm, setTeamForm]                             = useState({name:'', liga:'', tableUrl:'', scheduleUrl:'', trainerUids:[], childIds:[]});
@@ -777,6 +788,17 @@ export default function TrainingsApp() {
   const [tmSearch2, setTmSearch2] = useState('');
   const [tmSearchFocus2, setTmSearchFocus2] = useState(false);
   const [tmForm, setTmForm] = useState({opponent:'',opponentCustom:'',useCustom:false,player1:'',result:'3:0',vorgabe:false,vorgabePlayer:'',vorgabePoints:1,date:'',otherMatch:false});
+  const [tmMode, setTmMode] = useState(null); // null=Auswahl, 'single', 'double'
+  const [wettenZitate, setWettenZitate] = useState([]);
+  const [wzAdding, setWzAdding] = useState(false);
+  const [wzEditId, setWzEditId] = useState(null);
+  const [wzForm, setWzForm] = useState({type:'zitat',text:'',date:''});
+  const [wzEditText, setWzEditText] = useState('');
+  const [trainingsdoppel, setTrainingsdoppel] = useState([]);
+  const [tmDoppelAdding, setTmDoppelAdding] = useState(false);
+  const [tmDoppelEditId, setTmDoppelEditId] = useState(null);
+  const [tmDoppelSort, setTmDoppelSort] = useState('winrate');
+  const [tmDoppelForm, setTmDoppelForm] = useState({playerA:'',playerB:'',playerC:'',playerD:'',result:'3:0',date:''});
   const [activePracticeId, setActivePracticeId]                     = useState(null);
   const [ptCreating, setPtCreating]                                 = useState(false);
   const [ptCreateStep, setPtCreateStep]                             = useState(1);
@@ -896,6 +918,9 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','materialverwaltung'), s => setMaterialverwaltung(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','ttrHistory'), s => setTtrHistory(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','trainingsmatches'), s => setTrainingsmatches(s.exists()&&Array.isArray(s.data().matches)?s.data().matches:[])),
+      onSnapshot(doc(db,'ttc','trainingsdoppel'), s => setTrainingsdoppel(s.exists()&&Array.isArray(s.data().matches)?s.data().matches:[])),
+      onSnapshot(doc(db,'ttc','wettenZitate'), s => setWettenZitate(s.exists()&&Array.isArray(s.data().entries)?s.data().entries:[])),
+      onSnapshot(doc(db,'ttc','trikotDaten'), s => setTrikotDaten(s.exists()?s.data():{})),
     ];
     // Fetch TTC News via rss2json
     fetchTtcNews();
@@ -2036,6 +2061,81 @@ export default function TrainingsApp() {
     setEditingArchivedTourn(null);
   };
 
+  // ── Spieler des Monats / Jahres – shared computation (view + errungenschaften) ──
+  // NOTE: placed early so it's available in home/eltern view AND spielerDesMonats view.
+  // Uses IDENTICAL logic to the spielerDesMonats view's calcWinners to guarantee consistency.
+  const sdmJugendKids = Object.values(children).filter(c => subgroups[c.subgroupId]?.groupId === 'jugend' && !c.nachwuchsKarriereBeendet);
+  const sdmAllMs = Object.values(ttrHistory).flatMap(h => (h.entries || []).map(e => e.month));
+  const sdmLatestM = sdmAllMs.length ? sdmAllMs.reduce((a,b) => a>b?a:b) : null;
+  const sdmPrevM = sdmLatestM ? (()=>{const[y,m]=sdmLatestM.split('-').map(Number);const d=new Date(y,m-2,1);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;})() : null;
+  const sdmGetTtrAt = (sorted, ym) => {
+    const exact = sorted.find(e => e.month === ym);
+    if (exact) return exact;
+    const before = sorted.filter(e => e.month < ym);
+    return before.length ? before[before.length-1] : null;
+  };
+  // Returns array of {child, diff, currTtr, prevTtr} (max-diff winners only), or null
+  const sdmCalcWinners = (endYM, startYM) => {
+    const res = [];
+    sdmJugendKids.forEach(c => {
+      const entries = (ttrHistory[c.id]?.entries || []);
+      if (entries.length < 2) return;
+      const sorted = [...entries].sort((a,b) => a.month.localeCompare(b.month));
+      const first = sorted[0];
+      const curr = sdmGetTtrAt(sorted, endYM);
+      const prev = sdmGetTtrAt(sorted, startYM);
+      if (!curr || !prev) return;
+      if (prev.month === first.month) return;
+      const diff = curr.ttr - prev.ttr;
+      res.push({child: c, diff, currTtr: curr.ttr, prevTtr: prev.ttr});
+    });
+    if (!res.length) return null;
+    const maxDiff = Math.max(...res.map(r => r.diff));
+    if (maxDiff <= 0) return null;
+    return res.filter(r => r.diff === maxDiff);
+  };
+  const sdmAllEntryMonths = [...new Set(sdmAllMs)].sort();
+  const sdmHistoricMonths = []; // [{period:'YYYY-MM', winners:[{child,diff,...}]}]
+  if (sdmAllEntryMonths.length >= 2) {
+    const [fy,fm] = sdmAllEntryMonths[0].split('-').map(Number);
+    let sy=fy, sm=fm;
+    const [ly,lm] = (sdmLatestM||sdmAllEntryMonths[sdmAllEntryMonths.length-1]).split('-').map(Number);
+    while (sy<ly || (sy===ly && sm<lm)) {
+      const startYM=`${sy}-${String(sm).padStart(2,'0')}`;
+      const endD=new Date(sy,sm,1);
+      const endYM=`${endD.getFullYear()}-${String(endD.getMonth()+1).padStart(2,'0')}`;
+      const winners=sdmCalcWinners(endYM, startYM);
+      if (winners) sdmHistoricMonths.push({period:startYM, winners});
+      sm++; if (sm>12){sm=1;sy++;}
+    }
+  }
+  const sdmHistoricYears = []; // [{period:'YYYY', winners:[...]}]
+  const sdmYears = [...new Set(sdmAllMs.map(m=>m.slice(0,4)))].sort();
+  for (let i=1;i<sdmYears.length;i++) {
+    const cy=sdmYears[i], py=sdmYears[i-1];
+    const winners=sdmCalcWinners(`${cy}-01`, `${py}-01`);
+    if (winners) sdmHistoricYears.push({period:py, winners});
+  }
+  const sdmCurrentMonthWinners = sdmLatestM && sdmPrevM ? sdmCalcWinners(sdmLatestM, sdmPrevM) : null;
+  const sdmCurrentMonthLabel = sdmPrevM;
+  const sdmLatestYear = sdmLatestM ? Number(sdmLatestM.slice(0,4)) : new Date().getFullYear();
+  const sdmCurrentYearWinners = sdmCalcWinners(`${sdmLatestYear}-01`, `${sdmLatestYear-1}-01`);
+  const sdmCurrentYearLabel = String(sdmLatestYear - 1);
+  // Build per-child wins map from the same historicMonths/Years data
+  const spielerDesMonatsWins = {};
+  sdmHistoricMonths.forEach(({period, winners}) => {
+    winners.forEach(({child}) => {
+      if (!spielerDesMonatsWins[child.id]) spielerDesMonatsWins[child.id] = [];
+      spielerDesMonatsWins[child.id].push({period, type:'month'});
+    });
+  });
+  sdmHistoricYears.forEach(({period, winners}) => {
+    winners.forEach(({child}) => {
+      if (!spielerDesMonatsWins[child.id]) spielerDesMonatsWins[child.id] = [];
+      spielerDesMonatsWins[child.id].push({period, type:'year'});
+    });
+  });
+
   // ── Errungenschaften Helpers ─────────────────────────────────
   const getAchievements = (childId) => children[childId]?.achievements || {};
   const saveChildAchievements = (childId, newAch) => {
@@ -2048,6 +2148,8 @@ export default function TrainingsApp() {
       return updated;
     });
   };
+
+  const fmtYM = ym => { const [y,m]=ym.split('-'); return `${['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'][Number(m)-1]} '${y.slice(2)}`; };
 
   const getMonthlyAttendanceLevel = (childId, yearMonth) => {
     const child = children[childId];
@@ -2316,6 +2418,16 @@ export default function TrainingsApp() {
     if (!window.confirm('Kind löschen?')) return;
     const u={...children}; delete u[cid]; saveChildren(u);
   }
+  const beendeNachwuchskarriere = (childId) => {
+    const updated = {...children, [childId]: {...children[childId], nachwuchsKarriereBeendet: true, karriereBeendetAm: TODAY}};
+    saveChildren(updated);
+  };
+  const reaktiviereNachwuchskarriere = (childId) => {
+    const c = {...children[childId]};
+    delete c.nachwuchsKarriereBeendet;
+    delete c.karriereBeendetAm;
+    saveChildren({...children, [childId]: c});
+  };
   function moveChild(cid,newSid) {
     saveChildren({...children,[cid]:{...children[cid],subgroupId:newSid}});
     setMoveChildId(null);
@@ -2439,8 +2551,14 @@ export default function TrainingsApp() {
             )}
             <input type="email" placeholder="E-Mail" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} required
               style={{padding:'12px 16px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'12px',color:'white',fontSize:'15px',outline:'none',width:'100%',boxSizing:'border-box'}}/>
-            <input type="password" placeholder="Passwort (min. 6 Zeichen)" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} required
-              style={{padding:'12px 16px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'12px',color:'white',fontSize:'15px',outline:'none',width:'100%',boxSizing:'border-box'}}/>
+            <div style={{position:'relative'}}>
+              <input type={showLoginPassword?'text':'password'} placeholder="Passwort (min. 6 Zeichen)" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} required
+                style={{padding:'12px 44px 12px 16px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'12px',color:'white',fontSize:'15px',outline:'none',width:'100%',boxSizing:'border-box'}}/>
+              <button type="button" onClick={()=>setShowLoginPassword(v=>!v)}
+                style={{position:'absolute',right:'12px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.35)',fontSize:'18px',lineHeight:1,padding:'2px'}}>
+                {showLoginPassword?'🙈':'👁️'}
+              </button>
+            </div>
             {authMode==='login'&&(
               <label style={{display:'flex',alignItems:'center',gap:'9px',cursor:'pointer',fontSize:'14px',color:'rgba(255,255,255,0.5)',userSelect:'none',paddingLeft:'2px'}}>
                 <input type="checkbox" checked={stayLoggedIn} onChange={e=>setStayLoggedIn(e.target.checked)}
@@ -3659,7 +3777,6 @@ export default function TrainingsApp() {
           {label:'Turniere',         icon:'🏆', color:'#fde68a', bg:'rgba(253,230,138,0.1)',  border:'rgba(253,230,138,0.25)', action:()=>navTo('turniere')},
           {label:'Gegnerlogbuch',    icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.08)',   border:'rgba(8,145,178,0.25)',   action:()=>navTo('gegnerlogbuch')},
           {label:'TTR Werte',        icon:'📈', color:'#fbbf24', bg:'rgba(251,191,36,0.08)',  border:'rgba(251,191,36,0.25)',  action:()=>navTo('ttrWerte')},
-          {label:'Spieler d. Monats',icon:'🥇', color:'#fcd34d', bg:'rgba(252,211,77,0.08)',  border:'rgba(252,211,77,0.25)',  action:()=>navTo('spielerDesMonats')},
         ],
       },
       {
@@ -3669,6 +3786,10 @@ export default function TrainingsApp() {
           {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
           {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>navTo('notifications'), badge: unreadCount},
           {label:'Materialverwaltung',icon:'🏓', color:'#fb923c', bg:'rgba(251,146,60,0.08)', border:'rgba(251,146,60,0.25)',  action:()=>navTo('materialverwaltung')},
+          {label:'Wetten & Zitate',  icon:'🎰', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.2)',  action:()=>navTo('wettenZitate')},
+          ...(canEdit()?[
+            {label:'Trikotgrößen', icon:'👕', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.2)', action:()=>navTo('trikotgroessen')},
+          ]:[]),
           ...(canAccessRompel()?[
             {label:'Rompel Bereich', icon:{type:'img',src:'/rompel.jpg'}, color:'#fda4af', bg:'rgba(253,164,175,0.08)', border:'rgba(253,164,175,0.25)', action:()=>navTo('rompel')},
           ]:[]),
@@ -3769,7 +3890,7 @@ export default function TrainingsApp() {
                   {pastSess.length>0&&<p style={{margin:'0 0 6px',fontSize:'11px',fontWeight:'700',color:'rgba(252,165,165,0.55)',textTransform:'uppercase',letterSpacing:'1px'}}>Vergangen – Anwesenheit eintragen</p>}
                   {pastSess.map(session=>{
                     const sessionSubs=(session.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean);
-                    const allKids2=(session.subgroupIds||[]).flatMap(sid=>getChildrenForSubgroup(sid));
+                    const allKids2=(session.subgroupIds||[]).flatMap(sid=>getChildrenForSubgroup(sid)).filter(c=>!c.nachwuchsKarriereBeendet);
                     const recorded=allKids2.filter(c=>!!(children[c.id]?.attendance||{})[session.date]).length;
                     const archivable=isSessionArchivable(session);
                     const allDone=allKids2.length>0&&recorded===allKids2.length;
@@ -3851,7 +3972,7 @@ export default function TrainingsApp() {
 
 
   // ── AKTIVER DASHBOARD ────────────────────────────────────────────────────
-  if (userRole === 'aktiver' && !['gegnerlogbuch','ttcnews','trainingsmatches'].includes(view)) {
+  if (userRole === 'aktiver' && !['gegnerlogbuch','ttcnews','trainingsmatches','wettenZitate'].includes(view)) {
     const dateLabel = new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
     const greeting = new Date().getHours()<12?'Guten Morgen':new Date().getHours()<18?'Hallo':'Guten Abend';
 
@@ -3983,6 +4104,7 @@ export default function TrainingsApp() {
               {label:'Gegnerlogbuch', icon:'🎯', desc:`${gegnerLogbuch.length} ${gegnerLogbuch.length===1?'Eintrag':'Einträge'} · Taktiken & Hinweise`, color:'#67e8f9', bg:'rgba(8,145,178,0.08)', border:'rgba(8,145,178,0.2)', action:()=>navTo('gegnerlogbuch')},
               {label:'TTC News',        icon:'📰', desc:'Aktuelle Vereinsnachrichten',             color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',  action:()=>{navTo('ttcnews');fetchTtcNews();}},
               {label:'Trainingsmatches',icon:'⚔️', desc:'Duelle & Allzeittabelle',                  color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>navTo('trainingsmatches')},
+              {label:'Wetten & Zitate', icon:'🎰', desc:'Teamwetten & Sprüche', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate')},
               {label:'MyTischtennis', icon:'🏓', desc:'Vereinsübersicht auf MyTischtennis',                                                                  color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)',  action:()=>(()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);})()},
             ].map(t=>(
               <button key={t.label} onClick={t.action}
@@ -4245,47 +4367,113 @@ export default function TrainingsApp() {
           const streak=getLongestStreak(myChild.id);
           const tournParts=getTournamentParticipations(myChild.id);
           const openCount=(icon,title,desc,count)=>setAchievementPopup({icon,title,desc,count});
-          const Sec=({title,children:ch,mb=true})=>(
-            <div style={{marginBottom:mb?'18px':0}}>
-              <p style={{margin:'0 0 8px',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.35)',textTransform:'uppercase',letterSpacing:'0.5px',borderBottom:'1px solid rgba(255,255,255,0.06)',paddingBottom:'5px'}}>{title}</p>
-              <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>{ch}</div>
+
+          // ── Neue Design-Komponenten ──
+          const SH=({icon,title,mt=true})=>(
+            <div style={{display:'flex',alignItems:'center',gap:'8px',margin:`${mt?'24px':0} 0 10px`}}>
+              <div style={{height:'1px',width:'16px',background:'rgba(255,255,255,0.12)'}}/>
+              <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.35)',textTransform:'uppercase',letterSpacing:'1.5px',whiteSpace:'nowrap'}}>{icon} {title}</span>
+              <div style={{flex:1,height:'1px',background:'rgba(255,255,255,0.06)'}}/>
             </div>
           );
-          const TileA=({icon,iconGray='⬜',label,sub,has,activeBg='rgba(74,222,128,0.1)',activeBorder='rgba(74,222,128,0.3)',activeTextColor='#4ade80',onClick})=>(
-            <button onClick={onClick} style={{padding:'10px 12px',borderRadius:'12px',border:`2px solid ${has?activeBorder:'rgba(255,255,255,0.08)'}`,background:has?activeBg:'rgba(255,255,255,0.03)',cursor:'pointer',textAlign:'center',minWidth:'76px',maxWidth:'100px',transition:'transform 0.1s'}} onMouseEnter={e=>e.currentTarget.style.transform='scale(1.06)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
-              <div style={{fontSize:'22px'}}>{has?icon:iconGray}</div>
-              <div style={{fontSize:'11px',fontWeight:'700',color:has?activeTextColor:'rgba(255,255,255,0.2)',marginTop:'2px',lineHeight:'1.2'}}>{label}</div>
-              {sub&&<div style={{fontSize:'12px',fontWeight:'700',color:has?activeTextColor:'rgba(255,255,255,0.2)'}}>{sub}</div>}
+
+          // Vollbreite Zeilen-Karte
+          const AC=({icon,title,sub,note,has,onClick,accent='#fbbf24',acBg='rgba(251,191,36,0.08)',acBorder='rgba(251,191,36,0.22)'})=>(
+            <button onClick={onClick} style={{width:'100%',display:'flex',alignItems:'center',gap:'12px',padding:'12px 14px',borderRadius:'14px',border:`1.5px solid ${has?acBorder:'rgba(255,255,255,0.06)'}`,background:has?acBg:'rgba(255,255,255,0.025)',cursor:'pointer',textAlign:'left',transition:'all 0.12s',marginBottom:'6px'}}
+              onMouseEnter={e=>{e.currentTarget.style.transform='translateX(2px)';}}
+              onMouseLeave={e=>{e.currentTarget.style.transform='translateX(0)';}}>
+              <div style={{width:'42px',height:'42px',borderRadius:'11px',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'22px',background:has?`${acBg.replace('0.08','0.15')}`:'rgba(255,255,255,0.05)',border:`1px solid ${has?acBorder:'rgba(255,255,255,0.08)'}`}}>
+                {has?icon:'🔒'}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <p style={{margin:'0 0 1px',fontWeight:'800',fontSize:'14px',color:has?'white':'rgba(255,255,255,0.3)',lineHeight:'1.2'}}>{title}</p>
+                {sub&&<p style={{margin:0,fontSize:'12px',color:has?accent:'rgba(255,255,255,0.2)',fontWeight:'600'}}>{sub}</p>}
+                {note&&!has&&<p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.18)'}}>{note}</p>}
+              </div>
+              {has&&<span style={{fontSize:'18px',flexShrink:0,color:accent}}>✓</span>}
+              {!has&&<span style={{fontSize:'13px',flexShrink:0,color:'rgba(255,255,255,0.15)'}}>🔒</span>}
             </button>
           );
+
+          // Kompakte Chips-Reihe (für TTR, Rangliste-Tiers etc.)
+          const ChipRow=({children})=><div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'8px'}}>{children}</div>;
+
           return (
-            <div style={DARK_CARD}>
-              <Sec title="🏓 TTR Meilensteine">
-                {TTR_MILESTONES.map((val,i)=>{const unlocked=ttrUnlocked.includes(val);const col=TTR_COLORS[i];return(<button key={val} onClick={()=>setAchievementPopup({icon:unlocked?'🏓':'🔒',title:`${val} TTR`,desc:unlocked?ACHIEVEMENT_DESCRIPTIONS.ttr(val):`Noch nicht erreicht. Erreiche ${val} TTR-Punkte!`})} style={{padding:'8px 10px',borderRadius:'10px',border:`2px solid ${unlocked?col.bg:'rgba(255,255,255,0.08)'}`,background:unlocked?col.bg:'rgba(255,255,255,0.03)',color:unlocked?col.text:'rgba(255,255,255,0.2)',fontWeight:'700',fontSize:'12px',cursor:'pointer',minWidth:'54px',transition:'transform 0.1s'}} onMouseEnter={e=>e.currentTarget.style.transform='scale(1.08)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>{unlocked?'🏓 ':''}{val}</button>);})}
-              </Sec>
-              <Sec title="📅 Trainings-Meilensteine">
-                {[10,25,50,100,200,500,1000].map(m=>{const has=totalTrainings>=m;return<TileA key={m} icon="🏋️" label={`${m} Trainings`} sub={has?'✓':`${totalTrainings}/${m}`} has={has} activeBg="rgba(74,222,128,0.1)" activeBorder="rgba(74,222,128,0.3)" activeTextColor="#4ade80" onClick={()=>setAchievementPopup({icon:'🏋️',title:`${m} Trainings`,desc:`Du hast insgesamt ${m} Trainingseinheiten absolviert! Aktuell: ${totalTrainings} Trainings.`})}/>;} )}
-                {[5,10,20,30,50].map(m=>{const has=streak>=m;return<TileA key={`str${m}`} icon="🔥" label={`${m}× Serie`} sub={has?'✓':`${streak}/${m}`} has={has} activeBg="rgba(251,146,60,0.1)" activeBorder="rgba(251,146,60,0.3)" activeTextColor="#fb923c" onClick={()=>setAchievementPopup({icon:'🔥',title:`${m}er Trainingsserie`,desc:`${m} Trainingseinheiten in Folge ohne Fehlzeit! Deine längste Serie: ${streak} Einheiten.`})}/>;} )}
-              </Sec>
-              <Sec title="🏆 Turnier-Teilnahmen">
-                {[1,5,10,20].map(m=>{const has=tournParts>=m;return<TileA key={m} icon="🏆" label={`${m} Turnier${m>1?'e':''}`} sub={has?'✓':`${tournParts}/${m}`} has={has} activeBg="rgba(253,230,138,0.1)" activeBorder="rgba(253,230,138,0.3)" activeTextColor="#fde68a" onClick={()=>setAchievementPopup({icon:'🏆',title:`${m} Turnier${m>1?'e':''}`,desc:`Du hast an ${m} Turnier${m>1?'en':''} teilgenommen! Bisher: ${tournParts}.`})}/>;} )}
-              </Sec>
-              <Sec title="🥊 Turnierergebnisse Einzel">
-                {[{icon:'🥇',label:'1. Platz',field:'einzel1',desc:ACHIEVEMENT_DESCRIPTIONS.einzel1},{icon:'🥈',label:'2. Platz',field:'einzel2',desc:ACHIEVEMENT_DESCRIPTIONS.einzel2},{icon:'🥉',label:'3. Platz',field:'einzel3',desc:ACHIEVEMENT_DESCRIPTIONS.einzel3}].map(({icon,label,field,desc})=>{const count=ach[field]||0;return<TileA key={field} icon={icon} label={label} sub={count>0?`×${count}`:undefined} has={count>0} activeBg="rgba(253,230,138,0.1)" activeBorder="rgba(253,230,138,0.3)" activeTextColor="#fde68a" onClick={()=>openCount(icon,label,desc,count)}/>;} )}
-              </Sec>
-              <Sec title="🤝 Turnierergebnisse Doppel">
-                {[{icon:'🥇',label:'1. Platz',field:'doppel1',desc:ACHIEVEMENT_DESCRIPTIONS.doppel1},{icon:'🥈',label:'2. Platz',field:'doppel2',desc:ACHIEVEMENT_DESCRIPTIONS.doppel2},{icon:'🥉',label:'3. Platz',field:'doppel3',desc:ACHIEVEMENT_DESCRIPTIONS.doppel3}].map(({icon,label,field,desc})=>{const count=ach[field]||0;return<TileA key={field} icon={icon} label={label} sub={count>0?`×${count}`:undefined} has={count>0} activeBg="rgba(253,230,138,0.1)" activeBorder="rgba(253,230,138,0.3)" activeTextColor="#fde68a" onClick={()=>openCount(icon,label,desc,count)}/>;} )}
-              </Sec>
-              <Sec title="🏅 Mannschaft & Auszeichnungen">
-                {[{icon:'🏆',label:'Meisterschaft',field:'team',desc:ACHIEVEMENT_DESCRIPTIONS.team},{icon:'⭐',label:'Spieler d. M.',field:'spielerDesMonats',desc:'Du wurdest zum Spieler des Monats gewählt!'}].map(({icon,label,field,desc})=>{const count=ach[field]||0;return<TileA key={field} icon={icon} label={label} sub={count>0?`×${count}`:undefined} has={count>0} activeBg="rgba(253,230,138,0.1)" activeBorder="rgba(253,230,138,0.3)" activeTextColor="#fde68a" onClick={()=>openCount(icon,label,desc,count)}/>;} )}
-              </Sec>
-              <Sec title={`📆 Anwesenheit ${monthName}`}>
-                {(()=>{const attCfgMap={gold:{icon:'🥇',color:'#fde68a',bg:'rgba(253,230,138,0.15)',border:'rgba(253,230,138,0.4)',label:'Gold (100%)'},silver:{icon:'🥈',color:'rgba(255,255,255,0.6)',bg:'rgba(255,255,255,0.08)',border:'rgba(255,255,255,0.2)',label:'Silber (≥90%)'},bronze:{icon:'🥉',color:'#fb923c',bg:'rgba(251,146,60,0.12)',border:'rgba(251,146,60,0.3)',label:'Bronze (≥80%)'}};const cfg3=currentLevel?attCfgMap[currentLevel]:null;return(<button onClick={()=>setAchievementPopup({icon:cfg3?cfg3.icon:'📅',title:monthName,desc:cfg3?cfg3.label:'Noch nicht genug Trainings besucht (mind. 80% für Bronze).'})} style={{padding:'10px 14px',borderRadius:'12px',border:`2px solid ${cfg3?cfg3.border:'rgba(255,255,255,0.08)'}`,background:cfg3?cfg3.bg:'rgba(255,255,255,0.03)',cursor:'pointer',textAlign:'center',minWidth:'100px'}} onMouseEnter={e=>e.currentTarget.style.transform='scale(1.05)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}><div style={{fontSize:'26px'}}>{cfg3?cfg3.icon:'⬜'}</div><div style={{fontSize:'12px',fontWeight:'700',color:cfg3?cfg3.color:'rgba(255,255,255,0.2)',marginTop:'2px'}}>{cfg3?cfg3.label:'Kein Rang'}</div></button>);})()}
-              </Sec>
-              <Sec title="📊 Anwesenheits-Monate (Gesamt)">
-                {[{icon:'🥇',label:'Gold-Monate',count:cumul.gold,activeBg:'rgba(253,230,138,0.12)',activeBorder:'rgba(253,230,138,0.35)',activeTextColor:'#fde68a',desc:ACHIEVEMENT_DESCRIPTIONS.attendanceGold},{icon:'🥈',label:'Silber-Monate',count:cumul.silver,activeBg:'rgba(255,255,255,0.08)',activeBorder:'rgba(255,255,255,0.2)',activeTextColor:'rgba(255,255,255,0.7)',desc:ACHIEVEMENT_DESCRIPTIONS.attendanceSilver},{icon:'🥉',label:'Bronze-Monate',count:cumul.bronze,activeBg:'rgba(251,146,60,0.1)',activeBorder:'rgba(251,146,60,0.3)',activeTextColor:'#fb923c',desc:ACHIEVEMENT_DESCRIPTIONS.attendanceBronze}].map(({icon,label,count,activeBg,activeBorder,activeTextColor,desc})=>(<TileA key={label} icon={icon} label={label} sub={count>0?`${count}×`:undefined} has={count>0} activeBg={activeBg} activeBorder={activeBorder} activeTextColor={activeTextColor} onClick={()=>openCount(icon,label,desc,count)}/>))}
-              </Sec>
-              {rangliste.length>0&&rangliste.includes(myChild.id)&&(()=>{const rAch=getRanglisteAch(myChild.id);const myRank=rangliste.indexOf(myChild.id)+1;return(<><Sec title="📊 Rangliste – Erstmals erreicht">{RANK_TIERS.map(t=>{const has=!!rAch.reached?.[t.key];const date=rAch.reached?.[t.key];return(<TileA key={t.key} icon={t.icon} iconGray="⬜" label={t.label} sub={has&&date?new Date(date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'}):undefined} has={has} activeBg="rgba(252,211,77,0.12)" activeBorder="rgba(252,211,77,0.35)" activeTextColor="#fcd34d" onClick={()=>setAchievementPopup({icon:has?t.icon:'🔒',title:t.label,desc:has?`Du hast ${t.label} erstmals am ${new Date(date).toLocaleDateString('de-DE')} erreicht!`:`Noch nicht erreicht. Aktuell: Platz #${myRank}`})}/>);})}</Sec><Sec title="📅 Rangliste – Wochen im Tier" mb={false}>{RANK_TIERS.map(t=>{const wk=rAch.weeks?.[t.key]?.count||0;return(<TileA key={t.key} icon={t.icon} iconGray="⬜" label={t.label} sub={wk>0?`${wk}W`:undefined} has={wk>0} activeBg="rgba(252,211,77,0.08)" activeBorder="rgba(252,211,77,0.25)" activeTextColor="#fcd34d" onClick={()=>setAchievementPopup({icon:t.icon,title:`Wochen ${t.label}`,desc:`Du hast insgesamt ${wk} Woche${wk!==1?'n':''} in der ${t.label} verbracht.`,count:wk})}/>);})}</Sec></>);})()}
+            <div>
+              {/* ── TTR Meilensteine ── */}
+              <SH icon="🏓" title="TTR Meilensteine" mt={false}/>
+              <ChipRow>
+                {TTR_MILESTONES.map((val)=>{const unlocked=ttrUnlocked.includes(val);return(
+                  <button key={val} onClick={()=>setAchievementPopup({icon:unlocked?'🏓':'🔒',title:`${val} TTR`,desc:unlocked?ACHIEVEMENT_DESCRIPTIONS.ttr(val):`Noch nicht erreicht. Erreiche ${val} TTR-Punkte!`})}
+                    style={{padding:'7px 12px',borderRadius:'10px',border:`1.5px solid ${unlocked?'rgba(74,222,128,0.4)':'rgba(255,255,255,0.08)'}`,background:unlocked?'rgba(74,222,128,0.1)':'rgba(255,255,255,0.03)',color:unlocked?'#4ade80':'rgba(255,255,255,0.22)',fontWeight:'800',fontSize:'12px',cursor:'pointer',display:'flex',alignItems:'center',gap:'4px',transition:'transform 0.1s'}}
+                    onMouseEnter={e=>e.currentTarget.style.transform='scale(1.06)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
+                    {unlocked&&<span>🏓</span>}{val}
+                  </button>
+                );})}
+              </ChipRow>
+
+              {/* ── Trainings-Meilensteine ── */}
+              <SH icon="🏋️" title="Trainings-Meilensteine"/>
+              {[10,25,50,100,200,500,1000].map(m=>{const has=totalTrainings>=m;return<AC key={m} icon="🏋️" title={`${m} Trainings absolviert`} sub={has?`Erreicht! (${totalTrainings} gesamt)`:`${totalTrainings} von ${m}`} has={has} accent="#4ade80" acBg="rgba(74,222,128,0.07)" acBorder="rgba(74,222,128,0.2)" onClick={()=>setAchievementPopup({icon:'🏋️',title:`${m} Trainings`,desc:`Du hast insgesamt ${m} Trainingseinheiten absolviert! Aktuell: ${totalTrainings} Trainings.`})}/>;} )}
+              {[5,10,20,30,50].map(m=>{const has=streak>=m;return<AC key={`str${m}`} icon="🔥" title={`${m}er Trainingsserie`} sub={has?`Erreicht! (Längste Serie: ${streak})`:`Längste Serie: ${streak}/${m}`} has={has} accent="#fb923c" acBg="rgba(251,146,60,0.07)" acBorder="rgba(251,146,60,0.22)" onClick={()=>setAchievementPopup({icon:'🔥',title:`${m}er Trainingsserie`,desc:`${m} Trainingseinheiten in Folge ohne Fehlzeit! Deine längste Serie: ${streak} Einheiten.`})}/>;} )}
+
+              {/* ── Turnier-Teilnahmen ── */}
+              <SH icon="🏆" title="Turnier-Teilnahmen"/>
+              {[1,5,10,20].map(m=>{const has=tournParts>=m;return<AC key={m} icon="🏆" title={`${m} Turnier${m>1?'e':''} teilgenommen`} sub={has?'Erreicht!':`${tournParts} von ${m}`} has={has} accent="#fde68a" acBg="rgba(253,230,138,0.07)" acBorder="rgba(253,230,138,0.22)" onClick={()=>setAchievementPopup({icon:'🏆',title:`${m} Turnier${m>1?'e':''}`,desc:`Du hast an ${m} Turnier${m>1?'en':''} teilgenommen! Bisher: ${tournParts}.`})}/>;} )}
+
+              {/* ── Turnierergebnisse (Einzel & Doppel zusammen) ── */}
+              <SH icon="🎖️" title="Turnierergebnisse"/>
+              <div style={{background:'rgba(255,255,255,0.025)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'16px',overflow:'hidden',marginBottom:'6px'}}>
+                <div style={{padding:'7px 14px',background:'rgba(253,230,138,0.05)',borderBottom:'1px solid rgba(255,255,255,0.06)',fontSize:'10px',fontWeight:'800',color:'rgba(253,230,138,0.5)',letterSpacing:'1.5px'}}>EINZEL</div>
+                <div style={{padding:'6px 8px',display:'flex',flexDirection:'column',gap:'4px'}}>
+                  {[{icon:'🥇',title:'1. Platz Einzel',field:'einzel1',desc:ACHIEVEMENT_DESCRIPTIONS.einzel1},{icon:'🥈',title:'2. Platz Einzel',field:'einzel2',desc:ACHIEVEMENT_DESCRIPTIONS.einzel2},{icon:'🥉',title:'3. Platz Einzel',field:'einzel3',desc:ACHIEVEMENT_DESCRIPTIONS.einzel3}].map(({icon,title,field,desc})=>{const count=ach[field]||0;return<AC key={field} icon={icon} title={title} sub={count>0?`${count}× erreicht`:undefined} note="Noch kein Podestplatz im Einzel" has={count>0} accent="#fde68a" acBg="rgba(253,230,138,0.07)" acBorder="rgba(253,230,138,0.22)" onClick={()=>openCount(icon,title,desc,count)}/>;} )}
+                </div>
+                <div style={{padding:'7px 14px',background:'rgba(103,232,249,0.04)',borderTop:'1px solid rgba(255,255,255,0.06)',borderBottom:'1px solid rgba(255,255,255,0.06)',fontSize:'10px',fontWeight:'800',color:'rgba(103,232,249,0.5)',letterSpacing:'1.5px'}}>DOPPEL</div>
+                <div style={{padding:'6px 8px',display:'flex',flexDirection:'column',gap:'4px'}}>
+                  {[{icon:'🥇',title:'1. Platz Doppel',field:'doppel1',desc:ACHIEVEMENT_DESCRIPTIONS.doppel1},{icon:'🥈',title:'2. Platz Doppel',field:'doppel2',desc:ACHIEVEMENT_DESCRIPTIONS.doppel2},{icon:'🥉',title:'3. Platz Doppel',field:'doppel3',desc:ACHIEVEMENT_DESCRIPTIONS.doppel3}].map(({icon,title,field,desc})=>{const count=ach[field]||0;return<AC key={field} icon={icon} title={title} sub={count>0?`${count}× erreicht`:undefined} note="Noch kein Podestplatz im Doppel" has={count>0} accent="#67e8f9" acBg="rgba(103,232,249,0.07)" acBorder="rgba(103,232,249,0.22)" onClick={()=>openCount(icon,title,desc,count)}/>;} )}
+                </div>
+              </div>
+
+              {/* ── Mannschaftsmeisterschaft ── */}
+              <SH icon="🏆" title="Mannschaftsmeisterschaft"/>
+              {(()=>{const count=ach['team']||0;return<AC icon='🏆' title='Mannschaftsmeisterschaft' sub={count>0?`${count}× Meister!`:undefined} note="Gewinne eine Meisterschaft mit deiner Mannschaft" has={count>0} accent="#fbbf24" acBg="rgba(251,191,36,0.08)" acBorder="rgba(251,191,36,0.25)" onClick={()=>openCount('🏆','Meisterschaft',ACHIEVEMENT_DESCRIPTIONS.team,count)}/>;})()}
+
+              {/* ── Spieler des Monats / Jahres ── */}
+              <SH icon="⭐" title="Spieler des Monats / Jahres"/>
+              {(spielerDesMonatsWins[myChild.id]||[]).length>0
+                ? (spielerDesMonatsWins[myChild.id]||[]).map(w=>{
+                    const isYear=w.type==='year';
+                    const lbl=isYear?`Spieler des Jahres ${w.period}`:`Spieler des Monats ${fmtYM(w.period)}`;
+                    return<AC key={`${w.type}-${w.period}`} icon={isYear?'👑':'⭐'} title={lbl} sub="Ausgezeichnet!" has={true} accent="#fcd34d" acBg="rgba(252,211,77,0.07)" acBorder="rgba(252,211,77,0.3)" onClick={()=>openCount(isYear?'👑':'⭐',lbl,isYear?`Spieler des Jahres ${w.period}!`:`Spieler des Monats ${fmtYM(w.period)}!`,1)}/>;
+                  })
+                : <AC icon='⭐' title='Spieler des Monats' note="Erziele die größte TTR-Verbesserung im Monat" has={false} onClick={()=>openCount('⭐','Spieler des Monats','Werde Spieler des Monats mit der größten TTR-Verbesserung im Monat!',0)}/>
+              }
+
+              {/* ── Anwesenheit aktueller Monat ── */}
+              <SH icon="📆" title={`Anwesenheit ${monthName}`}/>
+              {(()=>{const attCfgMap={gold:{icon:'🥇',color:'#fde68a',acBg:'rgba(253,230,138,0.08)',acBorder:'rgba(253,230,138,0.3)',label:'Gold (100% Anwesenheit)',accent:'#fde68a'},silver:{icon:'🥈',color:'rgba(255,255,255,0.7)',acBg:'rgba(255,255,255,0.06)',acBorder:'rgba(255,255,255,0.2)',label:'Silber (≥ 90%)',accent:'rgba(255,255,255,0.6)'},bronze:{icon:'🥉',color:'#fb923c',acBg:'rgba(251,146,60,0.07)',acBorder:'rgba(251,146,60,0.25)',label:'Bronze (≥ 80%)',accent:'#fb923c'}};const cfg3=currentLevel?attCfgMap[currentLevel]:null;return<AC icon={cfg3?cfg3.icon:'📅'} title={monthName} sub={cfg3?cfg3.label:undefined} note="Mind. 80% Anwesenheit für Bronze" has={!!cfg3} accent={cfg3?.accent||'#fbbf24'} acBg={cfg3?.acBg||'rgba(251,191,36,0.07)'} acBorder={cfg3?.acBorder||'rgba(251,191,36,0.2)'} onClick={()=>setAchievementPopup({icon:cfg3?cfg3.icon:'📅',title:monthName,desc:cfg3?cfg3.label:'Noch nicht genug Trainings besucht (mind. 80% für Bronze).'})}/>;})()}
+
+              {/* ── Anwesenheits-Monate Gesamt ── */}
+              <SH icon="📊" title="Anwesenheits-Monate (Gesamt)"/>
+              {[{icon:'🥇',title:'Gold-Monate',count:cumul.gold,accent:'#fde68a',acBg:'rgba(253,230,138,0.07)',acBorder:'rgba(253,230,138,0.22)',desc:ACHIEVEMENT_DESCRIPTIONS.attendanceGold},{icon:'🥈',title:'Silber-Monate',count:cumul.silver,accent:'rgba(255,255,255,0.6)',acBg:'rgba(255,255,255,0.06)',acBorder:'rgba(255,255,255,0.18)',desc:ACHIEVEMENT_DESCRIPTIONS.attendanceSilver},{icon:'🥉',title:'Bronze-Monate',count:cumul.bronze,accent:'#fb923c',acBg:'rgba(251,146,60,0.07)',acBorder:'rgba(251,146,60,0.22)',desc:ACHIEVEMENT_DESCRIPTIONS.attendanceBronze}].map(({icon,title,count,accent,acBg,acBorder,desc})=>(<AC key={title} icon={icon} title={title} sub={count>0?`${count}× ${title.split('-')[0].toLowerCase()} Monat${count!==1?'e':''}`:undefined} note="Noch kein Monat mit diesem Rang" has={count>0} accent={accent} acBg={acBg} acBorder={acBorder} onClick={()=>openCount(icon,title,desc,count)}/>))}
+
+              {/* ── Rangliste ── */}
+              {rangliste.length>0&&rangliste.includes(myChild.id)&&(()=>{
+                const rAch=getRanglisteAch(myChild.id);const myRank=rangliste.indexOf(myChild.id)+1;
+                return(
+                  <>
+                    <SH icon="📊" title="Rangliste – Erstmals erreicht"/>
+                    {RANK_TIERS.map(t=>{const has=!!rAch.reached?.[t.key];const date=rAch.reached?.[t.key];return(
+                      <AC key={t.key} icon={t.icon} title={t.label} sub={has&&date?`Erstmals am ${new Date(date).toLocaleDateString('de-DE')} erreicht`:undefined} note={`Noch nicht erreicht. Aktuell: Platz #${myRank}`} has={has} accent="#4ade80" acBg="rgba(74,222,128,0.07)" acBorder="rgba(74,222,128,0.2)" onClick={()=>setAchievementPopup({icon:has?t.icon:'🔒',title:t.label,desc:has?`Erstmals am ${new Date(date).toLocaleDateString('de-DE')} erreicht!`:`Noch nicht erreicht. Aktuell: Platz #${myRank}`})}/>
+                    );})}
+                    <SH icon="📅" title="Rangliste – Wochen im Tier"/>
+                    {RANK_TIERS.map(t=>{const wk=rAch.weeks?.[t.key]?.count||0;return(
+                      <AC key={t.key} icon={t.icon} title={t.label} sub={wk>0?`${wk} Woche${wk!==1?'n':''} in diesem Tier`:undefined} note="Noch keine Wochen in diesem Tier" has={wk>0} accent="#4ade80" acBg="rgba(74,222,128,0.07)" acBorder="rgba(74,222,128,0.2)" onClick={()=>setAchievementPopup({icon:t.icon,title:`Wochen ${t.label}`,desc:`Du hast insgesamt ${wk} Woche${wk!==1?'n':''} in der ${t.label} verbracht.`,count:wk})}/>
+                    );})}
+
+                  </>
+                );
+              })()}
             </div>
           );
         }
@@ -4372,12 +4560,12 @@ export default function TrainingsApp() {
             </div>
           </div>
 
-          {/* ── Greeting ── */}
-          <div style={{marginBottom:'32px'}}>
-            <p style={{margin:'0 0 6px',color:'rgba(74,222,128,0.5)',fontSize:'12px',fontWeight:'700',letterSpacing:'1.5px',textTransform:'uppercase'}}>{dateLabel}</p>
-            <h1 style={{margin:0,color:'white',fontSize:isMobile?'26px':'32px',fontWeight:'800',letterSpacing:'-1px',lineHeight:1.1}}>
+          {/* ── Greeting (kompakt) ── */}
+          <div style={{marginBottom:'16px',display:'flex',alignItems:'baseline',gap:'8px',flexWrap:'wrap'}}>
+            <h1 style={{margin:0,color:'white',fontSize:'18px',fontWeight:'800',letterSpacing:'-0.4px'}}>
               {greeting}, <span style={{color:'#4ade80'}}>{myChild?myChild.name.split(' ')[0]:(userProfile?.name||'').split(' ')[0]||'Hallo'}</span> 👋
             </h1>
+            <span style={{color:'rgba(74,222,128,0.4)',fontSize:'11px',fontWeight:'600'}}>{dateLabel}</span>
           </div>
 
           {/* ── Back-Button wenn Sub-View aktiv ── */}
@@ -4390,98 +4578,68 @@ export default function TrainingsApp() {
 
           {/* ── Kind-Info (kompakt) ── */}
           {myChild && !elternSubView && (
-            <>
-              <span style={SECTION_LABEL()}>Übersicht</span>
-              <div style={{...DARK_CARD,marginBottom:'28px'}}>
-                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'10px',marginBottom:'14px'}}>
-                  <div>
-                    <span style={{fontWeight:'800',fontSize:'18px',color:grp?.color||'#4ade80'}}>{myChild.name}</span>
-                    <span style={{marginLeft:'10px',fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>{grp?.emoji} {grp?.name} · {sub?.name}</span>
-                  </div>
-                  <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-                    {[
-                      {label:'Gesamt',value:stats.total,color:'rgba(255,255,255,0.6)',bg:'rgba(255,255,255,0.07)'},
-                      {label:'Anwesend',value:stats.present,color:'#4ade80',bg:'rgba(74,222,128,0.12)'},
-                      {label:'Unentsch.',value:stats.unexcused,color:'#f87171',bg:'rgba(239,68,68,0.1)'},
-                      {label:'Entsch.',value:stats.excused,color:'#94a3b8',bg:'rgba(148,163,184,0.1)'},
-                    ].map(({label,value,color,bg})=>(
-                      <div key={label} style={{background:bg,borderRadius:'10px',padding:'6px 12px',textAlign:'center',minWidth:'54px',border:'1px solid rgba(255,255,255,0.07)'}}>
-                        <p style={{margin:0,fontSize:'16px',fontWeight:'800',color}}>{value}</p>
-                        <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.35)',fontWeight:'600'}}>{label}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:'6px'}}>
-                    <span style={{fontSize:'12px',fontWeight:'700',color:'rgba(255,255,255,0.4)'}}>Anwesenheitsquote</span>
-                    <span style={{fontSize:'13px',fontWeight:'800',color:stats.percent>=80?'#4ade80':stats.percent>=60?'#fde68a':'#f87171'}}>{stats.percent}%</span>
-                  </div>
-                  <div style={{background:'rgba(255,255,255,0.08)',borderRadius:'99px',height:'8px',overflow:'hidden'}}>
-                    <div style={{width:`${stats.percent}%`,height:'100%',background:stats.percent>=80?'linear-gradient(90deg,#16a34a,#4ade80)':stats.percent>=60?'linear-gradient(90deg,#d97706,#fde68a)':'linear-gradient(90deg,#dc2626,#f87171)',borderRadius:'99px',transition:'width 0.6s ease'}}/>
-                  </div>
-                </div>
-                {(()=>{const mat=materialverwaltung[myChild.id];if(!mat||(!mat.vh&&!mat.rh&&!mat.holz))return null;
-                  const fmtD=(iso)=>{if(!iso)return'';try{return new Date(iso).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});}catch{return iso;}};
-                  return(
-                  <div style={{marginTop:'14px',paddingTop:'12px',borderTop:'1px solid rgba(255,255,255,0.06)',display:'flex',flexWrap:'wrap',gap:'8px'}}>
-                    {[{label:'VH',val:mat.vh,dicke:mat.vh_dicke,datum:mat.vh_datum,color:'#67e8f9'},{label:'RH',val:mat.rh,dicke:mat.rh_dicke,datum:mat.rh_datum,color:'#a78bfa'},{label:'Holz',val:mat.holz,color:'#86efac'}].filter(x=>x.val).map(x=>(
-                      <div key={x.label} style={{display:'flex',alignItems:'flex-start',gap:'6px',background:'rgba(255,255,255,0.04)',border:`1px solid ${x.color}22`,borderRadius:'8px',padding:'5px 10px'}}>
-                        <span style={{fontSize:'10px',fontWeight:'800',color:x.color,textTransform:'uppercase',letterSpacing:'0.5px',marginTop:'1px'}}>{x.label}</span>
-                        <div>
-                          <div style={{display:'flex',alignItems:'center',gap:'5px'}}>
-                            <span style={{fontSize:'12px',fontWeight:'600',color:'rgba(255,255,255,0.8)'}}>{x.val}</span>
-                            {x.dicke&&<span style={{fontSize:'10px',fontWeight:'700',color:x.color,background:`${x.color}18`,borderRadius:'4px',padding:'0 4px'}}>{x.dicke}</span>}
-                          </div>
-                          {x.datum&&<span style={{fontSize:'10px',color:'rgba(255,255,255,0.3)',fontWeight:'500'}}>Gewechselt {fmtD(x.datum)}</span>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                );})()}
+            <div style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(74,222,128,0.12)',borderRadius:'14px',padding:'11px 14px',marginBottom:'16px'}}>
+              {/* Zeile 1: Name + Gruppe + TTR */}
+              <div style={{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+                <span style={{fontWeight:'800',fontSize:'15px',color:grp?.color||'#4ade80'}}>{myChild.name}</span>
+                <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>{grp?.emoji} {sub?.name}</span>
+                <div style={{flex:1}}/>
                 {(()=>{const hist=ttrHistory[myChild.id]?.entries;if(!hist||hist.length===0)return null;
                   const last=hist[hist.length-1];const prev=hist.length>1?hist[hist.length-2]:null;
                   const diff=prev?last.ttr-prev.ttr:null;
                   return(
-                  <div style={{marginTop:'14px',paddingTop:'12px',borderTop:'1px solid rgba(255,255,255,0.06)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                    <div>
-                      <p style={{margin:'0 0 1px',fontSize:'10px',fontWeight:'700',color:'rgba(251,191,36,0.6)',textTransform:'uppercase',letterSpacing:'0.5px'}}>TTR {last.month}</p>
-                      <div style={{display:'flex',alignItems:'baseline',gap:'6px'}}>
-                        <span style={{fontSize:'22px',fontWeight:'900',color:'#fbbf24'}}>{last.ttr}</span>
-                        {diff!==null&&<span style={{fontSize:'12px',fontWeight:'700',color:diff>=0?'#4ade80':'#f87171'}}>{diff>=0?'+':''}{diff}</span>}
-                      </div>
-                    </div>
-                    <button onClick={()=>{setTtrVerlaufChild(myChild);navTo('ttrVerlauf');}}
-                      style={{padding:'8px 14px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'10px',color:'#fbbf24',cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>
-                      📈 Verlauf
-                    </button>
+                  <div style={{display:'flex',alignItems:'baseline',gap:'5px'}}>
+                    <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(251,191,36,0.5)',flexShrink:0}}>Stand {last.month}:</span>
+                    <span style={{fontSize:'15px',fontWeight:'900',color:'#fbbf24'}}>{last.ttr}</span>
+                    {diff!==null&&<span style={{fontSize:'11px',fontWeight:'700',color:diff>=0?'#4ade80':'#f87171'}}>{diff>=0?'+':''}{diff}</span>}
                   </div>
                 );})()}
               </div>
-            </>
+              {/* Zeile 2: Anwesenheitsbalken + Zahlen */}
+              {stats && (
+                <div style={{marginTop:'8px',display:'flex',alignItems:'center',gap:'8px'}}>
+                  <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(74,222,128,0.45)',textTransform:'uppercase',letterSpacing:'0.8px',flexShrink:0}}>Anwesenheit</span>
+                  <div style={{flex:1,background:'rgba(255,255,255,0.08)',borderRadius:'99px',height:'5px',overflow:'hidden'}}>
+                    <div style={{width:`${stats.percent}%`,height:'100%',background:stats.percent>=80?'linear-gradient(90deg,#16a34a,#4ade80)':stats.percent>=60?'linear-gradient(90deg,#d97706,#fde68a)':'linear-gradient(90deg,#dc2626,#f87171)',borderRadius:'99px'}}/>
+                  </div>
+                  <span style={{fontSize:'11px',fontWeight:'800',color:stats.percent>=80?'#4ade80':stats.percent>=60?'#fde68a':'#f87171',flexShrink:0}}>{stats.percent}%</span>
+                  <span style={{fontSize:'10px',color:'rgba(255,255,255,0.25)',flexShrink:0}}>({stats.present}/{stats.total})</span>
+                </div>
+              )}
+            </div>
           )}
 
-          {/* ── Trainings diese Woche (direkt auf dem Dashboard) ── */}
+          {/* ── Kommende Trainings (prominenteste Kachel) ── */}
           {myChild && !elternSubView && mySessions.length > 0 && (
-            <div style={{marginBottom:'24px'}}>
-              <span style={SECTION_LABEL()}>Kommende Trainings</span>
-              <div style={{display:'grid',gap:'10px'}}>
-                {mySessions.map(session=>{
+            <div style={{background:'rgba(74,222,128,0.05)',border:'1.5px solid rgba(74,222,128,0.22)',borderRadius:'16px',marginBottom:'20px',overflow:'hidden'}}>
+              <div style={{padding:'12px 16px',borderBottom:'1px solid rgba(74,222,128,0.12)',display:'flex',alignItems:'center',gap:'8px'}}>
+                <span style={{fontSize:'16px'}}>📅</span>
+                <span style={{fontWeight:'800',color:'white',fontSize:'15px'}}>Kommende Trainings</span>
+                <span style={{marginLeft:'auto',fontSize:'11px',color:'rgba(74,222,128,0.5)',fontWeight:'600'}}>{mySessions.length} Termin{mySessions.length>1?'e':''}</span>
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:'1px'}}>
+                {mySessions.map((session,si)=>{
                   const childId=myChild.id;
                   const myResponseRaw=(session.responses||{})[childId];
                   const myResponse=typeof myResponseRaw==='object'?myResponseRaw?.status:myResponseRaw;
                   const sessSubIds=session.subgroupIds||[];
                   const sessGrpNames=[...new Set(sessSubIds.map(sid=>{const sg=subgroups[sid];const fg=sg?FIXED_GROUPS.find(g=>g.id===sg.groupId):null;return fg?`${fg.emoji} ${fg.name}`:null;}).filter(Boolean))];
                   const isComing=myResponse==='coming'; const isMissing=myResponse==='missing';
+                  const todayStr=new Date().toISOString().split('T')[0];
+                  const isToday=session.date===todayStr;
                   return (
-                    <div key={session.id} style={{display:'flex',alignItems:'center',gap:'12px',padding:'10px 14px',borderRadius:'12px',border:`1px solid ${isComing?'rgba(74,222,128,0.25)':isMissing?'rgba(248,113,113,0.25)':'rgba(255,255,255,0.08)'}`,background:isComing?'rgba(74,222,128,0.06)':isMissing?'rgba(248,113,113,0.06)':'rgba(255,255,255,0.02)'}}>
+                    <div key={session.id} style={{display:'flex',alignItems:'center',gap:'14px',padding:'14px 16px',background:isMissing?'rgba(248,113,113,0.06)':isComing?'rgba(74,222,128,0.04)':'transparent',borderTop:si>0?'1px solid rgba(255,255,255,0.05)':'none'}}>
                       <div style={{flex:1,minWidth:0}}>
-                        <p style={{margin:'0 0 2px',fontWeight:'700',color:'white',fontSize:'14px',lineHeight:'1.3'}}>{new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})} · {session.time} Uhr</p>
+                        <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',marginBottom:'3px'}}>
+                          <span style={{fontWeight:'800',color:'white',fontSize:'15px'}}>{new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'})}</span>
+                          <span style={{fontWeight:'700',color:'rgba(74,222,128,0.8)',fontSize:'14px'}}>{session.time} Uhr</span>
+                          {isToday&&<span style={{fontSize:'10px',background:'rgba(74,222,128,0.2)',color:'#4ade80',padding:'2px 8px',borderRadius:'20px',fontWeight:'800'}}>Heute</span>}
+                        </div>
                         {session.trainer&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>👤 {session.trainer}</p>}
-                        {sessGrpNames.length>0&&<p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>📂 {sessGrpNames.join(', ')}</p>}
                       </div>
-                      <button onClick={()=>respondToSession(session.id,'missing')} style={{flexShrink:0,padding:'10px 16px',border:`1.5px solid ${isMissing?'#dc2626':'rgba(248,113,113,0.4)'}`,background:isMissing?'#dc2626':'transparent',color:isMissing?'white':'#f87171',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px',whiteSpace:'nowrap'}}>
-                        {isMissing?'✕ Abgemeldet':'Ich fehle'}
+                      <button onClick={()=>respondToSession(session.id,'missing')}
+                        style={{flexShrink:0,padding:'12px 20px',border:`2px solid ${isMissing?'#dc2626':'rgba(248,113,113,0.5)'}`,background:isMissing?'#dc2626':'rgba(220,38,38,0.08)',color:isMissing?'white':'#f87171',borderRadius:'12px',cursor:'pointer',fontWeight:'800',fontSize:'15px',whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:'6px'}}>
+                        <X size={16}/> {isMissing?'Abgemeldet':'Ich fehle'}
                       </button>
                     </div>
                   );
@@ -4490,35 +4648,55 @@ export default function TrainingsApp() {
             </div>
           )}
 
-          {/* ── Hub-Kacheln (nur wenn kein Sub-View) ── */}
+          {/* ── Menükacheln (Trainer-Stil) ── */}
           {myChild && !elternSubView && (()=>{
             const { active } = getCleanedNotifications(myChild.id);
             const myTournaments = getMyUpcomingTournaments();
             const myTeam = Object.values(teams).find(t=>(t.childIds||[]).includes(myChild.id));
             const isJugend = grp?.id === 'jugend';
-            const tiles = [
-              { label:'Benachrichtigungen', icon:'🔔', desc: active.length>0?`${active.length} neue Nachricht${active.length>1?'en':''}` : 'Keine neuen Nachrichten', color:'#a78bfa', bg:'rgba(167,139,250,0.08)', border:'rgba(167,139,250,0.25)', sub:'benachrichtigungen' },
-              { label:'Trainingsverlauf',   icon:'📋', desc:`${dates.length} Einträge`, color:'#67e8f9', bg:'rgba(103,232,249,0.08)', border:'rgba(103,232,249,0.25)', sub:'trainingsverlauf' },
-              { label:'Mannschaft',         icon:'🏓', desc: myTeam ? myTeam.name : 'Keine Mannschaft', color:'#2dd4bf', bg:'rgba(45,212,191,0.08)', border:'rgba(45,212,191,0.25)', sub:'mannschaft' },
-              { label:'Turniere',           icon:'🏆', desc: myTournaments.length>0?`${myTournaments.length} kommend`:'Kein Turnier bald', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.25)', sub:'turniere' },
-              ...(isJugend ? [
-                { label:'Rangliste',        icon:'📊', desc: rangliste.length>0?`${rangliste.length} Spieler`:'Noch keine Daten', color:'#fbbf24', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)', sub:'rangliste' },
-                { label:'Errungenschaften', icon:'🏅', desc:'Abzeichen & Meilensteine', color:'#86efac', bg:'rgba(134,239,172,0.08)', border:'rgba(134,239,172,0.25)', sub:'errungenschaften' },
-              ] : []),
-              { label:'TTC News',     icon:'📰', desc:'Neuigkeiten vom Verein', color:'#86efac', bg:'rgba(134,239,172,0.08)', border:'rgba(134,239,172,0.25)', action:()=>{navTo('ttcnews');fetchTtcNews();} },
-              { label:'MyTischtennis',icon:'🏓', desc:'Click-TT & Ergebnisse',  color:'#fcd34d', bg:'rgba(252,211,77,0.08)',   border:'rgba(252,211,77,0.25)',   action:()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);} },
+            const QL = (bg,border) => ({position:'relative',padding:'15px 8px 13px',background:bg,border:'1px solid '+border,borderRadius:'16px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:'8px',transition:'transform 0.12s',textAlign:'center'});
+            const menuCats = [
+              {
+                label:'Training', color:'rgba(103,232,249,0.45)',
+                links:[
+                  {label:'Trainingsverlauf', icon:'📋', color:'#67e8f9', bg:'rgba(103,232,249,0.1)', border:'rgba(103,232,249,0.25)', action:()=>setElternSubView('trainingsverlauf')},
+                  ...(isJugend ? [{label:'Rangliste', icon:'📊', color:'#fbbf24', bg:'rgba(251,191,36,0.1)', border:'rgba(251,191,36,0.25)', action:()=>setElternSubView('rangliste')}] : []),
+                  {label:'Nachrichten', icon:'🔔', color:'#a78bfa', bg:'rgba(167,139,250,0.1)', border:'rgba(167,139,250,0.25)', action:()=>setElternSubView('benachrichtigungen'), badge: active.length>0?active.length:0},
+                ],
+              },
+              {
+                label:'Wettkampf', color:'rgba(253,230,138,0.45)',
+                links:[
+                  {label:'Meine Mannschaft', icon:'🏓', color:'#2dd4bf', bg:'rgba(45,212,191,0.1)',  border:'rgba(45,212,191,0.25)',  action:()=>setElternSubView('mannschaft')},
+                  {label:'MyTischtennis',    icon:'🌐', color:'#fcd34d', bg:'rgba(252,211,77,0.1)',   border:'rgba(252,211,77,0.25)',   action:()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);}},
+                  {label:'Turniere',         icon:'🏆', color:'#fde68a', bg:'rgba(253,230,138,0.1)', border:'rgba(253,230,138,0.25)', action:()=>setElternSubView('turniere'), badge: myTournaments.length>0?myTournaments.length:0},
+                  ...(isJugend ? [{label:'Errungenschaften', icon:'🏅', color:'#86efac', bg:'rgba(134,239,172,0.1)', border:'rgba(134,239,172,0.25)', action:()=>setElternSubView('errungenschaften')}] : []),
+                ],
+              },
+              {
+                label:'Sonstiges', color:'rgba(226,232,240,0.35)',
+                links:[
+                  {label:'TTC News', icon:'📰', color:'#86efac', bg:'rgba(134,239,172,0.1)', border:'rgba(134,239,172,0.25)', action:()=>{navTo('ttcnews');fetchTtcNews();}},
+                ],
+              },
             ];
             return (
-              <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'12px',marginBottom:'28px'}}>
-                {tiles.map((t,ti)=>(
-                  <button key={t.sub||ti} onClick={t.action||(()=>setElternSubView(t.sub))}
-                    style={{background:t.bg,border:`1px solid ${t.border}`,borderRadius:'16px',padding:'18px 16px',cursor:'pointer',textAlign:'left',transition:'transform 0.12s,opacity 0.12s'}}
-                    onMouseEnter={e=>e.currentTarget.style.transform='scale(1.02)'}
-                    onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
-                    <div style={{fontSize:'28px',marginBottom:'8px'}}>{t.icon}</div>
-                    <p style={{margin:'0 0 4px',fontWeight:'800',color:'white',fontSize:'15px'}}>{t.label}</p>
-                    <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.4)',lineHeight:'1.3'}}>{t.desc}</p>
-                  </button>
+              <div style={{marginBottom:'28px'}}>
+                {menuCats.map(cat=>(
+                  <div key={cat.label} style={{marginBottom:'18px'}}>
+                    <p style={{color:cat.color,fontSize:'10px',fontWeight:'800',textTransform:'uppercase',letterSpacing:'2px',margin:'0 0 10px'}}>⬡ {cat.label}</p>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(110px,1fr))',gap:'8px'}}>
+                      {cat.links.map((ql,i)=>(
+                        <button key={i} onClick={ql.action} style={QL(ql.bg,ql.border)}
+                          onMouseEnter={e=>e.currentTarget.style.transform='translateY(-2px)'}
+                          onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
+                          <span style={{fontSize:'24px',lineHeight:1}}>{ql.icon}</span>
+                          <span style={{fontSize:'11px',fontWeight:'700',color:ql.color,lineHeight:'1.3'}}>{ql.label}</span>
+                          {ql.badge>0&&<span style={{position:'absolute',top:'8px',right:'8px',background:'#dc2626',color:'white',borderRadius:'50%',width:'18px',height:'18px',fontSize:'10px',fontWeight:'800',display:'flex',alignItems:'center',justifyContent:'center'}}>{ql.badge>9?'9+':ql.badge}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             );
@@ -5076,17 +5254,17 @@ export default function TrainingsApp() {
                       </Sec>
 
                       <Sec title="🏅 Mannschaft & Auszeichnungen">
-                        {[
-                          {icon:'🏆',label:'Meisterschaft',field:'team',desc:ACHIEVEMENT_DESCRIPTIONS.team},
-                          {icon:'⭐',label:'Spieler d. M.',field:'spielerDesMonats',desc:'Du wurdest zum Spieler des Monats gewählt! Eine besondere Auszeichnung vom Trainer.'},
-                        ].map(({icon,label,field,desc})=>{
-                          const count=ach[field]||0;
-                          return <Tile key={field} icon={icon} label={label} sub={count>0?`×${count}`:undefined}
-                            has={count>0} activeBg="rgba(253,230,138,0.1)"
-                            activeBorder={field==='spielerDesMonats'?'rgba(253,211,77,0.4)':'rgba(253,230,138,0.3)'}
-                            activeTextColor="#fde68a"
-                            onClick={()=>openCount(icon,label,desc,count)}/>;
-                        })}
+                        {(()=>{const count=ach['team']||0;return <Tile icon='🏆' label='Meisterschaft' sub={count>0?`×${count}`:undefined} has={count>0} activeBg="rgba(253,230,138,0.1)" activeBorder="rgba(253,230,138,0.3)" activeTextColor="#fde68a" onClick={()=>openCount('🏆','Meisterschaft',ACHIEVEMENT_DESCRIPTIONS.team,count)}/>;})()}
+                        {(spielerDesMonatsWins[myChild.id]||[]).length>0
+                          ? (spielerDesMonatsWins[myChild.id]||[]).map(w=>{
+                              const isYear=w.type==='year';
+                              const lbl=isYear?`Sp. d. J. ${w.period}`:`Sp. d. M. ${fmtYM(w.period)}`;
+                              return <Tile key={`${w.type}-${w.period}`} icon={isYear?'🏆':'⭐'} label={lbl} has={true}
+                                activeBg="rgba(252,211,77,0.08)" activeBorder="rgba(252,211,77,0.4)" activeTextColor="#fcd34d"
+                                onClick={()=>openCount(isYear?'🏆':'⭐',lbl,isYear?`Spieler des Jahres ${w.period}! Größte TTR-Verbesserung im Jahr.`:`Spieler des Monats ${fmtYM(w.period)}! Größte TTR-Verbesserung des Monats.`,1)}/>;
+                            })
+                          : <Tile icon='⭐' label='Spieler d. M.' has={false} onClick={()=>openCount('⭐','Spieler des Monats','Werde Spieler des Monats mit der größten TTR-Verbesserung im Monat!',0)}/>
+                        }
                       </Sec>
 
                       <Sec title={`📆 Anwesenheit ${monthName}`}>
@@ -5260,10 +5438,12 @@ export default function TrainingsApp() {
   if (view==='subgroup') {
     const sub=subgroups[activeSubgroup.id]||activeSubgroup;
     const kids=getChildrenForSubgroup(sub.id);
+    const activeKids=kids.filter(c=>!c.nachwuchsKarriereBeendet);
+    const retiredKids=kids.filter(c=>c.nachwuchsKarriereBeendet);
     const allSubs=Object.values(subgroups);
-    const totalPresent=kids.reduce((sum,c)=>sum+getAttendanceStats(c.id,sub.id).present,0);
+    const totalPresent=activeKids.reduce((sum,c)=>sum+getAttendanceStats(c.id,sub.id).present,0);
     const totalSessions=(sub.trainingDates||[]).length;
-    const avgPct=kids.length>0&&totalSessions>0?Math.round((totalPresent/(kids.length*totalSessions))*100):0;
+    const avgPct=activeKids.length>0&&totalSessions>0?Math.round((totalPresent/(activeKids.length*totalSessions))*100):0;
 
     const DI = {background:'rgba(255,255,255,0.07)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'12px',color:'white',fontSize:'14px',outline:'none'};
 
@@ -5318,9 +5498,9 @@ export default function TrainingsApp() {
 
           {/* Kinderliste */}
           <div style={{display:'grid',gap:'8px'}}>
-            {kids.length===0
+            {activeKids.length===0 && retiredKids.length===0
               ? <div style={{textAlign:'center',padding:'48px 20px',color:'rgba(255,255,255,0.2)',fontSize:'15px'}}>Noch keine Kinder. Oben hinzufügen!</div>
-              : kids.map(child=>{
+              : activeKids.map(child=>{
                 const stats=getAttendanceStats(child.id,sub.id);
                 const pct=stats.percent;
                 const childTtr=ttrHistory[child.id]?.entries;
@@ -5335,6 +5515,7 @@ export default function TrainingsApp() {
                     <div style={{flex:1,minWidth:0,cursor:'pointer'}} onClick={()=>{setActiveChild(child);navTo('childHistory');}}>
                       <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'7px'}}>
                         <p style={{margin:0,fontWeight:'700',color:'white',fontSize:'15px'}}>{child.name}</p>
+                        {child.nachwuchsKarriereBeendet && <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(148,163,184,0.6)',background:'rgba(148,163,184,0.1)',border:'1px solid rgba(148,163,184,0.2)',borderRadius:'5px',padding:'1px 6px'}}>🏁 Karriere beendet</span>}
                         {lastTtr&&<span style={{fontSize:'11px',fontWeight:'800',color:'#fbbf24',background:'rgba(251,191,36,0.12)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'6px',padding:'1px 6px'}}>
                           TTR {lastTtr.ttr}{ttrDiff!==null&&<span style={{color:ttrDiff>=0?'#4ade80':'#f87171',marginLeft:'3px'}}>{ttrDiff>=0?'+':''}{ttrDiff}</span>}
                         </span>}
@@ -5360,6 +5541,32 @@ export default function TrainingsApp() {
               })
             }
           </div>
+
+          {/* Ehemalige (Karriere beendet) */}
+          {retiredKids.length>0&&(
+            <div style={{marginTop:'24px'}}>
+              <details>
+                <summary style={{cursor:'pointer',fontSize:'12px',fontWeight:'700',color:'rgba(148,163,184,0.5)',padding:'8px 0',listStyle:'none',display:'flex',alignItems:'center',gap:'6px'}}>
+                  <span>🏁 Ehemalige ({retiredKids.length})</span>
+                </summary>
+                <div style={{display:'grid',gap:'6px',marginTop:'8px'}}>
+                  {retiredKids.map(child=>(
+                    <div key={child.id} onClick={()=>{setActiveChild(child);navTo('childHistory');}}
+                      style={{display:'flex',alignItems:'center',gap:'12px',padding:'10px 14px',background:'rgba(148,163,184,0.04)',border:'1px solid rgba(148,163,184,0.1)',borderRadius:'12px',cursor:'pointer',opacity:0.7}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                          <p style={{margin:0,fontWeight:'600',color:'rgba(255,255,255,0.5)',fontSize:'14px'}}>{child.name}</p>
+                          <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(148,163,184,0.6)',background:'rgba(148,163,184,0.1)',border:'1px solid rgba(148,163,184,0.2)',borderRadius:'5px',padding:'1px 6px'}}>🏁 Karriere beendet</span>
+                        </div>
+                        {child.karriereBeendetAm&&<p style={{margin:'3px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>Beendet am {new Date(child.karriereBeendetAm+'T12:00:00').toLocaleDateString('de-DE')}</p>}
+                      </div>
+                      <ChevronRight size={14} color="rgba(148,163,184,0.2)"/>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -5369,10 +5576,11 @@ export default function TrainingsApp() {
   if (view==='sessionAttendance') {
     const session = sessions[activeSession?.id] || activeSession;
     const sessionSubs = (session?.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean);
-    const subgroupKids = sessionSubs.flatMap(sub => getChildrenForSubgroup(sub.id));
+    const subgroupKids = sessionSubs.flatMap(sub => getChildrenForSubgroup(sub.id)).filter(c=>!c.nachwuchsKarriereBeendet);
     // Extra individual players not already in a subgroup
     const extraPlayers = (session?.extraPlayerIds||[])
       .map(id=>children[id]).filter(Boolean)
+      .filter(ep=>!ep.nachwuchsKarriereBeendet)
       .filter(ep=>!subgroupKids.some(k=>k.id===ep.id));
     const allKids = [...subgroupKids, ...extraPlayers];
     const sessionDate = session?.date;
@@ -5765,7 +5973,17 @@ export default function TrainingsApp() {
                   {[{i:'🥇',f:'doppel1',d:ACHIEVEMENT_DESCRIPTIONS.doppel1},{i:'🥈',f:'doppel2',d:ACHIEVEMENT_DESCRIPTIONS.doppel2},{i:'🥉',f:'doppel3',d:ACHIEVEMENT_DESCRIPTIONS.doppel3}].map(({i,f,d})=>{const c=ach[f]||0;return <SmTile2 key={f} icon={i} label="Platz" sub2={c>0?`×${c}`:undefined} has={c>0} activeBg="rgba(253,230,138,0.1)" activeBorder="rgba(253,230,138,0.3)" activeTextColor="#fde68a" onClick={()=>openP(i,f,d,c)}/>;  })}
                 </Sec2>
                 <Sec2 title="Mannschaft & Auszeichnungen">
-                  {[{i:'🏆',f:'team',d:ACHIEVEMENT_DESCRIPTIONS.team},{i:'⭐',f:'spielerDesMonats',d:'Spieler des Monats'}].map(({i,f,d})=>{const c=ach[f]||0;return <SmTile2 key={f} icon={i} label={f==='team'?'Meister':'Sp.d.M.'} sub2={c>0?`×${c}`:undefined} has={c>0} activeBg="rgba(253,230,138,0.1)" activeBorder="rgba(253,230,138,0.3)" activeTextColor="#fde68a" onClick={()=>openP(i,f==='team'?'Meisterschaft':'Spieler d.M.',d,c)}/>;  })}
+                  {(()=>{const c=ach['team']||0;return <SmTile2 icon='🏆' label='Meister' sub2={c>0?`×${c}`:undefined} has={c>0} activeBg="rgba(253,230,138,0.1)" activeBorder="rgba(253,230,138,0.3)" activeTextColor="#fde68a" onClick={()=>openP('🏆','Meisterschaft',ACHIEVEMENT_DESCRIPTIONS.team,c)}/>;})()}
+                  {(spielerDesMonatsWins[child.id]||[]).length>0
+                    ? (spielerDesMonatsWins[child.id]||[]).map(w=>{
+                        const isYear=w.type==='year';
+                        const lbl=isYear?`J. ${w.period}`:`${fmtYM(w.period)}`;
+                        return <SmTile2 key={`${w.type}-${w.period}`} icon={isYear?'🏆':'⭐'} label={lbl} has={true}
+                          activeBg="rgba(252,211,77,0.08)" activeBorder="rgba(252,211,77,0.4)" activeTextColor="#fcd34d"
+                          onClick={()=>openP(isYear?'🏆':'⭐',isYear?`Sp.d.J. ${w.period}`:`Sp.d.M. ${fmtYM(w.period)}`,isYear?`Spieler des Jahres ${w.period}!`:`Spieler des Monats ${fmtYM(w.period)}!`,1)}/>;
+                      })
+                    : <SmTile2 icon='⭐' label='Sp.d.M.' has={false} onClick={()=>openP('⭐','Spieler des Monats','Spieler des Monats',0)}/>
+                  }
                 </Sec2>
               </div>
             );
@@ -5956,7 +6174,56 @@ export default function TrainingsApp() {
               </div>
             </div>
           )}
+
+          {/* Nachwuchskarriere */}
+          {canEdit() && (
+            <div style={{marginTop:'40px',paddingTop:'20px',borderTop:'1px solid rgba(255,255,255,0.06)',textAlign:'center'}}>
+              {child.nachwuchsKarriereBeendet ? (
+                <div>
+                  <div style={{display:'inline-flex',alignItems:'center',gap:'8px',padding:'8px 16px',background:'rgba(148,163,184,0.1)',border:'1px solid rgba(148,163,184,0.25)',borderRadius:'10px',marginBottom:'12px'}}>
+                    <span style={{fontSize:'13px',fontWeight:'800',color:'rgba(148,163,184,0.7)'}}>🏁 Karriere beendet am {new Date(child.karriereBeendetAm+'T12:00:00').toLocaleDateString('de-DE')}</span>
+                  </div>
+                  {userRole==='admin' && (
+                    <div>
+                      <button onClick={()=>{if(window.confirm(`Nachwuchskarriere von ${child.name} reaktivieren?\n\nDas Kind erscheint wieder in allen aktiven Listen.`)) reaktiviereNachwuchskarriere(child.id);}}
+                        style={{padding:'8px 16px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'10px',color:'#4ade80',fontSize:'12px',fontWeight:'700',cursor:'pointer'}}>
+                        ↩ Nachwuchskarriere reaktivieren
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button onClick={()=>setKarriereConfirmChild(child.id)}
+                  style={{padding:'7px 14px',background:'none',border:'1px solid rgba(148,163,184,0.2)',borderRadius:'8px',color:'rgba(148,163,184,0.4)',fontSize:'12px',fontWeight:'600',cursor:'pointer'}}>
+                  🏁 Nachwuchskarriere beenden
+                </button>
+              )}
+            </div>
+          )}
         </div>
+
+      {karriereConfirmChild && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
+          <div style={{background:'#1a1a2e',border:'1.5px solid rgba(148,163,184,0.2)',borderRadius:'20px',padding:'28px 24px',maxWidth:'380px',width:'100%',textAlign:'center'}}>
+            <div style={{fontSize:'40px',marginBottom:'12px'}}>🏁</div>
+            <h3 style={{margin:'0 0 12px',color:'white',fontSize:'18px',fontWeight:'800'}}>Nachwuchskarriere beenden</h3>
+            <p style={{margin:'0 0 20px',color:'rgba(255,255,255,0.5)',fontSize:'13px',lineHeight:'1.6'}}>
+              Diese Aktion friert alle Daten von <strong style={{color:'white'}}>{children[karriereConfirmChild]?.name}</strong> ein. Das Kind wird aus aktiven Listen entfernt, bleibt aber dauerhaft in der Datenbank gespeichert.<br/><br/>
+              <span style={{color:'#f87171',fontWeight:'700'}}>Diese Aktion kann nur von einem Admin rückgängig gemacht werden.</span>
+            </p>
+            <div style={{display:'flex',gap:'10px',justifyContent:'center'}}>
+              <button onClick={()=>setKarriereConfirmChild(null)}
+                style={{flex:1,padding:'12px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',color:'rgba(255,255,255,0.6)',fontSize:'14px',fontWeight:'700',cursor:'pointer'}}>
+                Abbrechen
+              </button>
+              <button onClick={()=>{beendeNachwuchskarriere(karriereConfirmChild);setKarriereConfirmChild(null);}}
+                style={{flex:1,padding:'12px',background:'rgba(148,163,184,0.15)',border:'1.5px solid rgba(148,163,184,0.35)',borderRadius:'12px',color:'#94a3b8',fontSize:'14px',fontWeight:'800',cursor:'pointer'}}>
+                Ja, beenden
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     );
   }
@@ -5965,7 +6232,7 @@ export default function TrainingsApp() {
   // ── RANGLISTE VIEW (Trainer/Admin) ──────────────────────────────────────
   if (view === 'rangliste' && canEdit()) {
     const jugendChildren = Object.values(children)
-      .filter(c => subgroups[c.subgroupId]?.groupId === 'jugend')
+      .filter(c => subgroups[c.subgroupId]?.groupId === 'jugend' && !c.nachwuchsKarriereBeendet)
       .sort((a,b) => a.name.localeCompare(b.name,'de'));
     const jugendSubs = Object.values(subgroups).filter(sg => sg.groupId==='jugend').sort((a,b)=>a.name.localeCompare(b.name,'de'));
 
@@ -6015,6 +6282,29 @@ export default function TrainingsApp() {
       setNewSpielForm({ open: false, challengerId: '', defenderId: '' });
     };
 
+    // Selection mode helpers
+    const handleRangSelect = (childId) => {
+      if (rangSelection.includes(childId)) {
+        setRangSelection(rangSelection.filter(id => id !== childId));
+        return;
+      }
+      if (rangSelection.length === 0) {
+        setRangSelection([childId]);
+        return;
+      }
+      // Second selection → auto-create game
+      const first = rangSelection[0];
+      const firstIdx = rangliste.indexOf(first);
+      const secondIdx = rangliste.indexOf(childId);
+      if (firstIdx === secondIdx) return;
+      // lower rank number = higher position, challenger must be lower-ranked (higher index)
+      const challengerId = firstIdx > secondIdx ? first : childId;
+      const defenderId   = firstIdx > secondIdx ? childId : first;
+      const spiel = { id: 'spiel_'+Date.now(), challengerId, defenderId, sets1: null, sets2: null, winSets: 3, date: new Date().toISOString().slice(0,10) };
+      saveRanglistenspiele({ ...ranglistenspiele, active: [...activeSpiele, spiel] });
+      setRangSelection([]);
+    };
+
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#78350f 0%,#d97706 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
         <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
@@ -6022,85 +6312,77 @@ export default function TrainingsApp() {
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>📊 Rangliste Jugend</h1>
           <button onClick={()=>{setArchiveTab('rangliste');navTo('archiv');}} style={{...s.btn('#92400e'),fontSize:'12px'}}>🏅 Archiv</button>
         </div>
+        {rangSelectionMode && (
+          <div style={{background:'#9a3412',padding:'8px 16px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap',borderBottom:'1px solid rgba(251,146,60,0.3)'}}>
+            <span style={{fontSize:'13px',fontWeight:'700',color:'#fed7aa',flexShrink:0}}>⚔️ Spielmodus:</span>
+            {rangSelection.length === 0
+              ? <span style={{fontSize:'13px',color:'rgba(255,255,255,0.6)',flex:1}}>Wähle 1. Spieler…</span>
+              : <span style={{fontSize:'13px',color:'white',flex:1,fontWeight:'600'}}>
+                  <span style={{background:'rgba(251,146,60,0.35)',padding:'2px 8px',borderRadius:'6px',marginRight:'6px'}}>{children[rangSelection[0]]?.name}</span>
+                  vs <span style={{color:'rgba(255,255,255,0.5)',marginLeft:'6px'}}>Wähle 2. Spieler…</span>
+                </span>
+            }
+            <button onClick={()=>{ setRangSelectionMode(false); setRangSelection([]); }}
+              style={{padding:'5px 12px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.12)',color:'white',cursor:'pointer',fontSize:'12px',fontWeight:'700',flexShrink:0}}>
+              Modus beenden
+            </button>
+          </div>
+        )}
         <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
 
-          {/* ── Spieler hinzufügen ─────────────────────────────── */}
-          <div style={{...s.card,border:'2px solid #fcd34d',marginBottom:'20px'}}>
-            <h2 style={{margin:'0 0 16px',color:'#92400e',fontSize:'16px',fontWeight:'800'}}>+ Spieler hinzufügen</h2>
-            <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'12px'}}>
-              <button onClick={addAll} disabled={notInRangliste.length===0}
-                style={{...s.btn('#d97706'),opacity:notInRangliste.length===0?0.4:1}}>
-                + Alle Jugend ({notInRangliste.length} ausstehend)
-              </button>
-              {jugendSubs.map(sub=>{
-                const cnt = jugendChildren.filter(c=>c.subgroupId===sub.id&&!inRangliste.has(c.id)).length;
-                return (
-                  <button key={sub.id} onClick={()=>addSubgroup(sub.id)} disabled={cnt===0}
-                    style={{...s.btn('#b45309'),opacity:cnt===0?0.4:1,fontSize:'13px'}}>
-                    + {sub.name} ({cnt})
-                  </button>
-                );
-              })}
-            </div>
-            {notInRangliste.length > 0 && (
-              <select defaultValue="" onChange={e=>{addChild(e.target.value);e.target.value='';}}
-                style={{width:'100%',padding:'10px 12px',border:'1px solid #fcd34d',borderRadius:'8px',fontSize:'14px',color:'#333',background:'white',cursor:'pointer'}}>
-                <option value="">+ Einzelnen Spieler hinzufügen…</option>
-                {notInRangliste.map(c=>{
-                  const sub = subgroups[c.subgroupId];
-                  return <option key={c.id} value={c.id}>{c.name}{sub?` – ${sub.name}`:''}</option>;
-                })}
-              </select>
-            )}
+          {/* ── Top action row ────────────────────────────────── */}
+          <div style={{display:'flex',gap:'10px',marginBottom:'20px',alignItems:'stretch'}}>
+            <button
+              onClick={()=>{ if(!rangSelectionMode){ setRangSelectionMode(true); setRangSelection([]); } }}
+              style={{flex:1,padding:'14px 16px',borderRadius:'14px',border:`2px solid ${rangSelectionMode?'#fb923c':'rgba(251,146,60,0.5)'}`,background:rangSelectionMode?'rgba(251,146,60,0.15)':'rgba(255,255,255,0.08)',color:rangSelectionMode?'#fb923c':'rgba(255,255,255,0.9)',cursor:rangSelectionMode?'default':'pointer',fontWeight:'800',fontSize:'15px',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',transition:'all 0.15s'}}>
+              ⚔️ Ranglistenspiel starten
+            </button>
+            <button
+              onClick={()=>setRangAddOpen(v=>!v)}
+              style={{padding:'14px 16px',borderRadius:'14px',border:'2px solid rgba(252,211,77,0.4)',background:'rgba(255,255,255,0.08)',color:'rgba(255,255,255,0.8)',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',gap:'6px',transition:'all 0.15s'}}>
+              {rangAddOpen ? '✕' : '+ Spieler'}
+            </button>
           </div>
 
-          {/* ── Ranglistenspiele ───────────────────────────────── */}
-          <div style={{...s.card,border:'2px solid #fb923c',marginBottom:'20px'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px',flexWrap:'wrap',gap:'8px'}}>
-              <h2 style={{margin:0,color:'#9a3412',fontSize:'16px',fontWeight:'800'}}>⚔️ Ranglistenspiele {activeSpiele.length>0&&<span style={{background:'#fb923c',color:'white',borderRadius:'10px',padding:'1px 8px',fontSize:'12px',marginLeft:'6px'}}>{activeSpiele.length}</span>}</h2>
-              <button onClick={()=>setNewSpielForm({open:true,challengerId:'',defenderId:''})}
-                style={{...s.btn('#ea580c'),fontSize:'13px'}}>+ Neues Spiel</button>
-            </div>
-
-            {/* Neues Spiel Formular */}
-            {newSpielForm.open && (
-              <div style={{background:'#fff7ed',border:'1px solid #fb923c',borderRadius:'12px',padding:'16px',marginBottom:'16px'}}>
-                <p style={{margin:'0 0 12px',fontWeight:'700',color:'#9a3412',fontSize:'14px'}}>Neues Ranglistenspiel anlegen</p>
-
-                <p style={{margin:'0 0 6px',fontSize:'12px',color:'#92400e',fontWeight:'600'}}>Herausforderer (niedrigerer Rang wählt höheren aus):</p>
-                <select value={newSpielForm.challengerId} onChange={e=>setNewSpielForm(f=>({...f,challengerId:e.target.value,defenderId:''}))}
-                  style={{width:'100%',padding:'8px 10px',borderRadius:'8px',border:'1px solid #fb923c',fontSize:'14px',marginBottom:'10px',background:'white'}}>
-                  <option value="">Herausforderer wählen…</option>
-                  {rangliste.slice(1).map((id,i)=>{
-                    const c=children[id]; if(!c)return null;
-                    return <option key={id} value={id}>#{i+2} {c.name}</option>;
-                  })}
-                </select>
-                <p style={{margin:'0 0 6px',fontSize:'12px',color:'#92400e',fontWeight:'600'}}>Herausgeforderter (muss höher platziert sein):</p>
-                <select value={newSpielForm.defenderId} onChange={e=>setNewSpielForm(f=>({...f,defenderId:e.target.value}))}
-                  disabled={!newSpielForm.challengerId}
-                  style={{width:'100%',padding:'8px 10px',borderRadius:'8px',border:'1px solid #fb923c',fontSize:'14px',marginBottom:'12px',background:'white',opacity:newSpielForm.challengerId?1:0.5}}>
-                  <option value="">Herausgeforderter wählen…</option>
-                  {rangliste.slice(0, rangliste.indexOf(newSpielForm.challengerId)).map((id,i)=>{
-                    const c=children[id]; if(!c)return null;
-                    return <option key={id} value={id}>#{i+1} {c.name}</option>;
-                  })}
-                </select>
-                <div style={{display:'flex',gap:'8px'}}>
-                  <button onClick={startNeuesSpiel} disabled={!newSpielForm.challengerId||!newSpielForm.defenderId}
-                    style={{...s.btn('#ea580c'),flex:1,opacity:(!newSpielForm.challengerId||!newSpielForm.defenderId)?0.4:1}}>✓ Spiel starten</button>
-                  <button onClick={()=>setNewSpielForm({open:false,challengerId:'',defenderId:''})}
-                    style={{...s.btn('#6b7280'),flex:1}}>Abbrechen</button>
-                </div>
+          {/* ── Spieler hinzufügen (collapsible) ─────────────── */}
+          {rangAddOpen && (
+            <div style={{...s.card,border:'2px solid #fcd34d',marginBottom:'20px'}}>
+              <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom: notInRangliste.length>0 ? '12px' : '0'}}>
+                <button onClick={addAll} disabled={notInRangliste.length===0}
+                  style={{...s.btn('#d97706'),opacity:notInRangliste.length===0?0.4:1,fontSize:'13px'}}>
+                  + Alle ({notInRangliste.length})
+                </button>
+                {jugendSubs.map(sub=>{
+                  const cnt = jugendChildren.filter(c=>c.subgroupId===sub.id&&!inRangliste.has(c.id)).length;
+                  return (
+                    <button key={sub.id} onClick={()=>addSubgroup(sub.id)} disabled={cnt===0}
+                      style={{...s.btn('#b45309'),opacity:cnt===0?0.4:1,fontSize:'13px'}}>
+                      + {sub.name} ({cnt})
+                    </button>
+                  );
+                })}
               </div>
-            )}
+              {notInRangliste.length > 0 && (
+                <select defaultValue="" onChange={e=>{addChild(e.target.value);e.target.value='';}}
+                  style={{width:'100%',padding:'10px 12px',border:'1px solid #fcd34d',borderRadius:'8px',fontSize:'14px',color:'#333',background:'white',cursor:'pointer'}}>
+                  <option value="">+ Einzelnen Spieler hinzufügen…</option>
+                  {notInRangliste.map(c=>{
+                    const sub = subgroups[c.subgroupId];
+                    return <option key={c.id} value={c.id}>{c.name}{sub?` – ${sub.name}`:''}</option>;
+                  })}
+                </select>
+              )}
+              {notInRangliste.length === 0 && <p style={{margin:0,color:'#92400e',fontSize:'13px',fontWeight:'600'}}>✓ Alle Jugendspieler sind in der Rangliste.</p>}
+            </div>
+          )}
 
-            {/* Aktive Spiele */}
-            {activeSpiele.length === 0 && !newSpielForm.open ? (
-              <p style={{color:'#9ca3af',textAlign:'center',padding:'20px 0',fontSize:'14px'}}>Keine laufenden Ranglistenspiele. Starte ein neues Spiel.</p>
-            ) : (
-              <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
-                {activeSpiele.map(spiel => {
+
+          {/* ── Laufende Ranglistenspiele ─────────────────────── */}
+          {activeSpiele.length > 0 && (
+            <div style={{...s.card,border:'2px solid #fb923c',marginBottom:'20px'}}>
+              <h2 style={{margin:'0 0 14px',color:'#9a3412',fontSize:'16px',fontWeight:'800'}}>⚔️ Laufende Ranglistenspiele <span style={{background:'#fb923c',color:'white',borderRadius:'10px',padding:'1px 8px',fontSize:'12px',marginLeft:'6px'}}>{activeSpiele.length}</span></h2>
+              <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+                {[...activeSpiele].sort((a,b)=>Math.min(rangliste.indexOf(a.challengerId),rangliste.indexOf(a.defenderId))-Math.min(rangliste.indexOf(b.challengerId),rangliste.indexOf(b.defenderId))).map(spiel => {
                   const chal = children[spiel.challengerId];
                   const def  = children[spiel.defenderId];
                   const chalIdx = rangliste.indexOf(spiel.challengerId);
@@ -6110,86 +6392,55 @@ export default function TrainingsApp() {
                   const sets2 = spiel.sets2;
                   const hasScores = sets1 !== null && sets2 !== null;
                   const canFinalize = hasScores && sets1 !== sets2 && (sets1 === winSets || sets2 === winSets);
-                  // rnkBtn: interactive set-count button style
-                  const rnkBtn = (active, color) => ({width:'42px',height:'42px',borderRadius:'10px',border:`2px solid ${active?color:'#e5e7eb'}`,background:active?`rgba(${color==='#ea580c'?'234,88,12':'29,78,216'},0.1)`:'#f9fafb',color:active?color:'#9ca3af',cursor:'pointer',fontWeight:'900',fontSize:'18px',display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.1s'});
+                  const rnkBtn = (active, color) => ({width:'32px',height:'32px',borderRadius:'8px',border:`2px solid ${active?color:'#e5e7eb'}`,background:active?`rgba(${color==='#ea580c'?'234,88,12':'29,78,216'},0.1)`:'#f9fafb',color:active?color:'#9ca3af',cursor:'pointer',fontWeight:'900',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.1s'});
                   return (
-                    <div key={spiel.id} style={{border:'1px solid #fed7aa',borderRadius:'14px',overflow:'hidden',background:'#fff7ed'}}>
-                      {/* Header */}
-                      <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'12px 14px',borderBottom:'1px solid #fed7aa'}}>
-                        <div style={{textAlign:'center',flex:1,minWidth:0}}>
-                          <p style={{margin:'0 0 3px',fontWeight:'800',color:'#1f2937',fontSize:'14px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{chal?.name||'?'}</p>
-                          <span style={{fontSize:'11px',fontWeight:'700',background:'#fef3c7',color:'#92400e',padding:'1px 8px',borderRadius:'8px',border:'1px solid #fcd34d'}}>⚔️ #{chalIdx+1}</span>
-                        </div>
-                        <div style={{textAlign:'center',flexShrink:0,minWidth:'52px'}}>
-                          {hasScores
-                            ? <span style={{fontSize:'22px',fontWeight:'900',color:'#1f2937',letterSpacing:'1px'}}>{sets1}:{sets2}</span>
-                            : <span style={{fontSize:'13px',color:'#d1d5db',fontWeight:'700'}}>vs</span>}
-                        </div>
-                        <div style={{textAlign:'center',flex:1,minWidth:0}}>
-                          <p style={{margin:'0 0 3px',fontWeight:'800',color:'#1f2937',fontSize:'14px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{def?.name||'?'}</p>
-                          <span style={{fontSize:'11px',fontWeight:'700',background:'#dbeafe',color:'#1d4ed8',padding:'1px 8px',borderRadius:'8px',border:'1px solid #93c5fd'}}>🛡️ #{defIdx+1}</span>
-                        </div>
-                        <button onClick={()=>deleteSpiel(spiel.id)}
-                          style={{width:'28px',height:'28px',borderRadius:'6px',background:'#fee2e2',border:'none',cursor:'pointer',color:'#dc2626',fontSize:'13px',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>✕</button>
+                    <div key={spiel.id} style={{border:`1px solid ${canFinalize?'#86efac':'#fed7aa'}`,borderRadius:'12px',overflow:'hidden',background:'#fff7ed'}}>
+                      {/* Kompakte Kopfzeile */}
+                      <div style={{display:'flex',alignItems:'center',gap:'6px',padding:'8px 10px'}}>
+                        <span style={{fontSize:'11px',fontWeight:'700',color:'#92400e',flexShrink:0}}>#{defIdx+1}</span>
+                        <span style={{fontSize:'13px',fontWeight:'800',color:'#1f2937',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{def?.name||'?'}</span>
+                        <span style={{fontSize:'12px',color:'#9ca3af',fontWeight:'700',flexShrink:0}}>vs</span>
+                        <span style={{fontSize:'13px',fontWeight:'800',color:'#1f2937',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textAlign:'right'}}>{chal?.name||'?'}</span>
+                        <span style={{fontSize:'11px',fontWeight:'700',color:'#ea580c',flexShrink:0}}>#{chalIdx+1}</span>
+                        <button onClick={()=>deleteSpiel(spiel.id)} style={{width:'22px',height:'22px',borderRadius:'5px',background:'#fee2e2',border:'none',cursor:'pointer',color:'#dc2626',fontSize:'11px',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginLeft:'2px'}}>✕</button>
                       </div>
-
-                      {/* Interaktive Satz-Eingabe */}
-                      <div style={{padding:'14px',borderBottom:'1px solid #fed7aa'}}>
-                        <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'700',color:'#92400e',textTransform:'uppercase',letterSpacing:'0.4px'}}>Gewonnene Sätze · Best of {winSets*2-1}</p>
-                        <div style={{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-                          {/* Challenger */}
-                          <div style={{flex:1,minWidth:'130px',textAlign:'center'}}>
-                            <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'800',color:'#9a3412'}}>{chal?.name}</p>
-                            <div style={{display:'flex',gap:'5px',justifyContent:'center',flexWrap:'wrap'}}>
-                              {Array.from({length:winSets+1},(_,n)=>(
-                                <button key={n} onClick={()=>updateSpielField(spiel.id,'sets1',n)} style={rnkBtn(sets1===n,'#ea580c')}>{n}</button>
-                              ))}
-                            </div>
-                          </div>
-                          <span style={{fontWeight:'900',color:'#d1d5db',fontSize:'22px',flexShrink:0}}>:</span>
-                          {/* Defender */}
-                          <div style={{flex:1,minWidth:'130px',textAlign:'center'}}>
-                            <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'800',color:'#1d4ed8'}}>{def?.name}</p>
-                            <div style={{display:'flex',gap:'5px',justifyContent:'center',flexWrap:'wrap'}}>
-                              {Array.from({length:winSets+1},(_,n)=>(
-                                <button key={n} onClick={()=>updateSpielField(spiel.id,'sets2',n)} style={rnkBtn(sets2===n,'#1d4ed8')}>{n}</button>
-                              ))}
-                            </div>
-                          </div>
+                      {/* Satzeingabe */}
+                      <div style={{padding:'6px 10px 8px',borderTop:'1px solid #fed7aa',display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                        <div style={{display:'flex',gap:'4px',alignItems:'center'}}>
+                          {Array.from({length:winSets+1},(_,n)=>(
+                            <button key={n} onClick={()=>updateSpielField(spiel.id,'sets2',n)} style={rnkBtn(sets2===n,'#1d4ed8')}>{n}</button>
+                          ))}
                         </div>
-                      </div>
-
-                      {/* Ergebnis-Vorschau + Abschließen */}
-                      <div style={{padding:'10px 14px'}}>
-                        {canFinalize && (
-                          <div style={{background:sets1>sets2?'#dcfce7':'#dbeafe',border:`1px solid ${sets1>sets2?'#86efac':'#93c5fd'}`,borderRadius:'8px',padding:'8px 12px',marginBottom:'10px',fontSize:'13px',fontWeight:'700',color:sets1>sets2?'#166534':'#1d4ed8',textAlign:'center'}}>
-                            {sets1>sets2
-                              ? `🎉 ${chal?.name} gewinnt → rückt auf Platz #${defIdx+1} vor!`
-                              : `✅ ${def?.name} verteidigt Platz #${defIdx+1} erfolgreich`}
-                          </div>
-                        )}
-                        {hasScores && sets1===sets2 && (
-                          <div style={{background:'#fef3c7',border:'1px solid #fcd34d',borderRadius:'8px',padding:'8px 12px',marginBottom:'10px',fontSize:'13px',fontWeight:'700',color:'#92400e',textAlign:'center'}}>
-                            ⚠️ Unentschieden – kein Abschluss möglich
-                          </div>
-                        )}
+                        <span style={{fontWeight:'900',color:'#d1d5db',fontSize:'16px'}}>:</span>
+                        <div style={{display:'flex',gap:'4px',alignItems:'center'}}>
+                          {Array.from({length:winSets+1},(_,n)=>(
+                            <button key={n} onClick={()=>updateSpielField(spiel.id,'sets1',n)} style={rnkBtn(sets1===n,'#ea580c')}>{n}</button>
+                          ))}
+                        </div>
                         <button onClick={()=>finalizeRanglistenspiel(spiel)} disabled={!canFinalize}
-                          style={{...s.btn(canFinalize?'#16a34a':'#9ca3af'),width:'100%',opacity:canFinalize?1:0.4,cursor:canFinalize?'pointer':'not-allowed'}}>
-                          ✓ Spiel abschließen &amp; Rangliste aktualisieren
+                          style={{marginLeft:'auto',padding:'5px 12px',borderRadius:'8px',border:'none',background:canFinalize?'#16a34a':'#e5e7eb',color:canFinalize?'white':'#9ca3af',cursor:canFinalize?'pointer':'not-allowed',fontWeight:'700',fontSize:'12px',flexShrink:0,whiteSpace:'nowrap'}}>
+                          {canFinalize ? '✓ Abschließen' : 'Ergebnis eingeben'}
                         </button>
                       </div>
+                      {canFinalize && (
+                        <div style={{padding:'4px 10px 8px',fontSize:'12px',fontWeight:'700',color:sets1>sets2?'#166534':'#1d4ed8',textAlign:'center'}}>
+                          {sets1>sets2?`🎉 ${chal?.name} → Platz #${defIdx+1}`:`✅ ${def?.name} verteidigt #${defIdx+1}`}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* ── Aktuelle Rangliste ─────────────────────────────── */}
           <div style={{...s.card,marginBottom:'20px'}}>
-            <h2 style={{margin:'0 0 16px',color:'#92400e',fontSize:'16px',fontWeight:'800'}}>Aktuelle Rangliste <span style={{color:'#9ca3af',fontWeight:'600',fontSize:'14px'}}>({rangliste.length} Spieler)</span></h2>
+            <h2 style={{margin:'0 0 16px',color:'#92400e',fontSize:'16px',fontWeight:'800'}}>
+              {rangSelectionMode ? '👇 Spieler auswählen' : 'Aktuelle Rangliste'} <span style={{color:'#9ca3af',fontWeight:'600',fontSize:'14px'}}>({rangliste.length} Spieler)</span>
+            </h2>
             {rangliste.length === 0 ? (
-              <p style={{color:'#9ca3af',textAlign:'center',padding:'40px 0',fontSize:'14px'}}>Noch keine Spieler in der Rangliste. Füge oben Spieler hinzu.</p>
+              <p style={{color:'#9ca3af',textAlign:'center',padding:'40px 0',fontSize:'14px'}}>Noch keine Spieler. Tippe "+ Spieler" oben.</p>
             ) : (
               <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
                 {rangliste.map((childId, idx) => {
@@ -6199,24 +6450,32 @@ export default function TrainingsApp() {
                   const grp = FIXED_GROUPS.find(g=>g.id===sub?.groupId);
                   const medal = idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':null;
                   const hasActiveSpiel = activeSpiele.some(s=>s.challengerId===childId||s.defenderId===childId);
+                  const isSelected = rangSelection.includes(childId);
+                  const selectable = rangSelectionMode && !hasActiveSpiel;
+                  const rowBg = isSelected ? 'rgba(251,146,60,0.15)' : idx<3 ? '#fffbeb' : '#f9fafb';
+                  const rowBorder = isSelected ? '#fb923c' : hasActiveSpiel ? '#fb923c' : idx<3 ? '#fcd34d' : '#e5e7eb';
                   return (
-                    <div key={childId} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 14px',borderRadius:'10px',background:idx<3?'#fffbeb':'#f9fafb',border:`1px solid ${hasActiveSpiel?'#fb923c':idx<3?'#fcd34d':'#e5e7eb'}`,transition:'background 0.1s'}}>
-                      <div style={{width:'36px',height:'36px',borderRadius:'50%',background:idx===0?'#fbbf24':idx===1?'#d1d5db':idx===2?'#d97706':'#e5e7eb',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontWeight:'900',fontSize:medal?'20px':'14px',color:idx<3?'white':'#6b7280'}}>
-                        {medal || (idx+1)}
+                    <div key={childId}
+                      onClick={selectable ? ()=>handleRangSelect(childId) : undefined}
+                      style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 14px',borderRadius:'10px',background:rowBg,border:`2px solid ${rowBorder}`,transition:'all 0.1s',cursor:selectable?'pointer':'default',opacity:rangSelectionMode&&hasActiveSpiel?0.45:1}}>
+                      <div style={{width:'36px',height:'36px',borderRadius:'50%',background:isSelected?'#fb923c':idx===0?'#fbbf24':idx===1?'#d1d5db':idx===2?'#d97706':'#e5e7eb',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontWeight:'900',fontSize:medal&&!isSelected?'20px':'14px',color:isSelected?'white':idx<3?'white':'#6b7280'}}>
+                        {isSelected ? '✓' : medal || (idx+1)}
                       </div>
                       <div style={{flex:1,minWidth:0}}>
                         <p style={{margin:0,fontWeight:'700',color:'#1f2937',fontSize:'15px'}}>{child.name}</p>
                         {sub&&<p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>{grp?.emoji} {sub.name}</p>}
                       </div>
                       {hasActiveSpiel&&<span style={{fontSize:'11px',background:'#fff7ed',color:'#ea580c',border:'1px solid #fb923c',borderRadius:'8px',padding:'2px 7px',fontWeight:'700',flexShrink:0}}>⚔️ aktiv</span>}
-                      <div style={{display:'flex',gap:'4px',alignItems:'center',flexShrink:0}}>
-                        <button onClick={()=>moveUp(idx)} disabled={idx===0}
-                          style={{width:'28px',height:'28px',borderRadius:'6px',background:idx===0?'#f3f4f6':'#e0f2fe',border:'none',cursor:idx===0?'not-allowed':'pointer',color:idx===0?'#d1d5db':'#0369a1',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:'900'}}>▲</button>
-                        <button onClick={()=>moveDown(idx)} disabled={idx===rangliste.length-1}
-                          style={{width:'28px',height:'28px',borderRadius:'6px',background:idx===rangliste.length-1?'#f3f4f6':'#e0f2fe',border:'none',cursor:idx===rangliste.length-1?'not-allowed':'pointer',color:idx===rangliste.length-1?'#d1d5db':'#0369a1',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:'900'}}>▼</button>
-                        <button onClick={()=>removeFromRangliste(childId)}
-                          style={{width:'28px',height:'28px',borderRadius:'6px',background:'#fee2e2',border:'none',cursor:'pointer',color:'#dc2626',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
-                      </div>
+                      {!rangSelectionMode && (
+                        <div style={{display:'flex',gap:'4px',alignItems:'center',flexShrink:0}}>
+                          <button onClick={()=>moveUp(idx)} disabled={idx===0}
+                            style={{width:'28px',height:'28px',borderRadius:'6px',background:idx===0?'#f3f4f6':'#e0f2fe',border:'none',cursor:idx===0?'not-allowed':'pointer',color:idx===0?'#d1d5db':'#0369a1',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:'900'}}>▲</button>
+                          <button onClick={()=>moveDown(idx)} disabled={idx===rangliste.length-1}
+                            style={{width:'28px',height:'28px',borderRadius:'6px',background:idx===rangliste.length-1?'#f3f4f6':'#e0f2fe',border:'none',cursor:idx===rangliste.length-1?'not-allowed':'pointer',color:idx===rangliste.length-1?'#d1d5db':'#0369a1',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:'900'}}>▼</button>
+                          <button onClick={()=>removeFromRangliste(childId)}
+                            style={{width:'28px',height:'28px',borderRadius:'6px',background:'#fee2e2',border:'none',cursor:'pointer',color:'#dc2626',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -6224,36 +6483,27 @@ export default function TrainingsApp() {
             )}
           </div>
 
-          {/* ── Vergangene Ranglistenspiele ────────────────────── */}
-          {ranglistenspiele.archived.filter(s=>!s.hiddenInQuickView).length > 0 && (
+          {/* ── Abgeschlossene Ranglistenspiele ───────────────── */}
+          {ranglistenspiele.archived.length > 0 && (
             <div style={s.card}>
-              <h2 style={{margin:'0 0 16px',color:'#92400e',fontSize:'16px',fontWeight:'800'}}>📋 Vergangene Ranglistenspiele</h2>
+              <h2 style={{margin:'0 0 14px',color:'#92400e',fontSize:'16px',fontWeight:'800'}}>📋 Abgeschlossene Spiele</h2>
               <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
-                {ranglistenspiele.archived.filter(s=>!s.hiddenInQuickView).slice(0,5).map(spiel=>{
+                {ranglistenspiele.archived.slice(0,10).map(spiel=>{
                   const chal = children[spiel.challengerId];
                   const def  = children[spiel.defenderId];
                   const won = spiel.result==='challenger';
                   const score = `${spiel.sets1??spiel.challengerScore??'?'}:${spiel.sets2??spiel.defenderScore??'?'}`;
-                  const hideFromQuickView = (spielId) => {
-                    const updated = ranglistenspiele.archived.map(s => s.id===spielId ? {...s, hiddenInQuickView:true} : s);
-                    saveRanglistenspiele({ ...ranglistenspiele, archived: updated });
-                  };
                   return (
                     <div key={spiel.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 14px',borderRadius:'10px',background:'#f9fafb',border:'1px solid #e5e7eb'}}>
                       <span style={{fontSize:'18px',flexShrink:0}}>{won?'🎉':'✅'}</span>
                       <div style={{flex:1,minWidth:0}}>
-                        <p style={{margin:0,fontSize:'14px',fontWeight:'700',color:'#1f2937'}}>
-                          {chal?.name||'?'} {score} {def?.name||'?'}
-                        </p>
-                        <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>{won?`${chal?.name} rückte vor`:`${def?.name} verteidigte`} · {spiel.date}</p>
+                        <p style={{margin:0,fontSize:'14px',fontWeight:'700',color:'#1f2937'}}>{chal?.name||'?'} {score} {def?.name||'?'}</p>
+                        <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>{won?`${chal?.name} rückte vor`:`${def?.name} verteidigte`} · {spiel.date||spiel.closedAt?.slice(0,10)||''}</p>
                       </div>
-                      <button onClick={()=>hideFromQuickView(spiel.id)}
-                        title="Aus dieser Liste entfernen (bleibt im Archiv)"
-                        style={{width:'28px',height:'28px',borderRadius:'6px',background:'#fee2e2',border:'none',cursor:'pointer',color:'#dc2626',fontSize:'13px',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>✕</button>
                     </div>
                   );
                 })}
-                {ranglistenspiele.archived.length > 5 && (
+                {ranglistenspiele.archived.length > 10 && (
                   <button onClick={()=>{setArchiveTab('rangliste');navTo('archiv');}} style={{...s.btn('#d97706'),width:'100%',fontSize:'13px'}}>
                     Alle {ranglistenspiele.archived.length} Spiele im Archiv ansehen →
                   </button>
@@ -6329,12 +6579,16 @@ export default function TrainingsApp() {
       .filter(c => jugendSubIds.has(c.subgroupId) || extraInJugend.has(c.id))
       .sort((a,b)=>a.name.localeCompare(b.name,'de'));
 
+    const filteredKids = achSearch.trim()
+      ? kidsWithSub.filter(c => c.name.toLowerCase().includes(achSearch.toLowerCase()))
+      : kidsWithSub;
+
     const AchCounter = ({label, val, onInc, onDec}) => (
       <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
-        <span style={{fontSize:'12px',color:'#555',minWidth:'90px'}}>{label}</span>
-        <button onClick={onDec} style={{width:'24px',height:'24px',border:'1px solid #ddd',borderRadius:'4px',background:'#f3f4f6',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
-        <span style={{minWidth:'24px',textAlign:'center',fontWeight:'700',fontSize:'14px',color:'#111'}}>{val||0}</span>
-        <button onClick={onInc} style={{width:'24px',height:'24px',border:'1px solid #ddd',borderRadius:'4px',background:'#f0fdf4',cursor:'pointer',fontWeight:'700',fontSize:'14px',color:'#16a34a',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
+        {label&&<span style={{fontSize:'12px',color:'#555',minWidth:'90px'}}>{label}</span>}
+        <button onClick={onDec} style={{width:'26px',height:'26px',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'6px',background:'rgba(255,255,255,0.08)',cursor:'pointer',fontWeight:'800',fontSize:'15px',display:'flex',alignItems:'center',justifyContent:'center',color:'rgba(255,255,255,0.6)'}}>−</button>
+        <span style={{minWidth:'22px',textAlign:'center',fontWeight:'800',fontSize:'14px',color:'white'}}>{val||0}</span>
+        <button onClick={onInc} style={{width:'26px',height:'26px',border:'1px solid rgba(74,222,128,0.3)',borderRadius:'6px',background:'rgba(74,222,128,0.12)',cursor:'pointer',fontWeight:'800',fontSize:'15px',color:'#4ade80',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
       </div>
     );
 
@@ -6345,6 +6599,17 @@ export default function TrainingsApp() {
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>🏅 Errungenschaften verwalten</h1>
         </div>
         <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
+
+          {/* ── Suche ── */}
+          <div style={{position:'relative',marginBottom:'16px'}}>
+            <span style={{position:'absolute',left:'12px',top:'50%',transform:'translateY(-50%)',fontSize:'16px',pointerEvents:'none'}}>🔍</span>
+            <input
+              value={achSearch} onChange={e=>setAchSearch(e.target.value)}
+              placeholder="Kind suchen…"
+              style={{width:'100%',boxSizing:'border-box',padding:'11px 12px 11px 38px',borderRadius:'12px',border:'1.5px solid rgba(255,255,255,0.15)',background:'rgba(255,255,255,0.1)',color:'white',fontSize:'14px',fontWeight:'600',outline:'none'}}
+            />
+            {achSearch&&<button onClick={()=>setAchSearch('')} style={{position:'absolute',right:'10px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'rgba(255,255,255,0.5)',fontSize:'18px',cursor:'pointer',lineHeight:1}}>×</button>}
+          </div>
 
           {/* ── Ranglisten-Errungenschaften Admin-Panel ──────────── */}
           <RlAchPanel
@@ -6357,20 +6622,29 @@ export default function TrainingsApp() {
             setRlAchEditChild={setRlAchEditChild}
           />
 
-          {kidsWithSub.length===0
-            ? <div style={{background:'rgba(255,255,255,0.1)',borderRadius:'12px',padding:'30px',textAlign:'center',color:'rgba(255,255,255,0.7)'}}>Keine Kinder vorhanden.</div>
-            : <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
-              {kidsWithSub.map(child=>{
+          {filteredKids.length===0
+            ? <div style={{background:'rgba(255,255,255,0.1)',borderRadius:'12px',padding:'30px',textAlign:'center',color:'rgba(255,255,255,0.7)'}}>{achSearch?'Kein Kind gefunden.':'Keine Kinder vorhanden.'}</div>
+            : <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+              {filteredKids.map(child=>{
                 const sg = subgroups[child.subgroupId];
                 const ach = getAchievements(child.id);
                 const ttrUnlocked = ach.ttrUnlocked || [];
+                const isOpen = achExpandedChild === child.id;
+
+                // Gesamtzahl erreichter Errungenschaften berechnen
+                const ttrCount = ttrUnlocked.length;
+                const tournCount = (ach.einzel1||0)+(ach.einzel2||0)+(ach.einzel3||0)+(ach.doppel1||0)+(ach.doppel2||0)+(ach.doppel3||0);
+                const teamCount = ach.team||0;
+                const sdmCount = (spielerDesMonatsWins[child.id]||[]).length;
+                const rAch = getRanglisteAch(child.id);
+                const rlCount = RANK_TIERS.filter(t=>!!rAch.reached?.[t.key]).length;
+                const totalAch = ttrCount + tournCount + teamCount + sdmCount + rlCount;
 
                 const ACH_LABELS = {
                   einzel1:'🥇 1. Platz Einzel', einzel2:'🥈 2. Platz Einzel', einzel3:'🥉 3. Platz Einzel',
                   doppel1:'🥇 1. Platz Doppel', doppel2:'🥈 2. Platz Doppel', doppel3:'🥉 3. Platz Doppel',
-                  team:'🏆 Mannschaftsmeister', spielerDesMonats:'⭐ Spieler des Monats',
+                  team:'🏆 Mannschaftsmeister',
                 };
-                // All three functions read fresh ach inside setChildren functional update
                 const toggleTTR = (val) => {
                   setChildren(prev => {
                     const prevChild = prev[child.id]; if (!prevChild) return prev;
@@ -6398,7 +6672,7 @@ export default function TrainingsApp() {
                     return updated;
                   });
                   const label = ACH_LABELS[field] || field;
-                  createNotification(child.id, 'achievement', `${label}`,
+                  createNotification(child.id, 'achievement', label,
                     `Glückwunsch ${child.name}! Du hast eine neue Errungenschaft erhalten: ${label}. Weiter so! 🎉`);
                 };
                 const decField = (field) => {
@@ -6412,100 +6686,141 @@ export default function TrainingsApp() {
                   });
                 };
 
+                const ttrEntries = ttrHistory[child.id]?.entries || [];
+                const personalMax = ttrEntries.length ? Math.max(...ttrEntries.map(e=>Number(e.ttr)||0)) : null;
+
+                // Sektionstitel-Stil
+                const SecLbl = ({children:ch})=><p style={{margin:'0 0 6px',fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.35)',textTransform:'uppercase',letterSpacing:'1.2px'}}>{ch}</p>;
+
                 return (
-                  <div key={child.id} style={{background:'white',borderRadius:'14px',padding:'16px',boxShadow:'0 2px 8px rgba(0,0,0,0.15)'}}>
-                    <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'14px'}}>
-                      <div style={{width:'36px',height:'36px',borderRadius:'50%',background:sg?.color||'#ddd',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:'700',fontSize:'14px'}}>
+                  <div key={child.id} style={{borderRadius:'14px',overflow:'hidden',border:'1px solid rgba(255,255,255,0.08)',background:'rgba(255,255,255,0.04)'}}>
+                    {/* ── Kopfzeile (immer sichtbar) ── */}
+                    <button onClick={()=>setAchExpandedChild(isOpen?null:child.id)}
+                      style={{width:'100%',display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',background:'transparent',border:'none',cursor:'pointer',textAlign:'left'}}>
+                      <div style={{width:'38px',height:'38px',borderRadius:'50%',background:sg?.color||'#4ade80',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:'800',fontSize:'15px',flexShrink:0}}>
                         {child.name[0]}
                       </div>
-                      <div>
-                        <div style={{fontWeight:'700',fontSize:'15px',color:'#111'}}>{child.name}</div>
-                        <div style={{fontSize:'12px',color:'#888'}}>{sg?.name||'–'}</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <p style={{margin:'0 0 2px',fontWeight:'800',fontSize:'15px',color:'white'}}>{child.name}</p>
+                        <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>{sg?.name||'–'}</p>
                       </div>
-                    </div>
-
-                    {/* TTR Milestones */}
-                    {(()=>{
-                      const ttrEntries = ttrHistory[child.id]?.entries || [];
-                      const personalMax = ttrEntries.length ? Math.max(...ttrEntries.map(e=>Number(e.ttr)||0)) : null;
-                      return (
-                    <div style={{marginBottom:'14px'}}>
-                      <div style={{display:'flex',alignItems:'center',gap:'8px',margin:'0 0 8px',flexWrap:'wrap'}}>
-                        <p style={{margin:0,fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>TTR Errungenschaften</p>
-                        {personalMax!==null
-                          ? <span style={{fontSize:'11px',fontWeight:'700',color:'#b45309',background:'#fef3c7',border:'1px solid #fde68a',borderRadius:'6px',padding:'1px 7px'}}>⚡ Auto · Bestwert {personalMax}</span>
-                          : <span style={{fontSize:'11px',fontWeight:'600',color:'#9ca3af',background:'#f3f4f6',borderRadius:'6px',padding:'1px 7px'}}>manuell (keine TTR-Daten)</span>}
-                      </div>
-                      <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                        {TTR_MILESTONES.map((val,i)=>{
-                          const unlocked = ttrUnlocked.includes(val);
-                          const auto = personalMax!==null && val<=personalMax;
-                          const col = TTR_COLORS[i];
-                          return (
-                            <button key={val} onClick={()=>toggleTTR(val)}
-                              title={auto?`${val} TTR automatisch erreicht (Bestwert ${personalMax})`:`${val} TTR ${unlocked?'entfernen':'vergeben'}`}
-                              style={{position:'relative',padding:'5px 10px',borderRadius:'8px',border:`2px solid ${unlocked?col.bg:'#e5e7eb'}`,background:unlocked?col.bg:'#f9fafb',color:unlocked?col.text:'#9ca3af',fontWeight:'700',fontSize:'12px',cursor:'pointer',transition:'all 0.15s'}}>
-                              {auto&&unlocked?'⚡ ':''}{val}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                      );
-                    })()}
-
-                    {/* Tournament + Team */}
-                    <div style={{display:'flex',gap:'16px',flexWrap:'wrap'}}>
-                      <div>
-                        <p style={{margin:'0 0 6px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>Einzel Turniere</p>
-                        <div style={{display:'flex',flexDirection:'column',gap:'5px'}}>
-                          <AchCounter label="🥇 1. Platz" val={ach.einzel1} onInc={()=>incField('einzel1')} onDec={()=>decField('einzel1')}/>
-                          <AchCounter label="🥈 2. Platz" val={ach.einzel2} onInc={()=>incField('einzel2')} onDec={()=>decField('einzel2')}/>
-                          <AchCounter label="🥉 3. Platz" val={ach.einzel3} onInc={()=>incField('einzel3')} onDec={()=>decField('einzel3')}/>
+                      <div style={{display:'flex',alignItems:'center',gap:'10px',flexShrink:0}}>
+                        <div style={{textAlign:'right'}}>
+                          <span style={{display:'inline-block',padding:'4px 12px',borderRadius:'20px',background:'rgba(74,222,128,0.12)',border:'1px solid rgba(74,222,128,0.25)',color:'#4ade80',fontWeight:'800',fontSize:'13px'}}>
+                            🏅 {totalAch}
+                          </span>
                         </div>
+                        <span style={{fontSize:'16px',color:'rgba(255,255,255,0.3)',transform:isOpen?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s'}}>▾</span>
                       </div>
-                      <div>
-                        <p style={{margin:'0 0 6px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>Doppel Turniere</p>
-                        <div style={{display:'flex',flexDirection:'column',gap:'5px'}}>
-                          <AchCounter label="🥇 1. Platz" val={ach.doppel1} onInc={()=>incField('doppel1')} onDec={()=>decField('doppel1')}/>
-                          <AchCounter label="🥈 2. Platz" val={ach.doppel2} onInc={()=>incField('doppel2')} onDec={()=>decField('doppel2')}/>
-                          <AchCounter label="🥉 3. Platz" val={ach.doppel3} onInc={()=>incField('doppel3')} onDec={()=>decField('doppel3')}/>
-                        </div>
-                      </div>
-                      <div>
-                        <p style={{margin:'0 0 6px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>Mannschaft</p>
-                        <AchCounter label="🏆 Meisterschaft" val={ach.team} onInc={()=>incField('team')} onDec={()=>decField('team')}/>
-                      </div>
-                      <div>
-                        <p style={{margin:'0 0 6px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>Auszeichnungen</p>
-                        <AchCounter label="⭐ Spieler d. Monats" val={ach.spielerDesMonats} onInc={()=>incField('spielerDesMonats')} onDec={()=>decField('spielerDesMonats')}/>
-                      </div>
-                    </div>
+                    </button>
 
-                    {/* Rangliste Achievements (read-only summary per child) */}
-                    {rangliste.includes(child.id) && (()=>{
-                      const rAch = getRanglisteAch(child.id);
-                      const rank = rangliste.indexOf(child.id)+1;
-                      return (
-                        <div style={{marginTop:'12px',paddingTop:'12px',borderTop:'1px solid #f3f4f6'}}>
-                          <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'700',color:'#374151',textTransform:'uppercase',letterSpacing:'0.4px'}}>📊 Rangliste (Rang #{rank})</p>
-                          <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'6px'}}>
-                            {RANK_TIERS.map(t=>{
-                              const has = !!rAch.reached?.[t.key];
-                              const wk = rAch.weeks?.[t.key]?.count||0;
-                              const frozen = rAch.weeks?.[t.key]?.frozen;
+                    {/* ── Ausgeklappter Bereich ── */}
+                    {isOpen && (
+                      <div style={{padding:'0 16px 16px',borderTop:'1px solid rgba(255,255,255,0.06)',display:'flex',flexDirection:'column',gap:'16px'}}>
+
+                        {/* TTR */}
+                        <div style={{paddingTop:'14px'}}>
+                          <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px',flexWrap:'wrap'}}>
+                            <SecLbl>🏓 TTR Meilensteine</SecLbl>
+                            {personalMax!==null
+                              ? <span style={{fontSize:'10px',fontWeight:'700',color:'#fbbf24',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'6px',padding:'1px 7px'}}>⚡ Auto · Bestwert {personalMax}</span>
+                              : <span style={{fontSize:'10px',fontWeight:'600',color:'rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.06)',borderRadius:'6px',padding:'1px 7px'}}>manuell</span>}
+                          </div>
+                          <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                            {TTR_MILESTONES.map(val=>{
+                              const unlocked = ttrUnlocked.includes(val);
+                              const auto = personalMax!==null && val<=personalMax;
+                              const manualOverride = unlocked && !auto;
                               return (
-                                <div key={t.key} style={{padding:'4px 8px',borderRadius:'8px',border:`1px solid ${has?'#7c3aed':'#e5e7eb'}`,background:has?'rgba(124,58,237,0.07)':'#f9fafb',textAlign:'center',minWidth:'60px'}}>
-                                  <div style={{fontSize:'14px'}}>{t.icon}</div>
-                                  <div style={{fontSize:'10px',fontWeight:'700',color:has?'#7c3aed':'#9ca3af'}}>{t.label}</div>
-                                  <div style={{fontSize:'11px',color:has?'#374151':'#d1d5db',fontWeight:'600'}}>{wk}W {frozen?'❄️':''}</div>
+                                <div key={val} style={{position:'relative'}}>
+                                  <button onClick={()=>toggleTTR(val)}
+                                    title={auto?`Automatisch (Bestwert ${personalMax})`:manualOverride?'Manuell vergeben – klicken zum Entfernen':'Manuell vergeben'}
+                                    style={{padding:'6px 11px',borderRadius:'9px',
+                                      border:`1.5px solid ${manualOverride?'rgba(251,146,60,0.6)':unlocked?'rgba(74,222,128,0.4)':'rgba(255,255,255,0.1)'}`,
+                                      background:manualOverride?'rgba(251,146,60,0.14)':unlocked?'rgba(74,222,128,0.12)':'rgba(255,255,255,0.04)',
+                                      color:manualOverride?'#fb923c':unlocked?'#4ade80':'rgba(255,255,255,0.25)',
+                                      fontWeight:'800',fontSize:'12px',cursor:'pointer',transition:'all 0.12s'}}>
+                                    {auto&&unlocked?'⚡ ':manualOverride?'✏️ ':''}{val}
+                                  </button>
+                                  {manualOverride&&<span style={{position:'absolute',top:'-6px',right:'-4px',background:'#fb923c',color:'white',fontSize:'8px',fontWeight:'800',borderRadius:'4px',padding:'1px 3px',lineHeight:'1.2',pointerEvents:'none'}}>M</span>}
                                 </div>
                               );
                             })}
                           </div>
                         </div>
-                      );
-                    })()}
+
+                        {/* Turnierergebnisse */}
+                        <div>
+                          <SecLbl>🎖️ Turnierergebnisse</SecLbl>
+                          <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'12px',overflow:'hidden'}}>
+                            <div style={{padding:'6px 12px',borderBottom:'1px solid rgba(255,255,255,0.06)',fontSize:'10px',fontWeight:'800',color:'rgba(253,230,138,0.4)',letterSpacing:'1.2px'}}>EINZEL</div>
+                            <div style={{padding:'6px 10px',display:'flex',flexDirection:'column',gap:'4px'}}>
+                              {[{label:'🥇 1. Platz',field:'einzel1'},{label:'🥈 2. Platz',field:'einzel2'},{label:'🥉 3. Platz',field:'einzel3'}].map(({label,field})=>{const v=ach[field]||0;return(
+                                <div key={field} style={{display:'flex',alignItems:'center',gap:'10px',padding:'4px 6px',borderRadius:'8px',background:v>0?'rgba(251,146,60,0.08)':'transparent',border:v>0?'1px solid rgba(251,146,60,0.25)':'1px solid transparent'}}>
+                                  <span style={{flex:1,fontSize:'13px',color:v>0?'#fb923c':'rgba(255,255,255,0.3)',fontWeight:'700'}}>{label}</span>
+                                  {v>0&&<span style={{fontSize:'9px',fontWeight:'800',color:'#fb923c',background:'rgba(251,146,60,0.15)',border:'1px solid rgba(251,146,60,0.3)',borderRadius:'4px',padding:'1px 5px'}}>MANUELL</span>}
+                                  <AchCounter label="" val={v} onInc={()=>incField(field)} onDec={()=>decField(field)}/>
+                                </div>
+                              );})}
+                            </div>
+                            <div style={{padding:'6px 12px',borderTop:'1px solid rgba(255,255,255,0.06)',borderBottom:'1px solid rgba(255,255,255,0.06)',fontSize:'10px',fontWeight:'800',color:'rgba(103,232,249,0.4)',letterSpacing:'1.2px'}}>DOPPEL</div>
+                            <div style={{padding:'6px 10px',display:'flex',flexDirection:'column',gap:'4px'}}>
+                              {[{label:'🥇 1. Platz',field:'doppel1'},{label:'🥈 2. Platz',field:'doppel2'},{label:'🥉 3. Platz',field:'doppel3'}].map(({label,field})=>{const v=ach[field]||0;return(
+                                <div key={field} style={{display:'flex',alignItems:'center',gap:'10px',padding:'4px 6px',borderRadius:'8px',background:v>0?'rgba(251,146,60,0.08)':'transparent',border:v>0?'1px solid rgba(251,146,60,0.25)':'1px solid transparent'}}>
+                                  <span style={{flex:1,fontSize:'13px',color:v>0?'#fb923c':'rgba(255,255,255,0.3)',fontWeight:'700'}}>{label}</span>
+                                  {v>0&&<span style={{fontSize:'9px',fontWeight:'800',color:'#fb923c',background:'rgba(251,146,60,0.15)',border:'1px solid rgba(251,146,60,0.3)',borderRadius:'4px',padding:'1px 5px'}}>MANUELL</span>}
+                                  <AchCounter label="" val={v} onInc={()=>incField(field)} onDec={()=>decField(field)}/>
+                                </div>
+                              );})}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Mannschaft + SdM */}
+                        <div style={{display:'flex',gap:'12px',flexWrap:'wrap'}}>
+                          <div style={{flex:1,minWidth:'140px'}}>
+                            <SecLbl>🏆 Mannschaft</SecLbl>
+                            <div style={{display:'flex',alignItems:'center',gap:'10px',background:teamCount>0?'rgba(251,146,60,0.08)':'rgba(255,255,255,0.03)',border:`1px solid ${teamCount>0?'rgba(251,146,60,0.25)':'rgba(255,255,255,0.07)'}`,borderRadius:'10px',padding:'8px 12px'}}>
+                              <span style={{flex:1,fontSize:'13px',color:teamCount>0?'#fb923c':'rgba(255,255,255,0.3)',fontWeight:'700'}}>🏆 Meisterschaft</span>
+                              {teamCount>0&&<span style={{fontSize:'9px',fontWeight:'800',color:'#fb923c',background:'rgba(251,146,60,0.15)',border:'1px solid rgba(251,146,60,0.3)',borderRadius:'4px',padding:'1px 5px'}}>MANUELL</span>}
+                              <AchCounter label="" val={ach.team} onInc={()=>incField('team')} onDec={()=>decField('team')}/>
+                            </div>
+                          </div>
+                          <div style={{flex:1,minWidth:'140px'}}>
+                            <SecLbl>⭐ Spieler des Monats</SecLbl>
+                            <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'10px',padding:'8px 12px'}}>
+                              {sdmCount>0
+                                ? <p style={{margin:0,fontSize:'12px',color:'#fcd34d',fontWeight:'700',lineHeight:'1.5'}}>{(spielerDesMonatsWins[child.id]||[]).map(w=>w.type==='year'?`👑 J.${w.period}`:`⭐ ${fmtYM(w.period)}`).join(' · ')}</p>
+                                : <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.25)'}}>– noch keine –</p>}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Rangliste */}
+                        {rangliste.includes(child.id) && (()=>{
+                          const rank = rangliste.indexOf(child.id)+1;
+                          return (
+                            <div>
+                              <SecLbl>📊 Rangliste (Rang #{rank})</SecLbl>
+                              <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                                {RANK_TIERS.map(t=>{
+                                  const has = !!rAch.reached?.[t.key];
+                                  const wk = rAch.weeks?.[t.key]?.count||0;
+                                  const frozen = rAch.weeks?.[t.key]?.frozen;
+                                  return (
+                                    <div key={t.key} style={{padding:'6px 10px',borderRadius:'10px',border:`1.5px solid ${has?'rgba(74,222,128,0.35)':'rgba(255,255,255,0.07)'}`,background:has?'rgba(74,222,128,0.08)':'rgba(255,255,255,0.02)',textAlign:'center',minWidth:'58px'}}>
+                                      <div style={{fontSize:'16px'}}>{has?t.icon:'🔒'}</div>
+                                      <div style={{fontSize:'10px',fontWeight:'800',color:has?'#4ade80':'rgba(255,255,255,0.2)',marginTop:'2px'}}>{t.label}</div>
+                                      <div style={{fontSize:'10px',color:'rgba(255,255,255,0.35)',fontWeight:'600'}}>{wk}W{frozen?' ❄️':''}</div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -7103,7 +7418,7 @@ export default function TrainingsApp() {
         const maxTTR = ttrUnlocked.length > 0 ? Math.max(...ttrUnlocked) : 0;
         const achScore = (ach.einzel1||0)*3+(ach.einzel2||0)*2+(ach.einzel3||0) +
           (ach.doppel1||0)*3+(ach.doppel2||0)*2+(ach.doppel3||0) +
-          (ach.team||0)*2+(ach.spielerDesMonats||0)+ttrUnlocked.length;
+          (ach.team||0)*2+(spielerDesMonatsWins[id]?.length||0)+ttrUnlocked.length;
         return { childId:id, name:children[id]?.name||'?', subgroupId:children[id]?.subgroupId, maxTTR, achScore };
       })
       .sort((a,b) => b.maxTTR!==a.maxTTR ? b.maxTTR-a.maxTTR : b.achScore!==a.achScore ? b.achScore-a.achScore : a.name.localeCompare(b.name,'de'));
@@ -8946,91 +9261,30 @@ export default function TrainingsApp() {
   }
 
   // ── SPIELER DES MONATS VIEW ─────────────────────────────────────────────
-  if (view === 'spielerDesMonats' && canEdit()) {
-    const jugendChildren = Object.values(children).filter(c=>subgroups[c.subgroupId]?.groupId==='jugend');
-
-    // Helper: get TTR entry closest to a given YYYY-MM (exact match preferred, else nearest before)
-    const getTtrAt = (entries, ym) => {
-      const sorted = [...entries].sort((a,b)=>a.month.localeCompare(b.month));
-      const exact = sorted.find(e=>e.month===ym);
-      if (exact) return exact;
-      // nearest entry at or before ym
-      const before = sorted.filter(e=>e.month<ym);
-      return before.length ? before[before.length-1] : null;
-    };
-
-    // DRY helper: compute winner(s) for a period comparison
-    // currentYM, prevYM: YYYY-MM strings
-    const calcWinners = (currentYM, prevYM) => {
-      const results = [];
-      jugendChildren.forEach(c => {
-        const entries = (ttrHistory[c.id]?.entries || []);
-        if (entries.length < 2) return;
-        const sorted = [...entries].sort((a,b)=>a.month.localeCompare(b.month));
-        const firstEntry = sorted[0];
-        const currEntry = getTtrAt(sorted, currentYM);
-        const prevEntry = getTtrAt(sorted, prevYM);
-        if (!currEntry || !prevEntry) return;
-        // Exclusion: prevEntry must not be the first ever entry
-        if (prevEntry.month === firstEntry.month) return;
-        const diff = currEntry.ttr - prevEntry.ttr;
-        results.push({child: c, currTtr: currEntry.ttr, prevTtr: prevEntry.ttr, diff, currYM: currEntry.month, prevYM: prevEntry.month});
-      });
-      if (!results.length) return null;
-      const maxDiff = Math.max(...results.map(r=>r.diff));
-      if (maxDiff <= 0) return null;
-      return results.filter(r=>r.diff===maxDiff);
-    };
-
-    // Current month & previous month (use latestImportMonth as "current")
-    const allMs = Object.values(ttrHistory).flatMap(h=>(h.entries||[]).map(e=>e.month));
-    const latestM = allMs.length ? allMs.reduce((a,b)=>a>b?a:b) : null;
-    const prevM = latestM ? (()=>{const [y,m]=latestM.split('-').map(Number);const d=new Date(y,m-2,1);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;})() : null;
-    const currentMonthWinners = latestM && prevM ? calcWinners(latestM, prevM) : null;
-
-    // Current year (compare Jan this year vs Jan last year)
-    const curYear = latestM ? latestM.slice(0,4) : String(new Date().getFullYear());
-    const curYearJan = `${curYear}-01`;
-    const prevYearJan = `${Number(curYear)-1}-01`;
-    const currentYearWinners = calcWinners(curYearJan, prevYearJan);
-
-    // Historical months: all YYYY-MM from earliest to latestM
-    const allEntryMonths = [...new Set(allMs)].sort();
-    const historicMonths = [];
-    if (allEntryMonths.length >= 2) {
-      const [fy, fm] = allEntryMonths[0].split('-').map(Number);
-      let y=fy, m=fm+1;
-      if (m>12) { m=1; y++; }
-      const [ly, lm] = (latestM||allEntryMonths[allEntryMonths.length-1]).split('-').map(Number);
-      while (y<ly || (y===ly&&m<=lm)) {
-        const curYM = `${y}-${String(m).padStart(2,'0')}`;
-        const prevD = new Date(y,m-2,1);
-        const prevYM = `${prevD.getFullYear()}-${String(prevD.getMonth()+1).padStart(2,'0')}`;
-        const winners = calcWinners(curYM, prevYM);
-        if (winners) historicMonths.push({period: curYM, winners});
-        m++; if (m>12){m=1;y++;}
-      }
-    }
-    historicMonths.reverse();
-
-    // Historical years
-    const historicYears = [];
-    const years = [...new Set(allMs.map(m=>m.slice(0,4)))].sort();
-    for (let i=1;i<years.length;i++) {
-      const cy=years[i], py=years[i-1];
-      const winners = calcWinners(`${cy}-01`, `${py}-01`);
-      if (winners) historicYears.push({period: cy, winners});
-    }
-    historicYears.reverse();
-
+  if (view === 'spielerDesMonats') {
     const fmtMonth = ym => { const [y,m]=ym.split('-'); return `${['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'][Number(m)-1]} ${y}`; };
-    const WinnerBadge = ({w,compact=false}) => (
-      <div style={{display:'flex',alignItems:'center',gap:compact?'8px':'12px'}}>
-        <div style={{width:compact?'32px':'48px',height:compact?'32px':'48px',borderRadius:'50%',background:'rgba(252,211,77,0.15)',border:'2px solid rgba(252,211,77,0.4)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:compact?'16px':'24px',flexShrink:0}}>🏅</div>
+    const historicMonths = [...sdmHistoricMonths].reverse();
+    const historicYears  = [...sdmHistoricYears].reverse();
+
+    // Stats: wins per player
+    const winCounts = {};
+    sdmHistoricMonths.forEach(({winners}) => winners.forEach(({child}) => { winCounts[child.id]=(winCounts[child.id]||0)+1; }));
+    const winRanking = Object.entries(winCounts).map(([id,count])=>({name:children[id]?.name||'?',count})).sort((a,b)=>b.count-a.count);
+    const maxWinCount = winRanking.length ? winRanking[0].count : 1;
+    // Top 3 highest single-month TTR gain
+    const allGains = [];
+    sdmHistoricMonths.forEach(({period,winners}) => winners.forEach(({child,diff})=>allGains.push({name:child.name,diff,period})));
+    const top3Gains = allGains.sort((a,b)=>b.diff-a.diff).slice(0,3);
+
+    const WinnerBadge = ({w,large=false}) => (
+      <div style={{display:'flex',alignItems:'center',gap:large?'14px':'10px'}}>
+        <div style={{width:large?'52px':'36px',height:large?'52px':'36px',borderRadius:'50%',background:'rgba(252,211,77,0.18)',border:`2px solid rgba(252,211,77,${large?'0.6':'0.35'})`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:large?'26px':'18px',flexShrink:0}}>
+          {large?'🥇':'🏅'}
+        </div>
         <div>
-          <p style={{margin:0,fontWeight:'800',fontSize:compact?'13px':'16px',color:'white'}}>{w.child.name}</p>
-          <p style={{margin:0,fontSize:compact?'11px':'12px',color:'rgba(255,255,255,0.45)'}}>
-            {w.prevTtr} → {w.currTtr} <span style={{color:'#4ade80',fontWeight:'700'}}>+{w.diff}</span>
+          <p style={{margin:0,fontWeight:'900',fontSize:large?'19px':'14px',color:'white',letterSpacing:large?'-0.3px':'0'}}>{w.child.name}</p>
+          <p style={{margin:'2px 0 0',fontSize:large?'12px':'11px',color:'rgba(255,255,255,0.4)'}}>
+            {w.prevTtr} → {w.currTtr} <span style={{color:'#4ade80',fontWeight:'800'}}>+{w.diff}</span>
           </p>
         </div>
       </div>
@@ -9039,53 +9293,109 @@ export default function TrainingsApp() {
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#0c0a00 0%,#1a1400 45%,#0c0a00 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-          <button onClick={()=>navTo('home')} style={s.btn('#fcd34d')}><Home size={16}/></button>
+          <button onClick={()=>navTo('ttrWerte')} style={s.btn('#fcd34d')}><Home size={16}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>🥇 Spieler des Monats</h1>
         </div>
-        <div style={{maxWidth:'680px',margin:'0 auto',padding:isMobile?'16px 14px 48px':'20px 24px 60px',display:'flex',flexDirection:'column',gap:'16px'}}>
+        <div style={{maxWidth:'680px',margin:'0 auto',padding:isMobile?'16px 14px 48px':'20px 24px 60px',display:'flex',flexDirection:'column',gap:'14px'}}>
 
-          {/* Aktueller Spieler des Monats */}
-          <div style={{background:'rgba(252,211,77,0.06)',border:'1px solid rgba(252,211,77,0.25)',borderRadius:'18px',padding:'20px'}}>
-            <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'800',color:'rgba(252,211,77,0.5)',textTransform:'uppercase',letterSpacing:'1.5px'}}>
-              {latestM ? fmtMonth(latestM) : 'Aktuell'} · Spieler des Monats
-            </p>
-            {currentMonthWinners ? (
-              <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'16px'}}>
-                {currentMonthWinners.map((w,i)=><WinnerBadge key={i} w={w}/>)}
+          {/* Spieler des Monats – große Hauptkachel */}
+          <div style={{background:'linear-gradient(135deg,rgba(252,211,77,0.10) 0%,rgba(252,211,77,0.04) 100%)',border:'1.5px solid rgba(252,211,77,0.35)',borderRadius:'20px',padding:'20px 22px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'14px'}}>
+              <span style={{fontSize:'9px',fontWeight:'900',color:'rgba(252,211,77,0.55)',textTransform:'uppercase',letterSpacing:'2px'}}>
+                {sdmCurrentMonthLabel ? fmtMonth(sdmCurrentMonthLabel) : 'Aktuell'}
+              </span>
+              <span style={{fontSize:'9px',fontWeight:'900',color:'rgba(252,211,77,0.3)',textTransform:'uppercase',letterSpacing:'2px'}}>· Spieler des Monats</span>
+            </div>
+            {sdmCurrentMonthWinners ? (
+              <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+                {sdmCurrentMonthWinners.map((w,i)=><WinnerBadge key={i} w={w} large/>)}
               </div>
             ) : (
-              <p style={{margin:'0 0 16px',fontSize:'14px',color:'rgba(255,255,255,0.35)'}}>Kein Gewinner diesen Monat</p>
+              <p style={{margin:0,fontSize:'14px',color:'rgba(255,255,255,0.3)'}}>Noch keine Daten für diesen Monat.</p>
             )}
+          </div>
 
-            {/* Spieler des Jahres – kompakt eingebettet */}
-            <div style={{borderTop:'1px solid rgba(252,211,77,0.12)',paddingTop:'14px',marginTop:'4px'}}>
-              <p style={{margin:'0 0 10px',fontSize:'10px',fontWeight:'800',color:'rgba(252,211,77,0.4)',textTransform:'uppercase',letterSpacing:'1.5px'}}>
-                {curYear} · Spieler des Jahres
-              </p>
-              {currentYearWinners ? (
-                <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
-                  {currentYearWinners.map((w,i)=><WinnerBadge key={i} w={w} compact/>)}
+          {/* Spieler des Jahres – eigene prominente Kachel */}
+          <div style={{background:'linear-gradient(135deg,rgba(251,191,36,0.16) 0%,rgba(217,119,6,0.08) 100%)',border:'2px solid rgba(251,191,36,0.5)',borderRadius:'20px',padding:'20px 22px',boxShadow:'0 0 28px rgba(251,191,36,0.08)'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'14px'}}>
+              <span style={{fontSize:'20px'}}>👑</span>
+              <div>
+                <p style={{margin:0,fontSize:'9px',fontWeight:'900',color:'rgba(251,191,36,0.5)',textTransform:'uppercase',letterSpacing:'2px'}}>Spieler des Jahres</p>
+                <p style={{margin:0,fontSize:'20px',fontWeight:'900',color:'#fbbf24',letterSpacing:'-0.5px'}}>{sdmCurrentYearLabel}</p>
+              </div>
+            </div>
+            {sdmCurrentYearWinners ? (
+              <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+                {sdmCurrentYearWinners.map((w,i)=>(
+                  <div key={i} style={{display:'flex',alignItems:'center',gap:'12px'}}>
+                    <div style={{width:'44px',height:'44px',borderRadius:'50%',background:'rgba(251,191,36,0.2)',border:'2px solid rgba(251,191,36,0.5)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'22px',flexShrink:0}}>🏆</div>
+                    <div>
+                      <p style={{margin:0,fontWeight:'900',fontSize:'17px',color:'#fbbf24',letterSpacing:'-0.2px'}}>{w.child.name}</p>
+                      <p style={{margin:'2px 0 0',fontSize:'12px',color:'rgba(251,191,36,0.5)'}}>
+                        {w.prevTtr} → {w.currTtr} <span style={{color:'#4ade80',fontWeight:'800'}}>+{w.diff}</span>
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{margin:0,fontSize:'14px',color:'rgba(255,255,255,0.3)'}}>Noch keine Daten für dieses Jahr.</p>
+            )}
+          </div>
+
+          {/* Statistik-Kachel */}
+          {(winRanking.length>0||top3Gains.length>0)&&(
+            <div style={{background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'18px',padding:'18px 20px'}}>
+              <p style={{margin:'0 0 16px',fontSize:'10px',fontWeight:'900',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'1.5px'}}>📊 Statistiken</p>
+
+              {/* Balkendiagramm Monatssieger */}
+              {winRanking.length>0&&(
+                <div style={{marginBottom:'20px'}}>
+                  <p style={{margin:'0 0 10px',fontSize:'12px',fontWeight:'800',color:'rgba(255,255,255,0.5)'}}>Anzahl Monatssiege</p>
+                  <div style={{display:'flex',flexDirection:'column',gap:'7px'}}>
+                    {winRanking.map((p,i)=>(
+                      <div key={p.name} style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                        <span style={{fontSize:'11px',color:'rgba(255,255,255,0.45)',minWidth:'96px',textAlign:'right',fontWeight:'600',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</span>
+                        <div style={{flex:1,height:'20px',background:'rgba(255,255,255,0.04)',borderRadius:'6px',overflow:'hidden'}}>
+                          <div style={{height:'100%',width:`${(p.count/maxWinCount)*100}%`,background:i===0?'linear-gradient(90deg,#fbbf24,#f59e0b)':i===1?'linear-gradient(90deg,rgba(251,191,36,0.55),rgba(245,158,11,0.55))':'linear-gradient(90deg,rgba(251,191,36,0.3),rgba(245,158,11,0.3))',borderRadius:'6px',transition:'width 0.3s',display:'flex',alignItems:'center',paddingLeft:'6px'}}>
+                            <span style={{fontSize:'10px',fontWeight:'800',color:i===0?'#1a1000':'rgba(255,255,255,0.6)',whiteSpace:'nowrap'}}>{p.count}×</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ) : (
-                <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.3)'}}>Kein Gewinner dieses Jahr</p>
+              )}
+
+              {/* Top 3 Höchste Monatsverbesserung */}
+              {top3Gains.length>0&&(
+                <div>
+                  <p style={{margin:'0 0 10px',fontSize:'12px',fontWeight:'800',color:'rgba(255,255,255,0.5)'}}>Top 3 – Höchste TTR-Verbesserung in einem Monat</p>
+                  <div style={{display:'flex',flexDirection:'column',gap:'7px'}}>
+                    {top3Gains.map((g,i)=>(
+                      <div key={i} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',background:`rgba(74,222,128,${0.06-i*0.015})`,border:`1px solid rgba(74,222,128,${0.2-i*0.05})`,borderRadius:'10px'}}>
+                        <span style={{fontSize:'16px'}}>{['🥇','🥈','🥉'][i]}</span>
+                        <span style={{flex:1,fontWeight:'700',fontSize:'13px',color:'white'}}>{g.name}</span>
+                        <span style={{fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>{fmtMonth(g.period)}</span>
+                        <span style={{fontWeight:'900',fontSize:'14px',color:'#4ade80'}}>+{g.diff}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
-          </div>
+          )}
 
           {/* Historische Monatsübersicht */}
           {historicMonths.length>0&&(
-            <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'16px',overflow:'hidden'}}>
-              <p style={{margin:0,padding:'14px 16px',fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'1.5px',borderBottom:'1px solid rgba(255,255,255,0.06)'}}>Historische Monatssieger</p>
-              <div style={{maxHeight:'340px',overflowY:'auto'}}>
+            <div style={{background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'16px',overflow:'hidden'}}>
+              <p style={{margin:0,padding:'13px 16px',fontSize:'10px',fontWeight:'900',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'1.5px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Historische Monatssieger</p>
+              <div style={{maxHeight:'320px',overflowY:'auto'}}>
                 {historicMonths.map(({period,winners})=>(
-                  <div key={period} style={{display:'flex',alignItems:'center',gap:'12px',padding:'10px 16px',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-                    <span style={{fontSize:'12px',color:'rgba(255,255,255,0.3)',fontWeight:'600',minWidth:'56px'}}>{fmtMonth(period)}</span>
-                    <div style={{flex:1}}>
-                      {winners.map((w,i)=>(
-                        <span key={i} style={{display:'block',fontWeight:'700',color:'white',fontSize:'13px'}}>{w.child.name}</span>
-                      ))}
-                    </div>
-                    <span style={{fontSize:'13px',fontWeight:'800',color:'#4ade80'}}>+{winners[0].diff}</span>
+                  <div key={period} style={{display:'flex',alignItems:'center',gap:'12px',padding:'9px 16px',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',fontWeight:'700',minWidth:'56px'}}>{fmtMonth(period)}</span>
+                    <div style={{flex:1}}>{winners.map((w,i)=><span key={i} style={{display:'block',fontWeight:'700',color:'white',fontSize:'13px'}}>{w.child.name}</span>)}</div>
+                    <span style={{fontSize:'12px',fontWeight:'800',color:'#4ade80'}}>+{winners[0].diff}</span>
                   </div>
                 ))}
               </div>
@@ -9094,23 +9404,19 @@ export default function TrainingsApp() {
 
           {/* Historische Jahresübersicht */}
           {historicYears.length>0&&(
-            <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'16px',overflow:'hidden'}}>
-              <p style={{margin:0,padding:'14px 16px',fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'1.5px',borderBottom:'1px solid rgba(255,255,255,0.06)'}}>Historische Jahressieger</p>
+            <div style={{background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'16px',overflow:'hidden'}}>
+              <p style={{margin:0,padding:'13px 16px',fontSize:'10px',fontWeight:'900',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'1.5px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Historische Jahressieger</p>
               {historicYears.map(({period,winners})=>(
-                <div key={period} style={{display:'flex',alignItems:'center',gap:'12px',padding:'10px 16px',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-                  <span style={{fontSize:'12px',color:'rgba(255,255,255,0.3)',fontWeight:'600',minWidth:'36px'}}>{period}</span>
-                  <div style={{flex:1}}>
-                    {winners.map((w,i)=>(
-                      <span key={i} style={{display:'block',fontWeight:'700',color:'white',fontSize:'13px'}}>{w.child.name}</span>
-                    ))}
-                  </div>
-                  <span style={{fontSize:'13px',fontWeight:'800',color:'#4ade80'}}>+{winners[0].diff}</span>
+                <div key={period} style={{display:'flex',alignItems:'center',gap:'12px',padding:'9px 16px',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                  <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',fontWeight:'700',minWidth:'40px'}}>{period}</span>
+                  <div style={{flex:1}}>{winners.map((w,i)=><span key={i} style={{display:'block',fontWeight:'700',color:'#fbbf24',fontSize:'13px'}}>{w.child.name}</span>)}</div>
+                  <span style={{fontSize:'12px',fontWeight:'800',color:'#4ade80'}}>+{winners[0].diff}</span>
                 </div>
               ))}
             </div>
           )}
 
-          {historicMonths.length===0&&historicYears.length===0&&(
+          {sdmHistoricMonths.length===0&&sdmHistoricYears.length===0&&(
             <div style={{textAlign:'center',padding:'48px 20px',color:'rgba(255,255,255,0.25)',fontSize:'14px'}}>
               <p style={{fontSize:'36px',margin:'0 0 12px'}}>📊</p>
               Noch nicht genug TTR-Daten für eine Auswertung.
@@ -9176,13 +9482,21 @@ export default function TrainingsApp() {
         </div>
         <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
 
-          {/* TTR Import Button */}
-          <button onClick={()=>navTo('ttrImport')}
-            style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',padding:'12px',marginBottom:'16px',background:'rgba(110,231,183,0.07)',border:'1px solid rgba(110,231,183,0.2)',borderRadius:'14px',color:'#6ee7b7',cursor:'pointer',fontWeight:'700',fontSize:'14px',transition:'all 0.12s'}}
-            onMouseEnter={e=>{e.currentTarget.style.background='rgba(110,231,183,0.13)';e.currentTarget.style.borderColor='rgba(110,231,183,0.35)';}}
-            onMouseLeave={e=>{e.currentTarget.style.background='rgba(110,231,183,0.07)';e.currentTarget.style.borderColor='rgba(110,231,183,0.2)';}}>
-            <span style={{fontSize:'16px'}}>📥</span> TTR-Import
-          </button>
+          {/* TTR Import + Spieler des Monats Buttons */}
+          <div style={{display:'flex',gap:'8px',marginBottom:'16px'}}>
+            <button onClick={()=>navTo('ttrImport')}
+              style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',padding:'12px',background:'rgba(110,231,183,0.07)',border:'1px solid rgba(110,231,183,0.2)',borderRadius:'14px',color:'#6ee7b7',cursor:'pointer',fontWeight:'700',fontSize:'14px',transition:'all 0.12s'}}
+              onMouseEnter={e=>{e.currentTarget.style.background='rgba(110,231,183,0.13)';e.currentTarget.style.borderColor='rgba(110,231,183,0.35)';}}
+              onMouseLeave={e=>{e.currentTarget.style.background='rgba(110,231,183,0.07)';e.currentTarget.style.borderColor='rgba(110,231,183,0.2)';}}>
+              <span style={{fontSize:'16px'}}>📥</span> TTR-Import
+            </button>
+            <button onClick={()=>navTo('spielerDesMonats')}
+              style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',padding:'12px',background:'rgba(252,211,77,0.07)',border:'1px solid rgba(252,211,77,0.2)',borderRadius:'14px',color:'#fcd34d',cursor:'pointer',fontWeight:'700',fontSize:'14px',transition:'all 0.12s'}}
+              onMouseEnter={e=>{e.currentTarget.style.background='rgba(252,211,77,0.13)';e.currentTarget.style.borderColor='rgba(252,211,77,0.4)';}}
+              onMouseLeave={e=>{e.currentTarget.style.background='rgba(252,211,77,0.07)';e.currentTarget.style.borderColor='rgba(252,211,77,0.2)';}}>
+              <span style={{fontSize:'16px'}}>🥇</span> Spieler des Monats
+            </button>
+          </div>
 
           <div style={{display:'flex',gap:'6px',marginBottom:'16px',flexWrap:'wrap'}}>
             {filterTabs.map(tab=>(
@@ -9325,8 +9639,6 @@ export default function TrainingsApp() {
               prevLabel = label;
             }
           }
-
-          console.log('[TTR-Import] Erkannte Monate:', months.map(m=>m.label).join(', '));
 
           // Build name→entries map from Excel
           const excelMap = {};
@@ -9873,6 +10185,256 @@ export default function TrainingsApp() {
     const linkedPlayer = userProfile?.linkedPlayerId ? aktiveSpieler[userProfile.linkedPlayerId] : null;
     const me = linkedPlayer?.name || userProfile?.name || user?.email || '';
 
+    // ── AUSWAHLSCREEN ───────────────────────────────────────────────────────
+    if (!tmMode) {
+      return (
+        <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#1a0a1e 0%,#0d0a1f 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+          <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
+            <button onClick={()=>navTo('home')} style={s.btn('#f472b6')}><Home size={16}/></button>
+            <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>⚔️ Trainingsmatches</h1>
+          </div>
+          <div style={{padding:'40px 20px',maxWidth:'500px',margin:'0 auto',display:'flex',flexDirection:'column',gap:'16px'}}>
+            <p style={{textAlign:'center',color:'rgba(255,255,255,0.4)',fontSize:'13px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'1.5px',margin:'0 0 8px'}}>Spielmodus wählen</p>
+            <button onClick={()=>setTmMode('single')}
+              style={{padding:'28px 20px',background:'rgba(244,114,182,0.08)',border:'2px solid rgba(244,114,182,0.3)',borderRadius:'20px',cursor:'pointer',textAlign:'left',display:'flex',alignItems:'center',gap:'20px',transition:'transform 0.12s'}}
+              onMouseEnter={e=>e.currentTarget.style.transform='translateY(-2px)'}
+              onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
+              <span style={{fontSize:'48px',lineHeight:1,flexShrink:0}}>🏓</span>
+              <div>
+                <p style={{margin:'0 0 4px',fontWeight:'800',color:'white',fontSize:'20px'}}>Einzel</p>
+                <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.4)',lineHeight:'1.4'}}>1 gegen 1 · Allzeittabelle & Verlauf</p>
+              </div>
+            </button>
+            <button onClick={()=>setTmMode('double')}
+              style={{padding:'28px 20px',background:'rgba(99,102,241,0.08)',border:'2px solid rgba(99,102,241,0.3)',borderRadius:'20px',cursor:'pointer',textAlign:'left',display:'flex',alignItems:'center',gap:'20px',transition:'transform 0.12s'}}
+              onMouseEnter={e=>e.currentTarget.style.transform='translateY(-2px)'}
+              onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
+              <span style={{fontSize:'48px',lineHeight:1,flexShrink:0}}>👥</span>
+              <div>
+                <p style={{margin:'0 0 4px',fontWeight:'800',color:'#a5b4fc',fontSize:'20px'}}>Doppel</p>
+                <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.4)',lineHeight:'1.4'}}>2 gegen 2 · Paarungstabelle & Spielertabelle</p>
+              </div>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // ── DOPPEL-VIEW ─────────────────────────────────────────────────────────
+    if (tmMode === 'double') {
+      const dac = '#818cf8'; // indigo accent
+      const dacBorder = 'rgba(129,140,248,0.25)';
+      const dacBg = 'rgba(129,140,248,0.07)';
+      const saveDoppel = matches => { setTrainingsdoppel(matches); setDoc(doc(db,'ttc','trainingsdoppel'),{matches}); };
+
+      // Spielerliste (alle aktiven + bisherige Doppelspiele-Namen)
+      const doppelNames = new Set(trainingsdoppel.flatMap(m=>[m.playerA,m.playerB,m.playerC,m.playerD]).filter(Boolean));
+      const aktiveSpielerNames2 = new Set(Object.values(aktiveSpieler).map(sp=>sp.name).filter(Boolean));
+      const allPlayers = [...new Set([...aktiveSpielerNames2,...doppelNames])].sort((a,b)=>a.localeCompare(b,'de'));
+
+      const submitDoppel = () => {
+        const {playerA,playerB,playerC,playerD,result,date} = tmDoppelForm;
+        if (!playerA||!playerB||!playerC||!playerD||!result) return;
+        if (new Set([playerA,playerB,playerC,playerD]).size < 4) return; // no duplicates
+        const [s1,s2] = result.split(':').map(Number);
+        const entry = {
+          id:'td_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+          date: date||TODAY,
+          playerA, playerB, playerC, playerD,
+          score1: s1, score2: s2,
+          createdBy: me,
+          createdAt: new Date().toISOString(),
+        };
+        saveDoppel([entry, ...trainingsdoppel]);
+        setTmDoppelAdding(false);
+        setTmDoppelForm({playerA:'',playerB:'',playerC:'',playerD:'',result:'3:0',date:''});
+      };
+
+      // ── Paarungstabelle ──
+      const pairingStats = {};
+      trainingsdoppel.forEach(m => {
+        const t1won = m.score1 > m.score2;
+        [[m.playerA,m.playerB,t1won],[m.playerC,m.playerD,!t1won]].forEach(([pX,pY,won]) => {
+          const key = [pX,pY].sort().join('|||');
+          if (!pairingStats[key]) pairingStats[key] = {name:`${[pX,pY].sort()[0]} & ${[pX,pY].sort()[1]}`,matches:0,wins:0,losses:0};
+          pairingStats[key].matches++;
+          if (won) pairingStats[key].wins++; else pairingStats[key].losses++;
+        });
+      });
+      const pairingTable = Object.values(pairingStats)
+        .map(r=>({...r,winrate:r.matches>0?r.wins/r.matches:0}))
+        .sort((a,b)=>b.winrate-a.winrate||b.wins-a.wins);
+
+      // ── Spielertabelle ──
+      const playerStats = {};
+      trainingsdoppel.forEach(m => {
+        const t1won = m.score1 > m.score2;
+        [[m.playerA,t1won],[m.playerB,t1won],[m.playerC,!t1won],[m.playerD,!t1won]].forEach(([p,won]) => {
+          if (!p) return;
+          if (!playerStats[p]) playerStats[p] = {name:p,matches:0,wins:0,losses:0};
+          playerStats[p].matches++;
+          if (won) playerStats[p].wins++; else playerStats[p].losses++;
+        });
+      });
+      const playerTable = Object.values(playerStats)
+        .map(r=>({...r,winrate:r.matches>0?r.wins/r.matches:0}))
+        .sort((a,b)=>b.winrate-a.winrate||b.wins-a.wins);
+
+      const resultOptions = ['3:0','3:1','3:2','2:3','1:3','0:3'];
+      const PlayerSelect = ({label,field,exclude=[]}) => (
+        <div>
+          <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase'}}>{label}</label>
+          <select value={tmDoppelForm[field]} onChange={e=>setTmDoppelForm(f=>({...f,[field]:e.target.value}))}
+            style={{width:'100%',padding:'9px 12px',background:'#1a0a1e',border:`1px solid ${tmDoppelForm[field]?dac:dacBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}>
+            <option value="">Spieler wählen…</option>
+            {allPlayers.filter(p=>!exclude.includes(p)).map(p=><option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+      );
+
+      const TableGrid = ({data, cols}) => (
+        <div style={{background:'rgba(255,255,255,0.03)',border:`1px solid ${dacBorder}`,borderRadius:'14px',overflow:'hidden'}}>
+          <div style={{display:'grid',gridTemplateColumns:cols,gap:'4px',padding:'8px 14px',borderBottom:`1px solid ${dacBorder}`,fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'0.5px'}}>
+            <span>#</span><span>Name</span><span style={{textAlign:'center'}}>M</span><span style={{textAlign:'center'}}>S</span><span style={{textAlign:'center'}}>N</span><span style={{textAlign:'right'}}>Quote</span>
+          </div>
+          {data.length===0
+            ? <div style={{padding:'24px',textAlign:'center',fontSize:'13px',color:'rgba(255,255,255,0.2)'}}>Noch keine Daten</div>
+            : data.map((row,i)=>(
+              <div key={row.name} style={{display:'grid',gridTemplateColumns:cols,gap:'4px',padding:'10px 14px',borderBottom:i<data.length-1?'1px solid rgba(255,255,255,0.04)':'none',alignItems:'center'}}>
+                <span style={{fontSize:'12px',fontWeight:'800',color:i===0?'#fbbf24':i===1?'rgba(255,255,255,0.5)':i===2?'#cd7c32':'rgba(255,255,255,0.25)'}}>{i+1}</span>
+                <span style={{fontSize:'13px',fontWeight:'700',color:'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{row.name}</span>
+                <span style={{textAlign:'center',fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>{row.matches}</span>
+                <span style={{textAlign:'center',fontSize:'13px',color:'#86efac',fontWeight:'700'}}>{row.wins}</span>
+                <span style={{textAlign:'center',fontSize:'13px',color:'#fca5a5'}}>{row.losses}</span>
+                <span style={{textAlign:'right',fontSize:'13px',fontWeight:'800',color:dac}}>{Math.round(row.winrate*100)}%</span>
+              </div>
+            ))
+          }
+        </div>
+      );
+
+      return (
+        <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#0a0a1e 0%,#0d0a1f 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+          <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+            <button onClick={()=>setTmMode(null)} style={s.btn('#818cf8')}><ArrowLeft size={16}/></button>
+            <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>👥 Doppelmatches</h1>
+          </div>
+          <div style={{padding:'20px',maxWidth:'820px',margin:'0 auto'}}>
+
+            {/* Neues Doppelmatch Button */}
+            {!tmDoppelAdding&&<button onClick={()=>setTmDoppelAdding(true)}
+              style={{width:'100%',padding:'11px',background:`linear-gradient(135deg,${dac},#6366f1)`,border:'none',borderRadius:'12px',color:'white',fontWeight:'700',fontSize:'14px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',marginBottom:'20px'}}>
+              <Plus size={16}/> Neues Doppelmatch
+            </button>}
+
+            {/* Formular */}
+            {tmDoppelAdding&&(
+              <div style={{background:dacBg,border:`1px solid ${dacBorder}`,borderRadius:'16px',padding:'18px',marginBottom:'20px'}}>
+                <p style={{margin:'0 0 14px',fontSize:'12px',fontWeight:'800',color:dac,textTransform:'uppercase',letterSpacing:'0.5px'}}>Neues Doppelmatch</p>
+                <div style={{display:'grid',gap:'10px'}}>
+                  <p style={{margin:0,fontSize:'12px',fontWeight:'700',color:'rgba(255,255,255,0.5)'}}>🔵 Team 1</p>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
+                    <PlayerSelect label="Spieler A" field="playerA" exclude={[tmDoppelForm.playerB,tmDoppelForm.playerC,tmDoppelForm.playerD].filter(Boolean)}/>
+                    <PlayerSelect label="Spieler B" field="playerB" exclude={[tmDoppelForm.playerA,tmDoppelForm.playerC,tmDoppelForm.playerD].filter(Boolean)}/>
+                  </div>
+                  <p style={{margin:0,fontSize:'12px',fontWeight:'700',color:'rgba(255,255,255,0.5)'}}>🔴 Team 2</p>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
+                    <PlayerSelect label="Spieler C" field="playerC" exclude={[tmDoppelForm.playerA,tmDoppelForm.playerB,tmDoppelForm.playerD].filter(Boolean)}/>
+                    <PlayerSelect label="Spieler D" field="playerD" exclude={[tmDoppelForm.playerA,tmDoppelForm.playerB,tmDoppelForm.playerC].filter(Boolean)}/>
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
+                    <div>
+                      <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase'}}>Ergebnis (Sätze)</label>
+                      <select value={tmDoppelForm.result} onChange={e=>setTmDoppelForm(f=>({...f,result:e.target.value}))}
+                        style={{width:'100%',padding:'9px 12px',background:'#1a0a1e',border:`1px solid ${dacBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}>
+                        {resultOptions.map(r=>{const[a,b]=r.split(':');return<option key={r} value={r}>Team 1 {a}:{b} Team 2</option>;})}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase'}}>Datum</label>
+                      <input type="date" value={tmDoppelForm.date||TODAY} onChange={e=>setTmDoppelForm(f=>({...f,date:e.target.value}))}
+                        style={{width:'100%',padding:'9px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${dacBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
+                    </div>
+                  </div>
+                  <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>
+                    <button onClick={()=>{setTmDoppelAdding(false);setTmDoppelForm({playerA:'',playerB:'',playerC:'',playerD:'',result:'3:0',date:''});}}
+                      style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
+                    <button onClick={submitDoppel}
+                      disabled={!tmDoppelForm.playerA||!tmDoppelForm.playerB||!tmDoppelForm.playerC||!tmDoppelForm.playerD||new Set([tmDoppelForm.playerA,tmDoppelForm.playerB,tmDoppelForm.playerC,tmDoppelForm.playerD]).size<4}
+                      style={{padding:'9px 20px',background:`linear-gradient(135deg,${dac},#6366f1)`,color:'white',border:'none',borderRadius:'10px',fontWeight:'700',fontSize:'13px',cursor:'pointer',opacity:(!tmDoppelForm.playerA||!tmDoppelForm.playerB||!tmDoppelForm.playerC||!tmDoppelForm.playerD)?0.4:1}}>
+                      Match speichern
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Paarungstabelle */}
+            <div style={{marginBottom:'24px'}}>
+              <h2 style={{margin:'0 0 12px',fontSize:'16px',fontWeight:'800',color:'white'}}>🤝 Beste Doppel (Paarungen)</h2>
+              <TableGrid data={pairingTable} cols="28px 1fr 50px 50px 50px 56px"/>
+            </div>
+
+            {/* Spielertabelle */}
+            <div style={{marginBottom:'24px'}}>
+              <h2 style={{margin:'0 0 12px',fontSize:'16px',fontWeight:'800',color:'white'}}>🏆 Beste Doppelspieler</h2>
+              <TableGrid data={playerTable} cols="28px 1fr 50px 50px 50px 56px"/>
+            </div>
+
+            {/* Verlauf */}
+            <h2 style={{margin:'0 0 12px',fontSize:'16px',fontWeight:'800',color:'white'}}>📋 Abgeschlossene Doppelmatches</h2>
+            {trainingsdoppel.length===0
+              ? <div style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.2)',fontSize:'13px'}}>Noch keine Doppelmatches</div>
+              : <div style={{display:'grid',gap:'8px'}}>
+                  {trainingsdoppel.map(m=>{
+                    const d=m.date?new Date(m.date+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
+                    const t1won=m.score1>m.score2;
+                    const isEditing=tmDoppelEditId===m.id;
+                    if(isEditing) return (
+                      <div key={m.id} style={{background:dacBg,border:`1px solid ${dacBorder}`,borderRadius:'12px',padding:'12px 14px'}}>
+                        <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:dac,textTransform:'uppercase'}}>Match bearbeiten</p>
+                        <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                          <select defaultValue={`${m.score1}:${m.score2}`} id={`dscore-${m.id}`}
+                            style={{padding:'8px 10px',background:'#1a0a1e',border:`1px solid ${dacBorder}`,borderRadius:'8px',color:'white',fontSize:'14px'}}>
+                            {resultOptions.map(r=><option key={r} value={r}>{r}</option>)}
+                          </select>
+                          <input type="date" defaultValue={m.date||''} id={`ddate-${m.id}`}
+                            style={{padding:'8px 10px',background:'rgba(255,255,255,0.07)',border:`1px solid ${dacBorder}`,borderRadius:'8px',color:'white',fontSize:'13px'}}/>
+                          <button onClick={()=>{
+                            const se=document.getElementById(`dscore-${m.id}`);
+                            const de=document.getElementById(`ddate-${m.id}`);
+                            const[ns1,ns2]=(se?.value||`${m.score1}:${m.score2}`).split(':').map(Number);
+                            saveDoppel(trainingsdoppel.map(x=>x.id===m.id?{...x,score1:ns1,score2:ns2,date:de?.value||m.date}:x));
+                            setTmDoppelEditId(null);
+                          }} style={{padding:'8px 14px',background:`linear-gradient(135deg,${dac},#6366f1)`,border:'none',borderRadius:'8px',color:'white',fontWeight:'700',fontSize:'13px',cursor:'pointer'}}>Speichern</button>
+                          <button onClick={()=>setTmDoppelEditId(null)} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.5)',fontWeight:'600',fontSize:'13px',cursor:'pointer'}}>Abbrechen</button>
+                        </div>
+                      </div>
+                    );
+                    return (
+                      <div key={m.id} style={{background:'rgba(255,255,255,0.03)',border:`1px solid ${dacBorder}`,borderRadius:'12px',padding:'12px 14px',display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap',marginBottom:'4px'}}>
+                            <span style={{fontWeight:'700',color:t1won?'#86efac':'rgba(255,255,255,0.6)',fontSize:'13px'}}>{m.playerA} & {m.playerB}</span>
+                            <span style={{fontWeight:'900',fontSize:'15px',color:'white'}}>{m.score1}:{m.score2}</span>
+                            <span style={{fontWeight:'700',color:!t1won?'#86efac':'rgba(255,255,255,0.6)',fontSize:'13px'}}>{m.playerC} & {m.playerD}</span>
+                          </div>
+                          <div style={{fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{d}</div>
+                        </div>
+                        {isAdmin&&<button onClick={()=>setTmDoppelEditId(m.id)}
+                          style={{width:'28px',height:'28px',borderRadius:'7px',background:dacBg,border:`1px solid ${dacBorder}`,color:dac,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Pencil size={12}/></button>}
+                        {isAdmin&&<button onClick={()=>{if(!window.confirm('Match löschen?'))return;saveDoppel(trainingsdoppel.filter(x=>x.id!==m.id));}}
+                          style={{width:'28px',height:'28px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Trash2 size={12}/></button>}
+                      </div>
+                    );
+                  })}
+                </div>
+            }
+          </div>
+        </div>
+      );
+    }
+
     // Player list: alle aktiven Spieler (aus aktiveSpieler DB) + Match-Namen
     const aktiveSpielerNames = new Set(Object.values(aktiveSpieler).map(sp=>sp.name).filter(Boolean));
     const matchNames = new Set(trainingsmatches.flatMap(m=>[m.player1,m.player2]).filter(Boolean));
@@ -9927,8 +10489,8 @@ export default function TrainingsApp() {
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#1a0a1e 0%,#0d0a1f 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-          <button onClick={()=>navTo('home')} style={s.btn('#f472b6')}><Home size={16}/></button>
-          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>⚔️ Trainingsmatches</h1>
+          <button onClick={()=>setTmMode(null)} style={s.btn('#f472b6')}><ArrowLeft size={16}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🏓 Einzel-Matches</h1>
           {linkedPlayer&&<span style={{fontSize:'12px',color:'#f9a8d4',fontWeight:'600'}}>⚡ {linkedPlayer.name}</span>}
         </div>
 
@@ -10191,6 +10753,357 @@ export default function TrainingsApp() {
               })}
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── WETTEN & ZITATE ─────────────────────────────────────────────────────
+  if (view === 'wettenZitate' && ['aktiver','trainer','admin'].includes(userRole)) {
+    const ac = '#fbbf24';
+    const acBorder = 'rgba(251,191,36,0.25)';
+    const acBg = 'rgba(251,191,36,0.07)';
+    const saveWZ = entries => { setWettenZitate(entries); setDoc(doc(db,'ttc','wettenZitate'),{entries}); };
+    const authorName = userProfile?.name || user?.email || 'Unbekannt';
+    const canEditEntry = (entry) => userRole==='admin' || entry.createdBy===authorName;
+
+    const submitWZ = () => {
+      if (!wzForm.text.trim()) return;
+      const entry = {
+        id:'wz_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+        type: wzForm.type,
+        text: wzForm.text.trim(),
+        createdBy: authorName,
+        date: wzForm.date || TODAY,
+        createdAt: new Date().toISOString(),
+      };
+      saveWZ([entry, ...wettenZitate]);
+      setWzAdding(false);
+      setWzForm({type:'zitat',text:'',date:''});
+    };
+
+    const saveEdit = (id) => {
+      if (!wzEditText.trim()) return;
+      saveWZ(wettenZitate.map(e=>e.id===id?{...e,text:wzEditText.trim(),edited:true}:e));
+      setWzEditId(null);
+    };
+
+    const typeCfg = {
+      zitat:  {label:'Zitat',  icon:'💬', color:'#67e8f9', bg:'rgba(103,232,249,0.1)', border:'rgba(103,232,249,0.3)'},
+      wette:  {label:'Wette',  icon:'🎰', color:'#fbbf24', bg:'rgba(251,191,36,0.1)',  border:'rgba(251,191,36,0.3)'},
+    };
+
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#1a1000 0%,#0d0a00 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
+          <button onClick={()=>navTo('home')} style={s.btn('#fbbf24')}><Home size={16}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🎰 Wetten & Zitate</h1>
+          <span style={{fontSize:'12px',color:'rgba(251,191,36,0.6)',fontWeight:'600'}}>{wettenZitate.length} Einträge</span>
+        </div>
+
+        <div style={{padding:'20px',maxWidth:'820px',margin:'0 auto'}}>
+
+          {/* Neuer Eintrag Button */}
+          {!wzAdding && (
+            <button onClick={()=>setWzAdding(true)}
+              style={{width:'100%',padding:'11px',background:`linear-gradient(135deg,${ac},#d97706)`,border:'none',borderRadius:'12px',color:'white',fontWeight:'700',fontSize:'14px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',marginBottom:'20px'}}>
+              <Plus size={16}/> Neuer Eintrag
+            </button>
+          )}
+
+          {/* Formular */}
+          {wzAdding && (
+            <div style={{background:acBg,border:`1px solid ${acBorder}`,borderRadius:'16px',padding:'18px',marginBottom:'20px'}}>
+              {/* Typ-Auswahl */}
+              <div style={{display:'flex',gap:'8px',marginBottom:'14px'}}>
+                {Object.entries(typeCfg).map(([key,cfg])=>(
+                  <button key={key} onClick={()=>setWzForm(f=>({...f,type:key}))}
+                    style={{flex:1,padding:'10px',borderRadius:'10px',border:`2px solid ${wzForm.type===key?cfg.border:'rgba(255,255,255,0.1)'}`,background:wzForm.type===key?cfg.bg:'rgba(255,255,255,0.04)',color:wzForm.type===key?cfg.color:'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'800',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>
+                    {cfg.icon} {cfg.label}
+                  </button>
+                ))}
+              </div>
+              {/* Text */}
+              <textarea
+                value={wzForm.text}
+                onChange={e=>setWzForm(f=>({...f,text:e.target.value}))}
+                placeholder={wzForm.type==='zitat'?'"Das war das beste Match meines Lebens…" – Wer hat das gesagt?':'Beschreibe die Wette…'}
+                rows={4}
+                style={{width:'100%',padding:'12px',background:'rgba(0,0,0,0.3)',border:`1px solid ${acBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',resize:'vertical',boxSizing:'border-box',fontFamily:'inherit',lineHeight:'1.5'}}
+              />
+              <div style={{display:'flex',gap:'8px',alignItems:'center',marginTop:'10px',flexWrap:'wrap'}}>
+                <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)',flexShrink:0}}>Von: {authorName}</span>
+                <input type="date" value={wzForm.date} onChange={e=>setWzForm(f=>({...f,date:e.target.value}))} max={TODAY}
+                  style={{padding:'5px 10px',borderRadius:'8px',border:`1px solid ${acBorder}`,background:'rgba(0,0,0,0.3)',color:'white',fontSize:'12px',outline:'none',fontFamily:'inherit'}}/>
+                {!wzForm.date&&<span style={{fontSize:'11px',color:'rgba(255,255,255,0.2)'}}>Kein Datum = heute</span>}
+              </div>
+              <div style={{display:'flex',gap:'8px',justifyContent:'flex-end',marginTop:'10px'}}>
+                <button onClick={()=>{setWzAdding(false);setWzForm({type:'zitat',text:'',date:''});}}
+                  style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
+                <button onClick={submitWZ} disabled={!wzForm.text.trim()}
+                  style={{padding:'9px 20px',background:wzForm.text.trim()?`linear-gradient(135deg,${ac},#d97706)`:'rgba(255,255,255,0.1)',color:'white',border:'none',borderRadius:'10px',cursor:wzForm.text.trim()?'pointer':'not-allowed',fontWeight:'700',fontSize:'13px',opacity:wzForm.text.trim()?1:0.5}}>
+                  Speichern
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Eintrags-Liste */}
+          {wettenZitate.length === 0 && !wzAdding ? (
+            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.2)',fontSize:'14px'}}>Noch keine Einträge. Lege den ersten an!</div>
+          ) : (
+            <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+              {wettenZitate.map(entry=>{
+                const cfg = typeCfg[entry.type] || typeCfg.zitat;
+                const dateStr = entry.date ? new Date(entry.date+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : '';
+                const isEditing = wzEditId === entry.id;
+                return (
+                  <div key={entry.id} style={{background:'rgba(255,255,255,0.03)',border:`1px solid ${acBorder}`,borderRadius:'14px',overflow:'hidden'}}>
+                    {/* Kopfzeile */}
+                    <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 14px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
+                      <span style={{fontSize:'11px',fontWeight:'800',color:cfg.color,background:cfg.bg,border:`1px solid ${cfg.border}`,borderRadius:'6px',padding:'2px 8px',flexShrink:0}}>{cfg.icon} {cfg.label}</span>
+                      <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)',flex:1}}>{entry.createdBy}</span>
+                      <span style={{fontSize:'11px',color:'rgba(255,255,255,0.2)'}}>{dateStr}</span>
+                      {entry.edited&&<span style={{fontSize:'10px',color:'rgba(255,255,255,0.2)',fontStyle:'italic'}}>bearbeitet</span>}
+                      {canEditEntry(entry) && !isEditing && (
+                        <div style={{display:'flex',gap:'4px',marginLeft:'4px'}}>
+                          <button onClick={()=>{setWzEditId(entry.id);setWzEditText(entry.text);}}
+                            style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.2)',color:ac,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Pencil size={12}/></button>
+                          <button onClick={()=>{if(!window.confirm('Eintrag löschen?'))return;saveWZ(wettenZitate.filter(e=>e.id!==entry.id));}}
+                            style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Trash2 size={12}/></button>
+                        </div>
+                      )}
+                    </div>
+                    {/* Text */}
+                    {isEditing ? (
+                      <div style={{padding:'12px 14px'}}>
+                        <textarea value={wzEditText} onChange={e=>setWzEditText(e.target.value)} rows={4}
+                          style={{width:'100%',padding:'10px',background:'rgba(0,0,0,0.3)',border:`1px solid ${acBorder}`,borderRadius:'8px',color:'white',fontSize:'14px',outline:'none',resize:'vertical',boxSizing:'border-box',fontFamily:'inherit',lineHeight:'1.5'}}/>
+                        <div style={{display:'flex',gap:'8px',marginTop:'8px',justifyContent:'flex-end'}}>
+                          <button onClick={()=>setWzEditId(null)} style={{padding:'7px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
+                          <button onClick={()=>saveEdit(entry.id)} style={{padding:'7px 16px',background:`linear-gradient(135deg,${ac},#d97706)`,border:'none',borderRadius:'8px',color:'white',fontWeight:'700',fontSize:'13px',cursor:'pointer'}}>Speichern</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p style={{margin:0,padding:'12px 14px',fontSize:'14px',color:'rgba(255,255,255,0.85)',lineHeight:'1.6',whiteSpace:'pre-wrap'}}>{entry.text}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── TRIKOTGRÖSSEN ───────────────────────────────────────────────────────
+  if (view === 'trikotgroessen' && canEdit()) {
+    const GROESSEN_HERREN = ['XXXS','XXS','XS','S','M','L','XL','XXL','XXXL'];
+    const GROESSEN_DAMEN  = ['XXS','XS','S','M','L','XL','XXL'];
+    const ANZAHLEN = [1,2,3];
+
+    const saveTrikot = (id, field, val) => {
+      const updated = {...trikotDaten, [id]: {...(trikotDaten[id]||{}), [field]: val}};
+      setTrikotDaten(updated);
+      setDoc(doc(db,'ttc','trikotDaten'), updated);
+    };
+
+    const deleteTrikotSpieler = (id) => {
+      if (!window.confirm('Spieler aus der Trikotliste entfernen?')) return;
+      const updated = {...trikotDaten};
+      delete updated[id];
+      // Mark as explicitly removed so they don't re-appear from auto-list
+      updated['__removed__'] = [...(updated['__removed__']||[]), id];
+      setTrikotDaten(updated);
+      setDoc(doc(db,'ttc','trikotDaten'), updated);
+    };
+
+    const removedIds = new Set(trikotDaten['__removed__']||[]);
+
+    // Alle Jugendkinder (auch ohne TTR)
+    const jugendSpieler = Object.values(children)
+      .filter(c => !c.nachwuchsKarriereBeendet && !removedIds.has(c.id))
+      .map(c => ({id: c.id, name: c.name, typ: 'jugend'}))
+      .sort((a,b)=>a.name.localeCompare(b.name,'de'));
+
+    // Alle Aktive (auch ohne TTR)
+    const aktiveSpielerList = Object.values(aktiveSpieler)
+      .filter(p => !removedIds.has(p.id||p.spielernr))
+      .map(p => ({id: p.id||p.spielernr, name: p.name, typ: 'aktiv'}))
+      .sort((a,b)=>a.name.localeCompare(b.name,'de'));
+
+    const alleUngefiltert = trikotFilter==='jugend' ? jugendSpieler
+      : trikotFilter==='aktiv' ? aktiveSpielerList
+      : [...jugendSpieler, ...aktiveSpielerList];
+
+    const alleSpieler = trikotSearch.trim()
+      ? alleUngefiltert.filter(p=>p.name.toLowerCase().includes(trikotSearch.toLowerCase()))
+      : alleUngefiltert;
+
+    const isComplete = (id) => {
+      const d = trikotDaten[id];
+      const unterseiteOk = d?.unterseite === 'Keine' || (d?.unterseite && d?.anzahlUnterseite);
+      return d?.groesse && d?.schnitt && d?.anzahlTrikot && unterseiteOk;
+    };
+
+    const erfasst = alleUngefiltert.filter(p => isComplete(p.id)).length;
+
+    const exportExcel = () => {
+      const esc = v => String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const th = v => `<th style="background:#1d4ed8;color:white;font-weight:bold;padding:6px 10px;border:1px solid #93c5fd">${esc(v)}</th>`;
+      const td = v => `<td style="padding:5px 10px;border:1px solid #cbd5e1">${esc(v)}</td>`;
+      const header = ['Name','Typ','Trikotgröße','Trikotschnitt','Anzahl Trikots','Unterseite','Anzahl Unterseite'];
+      const rows = alleUngefiltert.map(p => {
+        const d = trikotDaten[p.id]||{};
+        return [p.name, p.typ==='jugend'?'Jugend':'Aktiv', d.groesse||'–', d.schnitt||'–', d.anzahlTrikot||'–', d.unterseite||'–', d.anzahlUnterseite||'–'];
+      });
+      const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Trikotgrößen</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table border="1" style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:13px"><thead><tr>${header.map(th).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(td).join('')}</tr>`).join('')}</tbody></table></body></html>`;
+      const blob = new Blob(['﻿'+html], {type:'application/vnd.ms-excel;charset=utf-8'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download='trikotgroessen.xls'; a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    const FBtn = ({val, current, onSet}) => (
+      <button onClick={()=>onSet(current===val?null:val)}
+        style={{padding:'5px 12px',borderRadius:'7px',border:`1.5px solid ${current===val?'rgba(147,197,253,0.5)':'rgba(255,255,255,0.1)'}`,background:current===val?'rgba(147,197,253,0.15)':'rgba(255,255,255,0.03)',color:current===val?'#93c5fd':'rgba(255,255,255,0.4)',fontWeight:'700',fontSize:'12px',cursor:'pointer',transition:'all 0.1s',whiteSpace:'nowrap'}}>
+        {val}
+      </button>
+    );
+
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#0a1628 0%,#0d1f3c 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
+          <button onClick={()=>navTo('home')} style={s.btn('#93c5fd')}><Home size={16}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>👕 Trikotgrößen</h1>
+          <button onClick={exportExcel} style={{padding:'7px 14px',background:'rgba(147,197,253,0.12)',border:'1px solid rgba(147,197,253,0.25)',borderRadius:'10px',color:'#93c5fd',fontSize:'12px',fontWeight:'700',cursor:'pointer',display:'flex',alignItems:'center',gap:'5px'}}>
+            <Download size={13}/> Excel
+          </button>
+        </div>
+
+        <div style={{padding:'16px 20px',maxWidth:'900px',margin:'0 auto'}}>
+
+          {/* Filter */}
+          <div style={{display:'flex',gap:'6px',marginBottom:'12px'}}>
+            {[{k:'alle',l:'Alle'},{k:'jugend',l:'Jugend'},{k:'aktiv',l:'Aktive'}].map(({k,l})=>(
+              <button key={k} onClick={()=>setTrikotFilter(k)}
+                style={{padding:'7px 16px',borderRadius:'9px',border:`1.5px solid ${trikotFilter===k?'rgba(147,197,253,0.5)':'rgba(255,255,255,0.1)'}`,background:trikotFilter===k?'rgba(147,197,253,0.12)':'rgba(255,255,255,0.04)',color:trikotFilter===k?'#93c5fd':'rgba(255,255,255,0.4)',fontWeight:'800',fontSize:'13px',cursor:'pointer'}}>
+                {l}
+              </button>
+            ))}
+          </div>
+
+          {/* Suche */}
+          <div style={{position:'relative',marginBottom:'12px'}}>
+            <span style={{position:'absolute',left:'12px',top:'50%',transform:'translateY(-50%)',fontSize:'15px',pointerEvents:'none'}}>🔍</span>
+            <input value={trikotSearch} onChange={e=>setTrikotSearch(e.target.value)} placeholder="Spieler suchen…"
+              style={{width:'100%',boxSizing:'border-box',padding:'9px 12px 9px 36px',borderRadius:'10px',border:'1.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.06)',color:'white',fontSize:'14px',outline:'none'}}/>
+            {trikotSearch&&<button onClick={()=>setTrikotSearch('')} style={{position:'absolute',right:'10px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'rgba(255,255,255,0.4)',fontSize:'18px',cursor:'pointer',lineHeight:1}}>×</button>}
+          </div>
+
+          {/* Fortschritt */}
+          <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'10px 14px',background:'rgba(147,197,253,0.05)',border:'1px solid rgba(147,197,253,0.12)',borderRadius:'12px',marginBottom:'14px'}}>
+            <div style={{flex:1}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:'5px'}}>
+                <span style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>Erfasst</span>
+                <span style={{fontSize:'12px',fontWeight:'800',color:erfasst===alleUngefiltert.length&&alleUngefiltert.length>0?'#4ade80':'#93c5fd'}}>{erfasst} / {alleUngefiltert.length}</span>
+              </div>
+              <div style={{background:'rgba(255,255,255,0.08)',borderRadius:'99px',height:'6px',overflow:'hidden'}}>
+                <div style={{width:alleUngefiltert.length>0?`${Math.round(erfasst/alleUngefiltert.length*100)}%`:'0%',height:'100%',background:erfasst===alleUngefiltert.length&&alleUngefiltert.length>0?'linear-gradient(90deg,#16a34a,#4ade80)':'linear-gradient(90deg,#1d4ed8,#93c5fd)',borderRadius:'99px',transition:'width 0.4s'}}/>
+              </div>
+            </div>
+          </div>
+
+          {/* Spielerliste */}
+          <div style={{display:'flex',flexDirection:'column',gap:'5px'}}>
+            {alleSpieler.length===0 && (
+              <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.25)',fontSize:'14px'}}>Keine Spieler gefunden.</div>
+            )}
+            {alleSpieler.map(spieler => {
+              const d = trikotDaten[spieler.id] || {};
+              const complete = isComplete(spieler.id);
+              const isOpen = trikotExpanded === spieler.id;
+              return (
+                <div key={spieler.id} style={{borderRadius:'11px',overflow:'hidden',border:`1px solid ${complete?'rgba(74,222,128,0.15)':'rgba(255,255,255,0.07)'}`,background:complete?'rgba(74,222,128,0.04)':'rgba(255,255,255,0.025)'}}>
+                  {/* Kompakte Zeile */}
+                  <div style={{display:'flex',alignItems:'center',padding:'9px 12px',gap:'10px'}}>
+                    <span style={{fontSize:complete?'16px':'14px',flexShrink:0}}>{complete?'✅':'❌'}</span>
+                    <span style={{flex:1,fontWeight:'700',fontSize:'14px',color:'white'}}>{spieler.name}</span>
+                    <span style={{fontSize:'10px',fontWeight:'700',color:spieler.typ==='jugend'?'rgba(74,222,128,0.4)':'rgba(147,197,253,0.4)',textTransform:'uppercase',letterSpacing:'0.5px',flexShrink:0}}>{spieler.typ==='jugend'?'J':'A'}</span>
+                    {userRole==='admin' && (
+                      <button onClick={e=>{e.stopPropagation();deleteTrikotSpieler(spieler.id);}}
+                        style={{width:'24px',height:'24px',borderRadius:'6px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                        <Trash2 size={11}/>
+                      </button>
+                    )}
+                    <button onClick={()=>setTrikotExpanded(isOpen?null:spieler.id)}
+                      style={{width:'28px',height:'28px',borderRadius:'7px',background:'rgba(147,197,253,0.08)',border:'1px solid rgba(147,197,253,0.15)',color:'#93c5fd',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transform:isOpen?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s'}}>
+                      <ChevronRight size={14} style={{transform:'rotate(90deg)'}}/>
+                    </button>
+                  </div>
+
+                  {/* Ausgeklappte Felder */}
+                  {isOpen && (
+                    <div style={{borderTop:'1px solid rgba(255,255,255,0.06)',padding:'12px',display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'10px'}}>
+                      {/* Trikot */}
+                      <div>
+                        <p style={{margin:'0 0 8px',fontSize:'10px',fontWeight:'800',color:'rgba(147,197,253,0.5)',textTransform:'uppercase',letterSpacing:'1px'}}>Trikot</p>
+                        <div style={{display:'flex',flexDirection:'column',gap:'7px'}}>
+                          <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                            <span style={{fontSize:'11px',color:'rgba(255,255,255,0.4)',minWidth:'50px'}}>Größe</span>
+                            <select value={d.groesse||''} onChange={e=>saveTrikot(spieler.id,'groesse',e.target.value)}
+                              style={{flex:1,padding:'5px 8px',borderRadius:'7px',border:'1px solid rgba(147,197,253,0.2)',background:'rgba(15,30,60,0.8)',color:'white',fontSize:'13px',fontWeight:'700',outline:'none'}}>
+                              <option value="" style={{color:'#94a3b8'}}>— wählen —</option>
+                              {(d.schnitt==='Damen'?GROESSEN_DAMEN:GROESSEN_HERREN).map(g=><option key={g} value={g} style={{color:'white',background:'#1e3a5f'}}>{g}</option>)}
+                            </select>
+                          </div>
+                          <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                            <span style={{fontSize:'11px',color:'rgba(255,255,255,0.4)',minWidth:'50px'}}>Schnitt</span>
+                            <div style={{display:'flex',gap:'5px'}}>
+                              <FBtn val="Damen" current={d.schnitt} onSet={v=>saveTrikot(spieler.id,'schnitt',v)}/>
+                              <FBtn val="Herren" current={d.schnitt} onSet={v=>saveTrikot(spieler.id,'schnitt',v)}/>
+                            </div>
+                          </div>
+                          <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                            <span style={{fontSize:'11px',color:'rgba(255,255,255,0.4)',minWidth:'50px'}}>Anzahl</span>
+                            <div style={{display:'flex',gap:'5px'}}>
+                              {ANZAHLEN.map(n=><FBtn key={n} val={n} current={d.anzahlTrikot} onSet={v=>saveTrikot(spieler.id,'anzahlTrikot',v)}/>)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      {/* Unterseite */}
+                      <div>
+                        <p style={{margin:'0 0 8px',fontSize:'10px',fontWeight:'800',color:'rgba(147,197,253,0.5)',textTransform:'uppercase',letterSpacing:'1px'}}>{d.unterseite==='Hose'?'Hose':d.unterseite==='Rock'?'Rock':'Unterseite'}</p>
+                        <div style={{display:'flex',flexDirection:'column',gap:'7px'}}>
+                          <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                            <FBtn val="Hose" current={d.unterseite} onSet={v=>saveTrikot(spieler.id,'unterseite',v)}/>
+                            <FBtn val="Rock" current={d.unterseite} onSet={v=>saveTrikot(spieler.id,'unterseite',v)}/>
+                            <FBtn val="Keine" current={d.unterseite} onSet={v=>{
+                              const merged = {...(trikotDaten[spieler.id]||{}), unterseite: v, anzahlUnterseite: null};
+                              const updated = {...trikotDaten, [spieler.id]: merged};
+                              setTrikotDaten(updated);
+                              setDoc(doc(db,'ttc','trikotDaten'), updated);
+                            }}/>
+                          </div>
+                          {d.unterseite && d.unterseite !== 'Keine' && (
+                            <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                              <span style={{fontSize:'11px',color:'rgba(255,255,255,0.4)',minWidth:'50px'}}>Anzahl</span>
+                              <div style={{display:'flex',gap:'5px'}}>
+                                {ANZAHLEN.map(n=><FBtn key={n} val={n} current={d.anzahlUnterseite} onSet={v=>saveTrikot(spieler.id,'anzahlUnterseite',v)}/>)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
         </div>
       </div>
     );
