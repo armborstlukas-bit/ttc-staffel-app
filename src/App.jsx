@@ -10963,7 +10963,7 @@ export default function TrainingsApp() {
     };
 
     const FBtn = ({val, current, onSet}) => (
-      <button onClick={()=>onSet(current===val?null:val)}
+      <button translate="no" onClick={()=>onSet(current===val?null:val)}
         style={{padding:'5px 12px',borderRadius:'7px',border:`1.5px solid ${current===val?'rgba(147,197,253,0.5)':'rgba(255,255,255,0.1)'}`,background:current===val?'rgba(147,197,253,0.15)':'rgba(255,255,255,0.03)',color:current===val?'#93c5fd':'rgba(255,255,255,0.4)',fontWeight:'700',fontSize:'12px',cursor:'pointer',transition:'all 0.1s',whiteSpace:'nowrap'}}>
         {val}
       </button>
