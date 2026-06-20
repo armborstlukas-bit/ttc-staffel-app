@@ -813,6 +813,9 @@ export default function TrainingsApp() {
   const [ptPlayerSearch, setPtPlayerSearch]                         = useState('');
   const [ptManualForm, setPtManualForm]                             = useState({name:'',verein:''});
   const [ptShowManualForm, setPtShowManualForm]                     = useState(false);
+  const [sdmCustomOpen, setSdmCustomOpen]                           = useState(false);
+  const [sdmCustomStart, setSdmCustomStart]                         = useState('');
+  const [sdmCustomEnd, setSdmCustomEnd]                             = useState('');
   const [ptMatchEditing, setPtMatchEditing]                         = useState(null);
   const [ptMatchDraft, setPtMatchDraft]                             = useState(null);
   const [ptArchiveExpanded, setPtArchiveExpanded]                     = useState({});
@@ -9465,6 +9468,119 @@ export default function TrainingsApp() {
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>🥇 Spieler des Monats</h1>
         </div>
         <div style={{maxWidth:'680px',margin:'0 auto',padding:isMobile?'16px 14px 48px':'20px 24px 60px',display:'flex',flexDirection:'column',gap:'14px'}}>
+
+          {/* ── Individuelle Zeitraumauswertung ── */}
+          {(()=>{
+            // Quick-select presets → YYYY-MM strings
+            const toYM = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+            const now = new Date();
+            const presets = [
+              {label:'Letzte 3 Monate', start: toYM(new Date(now.getFullYear(), now.getMonth()-3, 1)), end: toYM(now)},
+              {label:'Letzte 6 Monate', start: toYM(new Date(now.getFullYear(), now.getMonth()-6, 1)), end: toYM(now)},
+              {label:'Letztes Jahr',    start: `${now.getFullYear()-1}-01`, end: `${now.getFullYear()-1}-12`},
+              {label:'Akt. Kalenderjahr', start: `${now.getFullYear()}-01`, end: toYM(now)},
+            ];
+
+            // Date-input value → YYYY-MM (strip day if present)
+            const toYMfromInput = v => v ? v.slice(0,7) : '';
+
+            const startYM = sdmCustomStart ? toYMfromInput(sdmCustomStart) : '';
+            const endYM   = sdmCustomEnd   ? toYMfromInput(sdmCustomEnd)   : '';
+
+            // Compute results whenever both dates are set
+            const results = (startYM && endYM && startYM <= endYM) ? (() => {
+              const rows = [];
+              let excluded = 0;
+              sdmJugendKids.forEach(c => {
+                const entries = (ttrHistory[c.id]?.entries || []);
+                if (!entries.length) { excluded++; return; }
+                const sorted = [...entries].sort((a,b)=>a.month.localeCompare(b.month));
+                // Ausschlusskriterium: erster Eintrag muss VOR startYM liegen
+                if (sorted[0].month >= startYM) { excluded++; return; }
+                const startEntry = sdmGetTtrAt(sorted, startYM);
+                const endEntry   = sdmGetTtrAt(sorted, endYM);
+                if (!startEntry || !endEntry) { excluded++; return; }
+                const diff = endEntry.ttr - startEntry.ttr;
+                rows.push({name: c.name, startTtr: startEntry.ttr, endTtr: endEntry.ttr, diff});
+              });
+              rows.sort((a,b) => b.diff - a.diff);
+              return {rows, excluded};
+            })() : null;
+
+            const fmtYMlong = ym => { if(!ym) return ''; const [y,m]=ym.split('-'); return `${String(m).padStart(2,'0')}.${y}`; };
+
+            return (
+              <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'18px',overflow:'hidden'}}>
+                {/* Header – immer sichtbar */}
+                <button onClick={()=>setSdmCustomOpen(v=>!v)}
+                  style={{width:'100%',padding:'14px 18px',display:'flex',alignItems:'center',gap:'10px',background:'none',border:'none',color:'white',cursor:'pointer',textAlign:'left'}}>
+                  <span style={{fontSize:'18px'}}>📊</span>
+                  <span style={{flex:1,fontWeight:'800',fontSize:'14px',color:'rgba(255,255,255,0.85)'}}>Individuelle Zeitraumauswertung</span>
+                  <span style={{fontSize:'14px',color:'rgba(255,255,255,0.3)',transform:sdmCustomOpen?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s'}}>▼</span>
+                </button>
+
+                {sdmCustomOpen && (
+                  <div style={{padding:'0 18px 18px',borderTop:'1px solid rgba(255,255,255,0.06)'}}>
+
+                    {/* Schnellauswahl */}
+                    <p style={{margin:'14px 0 8px',fontSize:'10px',fontWeight:'800',color:'rgba(252,211,77,0.5)',textTransform:'uppercase',letterSpacing:'1px'}}>Schnellauswahl</p>
+                    <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'14px'}}>
+                      {presets.map(p=>{
+                        const active = sdmCustomStart===p.start && sdmCustomEnd===p.end;
+                        return (
+                          <button key={p.label} onClick={()=>{setSdmCustomStart(p.start);setSdmCustomEnd(p.end);}}
+                            style={{padding:'6px 12px',borderRadius:'20px',border:`1.5px solid ${active?'#fcd34d':'rgba(255,255,255,0.12)'}`,background:active?'rgba(252,211,77,0.12)':'rgba(255,255,255,0.04)',color:active?'#fcd34d':'rgba(255,255,255,0.5)',fontSize:'12px',fontWeight:'700',cursor:'pointer',transition:'all 0.15s'}}>
+                            {p.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Freie Auswahl */}
+                    <p style={{margin:'0 0 8px',fontSize:'10px',fontWeight:'800',color:'rgba(252,211,77,0.5)',textTransform:'uppercase',letterSpacing:'1px'}}>Freie Auswahl</p>
+                    <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'16px',alignItems:'center'}}>
+                      <input type="month" value={sdmCustomStart} onChange={e=>setSdmCustomStart(e.target.value)}
+                        style={{flex:'1 1 130px',padding:'8px 10px',borderRadius:'9px',border:'1px solid rgba(252,211,77,0.2)',background:'rgba(255,255,255,0.05)',color:'white',fontSize:'13px',outline:'none',colorScheme:'dark'}}/>
+                      <span style={{color:'rgba(255,255,255,0.3)',fontSize:'13px',flexShrink:0}}>bis</span>
+                      <input type="month" value={sdmCustomEnd} onChange={e=>setSdmCustomEnd(e.target.value)}
+                        style={{flex:'1 1 130px',padding:'8px 10px',borderRadius:'9px',border:'1px solid rgba(252,211,77,0.2)',background:'rgba(255,255,255,0.05)',color:'white',fontSize:'13px',outline:'none',colorScheme:'dark'}}/>
+                    </div>
+
+                    {/* Ergebnis */}
+                    {!startYM || !endYM
+                      ? <p style={{color:'rgba(255,255,255,0.25)',fontSize:'13px',textAlign:'center',padding:'12px 0'}}>Zeitraum wählen, um die Auswertung zu sehen.</p>
+                      : startYM > endYM
+                      ? <p style={{color:'#f87171',fontSize:'13px',textAlign:'center',padding:'8px 0'}}>Startmonat muss vor dem Endmonat liegen.</p>
+                      : results && (<>
+                          {/* Info-Zeile */}
+                          <div style={{padding:'9px 12px',background:'rgba(252,211,77,0.06)',border:'1px solid rgba(252,211,77,0.15)',borderRadius:'10px',marginBottom:'12px',fontSize:'12px',color:'rgba(255,255,255,0.5)'}}>
+                            Auswertung: <span style={{color:'rgba(252,211,77,0.8)',fontWeight:'700'}}>{fmtYMlong(startYM)} – {fmtYMlong(endYM)}</span>
+                            {' · '}<span style={{color:'#4ade80',fontWeight:'700'}}>{results.rows.length} Spieler gewertet</span>
+                            {results.excluded>0&&<span style={{color:'rgba(255,255,255,0.3)'}}> · {results.excluded} ausgeschlossen</span>}
+                          </div>
+
+                          {results.rows.length===0
+                            ? <p style={{color:'rgba(255,255,255,0.3)',fontSize:'13px',textAlign:'center',padding:'12px 0'}}>Keine qualifizierten Spieler im gewählten Zeitraum.</p>
+                            : <div style={{display:'flex',flexDirection:'column',gap:'5px'}}>
+                                {results.rows.map((r,i)=>(
+                                  <div key={r.name} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 12px',borderRadius:'10px',background:i===0?'rgba(252,211,77,0.06)':'rgba(255,255,255,0.02)',border:`1px solid ${i===0?'rgba(252,211,77,0.2)':'rgba(255,255,255,0.05)'}` }}>
+                                    <span style={{fontSize:'13px',fontWeight:'900',color:i===0?'#fcd34d':'rgba(255,255,255,0.3)',minWidth:'22px',textAlign:'center'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}</span>
+                                    <span style={{flex:1,fontWeight:'700',fontSize:'13px',color:'white'}}>{r.name}</span>
+                                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.35)',flexShrink:0}}>{r.startTtr} → {r.endTtr}</span>
+                                    <span style={{fontSize:'13px',fontWeight:'900',minWidth:'46px',textAlign:'right',flexShrink:0,color:r.diff>0?'#4ade80':r.diff<0?'#f87171':'rgba(255,255,255,0.3)'}}>
+                                      {r.diff>0?'+':''}{r.diff}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                          }
+                        </>)
+                    }
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Spieler des Monats – große Hauptkachel */}
           <div style={{background:'linear-gradient(135deg,rgba(252,211,77,0.10) 0%,rgba(252,211,77,0.04) 100%)',border:'1.5px solid rgba(252,211,77,0.35)',borderRadius:'20px',padding:'20px 22px'}}>
