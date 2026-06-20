@@ -768,6 +768,9 @@ export default function TrainingsApp() {
   const [aktiverForm, setAktiverForm] = useState({name:'', ttr:'', spielernr:''});
   const [rompelHoursForm, setRompelHoursForm] = useState({date:new Date().toISOString().split('T')[0], hours:'', desc:''});
   const [rompelExpForm, setRompelExpForm] = useState({date:new Date().toISOString().split('T')[0], amount:'', desc:''});
+  const [pfandDaten, setPfandDaten] = useState({entries:[]});
+  const [pfandForm, setPfandForm] = useState({type:'einnahme', date:TODAY, amount:'', desc:''});
+  const [pfandEditId, setPfandEditId] = useState(null);
   const [elternSubView, setElternSubView] = useState(null);
   const [ttcNews, setTtcNews] = useState([]);
   const [ttcNewsLoading, setTtcNewsLoading] = useState(false);
@@ -907,6 +910,7 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','teams'),              s => setTeams(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','appSettings'),        s => setAppSettings(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','rompel'),             s => setRompelData(s.exists()?s.data():{hours:[],expenses:[]})),
+      onSnapshot(doc(db,'ttc','pfandkasse'),          s => setPfandDaten(s.exists()?s.data():{entries:[]})),
       onSnapshot(doc(db,'ttc','aktiveSpieler'),      s => setAktiveSpieler(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','leagueData'),         s => setLeagueData(s.exists()?s.data():{ table: null, schedule: null, fetchedAt: null })),
       onSnapshot(doc(db,'ttc','rangliste'), s => setRangliste(s.exists()&&s.data().entries ? s.data().entries : [])),
@@ -1186,6 +1190,7 @@ export default function TrainingsApp() {
   const saveTeams = u => { const s=sanitizeTeams(u); setTeams(s); setDoc(doc(db,'ttc','teams'), s).catch(e=>console.error('saveTeams failed:',e)); };
   const saveAppSettings                  = u => { setAppSettings(u);                  setDoc(doc(db,'ttc','appSettings'),                  u); };
   const saveRompelData                   = u => { setRompelData(u);                   setDoc(doc(db,'ttc','rompel'),                        u); };
+  const savePfandDaten                   = u => { setPfandDaten(u);                   setDoc(doc(db,'ttc','pfandkasse'),                    u); };
   const saveAktiveSpieler                = d => { setAktiveSpieler(d);               setDoc(doc(db,'ttc','aktiveSpieler'),                  d); };
   const canAccessRompel = () => userRole === 'admin' || (canEdit() && (appSettings.rompelTrainers || []).includes(user?.uid));
   const linkPlayerToUser = async (uid, spielerId) => {
@@ -3792,6 +3797,9 @@ export default function TrainingsApp() {
           ]:[]),
           ...(canAccessRompel()?[
             {label:'Rompel Bereich', icon:{type:'img',src:'/rompel.jpg'}, color:'#fda4af', bg:'rgba(253,164,175,0.08)', border:'rgba(253,164,175,0.25)', action:()=>navTo('rompel')},
+          ]:[]),
+          ...(canEdit()?[
+            {label:'Pfandkasse', icon:'♻️', color:'#86efac', bg:'rgba(134,239,172,0.08)', border:'rgba(134,239,172,0.2)', action:()=>navTo('pfandkasse')},
           ]:[]),
           ...(userRole==='admin'?[
             {label:'Trainingsmatches',icon:'⚔️', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.25)', action:()=>navTo('trainingsmatches')},
@@ -11225,6 +11233,135 @@ export default function TrainingsApp() {
                 ))}
               </div>
             )}
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
+  // ── PFANDKASSE ──────────────────────────────────────────────────────────
+  if (view === 'pfandkasse' && canEdit()) {
+    const accent = '#86efac';
+    const entries = (pfandDaten.entries || []).slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+    const totalEinnahmen = entries.filter(e=>e.type==='einnahme').reduce((s,e)=>s+(Number(e.amount)||0),0);
+    const totalAusgaben  = entries.filter(e=>e.type==='ausgabe').reduce((s,e)=>s+(Number(e.amount)||0),0);
+    const kassenstand    = totalEinnahmen - totalAusgaben;
+
+    const isEditing = pfandEditId !== null;
+    const editEntry = isEditing ? entries.find(e=>e.id===pfandEditId) : null;
+
+    const resetForm = () => { setPfandForm({type:'einnahme',date:TODAY,amount:'',desc:''}); setPfandEditId(null); };
+
+    const saveEntry = () => {
+      const a = Number(pfandForm.amount);
+      if (!a || a <= 0) return;
+      if (pfandForm.type === 'ausgabe' && !pfandForm.desc.trim()) return;
+      if (isEditing) {
+        const updated = {...pfandDaten, entries: (pfandDaten.entries||[]).map(e=>e.id===pfandEditId?{...e,...pfandForm,amount:a}:e)};
+        savePfandDaten(updated);
+      } else {
+        const entry = {id:'p_'+Date.now(), ...pfandForm, amount:a, createdBy: user?.uid||''};
+        const updated = {...pfandDaten, entries:[...(pfandDaten.entries||[]),entry]};
+        savePfandDaten(updated);
+      }
+      resetForm();
+    };
+
+    const deleteEntry = id => {
+      if (!window.confirm('Eintrag löschen?')) return;
+      savePfandDaten({...pfandDaten, entries:(pfandDaten.entries||[]).filter(e=>e.id!==id)});
+    };
+
+    const canModify = e => userRole==='admin' || e.createdBy===user?.uid;
+
+    const inputS = {padding:'10px 13px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(134,239,172,0.2)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',flex:1,minWidth:0};
+    const cardS  = {background:'rgba(255,255,255,0.04)',border:'1px solid rgba(134,239,172,0.1)',borderRadius:'16px',padding:'18px',marginBottom:'16px'};
+
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#011a0a 0%,#02280e 45%,#010e05 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+          <button onClick={()=>navTo('home')} style={s.btn(accent)}><Home size={16}/></button>
+          <span style={{fontSize:'26px'}}>♻️</span>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>Pfandkasse</h1>
+        </div>
+        <div style={{padding:'20px',maxWidth:'700px',margin:'0 auto'}}>
+
+          {/* Kassenstand-Übersicht */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'12px',marginBottom:'24px'}}>
+            {[
+              {label:'Gesamteinnahmen', value:`${totalEinnahmen.toFixed(2)} €`, color:'#4ade80'},
+              {label:'Gesamtausgaben',  value:`${totalAusgaben.toFixed(2)} €`,  color:'#f87171'},
+              {label:'Kassenstand',     value:`${kassenstand>=0?'+':''}${kassenstand.toFixed(2)} €`, color:kassenstand>=0?'#4ade80':'#f87171', big:true},
+            ].map(({label,value,color,big})=>(
+              <div key={label} style={{background:'rgba(255,255,255,0.04)',border:`1px solid ${color}33`,borderRadius:'14px',padding:'14px',textAlign:'center'}}>
+                <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px',color:'rgba(255,255,255,0.4)'}}>{label}</p>
+                <p style={{margin:0,fontSize:big?'22px':'18px',fontWeight:'800',color}}>{value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Neuer Eintrag */}
+          <div style={cardS}>
+            <h3 style={{margin:'0 0 14px',color:accent,fontSize:'15px',fontWeight:'800'}}>{isEditing?'✏️ Eintrag bearbeiten':'+ Neuer Eintrag'}</h3>
+
+            {/* Typ-Auswahl */}
+            <div style={{display:'flex',gap:'8px',marginBottom:'12px'}}>
+              {['einnahme','ausgabe'].map(t=>(
+                <button key={t} onClick={()=>setPfandForm(f=>({...f,type:t}))}
+                  style={{flex:1,padding:'9px',borderRadius:'10px',border:`1.5px solid ${pfandForm.type===t?(t==='einnahme'?'#4ade80':'#f87171'):'rgba(255,255,255,0.1)'}`,background:pfandForm.type===t?(t==='einnahme'?'rgba(74,222,128,0.12)':'rgba(248,113,113,0.12)'):'rgba(255,255,255,0.03)',color:pfandForm.type===t?(t==='einnahme'?'#4ade80':'#f87171'):'rgba(255,255,255,0.4)',fontWeight:'800',fontSize:'13px',cursor:'pointer',transition:'all 0.15s'}}>
+                  {t==='einnahme'?'📥 Einnahme':'📤 Ausgabe'}
+                </button>
+              ))}
+            </div>
+
+            <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'10px'}}>
+              <input type="date" value={pfandForm.date} onChange={e=>setPfandForm(f=>({...f,date:e.target.value}))} style={{...inputS,flex:'0 0 140px'}}/>
+              <input type="number" placeholder="Betrag €" min="0.01" step="0.01" value={pfandForm.amount} onChange={e=>setPfandForm(f=>({...f,amount:e.target.value}))} style={{...inputS,flex:'0 0 110px'}}/>
+              <input type="text"
+                placeholder={pfandForm.type==='ausgabe'?'Wofür? (Pflichtfeld)':'Anmerkung (optional)'}
+                value={pfandForm.desc}
+                onChange={e=>setPfandForm(f=>({...f,desc:e.target.value}))}
+                style={inputS}/>
+            </div>
+            <div style={{display:'flex',gap:'8px'}}>
+              <button onClick={saveEntry}
+                disabled={!pfandForm.amount||(pfandForm.type==='ausgabe'&&!pfandForm.desc.trim())}
+                style={{flex:1,padding:'11px',background:pfandForm.type==='einnahme'?'rgba(74,222,128,0.15)':'rgba(248,113,113,0.15)',border:`1px solid ${pfandForm.type==='einnahme'?'rgba(74,222,128,0.3)':'rgba(248,113,113,0.3)'}`,borderRadius:'10px',color:pfandForm.type==='einnahme'?'#4ade80':'#f87171',fontWeight:'800',fontSize:'14px',cursor:'pointer',opacity:(!pfandForm.amount||(pfandForm.type==='ausgabe'&&!pfandForm.desc.trim()))?0.4:1}}>
+                {isEditing?'Speichern':'Eintrag hinzufügen'}
+              </button>
+              {isEditing && <button onClick={resetForm} style={{padding:'11px 16px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.5)',fontWeight:'700',fontSize:'14px',cursor:'pointer'}}>Abbrechen</button>}
+            </div>
+          </div>
+
+          {/* Eintrags-Liste */}
+          <div style={cardS}>
+            <h3 style={{margin:'0 0 14px',color:'rgba(255,255,255,0.6)',fontSize:'15px',fontWeight:'800'}}>📋 Alle Einträge</h3>
+            {entries.length===0
+              ? <p style={{color:'rgba(255,255,255,0.25)',fontSize:'13px',textAlign:'center',padding:'20px'}}>Noch keine Einträge vorhanden.</p>
+              : <div style={{display:'flex',flexDirection:'column',gap:'7px'}}>
+                {entries.map(e=>(
+                  <div key={e.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'11px 13px',background:e.type==='einnahme'?'rgba(74,222,128,0.04)':'rgba(248,113,113,0.04)',border:`1px solid ${e.type==='einnahme'?'rgba(74,222,128,0.12)':'rgba(248,113,113,0.12)'}`,borderRadius:'11px'}}>
+                    <span style={{fontSize:'10px',fontWeight:'800',padding:'3px 7px',borderRadius:'6px',background:e.type==='einnahme'?'rgba(74,222,128,0.15)':'rgba(248,113,113,0.15)',color:e.type==='einnahme'?'#4ade80':'#f87171',flexShrink:0,textTransform:'uppercase',letterSpacing:'0.5px'}}>
+                      {e.type==='einnahme'?'Einnahme':'Ausgabe'}
+                    </span>
+                    <span style={{fontWeight:'800',fontSize:'15px',color:e.type==='einnahme'?'#4ade80':'#f87171',flexShrink:0}}>{Number(e.amount).toFixed(2)} €</span>
+                    <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)',flexShrink:0}}>{e.date}</span>
+                    <span style={{flex:1,fontSize:'13px',color:'rgba(255,255,255,0.55)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.desc||''}</span>
+                    {canModify(e) && (<>
+                      <button onClick={()=>{setPfandEditId(e.id);setPfandForm({type:e.type,date:e.date,amount:String(e.amount),desc:e.desc||''});window.scrollTo({top:0,behavior:'smooth'});}}
+                        style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(147,197,253,0.08)',border:'1px solid rgba(147,197,253,0.15)',color:'#93c5fd',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                        <Pencil size={11}/>
+                      </button>
+                      <button onClick={()=>deleteEntry(e.id)}
+                        style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                        <Trash2 size={11}/>
+                      </button>
+                    </>)}
+                  </div>
+                ))}
+              </div>
+            }
           </div>
 
         </div>
