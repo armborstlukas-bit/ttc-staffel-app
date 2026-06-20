@@ -1193,6 +1193,7 @@ export default function TrainingsApp() {
   const savePfandDaten                   = u => { setPfandDaten(u);                   setDoc(doc(db,'ttc','pfandkasse'),                    u); };
   const saveAktiveSpieler                = d => { setAktiveSpieler(d);               setDoc(doc(db,'ttc','aktiveSpieler'),                  d); };
   const canAccessRompel = () => userRole === 'admin' || (canEdit() && (appSettings.rompelTrainers || []).includes(user?.uid));
+  const canAccessPfand  = () => userRole === 'admin' || (canEdit() && (appSettings.pfandTrainers  || []).includes(user?.uid));
   const linkPlayerToUser = async (uid, spielerId) => {
     const cur = allUsersRef.current;
     const profile = cur[uid]||{};
@@ -3665,6 +3666,39 @@ export default function TrainingsApp() {
           );
         })()}
 
+          {/* Pfandkasse Zugang */}
+          {(()=>{
+            const trainers = Object.values(allUsers).filter(u=>(u.roles||[u.role]).includes('trainer')).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+            const currentList = appSettings.pfandTrainers || [];
+            const toggle = uid => {
+              const next = currentList.includes(uid) ? currentList.filter(x=>x!==uid) : [...currentList, uid];
+              saveAppSettings({...appSettings, pfandTrainers: next});
+            };
+            return (
+              <div style={{...s.card,marginTop:'16px'}}>
+                <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'14px'}}>
+                  <span style={{fontSize:'24px'}}>♻️</span>
+                  <span style={{fontWeight:'800',color:'#16a34a',fontSize:'14px'}}>Pfandkasse — Trainer-Zugang</span>
+                </div>
+                <p style={{margin:'0 0 10px',fontSize:'12px',color:'#6b7280'}}>Admins haben immer Zugang. Wähle Trainer aus, die ebenfalls Zugriff erhalten:</p>
+                {trainers.length === 0
+                  ? <p style={{fontSize:'13px',color:'#9ca3af'}}>Keine Trainer registriert.</p>
+                  : <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
+                    {trainers.map(u=>{
+                      const on = currentList.includes(u.uid);
+                      return (
+                        <button key={u.uid} onClick={()=>toggle(u.uid)}
+                          style={{padding:'7px 14px',borderRadius:'20px',border:`1px solid ${on?'#86efac':'#d1d5db'}`,background:on?'rgba(134,239,172,0.15)':'#f9fafb',color:on?'#16a34a':'#374151',cursor:'pointer',fontWeight:'700',fontSize:'13px',transition:'all 0.15s'}}>
+                          {on?'✓ ':''}{u.name||u.email}
+                        </button>
+                      );
+                    })}
+                  </div>
+                }
+              </div>
+            );
+          })()}
+
           {/* Rompel Bereich Zugang */}
           {(()=>{
             const trainers = Object.values(allUsers).filter(u=>(u.roles||[u.role]).includes('trainer')).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
@@ -3798,7 +3832,7 @@ export default function TrainingsApp() {
           ...(canAccessRompel()?[
             {label:'Rompel Bereich', icon:{type:'img',src:'/rompel.jpg'}, color:'#fda4af', bg:'rgba(253,164,175,0.08)', border:'rgba(253,164,175,0.25)', action:()=>navTo('rompel')},
           ]:[]),
-          ...(canEdit()?[
+          ...(canAccessPfand()?[
             {label:'Pfandkasse', icon:'♻️', color:'#86efac', bg:'rgba(134,239,172,0.08)', border:'rgba(134,239,172,0.2)', action:()=>navTo('pfandkasse')},
           ]:[]),
           ...(userRole==='admin'?[
@@ -11241,7 +11275,7 @@ export default function TrainingsApp() {
   }
 
   // ── PFANDKASSE ──────────────────────────────────────────────────────────
-  if (view === 'pfandkasse' && canEdit()) {
+  if (view === 'pfandkasse' && canAccessPfand()) {
     const accent = '#86efac';
     const entries = (pfandDaten.entries || []).slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
     const totalEinnahmen = entries.filter(e=>e.type==='einnahme').reduce((s,e)=>s+(Number(e.amount)||0),0);
