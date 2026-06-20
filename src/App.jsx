@@ -7814,11 +7814,10 @@ export default function TrainingsApp() {
                   <input type="text" placeholder="🔍 Spieler suchen…" value={ptPlayerSearch} onChange={e=>setPtPlayerSearch(e.target.value)}
                     style={{width:'100%',boxSizing:'border-box',padding:'8px 12px',borderRadius:'10px',border:'1px solid #e5e7eb',background:'#f9fafb',fontSize:'13px',outline:'none',marginBottom:'4px'}}/>
 
-                  {/* ── Jugend ── */}
-                  <SecHdr label="Jugend" right={`${ptSelectedChildren.length} ausgewählt`}/>
+                  {/* ── Filter-Leiste: Alle · Jugendgruppen · Erwachsene ── */}
                   {!searchLower&&(
-                    <div style={{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'8px'}}>
-                      {[{id:'all',name:'Alle'},...jugendSubs].map(sg=>(
+                    <div style={{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'10px'}}>
+                      {[{id:'all',name:'Alle'}, ...jugendSubs, {id:'erwachsene',name:'Erwachsene'}].map(sg=>(
                         <button key={sg.id} onClick={()=>setPtSubgroupFilter(sg.id)}
                           style={{padding:'4px 10px',borderRadius:'16px',border:`2px solid ${ptSubgroupFilter===sg.id?'#7c3aed':'#e5e7eb'}`,background:ptSubgroupFilter===sg.id?'rgba(124,58,237,0.1)':'white',color:ptSubgroupFilter===sg.id?'#7c3aed':'#6b7280',cursor:'pointer',fontSize:'11px',fontWeight:'700'}}>
                           {sg.name}
@@ -7826,32 +7825,39 @@ export default function TrainingsApp() {
                       ))}
                     </div>
                   )}
-                  <div style={{display:'grid',gap:'5px',marginBottom:'4px',maxHeight:'200px',overflowY:'auto',paddingRight:'4px'}}>
-                    {filtJugend.length===0
-                      ? <p style={{color:'#9ca3af',textAlign:'center',padding:'12px 0',fontSize:'13px'}}>Keine Kinder gefunden.</p>
-                      : filtJugend.map(c=>{
-                          const ach=getAchievements(c.id), tu=ach.ttrUnlocked||[];
-                          const ttr=tu.length>0?Math.max(...tu):null;
-                          return <PlayerRow key={c.id} id={c.id} name={c.name} sub={subgroups[c.subgroupId]?.name} ttr={ttr}
-                            selected={ptSelectedChildren.includes(c.id)}
-                            onToggle={()=>setPtSelectedChildren(prev=>prev.includes(c.id)?prev.filter(x=>x!==c.id):[...prev,c.id])}/>;
-                        })
-                    }
-                  </div>
 
-                  {/* ── Erwachsene ── */}
-                  <SecHdr label="Erwachsene" right={`${ptSelectedAktive.length} ausgewählt`}/>
-                  <div style={{display:'grid',gap:'5px',marginBottom:'4px',maxHeight:'200px',overflowY:'auto',paddingRight:'4px'}}>
-                    {filtAktive.length===0
-                      ? <p style={{color:'#9ca3af',textAlign:'center',padding:'12px 0',fontSize:'13px'}}>Keine Spieler gefunden.</p>
-                      : filtAktive.map(p=>{
-                          const pid=p.id||p.spielernr;
-                          return <PlayerRow key={pid} id={pid} name={p.name} sub={p.ttr?null:'kein TTR'} ttr={p.ttr||null}
-                            selected={ptSelectedAktive.includes(pid)}
-                            onToggle={()=>setPtSelectedAktive(prev=>prev.includes(pid)?prev.filter(x=>x!==pid):[...prev,pid])}/>;
-                        })
-                    }
-                  </div>
+                  {/* ── Jugend-Liste (versteckt wenn Filter=Erwachsene) ── */}
+                  {(ptSubgroupFilter!=='erwachsene'||searchLower)&&<>
+                    {!searchLower&&<SecHdr label="Jugend" right={`${ptSelectedChildren.length} ausgewählt`}/>}
+                    <div style={{display:'grid',gap:'5px',marginBottom:'6px',maxHeight:'220px',overflowY:'auto',paddingRight:'4px'}}>
+                      {filtJugend.length===0
+                        ? <p style={{color:'#9ca3af',textAlign:'center',padding:'12px 0',fontSize:'13px'}}>Keine Kinder gefunden.</p>
+                        : filtJugend.map(c=>{
+                            const ach=getAchievements(c.id), tu=ach.ttrUnlocked||[];
+                            const ttr=tu.length>0?Math.max(...tu):null;
+                            return <PlayerRow key={c.id} id={c.id} name={c.name} sub={subgroups[c.subgroupId]?.name} ttr={ttr}
+                              selected={ptSelectedChildren.includes(c.id)}
+                              onToggle={()=>setPtSelectedChildren(prev=>prev.includes(c.id)?prev.filter(x=>x!==c.id):[...prev,c.id])}/>;
+                          })
+                      }
+                    </div>
+                  </>}
+
+                  {/* ── Erwachsene-Liste (versteckt wenn Filter=Jugendgruppe) ── */}
+                  {(ptSubgroupFilter==='all'||ptSubgroupFilter==='erwachsene'||searchLower)&&<>
+                    <SecHdr label="Erwachsene" right={`${ptSelectedAktive.length} ausgewählt`}/>
+                    <div style={{display:'grid',gap:'5px',marginBottom:'4px',maxHeight:'220px',overflowY:'auto',paddingRight:'4px'}}>
+                      {filtAktive.length===0
+                        ? <p style={{color:'#9ca3af',textAlign:'center',padding:'12px 0',fontSize:'13px'}}>Keine Spieler gefunden.</p>
+                        : filtAktive.map(p=>{
+                            const pid=p.id||p.spielernr;
+                            return <PlayerRow key={pid} id={pid} name={p.name} sub={p.ttr?null:'kein TTR'} ttr={p.ttr||null}
+                              selected={ptSelectedAktive.includes(pid)}
+                              onToggle={()=>setPtSelectedAktive(prev=>prev.includes(pid)?prev.filter(x=>x!==pid):[...prev,pid])}/>;
+                          })
+                      }
+                    </div>
+                  </>}
 
                   {/* ── Manuell hinzugefügte ── */}
                   {ptManualPlayers.length>0&&(
