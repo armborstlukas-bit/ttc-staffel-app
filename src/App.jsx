@@ -808,6 +808,11 @@ export default function TrainingsApp() {
   const [ptCreateForm, setPtCreateForm]                             = useState({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPer100:1,handicapMax:6,doubleElim:false});
   const [ptSelectedChildren, setPtSelectedChildren]                 = useState([]);
   const [ptSubgroupFilter, setPtSubgroupFilter]                     = useState('all');
+  const [ptSelectedAktive, setPtSelectedAktive]                     = useState([]);
+  const [ptManualPlayers, setPtManualPlayers]                       = useState([]);
+  const [ptPlayerSearch, setPtPlayerSearch]                         = useState('');
+  const [ptManualForm, setPtManualForm]                             = useState({name:'',verein:''});
+  const [ptShowManualForm, setPtShowManualForm]                     = useState(false);
   const [ptMatchEditing, setPtMatchEditing]                         = useState(null);
   const [ptMatchDraft, setPtMatchDraft]                             = useState(null);
   const [ptArchiveExpanded, setPtArchiveExpanded]                     = useState({});
@@ -7467,10 +7472,37 @@ export default function TrainingsApp() {
 
     const jugendChildren = Object.values(children).filter(c => subgroups[c.subgroupId]?.groupId==='jugend').sort((a,b)=>a.name.localeCompare(b.name,'de'));
     const filteredChildren = ptSubgroupFilter==='all' ? jugendChildren : jugendChildren.filter(c=>c.subgroupId===ptSubgroupFilter);
-    const seededPreview = getSeededPlayers(ptSelectedChildren);
+
+    // Unified seeded list: Jugend + Aktive + Manual
+    const getAllSeeded = () => {
+      const jSeeded = ptSelectedChildren.map(id => {
+        const ach = getAchievements(id);
+        const ttrUnlocked = ach.ttrUnlocked||[];
+        const maxTTR = ttrUnlocked.length>0?Math.max(...ttrUnlocked):0;
+        const achScore = (ach.einzel1||0)*3+(ach.einzel2||0)*2+(ach.einzel3||0)+
+          (ach.doppel1||0)*3+(ach.doppel2||0)*2+(ach.doppel3||0)+
+          (ach.team||0)*2+(spielerDesMonatsWins[id]?.length||0)+ttrUnlocked.length;
+        return {childId:id, name:children[id]?.name||'?', subgroupId:children[id]?.subgroupId, maxTTR, achScore};
+      });
+      const aSeeded = ptSelectedAktive.map(id => {
+        const p = aktiveSpieler[id];
+        return {childId:`aktiv_${id}`, name:p?.name||'?', subgroupId:null, maxTTR:p?.ttr||0, achScore:0};
+      });
+      const mSeeded = ptManualPlayers.map(p => ({
+        childId:p.id, name:p.verein?`${p.name} (${p.verein})`:p.name, subgroupId:null, maxTTR:0, achScore:0, isManual:true
+      }));
+      return [...jSeeded, ...aSeeded, ...mSeeded]
+        .sort((a,b)=>b.maxTTR!==a.maxTTR?b.maxTTR-a.maxTTR:b.achScore!==a.achScore?b.achScore-a.achScore:a.name.localeCompare(b.name,'de'));
+    };
+    const seededPreview = getAllSeeded();
+
+    const resetPtPlayerState = () => {
+      setPtSelectedChildren([]); setPtSubgroupFilter('all');
+      setPtSelectedAktive([]); setPtManualPlayers([]); setPtPlayerSearch(''); setPtShowManualForm(false);
+    };
 
     const startKoTournament = () => {
-      const seeded = getSeededPlayers(ptSelectedChildren);
+      const seeded = getAllSeeded();
       const N = seeded.length;
       const B = Math.pow(2, Math.ceil(Math.log2(Math.max(N, 2))));
       const getSlots = (size) => { if(size===1) return [0]; const prev=getSlots(size/2); const result=new Array(size); for(let i=0;i<size/2;i++){result[2*i]=prev[i];result[2*i+1]=size-1-prev[i];} return result; };
@@ -7491,13 +7523,13 @@ export default function TrainingsApp() {
       };
       savePracticeTournaments({...practiceTournaments, [id]: newPT});
       setActivePracticeId(id);
-      setPtCreating(false); setPtCreateStep(1); setPtSelectedChildren([]); setPtSubgroupFilter('all');
+      setPtCreating(false); setPtCreateStep(1); resetPtPlayerState();
       navTo('practiceTournamentDetail');
     };
 
     const startTournament = () => {
       if (ptCreateForm.type === 'ko_runde') { startKoTournament(); return; }
-      const seeded = getSeededPlayers(ptSelectedChildren);
+      const seeded = getAllSeeded();
       const id = 'pt_' + Date.now();
       const newPT = {
         id, type:'4er_gruppe',
@@ -7537,7 +7569,7 @@ export default function TrainingsApp() {
       };
       savePracticeTournaments({...practiceTournaments, [id]: newPT});
       setActivePracticeId(id);
-      setPtCreating(false); setPtCreateStep(1); setPtSelectedChildren([]); setPtSubgroupFilter('all');
+      setPtCreating(false); setPtCreateStep(1); resetPtPlayerState();
       navTo('practiceTournamentDetail');
     };
 
@@ -7555,7 +7587,7 @@ export default function TrainingsApp() {
             <button onClick={()=>{setArchiveTab('practiceTournaments');navTo('archiv');}} style={s.btn('#6d28d9')}>
               <Archive size={14}/> Archiv
             </button>
-            <button onClick={()=>{setPtCreating(true);setPtCreateStep(1);setPtSelectedChildren([]);setPtSubgroupFilter('all');setPtCreateForm({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPer100:1,handicapMax:6,doubleElim:false});}} style={s.btn('#16a34a')}>
+            <button onClick={()=>{setPtCreating(true);setPtCreateStep(1);resetPtPlayerState();setPtCreateForm({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPer100:1,handicapMax:6,doubleElim:false});}} style={s.btn('#16a34a')}>
               <Plus size={15}/> Neuer Wettkampf
             </button>
           </div>)}
@@ -7576,7 +7608,7 @@ export default function TrainingsApp() {
                     {n<2&&<span style={{color:'#d1d5db',marginLeft:'4px'}}>›</span>}
                   </div>
                 ))}
-                <button onClick={()=>{setPtCreating(false);setPtCreateStep(1);}} style={{marginLeft:'auto',padding:'4px 10px',background:'#f3f4f6',border:'1px solid #e5e7eb',borderRadius:'8px',color:'#6b7280',cursor:'pointer',fontSize:'12px'}}>✕</button>
+                <button onClick={()=>{setPtCreating(false);setPtCreateStep(1);resetPtPlayerState();}} style={{marginLeft:'auto',padding:'4px 10px',background:'#f3f4f6',border:'1px solid #e5e7eb',borderRadius:'8px',color:'#6b7280',cursor:'pointer',fontSize:'12px'}}>✕</button>
               </div>
 
               {/* Step 1: Typ + Einstellungen */}
@@ -7730,60 +7762,152 @@ export default function TrainingsApp() {
               {/* Step 2: Spieler */}
               {ptCreateStep===2 && (()=>{
                 const isKo = ptCreateForm.type==='ko_runde';
-                const canStart = isKo ? ptSelectedChildren.length>=3 : ptSelectedChildren.length===maxPlayers;
+                const allSeeded = seededPreview; // already computed via getAllSeeded()
+                const totalSelected = allSeeded.length;
+                const canStart = isKo ? totalSelected>=3 : totalSelected===maxPlayers;
+
+                const searchLower = ptPlayerSearch.toLowerCase().trim();
+                const aktiveList = Object.values(aktiveSpieler).sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
+                const filtJugend = searchLower ? filteredChildren.filter(c=>c.name.toLowerCase().includes(searchLower)) : filteredChildren;
+                const filtAktive = searchLower ? aktiveList.filter(p=>(p.name||'').toLowerCase().includes(searchLower)) : aktiveList;
+
+                const SecHdr = ({label,right}) => (
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 2px 5px'}}>
+                    <span style={{fontSize:'10px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'1px'}}>{label}</span>
+                    {right&&<span style={{fontSize:'10px',color:'#9ca3af'}}>{right}</span>}
+                  </div>
+                );
+
+                const PlayerRow = ({id, name, sub, ttr, selected, onToggle, badgeLabel}) => {
+                  const disabled = !selected && !isKo && totalSelected>=maxPlayers;
+                  return (
+                    <div onClick={()=>{if(disabled)return;onToggle();}}
+                      style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 12px',borderRadius:'10px',border:`1.5px solid ${selected?'#7c3aed':'#e5e7eb'}`,background:selected?'rgba(124,58,237,0.06)':'#f9fafb',cursor:disabled?'not-allowed':'pointer',opacity:disabled?0.4:1,transition:'all 0.1s'}}>
+                      <div style={{width:'20px',height:'20px',borderRadius:'5px',border:`2px solid ${selected?'#7c3aed':'#d1d5db'}`,background:selected?'#7c3aed':'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                        {selected&&<Check size={12} color="white"/>}
+                      </div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <p style={{margin:0,fontWeight:'700',color:'#1f2937',fontSize:'13px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{name}</p>
+                        {sub&&<p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>{sub}</p>}
+                      </div>
+                      {badgeLabel&&<span style={{fontSize:'10px',fontWeight:'800',color:'#d97706',background:'rgba(217,119,6,0.08)',border:'1px solid rgba(217,119,6,0.2)',padding:'2px 7px',borderRadius:'8px',flexShrink:0}}>{badgeLabel}</span>}
+                      {ttr&&<span style={{fontSize:'11px',fontWeight:'800',color:'#7c3aed',background:'rgba(124,58,237,0.1)',padding:'2px 7px',borderRadius:'8px',flexShrink:0}}>TTR {ttr}</span>}
+                    </div>
+                  );
+                };
+
+                const addManual = () => {
+                  if(!ptManualForm.name.trim()) return;
+                  setPtManualPlayers(prev=>[...prev,{id:'manual_'+Date.now(),name:ptManualForm.name.trim(),verein:ptManualForm.verein.trim()}]);
+                  setPtManualForm({name:'',verein:''});
+                  setPtShowManualForm(false);
+                };
+
                 return (
                 <>
-                  <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'16px'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'12px'}}>
                     <button onClick={()=>setPtCreateStep(1)} style={{padding:'6px 12px',background:'#f3f4f6',border:'1px solid #e5e7eb',borderRadius:'8px',color:'#6b7280',cursor:'pointer',fontSize:'13px',fontWeight:'600'}}>← Zurück</button>
-                    <h3 style={{margin:0,color:'#7c3aed',fontSize:'15px',fontWeight:'800'}}>Spieler auswählen ({ptSelectedChildren.length}{isKo?'+ (min. 3)':'/'+maxPlayers})</h3>
+                    <h3 style={{margin:0,color:'#7c3aed',fontSize:'15px',fontWeight:'800'}}>Spieler ({totalSelected}{isKo?' (min. 3)':'/'+maxPlayers})</h3>
                   </div>
 
-                  {/* Untergruppen-Filter */}
-                  <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'14px'}}>
-                    {[{id:'all',name:'Alle Jugend'},...jugendSubs].map(s=>(
-                      <button key={s.id} onClick={()=>setPtSubgroupFilter(s.id)}
-                        style={{padding:'5px 12px',borderRadius:'20px',border:`2px solid ${ptSubgroupFilter===s.id?'#7c3aed':'#e5e7eb'}`,background:ptSubgroupFilter===s.id?'rgba(124,58,237,0.1)':'white',color:ptSubgroupFilter===s.id?'#7c3aed':'#6b7280',cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>
-                        {s.name}
-                      </button>
-                    ))}
-                  </div>
+                  {/* Suche */}
+                  <input type="text" placeholder="🔍 Spieler suchen…" value={ptPlayerSearch} onChange={e=>setPtPlayerSearch(e.target.value)}
+                    style={{width:'100%',boxSizing:'border-box',padding:'8px 12px',borderRadius:'10px',border:'1px solid #e5e7eb',background:'#f9fafb',fontSize:'13px',outline:'none',marginBottom:'4px'}}/>
 
-                  {/* Kinderliste */}
-                  <div style={{display:'grid',gap:'6px',marginBottom:'16px',maxHeight:'260px',overflowY:'auto',paddingRight:'4px'}}>
-                    {filteredChildren.length===0
-                      ? <p style={{color:'#9ca3af',textAlign:'center',padding:'20px 0'}}>Keine Kinder in dieser Gruppe.</p>
-                      : filteredChildren.map(child=>{
-                        const selected = ptSelectedChildren.includes(child.id);
-                        const ach = getAchievements(child.id);
-                        const ttrUnlocked = ach.ttrUnlocked||[];
-                        const maxTTR = ttrUnlocked.length>0?Math.max(...ttrUnlocked):null;
-                        const disabled = !selected && ptCreateForm.type!=='ko_runde' && ptSelectedChildren.length>=maxPlayers;
-                        return (
-                          <div key={child.id} onClick={()=>{if(disabled)return;setPtSelectedChildren(prev=>selected?prev.filter(id=>id!==child.id):[...prev,child.id]);}}
-                            style={{display:'flex',alignItems:'center',gap:'12px',padding:'10px 14px',borderRadius:'10px',border:`1.5px solid ${selected?'#7c3aed':'#e5e7eb'}`,background:selected?'rgba(124,58,237,0.06)':'#f9fafb',cursor:disabled?'not-allowed':'pointer',opacity:disabled?0.4:1,transition:'all 0.1s'}}>
-                            <div style={{width:'22px',height:'22px',borderRadius:'6px',border:`2px solid ${selected?'#7c3aed':'#d1d5db'}`,background:selected?'#7c3aed':'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                              {selected&&<Check size={13} color="white"/>}
-                            </div>
-                            <div style={{flex:1,minWidth:0}}>
-                              <p style={{margin:0,fontWeight:'700',color:'#1f2937',fontSize:'14px'}}>{child.name}</p>
-                              <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>{subgroups[child.subgroupId]?.name}{maxTTR?` · TTR ${maxTTR}`:' · kein TTR'}</p>
-                            </div>
-                            {maxTTR&&<span style={{fontSize:'11px',fontWeight:'800',color:'#7c3aed',background:'rgba(124,58,237,0.1)',padding:'2px 8px',borderRadius:'10px',flexShrink:0}}>TTR {maxTTR}</span>}
-                          </div>
-                        );
-                      })
+                  {/* ── Jugend ── */}
+                  <SecHdr label="Jugend" right={`${ptSelectedChildren.length} ausgewählt`}/>
+                  {!searchLower&&(
+                    <div style={{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'8px'}}>
+                      {[{id:'all',name:'Alle'},...jugendSubs].map(sg=>(
+                        <button key={sg.id} onClick={()=>setPtSubgroupFilter(sg.id)}
+                          style={{padding:'4px 10px',borderRadius:'16px',border:`2px solid ${ptSubgroupFilter===sg.id?'#7c3aed':'#e5e7eb'}`,background:ptSubgroupFilter===sg.id?'rgba(124,58,237,0.1)':'white',color:ptSubgroupFilter===sg.id?'#7c3aed':'#6b7280',cursor:'pointer',fontSize:'11px',fontWeight:'700'}}>
+                          {sg.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{display:'grid',gap:'5px',marginBottom:'4px',maxHeight:'200px',overflowY:'auto',paddingRight:'4px'}}>
+                    {filtJugend.length===0
+                      ? <p style={{color:'#9ca3af',textAlign:'center',padding:'12px 0',fontSize:'13px'}}>Keine Kinder gefunden.</p>
+                      : filtJugend.map(c=>{
+                          const ach=getAchievements(c.id), tu=ach.ttrUnlocked||[];
+                          const ttr=tu.length>0?Math.max(...tu):null;
+                          return <PlayerRow key={c.id} id={c.id} name={c.name} sub={subgroups[c.subgroupId]?.name} ttr={ttr}
+                            selected={ptSelectedChildren.includes(c.id)}
+                            onToggle={()=>setPtSelectedChildren(prev=>prev.includes(c.id)?prev.filter(x=>x!==c.id):[...prev,c.id])}/>;
+                        })
                     }
                   </div>
 
+                  {/* ── Erwachsene ── */}
+                  <SecHdr label="Erwachsene" right={`${ptSelectedAktive.length} ausgewählt`}/>
+                  <div style={{display:'grid',gap:'5px',marginBottom:'4px',maxHeight:'200px',overflowY:'auto',paddingRight:'4px'}}>
+                    {filtAktive.length===0
+                      ? <p style={{color:'#9ca3af',textAlign:'center',padding:'12px 0',fontSize:'13px'}}>Keine Spieler gefunden.</p>
+                      : filtAktive.map(p=>{
+                          const pid=p.id||p.spielernr;
+                          return <PlayerRow key={pid} id={pid} name={p.name} sub={p.ttr?null:'kein TTR'} ttr={p.ttr||null}
+                            selected={ptSelectedAktive.includes(pid)}
+                            onToggle={()=>setPtSelectedAktive(prev=>prev.includes(pid)?prev.filter(x=>x!==pid):[...prev,pid])}/>;
+                        })
+                    }
+                  </div>
+
+                  {/* ── Manuell hinzugefügte ── */}
+                  {ptManualPlayers.length>0&&(
+                    <div style={{display:'grid',gap:'5px',marginBottom:'4px'}}>
+                      <SecHdr label="Manuell" right={`${ptManualPlayers.length}`}/>
+                      {ptManualPlayers.map(p=>(
+                        <div key={p.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 12px',borderRadius:'10px',border:'1.5px solid #7c3aed',background:'rgba(124,58,237,0.06)'}}>
+                          <Check size={14} color="#7c3aed"/>
+                          <span style={{flex:1,fontWeight:'700',color:'#1f2937',fontSize:'13px'}}>{p.name}{p.verein&&<span style={{color:'#9ca3af',fontWeight:'400'}}> · {p.verein}</span>}</span>
+                          <span style={{fontSize:'10px',fontWeight:'800',color:'#d97706',background:'rgba(217,119,6,0.08)',border:'1px solid rgba(217,119,6,0.2)',padding:'2px 7px',borderRadius:'8px'}}>Gast</span>
+                          <button onClick={()=>setPtManualPlayers(prev=>prev.filter(x=>x.id!==p.id))}
+                            style={{width:'22px',height:'22px',borderRadius:'6px',background:'rgba(220,38,38,0.08)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                            <X size={11}/>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Manuell hinzufügen */}
+                  {!ptShowManualForm
+                    ? <button onClick={()=>setPtShowManualForm(true)}
+                        style={{width:'100%',padding:'9px',marginTop:'8px',background:'#f9fafb',border:'2px dashed #e5e7eb',borderRadius:'10px',color:'#9ca3af',cursor:'pointer',fontSize:'13px',fontWeight:'700'}}>
+                        + Spieler manuell hinzufügen
+                      </button>
+                    : <div style={{marginTop:'8px',padding:'12px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'10px'}}>
+                        <p style={{margin:'0 0 8px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.5px'}}>Spieler manuell hinzufügen</p>
+                        <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'8px'}}>
+                          <input type="text" placeholder="Name (Pflichtfeld)" value={ptManualForm.name} onChange={e=>setPtManualForm(f=>({...f,name:e.target.value}))}
+                            style={{flex:'1 1 150px',padding:'8px 10px',borderRadius:'8px',border:'1px solid #d1d5db',fontSize:'13px',outline:'none'}}/>
+                          <input type="text" placeholder="Verein (optional)" value={ptManualForm.verein} onChange={e=>setPtManualForm(f=>({...f,verein:e.target.value}))}
+                            style={{flex:'1 1 130px',padding:'8px 10px',borderRadius:'8px',border:'1px solid #d1d5db',fontSize:'13px',outline:'none'}}/>
+                        </div>
+                        <div style={{display:'flex',gap:'6px'}}>
+                          <button onClick={addManual} disabled={!ptManualForm.name.trim()}
+                            style={{flex:1,padding:'8px',background:ptManualForm.name.trim()?'rgba(124,58,237,0.1)':'#f3f4f6',border:`1px solid ${ptManualForm.name.trim()?'#c4b5fd':'#e5e7eb'}`,borderRadius:'8px',color:ptManualForm.name.trim()?'#7c3aed':'#9ca3af',cursor:ptManualForm.name.trim()?'pointer':'not-allowed',fontWeight:'700',fontSize:'13px'}}>
+                            Hinzufügen
+                          </button>
+                          <button onClick={()=>{setPtShowManualForm(false);setPtManualForm({name:'',verein:''});}}
+                            style={{padding:'8px 14px',background:'#f3f4f6',border:'1px solid #e5e7eb',borderRadius:'8px',color:'#6b7280',cursor:'pointer',fontSize:'13px'}}>
+                            Abbrechen
+                          </button>
+                        </div>
+                      </div>
+                  }
+
                   {/* Setzungs-Vorschau */}
-                  {seededPreview.length>0&&(
-                    <div style={{marginBottom:'14px',padding:'12px 14px',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:'12px'}}>
+                  {allSeeded.length>0&&(
+                    <div style={{margin:'12px 0',padding:'12px 14px',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:'12px'}}>
                       <p style={{margin:'0 0 8px',fontSize:'10px',fontWeight:'800',color:'#16a34a',textTransform:'uppercase',letterSpacing:'0.4px'}}>Setzung (nach TTR + Errungenschaften)</p>
                       <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
-                        {seededPreview.map((p,i)=>(
+                        {allSeeded.map((p,i)=>(
                           <div key={p.childId} style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                            <span style={{fontSize:'14px',fontWeight:'900',color:'#16a34a',minWidth:'20px'}}>{i+1}.</span>
-                            <span style={{fontSize:'14px',fontWeight:'700',color:'#1f2937'}}>{p.name}</span>
+                            <span style={{fontSize:'13px',fontWeight:'900',color:'#16a34a',minWidth:'20px'}}>{i+1}.</span>
+                            <span style={{fontSize:'13px',fontWeight:'700',color:'#1f2937'}}>{p.name}</span>
+                            {p.isManual&&<span style={{fontSize:'10px',fontWeight:'700',color:'#d97706'}}>Gast</span>}
                             {p.maxTTR>0&&<span style={{fontSize:'11px',color:'#7c3aed',fontWeight:'600'}}>TTR {p.maxTTR}</span>}
                           </div>
                         ))}
@@ -7793,7 +7917,7 @@ export default function TrainingsApp() {
 
                   <button onClick={startTournament} disabled={!canStart}
                     style={{width:'100%',padding:'14px',background:canStart?'linear-gradient(135deg,#7c3aed,#6d28d9)':'#e5e7eb',color:canStart?'white':'#9ca3af',border:'none',borderRadius:'12px',cursor:canStart?'pointer':'not-allowed',fontWeight:'800',fontSize:'15px',opacity:canStart?1:0.7,transition:'all 0.15s'}}>
-                    {canStart?(isKo?`🏆 KO Turnier starten! (${ptSelectedChildren.length} Spieler)`:'🎮 Wettkampf starten!'):(isKo?`Mind. 3 Spieler auswählen (${ptSelectedChildren.length}/3)`:`Noch ${maxPlayers-ptSelectedChildren.length} Spieler auswählen`)}
+                    {canStart?(isKo?`🏆 KO Turnier starten! (${totalSelected} Spieler)`:'🎮 Wettkampf starten!'):(isKo?`Mind. 3 Spieler auswählen (${totalSelected}/3)`:`Noch ${maxPlayers-totalSelected} Spieler auswählen`)}
                   </button>
                 </>
                 );
