@@ -805,7 +805,7 @@ export default function TrainingsApp() {
   const [activePracticeId, setActivePracticeId]                     = useState(null);
   const [ptCreating, setPtCreating]                                 = useState(false);
   const [ptCreateStep, setPtCreateStep]                             = useState(1);
-  const [ptCreateForm, setPtCreateForm]                             = useState({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPer100:1,handicapMax:6,doubleElim:false});
+  const [ptCreateForm, setPtCreateForm]                             = useState({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPerTTR:60,handicapMax:6,doubleElim:false});
   const [ptSelectedChildren, setPtSelectedChildren]                 = useState([]);
   const [ptSubgroupFilter, setPtSubgroupFilter]                     = useState('all');
   const [ptSelectedAktive, setPtSelectedAktive]                     = useState([]);
@@ -7444,7 +7444,7 @@ export default function TrainingsApp() {
     allM.forEach(m=>{ const r=cache[m.id];
       if(pt.settings?.handicap&&r.p1!=null&&r.p1!==undefined&&r.p2!=null&&r.p2!==undefined){
         const t1=pt.players[r.p1]?.maxTTR||0,t2=pt.players[r.p2]?.maxTTR||0,diff=t1-t2;
-        const raw=Math.round(Math.abs(diff)/100)*(pt.settings.handicapPer100||1);
+        const raw=Math.floor(Math.abs(diff)/(pt.settings.handicapPerTTR||pt.settings.handicapPer100?100/pt.settings.handicapPer100:60));
         const pts=Math.min(raw,pt.settings.handicapMax||6);
         if(pts>0) cache[m.id].handicap={b:diff>0?'p2':'p1',pts};
       }
@@ -7474,14 +7474,19 @@ export default function TrainingsApp() {
     const filteredChildren = ptSubgroupFilter==='all' ? jugendChildren : jugendChildren.filter(c=>c.subgroupId===ptSubgroupFilter);
 
     // Unified seeded list: Jugend + Aktive + Manual
+    const getLiveTTR = (id) => {
+      const entries = ttrHistory[id]?.entries || [];
+      if (!entries.length) return 0;
+      return [...entries].sort((a,b)=>b.month.localeCompare(a.month))[0]?.ttr || 0;
+    };
+
     const getAllSeeded = () => {
       const jSeeded = ptSelectedChildren.map(id => {
+        const maxTTR = getLiveTTR(id);
         const ach = getAchievements(id);
-        const ttrUnlocked = ach.ttrUnlocked||[];
-        const maxTTR = ttrUnlocked.length>0?Math.max(...ttrUnlocked):0;
         const achScore = (ach.einzel1||0)*3+(ach.einzel2||0)*2+(ach.einzel3||0)+
           (ach.doppel1||0)*3+(ach.doppel2||0)*2+(ach.doppel3||0)+
-          (ach.team||0)*2+(spielerDesMonatsWins[id]?.length||0)+ttrUnlocked.length;
+          (ach.team||0)*2+(spielerDesMonatsWins[id]?.length||0);
         return {childId:id, name:children[id]?.name||'?', subgroupId:children[id]?.subgroupId, maxTTR, achScore};
       });
       const aSeeded = ptSelectedAktive.map(id => {
@@ -7513,7 +7518,7 @@ export default function TrainingsApp() {
         id, type:'ko_runde',
         createdAt: new Date().toISOString(),
         createdBy: userProfile?.name || user?.email || 'Trainer',
-        settings: { winSets:ptCreateForm.winSets, setLength:ptCreateForm.setLength, deciderLength:ptCreateForm.deciderCustom?ptCreateForm.deciderLength:ptCreateForm.setLength, trackSetScores:ptCreateForm.trackSetScores, handicap:ptCreateForm.handicap, handicapPer100:ptCreateForm.handicapPer100, handicapMax:ptCreateForm.handicapMax },
+        settings: { winSets:ptCreateForm.winSets, setLength:ptCreateForm.setLength, deciderLength:ptCreateForm.deciderCustom?ptCreateForm.deciderLength:ptCreateForm.setLength, trackSetScores:ptCreateForm.trackSetScores, handicap:ptCreateForm.handicap, handicapPerTTR:ptCreateForm.handicapPerTTR||60, handicapMax:ptCreateForm.handicapMax },
         players: seeded.map((p,i) => ({...p, seed:i+1})),
         bracketSize: B,
         playerSlots,
@@ -7535,7 +7540,7 @@ export default function TrainingsApp() {
         id, type:'4er_gruppe',
         createdAt: new Date().toISOString(),
         createdBy: userProfile?.name || user?.email || 'Trainer',
-        settings: { winSets:ptCreateForm.winSets, setLength:ptCreateForm.setLength, deciderLength:ptCreateForm.deciderCustom?ptCreateForm.deciderLength:ptCreateForm.setLength, trackSetScores:ptCreateForm.trackSetScores, handicap:ptCreateForm.handicap, handicapPer100:ptCreateForm.handicapPer100, handicapMax:ptCreateForm.handicapMax },
+        settings: { winSets:ptCreateForm.winSets, setLength:ptCreateForm.setLength, deciderLength:ptCreateForm.deciderCustom?ptCreateForm.deciderLength:ptCreateForm.setLength, trackSetScores:ptCreateForm.trackSetScores, handicap:ptCreateForm.handicap, handicapPerTTR:ptCreateForm.handicapPerTTR||60, handicapMax:ptCreateForm.handicapMax },
         players: seeded.map((p,i) => ({...p, seed:i+1})),
         matches: (()=>{
           // Round-robin schedule: fix player 0, rotate rest; top 2 seeds always meet in last round
@@ -7554,7 +7559,7 @@ export default function TrainingsApp() {
                 if (ptCreateForm.handicap) {
                   const ttr1 = seeded[p1]?.maxTTR||0, ttr2 = seeded[p2]?.maxTTR||0;
                   const diff = ttr1 - ttr2;
-                  const raw = Math.round(Math.abs(diff) / 100) * ptCreateForm.handicapPer100;
+                  const raw = Math.floor(Math.abs(diff) / (ptCreateForm.handicapPerTTR||60));
                   const pts = Math.min(raw, ptCreateForm.handicapMax);
                   if (pts > 0) handicap = diff > 0 ? {beneficiary: p2, points: pts} : {beneficiary: p1, points: pts};
                 }
@@ -7587,7 +7592,7 @@ export default function TrainingsApp() {
             <button onClick={()=>{setArchiveTab('practiceTournaments');navTo('archiv');}} style={s.btn('#6d28d9')}>
               <Archive size={14}/> Archiv
             </button>
-            <button onClick={()=>{setPtCreating(true);setPtCreateStep(1);resetPtPlayerState();setPtCreateForm({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPer100:1,handicapMax:6,doubleElim:false});}} style={s.btn('#16a34a')}>
+            <button onClick={()=>{setPtCreating(true);setPtCreateStep(1);resetPtPlayerState();setPtCreateForm({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPerTTR:60,handicapMax:6,doubleElim:false});}} style={s.btn('#16a34a')}>
               <Plus size={15}/> Neuer Wettkampf
             </button>
           </div>)}
@@ -7728,19 +7733,17 @@ export default function TrainingsApp() {
                       </p>
                       {ptCreateForm.handicap&&(
                         <div style={{marginTop:'10px'}}>
-                          <p style={{margin:'0 0 6px',fontSize:'11px',fontWeight:'700',color:'#555'}}>Punkte pro 100 TTR Differenz:</p>
-                          <div style={{display:'flex',gap:'6px'}}>
-                            {[1,2].map(n=>(
-                              <button key={n} onClick={()=>setPtCreateForm(f=>({...f,handicapPer100:n}))}
-                                style={{...ptBtn(ptCreateForm.handicapPer100===n),flex:'none',padding:'8px 20px',fontSize:'14px'}}>
-                                {n} {n===1?'Punkt':'Punkte'}
-                              </button>
-                            ))}
+                          <p style={{margin:'0 0 6px',fontSize:'11px',fontWeight:'700',color:'#555'}}>Pro wie viele TTR Differenz = 1 Punkt Vorgabe:</p>
+                          <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'6px'}}>
+                            <button onClick={()=>setPtCreateForm(f=>({...f,handicapPerTTR:Math.max(10,f.handicapPerTTR-10)}))} style={smBtn(false)}>−</button>
+                            <span style={{fontSize:'22px',fontWeight:'900',color:'#7c3aed',minWidth:'48px',textAlign:'center'}}>{ptCreateForm.handicapPerTTR}</span>
+                            <button onClick={()=>setPtCreateForm(f=>({...f,handicapPerTTR:f.handicapPerTTR+10}))} style={smBtn(false)}>+</button>
+                            <span style={{fontSize:'12px',color:'#9ca3af'}}>TTR</span>
                           </div>
-                          <p style={{margin:'6px 0 0',fontSize:'11px',color:'#9ca3af'}}>
-                            Beispiel: TTR-Differenz 250 → {Math.min(Math.round(250/100)*ptCreateForm.handicapPer100, ptCreateForm.handicapMax)} Vorgabepunkte
+                          <p style={{margin:'0 0 10px',fontSize:'11px',color:'#9ca3af'}}>
+                            Beispiel: TTR-Differenz 240 → {Math.min(Math.floor(240/ptCreateForm.handicapPerTTR), ptCreateForm.handicapMax)} Vorgabepunkte
                           </p>
-                          <p style={{margin:'10px 0 6px',fontSize:'11px',fontWeight:'700',color:'#555'}}>Maximale Vorgabe: <span style={{color:'#7c3aed',fontWeight:'900'}}>{ptCreateForm.handicapMax} Punkte</span></p>
+                          <p style={{margin:'0 0 6px',fontSize:'11px',fontWeight:'700',color:'#555'}}>Maximale Vorgabe: <span style={{color:'#7c3aed',fontWeight:'900'}}>{ptCreateForm.handicapMax} Punkte</span></p>
                           <input type="range" min="1" max="20" step="1" value={ptCreateForm.handicapMax}
                             onChange={e=>setPtCreateForm(f=>({...f,handicapMax:Number(e.target.value)}))}
                             style={{width:'100%',accentColor:'#7c3aed',height:'6px',cursor:'pointer'}}/>
@@ -7826,38 +7829,31 @@ export default function TrainingsApp() {
                     </div>
                   )}
 
-                  {/* ── Jugend-Liste (versteckt wenn Filter=Erwachsene) ── */}
-                  {(ptSubgroupFilter!=='erwachsene'||searchLower)&&<>
-                    {!searchLower&&<SecHdr label="Jugend" right={`${ptSelectedChildren.length} ausgewählt`}/>}
-                    <div style={{display:'grid',gap:'5px',marginBottom:'6px',maxHeight:'220px',overflowY:'auto',paddingRight:'4px'}}>
-                      {filtJugend.length===0
-                        ? <p style={{color:'#9ca3af',textAlign:'center',padding:'12px 0',fontSize:'13px'}}>Keine Kinder gefunden.</p>
-                        : filtJugend.map(c=>{
-                            const ach=getAchievements(c.id), tu=ach.ttrUnlocked||[];
-                            const ttr=tu.length>0?Math.max(...tu):null;
-                            return <PlayerRow key={c.id} id={c.id} name={c.name} sub={subgroups[c.subgroupId]?.name} ttr={ttr}
-                              selected={ptSelectedChildren.includes(c.id)}
-                              onToggle={()=>setPtSelectedChildren(prev=>prev.includes(c.id)?prev.filter(x=>x!==c.id):[...prev,c.id])}/>;
-                          })
-                      }
-                    </div>
-                  </>}
-
-                  {/* ── Erwachsene-Liste (versteckt wenn Filter=Jugendgruppe) ── */}
-                  {(ptSubgroupFilter==='all'||ptSubgroupFilter==='erwachsene'||searchLower)&&<>
-                    <SecHdr label="Erwachsene" right={`${ptSelectedAktive.length} ausgewählt`}/>
-                    <div style={{display:'grid',gap:'5px',marginBottom:'4px',maxHeight:'220px',overflowY:'auto',paddingRight:'4px'}}>
-                      {filtAktive.length===0
-                        ? <p style={{color:'#9ca3af',textAlign:'center',padding:'12px 0',fontSize:'13px'}}>Keine Spieler gefunden.</p>
-                        : filtAktive.map(p=>{
-                            const pid=p.id||p.spielernr;
-                            return <PlayerRow key={pid} id={pid} name={p.name} sub={p.ttr?null:'kein TTR'} ttr={p.ttr||null}
-                              selected={ptSelectedAktive.includes(pid)}
-                              onToggle={()=>setPtSelectedAktive(prev=>prev.includes(pid)?prev.filter(x=>x!==pid):[...prev,pid])}/>;
-                          })
-                      }
-                    </div>
-                  </>}
+                  {/* ── Kombinierte Spielerliste ── */}
+                  {(()=>{
+                    const showJugend = ptSubgroupFilter!=='erwachsene' || searchLower;
+                    const showAktive = ptSubgroupFilter==='all'||ptSubgroupFilter==='erwachsene'||searchLower;
+                    const jugendRows = showJugend ? filtJugend.map(c=>{
+                      const ttr = getLiveTTR(c.id);
+                      return <PlayerRow key={c.id} id={c.id} name={c.name} sub={subgroups[c.subgroupId]?.name} ttr={ttr||null}
+                        selected={ptSelectedChildren.includes(c.id)}
+                        onToggle={()=>setPtSelectedChildren(prev=>prev.includes(c.id)?prev.filter(x=>x!==c.id):[...prev,c.id])}/>;
+                    }) : [];
+                    const aktiveRows = showAktive ? filtAktive.map(p=>{
+                      const pid=p.id||p.spielernr;
+                      return <PlayerRow key={pid} id={pid} name={p.name} sub="Aktive" ttr={p.ttr||null}
+                        selected={ptSelectedAktive.includes(pid)}
+                        onToggle={()=>setPtSelectedAktive(prev=>prev.includes(pid)?prev.filter(x=>x!==pid):[...prev,pid])}/>;
+                    }) : [];
+                    const combined = [...jugendRows, ...aktiveRows];
+                    return (
+                      <div style={{display:'grid',gap:'5px',marginBottom:'4px',maxHeight:'300px',overflowY:'auto',paddingRight:'4px'}}>
+                        {combined.length===0
+                          ? <p style={{color:'#9ca3af',textAlign:'center',padding:'16px 0',fontSize:'13px'}}>Keine Spieler gefunden.</p>
+                          : combined}
+                      </div>
+                    );
+                  })()}
 
                   {/* ── Manuell hinzugefügte ── */}
                   {ptManualPlayers.length>0&&(
