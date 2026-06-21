@@ -797,6 +797,8 @@ export default function TrainingsApp() {
   const [wzEditId, setWzEditId] = useState(null);
   const [wzForm, setWzForm] = useState({type:'zitat',text:'',date:'',dueDate:''});
   const [wzEditText, setWzEditText] = useState('');
+  const [wzSearch, setWzSearch] = useState('');
+  const [wzFilter, setWzFilter] = useState('alle');
   const [trainingsdoppel, setTrainingsdoppel] = useState([]);
   const [tmDoppelAdding, setTmDoppelAdding] = useState(false);
   const [tmDoppelEditId, setTmDoppelEditId] = useState(null);
@@ -3833,7 +3835,7 @@ export default function TrainingsApp() {
           {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
           {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>navTo('notifications'), badge: unreadCount},
           {label:'Materialverwaltung',icon:'🏓', color:'#fb923c', bg:'rgba(251,146,60,0.08)', border:'rgba(251,146,60,0.25)',  action:()=>navTo('materialverwaltung')},
-          {label:'Wetten & Zitate',  icon:'🎰', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.2)',  action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0},
+          {label:'Team-Board',  icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.2)',  action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0},
           ...(canEdit()?[
             {label:'Trikotgrößen', icon:'👕', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.2)', action:()=>navTo('trikotgroessen')},
           ]:[]),
@@ -4154,7 +4156,7 @@ export default function TrainingsApp() {
               {label:'Gegnerlogbuch', icon:'🎯', desc:`${gegnerLogbuch.length} ${gegnerLogbuch.length===1?'Eintrag':'Einträge'} · Taktiken & Hinweise`, color:'#67e8f9', bg:'rgba(8,145,178,0.08)', border:'rgba(8,145,178,0.2)', action:()=>navTo('gegnerlogbuch')},
               {label:'TTC News',        icon:'📰', desc:'Aktuelle Vereinsnachrichten',             color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',  action:()=>{navTo('ttcnews');fetchTtcNews();}},
               {label:'Trainingsmatches',icon:'⚔️', desc:'Duelle & Allzeittabelle',                  color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>navTo('trainingsmatches')},
-              {label:'Wetten & Zitate', icon:'🎰', desc:'Teamwetten & Sprüche', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0},
+              {label:'Team-Board', icon:'📋', desc:'Wetten, Zitate & Lessons Learned', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0},
               {label:'MyTischtennis', icon:'🏓', desc:'Vereinsübersicht auf MyTischtennis',                                                                  color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)',  action:()=>(()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);})()},
             ].map(t=>(
               <button key={t.label} onClick={t.action}
@@ -11085,7 +11087,7 @@ export default function TrainingsApp() {
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#1a1000 0%,#0d0a00 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
           <button onClick={()=>navTo('home')} style={s.btn('#fbbf24')}><Home size={16}/></button>
-          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🎰 Wetten & Zitate</h1>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>📋 Team-Board</h1>
           <span style={{fontSize:'12px',color:'rgba(251,191,36,0.6)',fontWeight:'600'}}>{wettenZitate.length} Einträge</span>
         </div>
 
@@ -11094,10 +11096,27 @@ export default function TrainingsApp() {
           {/* Neuer Eintrag Button */}
           {!wzAdding && (
             <button onClick={()=>setWzAdding(true)}
-              style={{width:'100%',padding:'11px',background:`linear-gradient(135deg,${ac},#d97706)`,border:'none',borderRadius:'12px',color:'white',fontWeight:'700',fontSize:'14px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',marginBottom:'20px'}}>
+              style={{width:'100%',padding:'11px',background:`linear-gradient(135deg,${ac},#d97706)`,border:'none',borderRadius:'12px',color:'white',fontWeight:'700',fontSize:'14px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',marginBottom:'12px'}}>
               <Plus size={16}/> Neuer Eintrag
             </button>
           )}
+
+          {/* Suche + Filter */}
+          <div style={{marginBottom:'16px',display:'flex',flexDirection:'column',gap:'8px'}}>
+            <input
+              value={wzSearch} onChange={e=>setWzSearch(e.target.value)}
+              placeholder="Suche…"
+              style={{width:'100%',padding:'9px 14px',background:'rgba(255,255,255,0.06)',border:`1px solid ${acBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box',fontFamily:'inherit'}}
+            />
+            <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+              {[['alle','Alle'],['zitat','💬 Zitate'],['wette','🎰 Wetten'],['lessons_learned','📚 Lessons']].map(([key,lbl])=>(
+                <button key={key} onClick={()=>setWzFilter(key)}
+                  style={{padding:'5px 12px',borderRadius:'20px',border:`1px solid ${wzFilter===key?ac:'rgba(255,255,255,0.15)'}`,background:wzFilter===key?'rgba(251,191,36,0.15)':'rgba(255,255,255,0.04)',color:wzFilter===key?ac:'rgba(255,255,255,0.45)',fontWeight:'700',fontSize:'12px',cursor:'pointer'}}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Formular */}
           {wzAdding && (
@@ -11144,7 +11163,14 @@ export default function TrainingsApp() {
             <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.2)',fontSize:'14px'}}>Noch keine Einträge. Lege den ersten an!</div>
           ) : (
             <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
-              {wettenZitate.map(entry=>{
+              {wettenZitate.filter(entry=>{
+                if (wzFilter !== 'alle' && entry.type !== wzFilter) return false;
+                if (wzSearch.trim()) {
+                  const q = wzSearch.trim().toLowerCase();
+                  return entry.text?.toLowerCase().includes(q) || entry.createdBy?.toLowerCase().includes(q);
+                }
+                return true;
+              }).map(entry=>{
                 const cfg = typeCfg[entry.type] || typeCfg.zitat;
                 const dateStr = entry.date ? new Date(entry.date+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : '';
                 const dueDateStr = entry.dueDate ? new Date(entry.dueDate+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : '';
@@ -11190,6 +11216,11 @@ export default function TrainingsApp() {
                   </div>
                 );
               })}
+              {wettenZitate.filter(entry=>{
+                if (wzFilter!=='alle'&&entry.type!==wzFilter) return false;
+                if (wzSearch.trim()){const q=wzSearch.trim().toLowerCase();return entry.text?.toLowerCase().includes(q)||entry.createdBy?.toLowerCase().includes(q);}
+                return true;
+              }).length===0 && <div style={{textAlign:'center',padding:'40px 20px',color:'rgba(255,255,255,0.2)',fontSize:'14px'}}>Keine Einträge gefunden.</div>}
             </div>
           )}
         </div>
