@@ -795,7 +795,7 @@ export default function TrainingsApp() {
   const [wettenZitate, setWettenZitate] = useState([]);
   const [wzAdding, setWzAdding] = useState(false);
   const [wzEditId, setWzEditId] = useState(null);
-  const [wzForm, setWzForm] = useState({type:'zitat',text:'',date:''});
+  const [wzForm, setWzForm] = useState({type:'zitat',text:'',date:'',dueDate:''});
   const [wzEditText, setWzEditText] = useState('');
   const [trainingsdoppel, setTrainingsdoppel] = useState([]);
   const [tmDoppelAdding, setTmDoppelAdding] = useState(false);
@@ -3833,7 +3833,7 @@ export default function TrainingsApp() {
           {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
           {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>navTo('notifications'), badge: unreadCount},
           {label:'Materialverwaltung',icon:'🏓', color:'#fb923c', bg:'rgba(251,146,60,0.08)', border:'rgba(251,146,60,0.25)',  action:()=>navTo('materialverwaltung')},
-          {label:'Wetten & Zitate',  icon:'🎰', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.2)',  action:()=>navTo('wettenZitate')},
+          {label:'Wetten & Zitate',  icon:'🎰', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.2)',  action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0},
           ...(canEdit()?[
             {label:'Trikotgrößen', icon:'👕', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.2)', action:()=>navTo('trikotgroessen')},
           ]:[]),
@@ -4154,13 +4154,14 @@ export default function TrainingsApp() {
               {label:'Gegnerlogbuch', icon:'🎯', desc:`${gegnerLogbuch.length} ${gegnerLogbuch.length===1?'Eintrag':'Einträge'} · Taktiken & Hinweise`, color:'#67e8f9', bg:'rgba(8,145,178,0.08)', border:'rgba(8,145,178,0.2)', action:()=>navTo('gegnerlogbuch')},
               {label:'TTC News',        icon:'📰', desc:'Aktuelle Vereinsnachrichten',             color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',  action:()=>{navTo('ttcnews');fetchTtcNews();}},
               {label:'Trainingsmatches',icon:'⚔️', desc:'Duelle & Allzeittabelle',                  color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>navTo('trainingsmatches')},
-              {label:'Wetten & Zitate', icon:'🎰', desc:'Teamwetten & Sprüche', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate')},
+              {label:'Wetten & Zitate', icon:'🎰', desc:'Teamwetten & Sprüche', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0},
               {label:'MyTischtennis', icon:'🏓', desc:'Vereinsübersicht auf MyTischtennis',                                                                  color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)',  action:()=>(()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);})()},
             ].map(t=>(
               <button key={t.label} onClick={t.action}
-                style={{background:t.bg,border:`1px solid ${t.border}`,borderRadius:'18px',padding:'22px 20px',cursor:'pointer',textAlign:'left',display:'flex',flexDirection:'column',gap:'8px',transition:'transform 0.15s'}}
+                style={{position:'relative',background:t.bg,border:`1px solid ${t.border}`,borderRadius:'18px',padding:'22px 20px',cursor:'pointer',textAlign:'left',display:'flex',flexDirection:'column',gap:'8px',transition:'transform 0.15s'}}
                 onMouseEnter={e=>e.currentTarget.style.transform='translateY(-2px)'}
                 onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
+                {t.badge>0&&<span style={{position:'absolute',top:'10px',right:'10px',background:'#dc2626',color:'white',borderRadius:'50%',width:'20px',height:'20px',fontSize:'11px',fontWeight:'800',display:'flex',alignItems:'center',justifyContent:'center'}}>{t.badge>9?'9+':t.badge}</span>}
                 <span style={{fontSize:'32px'}}>{t.icon}</span>
                 <p style={{margin:0,fontWeight:'800',fontSize:'17px',color:t.color}}>{t.label}</p>
                 <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)',lineHeight:'1.5'}}>{t.desc}</p>
@@ -11060,10 +11061,11 @@ export default function TrainingsApp() {
         createdBy: authorName,
         date: wzForm.date || TODAY,
         createdAt: new Date().toISOString(),
+        ...(wzForm.dueDate ? {dueDate: wzForm.dueDate} : {}),
       };
       saveWZ([entry, ...wettenZitate]);
       setWzAdding(false);
-      setWzForm({type:'zitat',text:'',date:''});
+      setWzForm({type:'zitat',text:'',date:'',dueDate:''});
     };
 
     const saveEdit = (id) => {
@@ -11073,9 +11075,11 @@ export default function TrainingsApp() {
     };
 
     const typeCfg = {
-      zitat:  {label:'Zitat',  icon:'💬', color:'#67e8f9', bg:'rgba(103,232,249,0.1)', border:'rgba(103,232,249,0.3)'},
-      wette:  {label:'Wette',  icon:'🎰', color:'#fbbf24', bg:'rgba(251,191,36,0.1)',  border:'rgba(251,191,36,0.3)'},
+      zitat:           {label:'Zitat',           icon:'💬', color:'#67e8f9', bg:'rgba(103,232,249,0.1)', border:'rgba(103,232,249,0.3)'},
+      wette:           {label:'Wette',           icon:'🎰', color:'#fbbf24', bg:'rgba(251,191,36,0.1)',  border:'rgba(251,191,36,0.3)'},
+      lessons_learned: {label:'Lessons Learned', icon:'📚', color:'#86efac', bg:'rgba(134,239,172,0.1)', border:'rgba(134,239,172,0.3)'},
     };
+    const wzDueCount = wettenZitate.filter(e => e.dueDate && e.dueDate <= TODAY && !e.dueSeen).length;
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#1a1000 0%,#0d0a00 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
@@ -11111,7 +11115,7 @@ export default function TrainingsApp() {
               <textarea
                 value={wzForm.text}
                 onChange={e=>setWzForm(f=>({...f,text:e.target.value}))}
-                placeholder={wzForm.type==='zitat'?'"Das war das beste Match meines Lebens…" – Wer hat das gesagt?':'Beschreibe die Wette…'}
+                placeholder={wzForm.type==='zitat'?'"Das war das beste Match meines Lebens…" – Wer hat das gesagt?':wzForm.type==='lessons_learned'?'Was haben wir gelernt?':'Beschreibe die Wette…'}
                 rows={4}
                 style={{width:'100%',padding:'12px',background:'rgba(0,0,0,0.3)',border:`1px solid ${acBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',resize:'vertical',boxSizing:'border-box',fontFamily:'inherit',lineHeight:'1.5'}}
               />
@@ -11120,9 +11124,12 @@ export default function TrainingsApp() {
                 <input type="date" value={wzForm.date} onChange={e=>setWzForm(f=>({...f,date:e.target.value}))} max={TODAY}
                   style={{padding:'5px 10px',borderRadius:'8px',border:`1px solid ${acBorder}`,background:'rgba(0,0,0,0.3)',color:'white',fontSize:'12px',outline:'none',fontFamily:'inherit'}}/>
                 {!wzForm.date&&<span style={{fontSize:'11px',color:'rgba(255,255,255,0.2)'}}>Kein Datum = heute</span>}
+                <input type="date" value={wzForm.dueDate} onChange={e=>setWzForm(f=>({...f,dueDate:e.target.value}))} min={TODAY}
+                  style={{padding:'5px 10px',borderRadius:'8px',border:'1px solid rgba(239,68,68,0.4)',background:'rgba(0,0,0,0.3)',color:wzForm.dueDate?'#fca5a5':'rgba(255,255,255,0.3)',fontSize:'12px',outline:'none',fontFamily:'inherit'}}/>
+                {!wzForm.dueDate&&<span style={{fontSize:'11px',color:'rgba(255,255,255,0.2)'}}>Fälligkeitsdatum (optional)</span>}
               </div>
               <div style={{display:'flex',gap:'8px',justifyContent:'flex-end',marginTop:'10px'}}>
-                <button onClick={()=>{setWzAdding(false);setWzForm({type:'zitat',text:'',date:''});}}
+                <button onClick={()=>{setWzAdding(false);setWzForm({type:'zitat',text:'',date:'',dueDate:''});}}
                   style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
                 <button onClick={submitWZ} disabled={!wzForm.text.trim()}
                   style={{padding:'9px 20px',background:wzForm.text.trim()?`linear-gradient(135deg,${ac},#d97706)`:'rgba(255,255,255,0.1)',color:'white',border:'none',borderRadius:'10px',cursor:wzForm.text.trim()?'pointer':'not-allowed',fontWeight:'700',fontSize:'13px',opacity:wzForm.text.trim()?1:0.5}}>
@@ -11140,13 +11147,22 @@ export default function TrainingsApp() {
               {wettenZitate.map(entry=>{
                 const cfg = typeCfg[entry.type] || typeCfg.zitat;
                 const dateStr = entry.date ? new Date(entry.date+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : '';
+                const dueDateStr = entry.dueDate ? new Date(entry.dueDate+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : '';
+                const isDue = entry.dueDate && entry.dueDate <= TODAY && !entry.dueSeen;
                 const isEditing = wzEditId === entry.id;
                 return (
-                  <div key={entry.id} style={{background:'rgba(255,255,255,0.03)',border:`1px solid ${acBorder}`,borderRadius:'14px',overflow:'hidden'}}>
+                  <div key={entry.id} style={{background: isDue ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.03)',border:`1px solid ${isDue ? 'rgba(239,68,68,0.4)' : acBorder}`,borderRadius:'14px',overflow:'hidden'}}>
                     {/* Kopfzeile */}
                     <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 14px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
                       <span style={{fontSize:'11px',fontWeight:'800',color:cfg.color,background:cfg.bg,border:`1px solid ${cfg.border}`,borderRadius:'6px',padding:'2px 8px',flexShrink:0}}>{cfg.icon} {cfg.label}</span>
                       <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)',flex:1}}>{entry.createdBy}</span>
+                      {entry.dueDate && (
+                        <span
+                          onClick={isDue ? ()=>saveWZ(wettenZitate.map(e=>e.id===entry.id?{...e,dueSeen:true}:e)) : undefined}
+                          style={{fontSize:'11px',fontWeight:'700',color:isDue?'#fca5a5':'rgba(255,255,255,0.3)',background:isDue?'rgba(239,68,68,0.15)':'rgba(255,255,255,0.05)',border:`1px solid ${isDue?'rgba(239,68,68,0.4)':'rgba(255,255,255,0.1)'}`,borderRadius:'6px',padding:'2px 8px',cursor:isDue?'pointer':'default',flexShrink:0}}>
+                          {isDue ? '⚠️ ' : '📅 '}fällig {dueDateStr}
+                        </span>
+                      )}
                       <span style={{fontSize:'11px',color:'rgba(255,255,255,0.2)'}}>{dateStr}</span>
                       {entry.edited&&<span style={{fontSize:'10px',color:'rgba(255,255,255,0.2)',fontStyle:'italic'}}>bearbeitet</span>}
                       {canEditEntry(entry) && !isEditing && (
