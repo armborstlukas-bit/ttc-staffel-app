@@ -801,6 +801,7 @@ export default function TrainingsApp() {
   const [wzFilter, setWzFilter] = useState('alle');
   const [wzAddOptionsId, setWzAddOptionsId] = useState(null);
   const [wzAddOptions, setWzAddOptions] = useState(['','']);
+  const [wzExpandedBets, setWzExpandedBets] = useState(new Set());
   const [trainingsdoppel, setTrainingsdoppel] = useState([]);
   const [tmDoppelAdding, setTmDoppelAdding] = useState(false);
   const [tmDoppelEditId, setTmDoppelEditId] = useState(null);
@@ -11075,13 +11076,42 @@ export default function TrainingsApp() {
       setWzForm({type:'zitat',text:'',date:'',dueDate:'',options:['','']});
     };
 
+    const daysDiff = (a, b) => Math.floor((new Date(b) - new Date(a)) / 86400000);
+
+    const canPlaceNewBet = (entry) => {
+      const agedays = daysDiff(entry.createdAt || entry.date+'T00:00:00', new Date().toISOString());
+      if (agedays >= 28) return false;
+      if (entry.dueDate) {
+        const betPeriod = daysDiff(entry.createdAt || entry.date+'T00:00:00', entry.dueDate+'T23:59:59');
+        const daysLeft  = daysDiff(new Date().toISOString(), entry.dueDate+'T23:59:59');
+        if (betPeriod >= 21) { if (daysLeft <= 21) return false; }
+        else                  { if (daysLeft <= 2)  return false; }
+      }
+      return true;
+    };
+
+    const canChangeBet = (entry) => {
+      const ts = entry.betTimestamps?.[authorName];
+      if (!ts) return true;
+      return (Date.now() - new Date(ts).getTime()) < 86400000;
+    };
+
     const placeBet = (entryId, optionIdx) => {
       const entry = wettenZitate.find(e=>e.id===entryId);
       if (!entry) return;
+      const hadBet = (entry.bets||{})[authorName] !== undefined;
+      if (hadBet && !canChangeBet(entry)) return;
+      if (!hadBet && !canPlaceNewBet(entry)) return;
       const bets = {...(entry.bets||{})};
-      if (bets[authorName] === optionIdx) { delete bets[authorName]; }
-      else { bets[authorName] = optionIdx; }
-      saveWZ(wettenZitate.map(e=>e.id===entryId?{...e,bets}:e));
+      const betTimestamps = {...(entry.betTimestamps||{})};
+      if (bets[authorName] === optionIdx) {
+        delete bets[authorName];
+        delete betTimestamps[authorName];
+      } else {
+        bets[authorName] = optionIdx;
+        betTimestamps[authorName] = new Date().toISOString();
+      }
+      saveWZ(wettenZitate.map(e=>e.id===entryId?{...e,bets,betTimestamps}:e));
     };
 
     const saveEdit = (id) => {
@@ -11293,18 +11323,51 @@ export default function TrainingsApp() {
                         {entry.options?.length>0 && (() => {
                           const bets = entry.bets || {};
                           const myBet = bets[authorName];
+                          const hasBet = myBet !== undefined;
                           const totalVotes = Object.keys(bets).length;
+                          const isExpanded = wzExpandedBets.has(entry.id);
+                          const toggleExpand = () => setWzExpandedBets(prev => { const s=new Set(prev); s.has(entry.id)?s.delete(entry.id):s.add(entry.id); return s; });
+                          const betOpen = canPlaceNewBet(entry);
+                          const changeOpen = hasBet && canChangeBet(entry);
+                          const canAct = (!hasBet && betOpen) || (hasBet && changeOpen);
+
+                          // Compact summary when voted and collapsed
+                          if (hasBet && !isExpanded) {
+                            const myOptLabel = entry.options[myBet];
+                            return (
+                              <div style={{padding:'0 14px 12px'}}>
+                                <button onClick={toggleExpand}
+                                  style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'9px',cursor:'pointer',gap:'8px'}}>
+                                  <span style={{fontSize:'13px',fontWeight:'700',color:'#fbbf24'}}>✓ {myOptLabel}</span>
+                                  <div style={{display:'flex',alignItems:'center',gap:'8px',flexShrink:0}}>
+                                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{totalVotes} {totalVotes===1?'Stimme':'Stimmen'}</span>
+                                    {changeOpen && <span style={{fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>änderbar</span>}
+                                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>▾ Details</span>
+                                  </div>
+                                </button>
+                              </div>
+                            );
+                          }
+
                           return (
                             <div style={{padding:'0 14px 14px',display:'flex',flexDirection:'column',gap:'7px'}}>
-                              <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',fontWeight:'700',marginBottom:'2px'}}>🗳️ Abstimmen · {totalVotes} {totalVotes===1?'Stimme':'Stimmen'}</span>
+                              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'2px'}}>
+                                <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',fontWeight:'700'}}>
+                                  🗳️ {betOpen ? 'Abstimmen' : 'Geschlossen'} · {totalVotes} {totalVotes===1?'Stimme':'Stimmen'}
+                                  {!betOpen && <span style={{marginLeft:'6px',color:'rgba(239,68,68,0.6)'}}>🔒</span>}
+                                </span>
+                                {hasBet && <button onClick={toggleExpand} style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',background:'none',border:'none',cursor:'pointer',padding:'0'}}>▴ Einklappen</button>}
+                              </div>
+                              {!betOpen && !hasBet && <span style={{fontSize:'11px',color:'rgba(239,68,68,0.5)',marginBottom:'2px'}}>Wettzeitraum abgelaufen – keine neue Wette möglich.</span>}
+                              {hasBet && !changeOpen && <span style={{fontSize:'11px',color:'rgba(239,68,68,0.5)',marginBottom:'2px'}}>Wette abgegeben – Änderungsfenster (24h) abgelaufen.</span>}
                               {entry.options.map((opt,i)=>{
                                 const count = Object.values(bets).filter(v=>v===i).length;
                                 const pct = totalVotes>0 ? Math.round(count/totalVotes*100) : 0;
                                 const isMine = myBet===i;
                                 const voters = Object.entries(bets).filter(([,v])=>v===i).map(([n])=>n);
                                 return (
-                                  <button key={i} onClick={()=>placeBet(entry.id,i)}
-                                    style={{position:'relative',padding:'9px 12px',borderRadius:'9px',border:`2px solid ${isMine?'#fbbf24':'rgba(255,255,255,0.1)'}`,background:isMine?'rgba(251,191,36,0.12)':'rgba(255,255,255,0.04)',cursor:'pointer',textAlign:'left',overflow:'hidden'}}>
+                                  <button key={i} onClick={()=>canAct&&placeBet(entry.id,i)}
+                                    style={{position:'relative',padding:'9px 12px',borderRadius:'9px',border:`2px solid ${isMine?'#fbbf24':'rgba(255,255,255,0.1)'}`,background:isMine?'rgba(251,191,36,0.12)':'rgba(255,255,255,0.04)',cursor:canAct?'pointer':'default',textAlign:'left',overflow:'hidden',opacity:canAct||isMine?1:0.6}}>
                                     <div style={{position:'absolute',top:0,left:0,height:'100%',width:`${pct}%`,background:isMine?'rgba(251,191,36,0.12)':'rgba(255,255,255,0.05)',borderRadius:'7px',transition:'width 0.3s'}}/>
                                     <div style={{position:'relative',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px'}}>
                                       <span style={{fontSize:'13px',fontWeight:isMine?'800':'600',color:isMine?'#fbbf24':'rgba(255,255,255,0.8)'}}>{isMine?'✓ ':''}{opt}</span>
