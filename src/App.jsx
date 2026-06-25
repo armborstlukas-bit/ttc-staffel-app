@@ -795,7 +795,7 @@ export default function TrainingsApp() {
   const [wettenZitate, setWettenZitate] = useState([]);
   const [wzAdding, setWzAdding] = useState(false);
   const [wzEditId, setWzEditId] = useState(null);
-  const [wzForm, setWzForm] = useState({type:'zitat',text:'',date:'',dueDate:''});
+  const [wzForm, setWzForm] = useState({type:'zitat',text:'',date:'',dueDate:'',options:['','']});
   const [wzEditText, setWzEditText] = useState('');
   const [wzSearch, setWzSearch] = useState('');
   const [wzFilter, setWzFilter] = useState('alle');
@@ -11056,6 +11056,8 @@ export default function TrainingsApp() {
 
     const submitWZ = () => {
       if (!wzForm.text.trim()) return;
+      const validOptions = wzForm.type==='wette' ? wzForm.options.map(o=>o.trim()).filter(Boolean) : [];
+      if (wzForm.type==='wette' && validOptions.length < 2) return;
       const entry = {
         id:'wz_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
         type: wzForm.type,
@@ -11064,10 +11066,20 @@ export default function TrainingsApp() {
         date: wzForm.date || TODAY,
         createdAt: new Date().toISOString(),
         ...(wzForm.dueDate ? {dueDate: wzForm.dueDate} : {}),
+        ...(validOptions.length ? {options: validOptions, bets: {}} : {}),
       };
       saveWZ([entry, ...wettenZitate]);
       setWzAdding(false);
-      setWzForm({type:'zitat',text:'',date:'',dueDate:''});
+      setWzForm({type:'zitat',text:'',date:'',dueDate:'',options:['','']});
+    };
+
+    const placeBet = (entryId, optionIdx) => {
+      const entry = wettenZitate.find(e=>e.id===entryId);
+      if (!entry) return;
+      const bets = {...(entry.bets||{})};
+      if (bets[authorName] === optionIdx) { delete bets[authorName]; }
+      else { bets[authorName] = optionIdx; }
+      saveWZ(wettenZitate.map(e=>e.id===entryId?{...e,bets}:e));
     };
 
     const saveEdit = (id) => {
@@ -11138,6 +11150,29 @@ export default function TrainingsApp() {
                 rows={4}
                 style={{width:'100%',padding:'12px',background:'rgba(0,0,0,0.3)',border:`1px solid ${acBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',resize:'vertical',boxSizing:'border-box',fontFamily:'inherit',lineHeight:'1.5'}}
               />
+              {/* Wett-Optionen */}
+              {wzForm.type==='wette' && (
+                <div style={{marginTop:'12px',padding:'12px',background:'rgba(251,191,36,0.05)',border:'1px solid rgba(251,191,36,0.15)',borderRadius:'10px'}}>
+                  <span style={{fontSize:'12px',fontWeight:'700',color:'rgba(251,191,36,0.7)',display:'block',marginBottom:'8px'}}>🎯 Wett-Optionen (min. 2)</span>
+                  <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+                    {wzForm.options.map((opt,i)=>(
+                      <div key={i} style={{display:'flex',gap:'6px',alignItems:'center'}}>
+                        <input value={opt} onChange={e=>{const o=[...wzForm.options];o[i]=e.target.value;setWzForm(f=>({...f,options:o}));}}
+                          placeholder={`Option ${i+1}…`}
+                          style={{flex:1,padding:'7px 10px',background:'rgba(0,0,0,0.3)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:'8px',color:'white',fontSize:'13px',outline:'none',fontFamily:'inherit'}}/>
+                        {wzForm.options.length>2&&(
+                          <button onClick={()=>setWzForm(f=>({...f,options:f.options.filter((_,j)=>j!==i)}))}
+                            style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {wzForm.options.length < 6 && (
+                    <button onClick={()=>setWzForm(f=>({...f,options:[...f.options,'']}))}
+                      style={{marginTop:'8px',padding:'5px 12px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:'8px',color:'#fbbf24',fontSize:'12px',fontWeight:'700',cursor:'pointer'}}>+ Option hinzufügen</button>
+                  )}
+                </div>
+              )}
               <div style={{display:'flex',gap:'8px',alignItems:'center',marginTop:'10px',flexWrap:'wrap'}}>
                 <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)',flexShrink:0}}>Von: {authorName}</span>
                 <input type="date" value={wzForm.date} onChange={e=>setWzForm(f=>({...f,date:e.target.value}))} max={TODAY}
@@ -11148,12 +11183,14 @@ export default function TrainingsApp() {
                 {!wzForm.dueDate&&<span style={{fontSize:'11px',color:'rgba(255,255,255,0.2)'}}>Fälligkeitsdatum (optional)</span>}
               </div>
               <div style={{display:'flex',gap:'8px',justifyContent:'flex-end',marginTop:'10px'}}>
-                <button onClick={()=>{setWzAdding(false);setWzForm({type:'zitat',text:'',date:'',dueDate:''});}}
+                <button onClick={()=>{setWzAdding(false);setWzForm({type:'zitat',text:'',date:'',dueDate:'',options:['','']});}}
                   style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
-                <button onClick={submitWZ} disabled={!wzForm.text.trim()}
-                  style={{padding:'9px 20px',background:wzForm.text.trim()?`linear-gradient(135deg,${ac},#d97706)`:'rgba(255,255,255,0.1)',color:'white',border:'none',borderRadius:'10px',cursor:wzForm.text.trim()?'pointer':'not-allowed',fontWeight:'700',fontSize:'13px',opacity:wzForm.text.trim()?1:0.5}}>
+                {(() => { const ok = wzForm.text.trim() && (wzForm.type!=='wette'||wzForm.options.filter(o=>o.trim()).length>=2); return (
+                <button onClick={submitWZ} disabled={!ok}
+                  style={{padding:'9px 20px',background:ok?`linear-gradient(135deg,${ac},#d97706)`:'rgba(255,255,255,0.1)',color:'white',border:'none',borderRadius:'10px',cursor:ok?'pointer':'not-allowed',fontWeight:'700',fontSize:'13px',opacity:ok?1:0.5}}>
                   Speichern
                 </button>
+                ); })()}
               </div>
             </div>
           )}
@@ -11211,7 +11248,38 @@ export default function TrainingsApp() {
                         </div>
                       </div>
                     ) : (
-                      <p style={{margin:0,padding:'12px 14px',fontSize:'14px',color:'rgba(255,255,255,0.85)',lineHeight:'1.6',whiteSpace:'pre-wrap'}}>{entry.text}</p>
+                      <>
+                        <p style={{margin:0,padding:'12px 14px 10px',fontSize:'14px',color:'rgba(255,255,255,0.85)',lineHeight:'1.6',whiteSpace:'pre-wrap'}}>{entry.text}</p>
+                        {entry.options?.length>0 && (() => {
+                          const bets = entry.bets || {};
+                          const myBet = bets[authorName];
+                          const totalVotes = Object.keys(bets).length;
+                          return (
+                            <div style={{padding:'0 14px 14px',display:'flex',flexDirection:'column',gap:'7px'}}>
+                              <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',fontWeight:'700',marginBottom:'2px'}}>🗳️ Abstimmen · {totalVotes} {totalVotes===1?'Stimme':'Stimmen'}</span>
+                              {entry.options.map((opt,i)=>{
+                                const count = Object.values(bets).filter(v=>v===i).length;
+                                const pct = totalVotes>0 ? Math.round(count/totalVotes*100) : 0;
+                                const isMine = myBet===i;
+                                const voters = Object.entries(bets).filter(([,v])=>v===i).map(([n])=>n);
+                                return (
+                                  <button key={i} onClick={()=>placeBet(entry.id,i)}
+                                    style={{position:'relative',padding:'9px 12px',borderRadius:'9px',border:`2px solid ${isMine?'#fbbf24':'rgba(255,255,255,0.1)'}`,background:isMine?'rgba(251,191,36,0.12)':'rgba(255,255,255,0.04)',cursor:'pointer',textAlign:'left',overflow:'hidden'}}>
+                                    <div style={{position:'absolute',top:0,left:0,height:'100%',width:`${pct}%`,background:isMine?'rgba(251,191,36,0.12)':'rgba(255,255,255,0.05)',borderRadius:'7px',transition:'width 0.3s'}}/>
+                                    <div style={{position:'relative',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px'}}>
+                                      <span style={{fontSize:'13px',fontWeight:isMine?'800':'600',color:isMine?'#fbbf24':'rgba(255,255,255,0.8)'}}>{isMine?'✓ ':''}{opt}</span>
+                                      <div style={{display:'flex',alignItems:'center',gap:'6px',flexShrink:0}}>
+                                        {voters.length>0&&<span style={{fontSize:'10px',color:'rgba(255,255,255,0.3)'}}>{voters.join(', ')}</span>}
+                                        <span style={{fontSize:'12px',fontWeight:'700',color:isMine?'#fbbf24':'rgba(255,255,255,0.4)'}}>{count} ({pct}%)</span>
+                                      </div>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </>
                     )}
                   </div>
                 );
