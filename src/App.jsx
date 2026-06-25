@@ -799,6 +799,8 @@ export default function TrainingsApp() {
   const [wzEditText, setWzEditText] = useState('');
   const [wzSearch, setWzSearch] = useState('');
   const [wzFilter, setWzFilter] = useState('alle');
+  const [wzAddOptionsId, setWzAddOptionsId] = useState(null);
+  const [wzAddOptions, setWzAddOptions] = useState(['','']);
   const [trainingsdoppel, setTrainingsdoppel] = useState([]);
   const [tmDoppelAdding, setTmDoppelAdding] = useState(false);
   const [tmDoppelEditId, setTmDoppelEditId] = useState(null);
@@ -11230,6 +11232,10 @@ export default function TrainingsApp() {
                       {entry.edited&&<span style={{fontSize:'10px',color:'rgba(255,255,255,0.2)',fontStyle:'italic'}}>bearbeitet</span>}
                       {canEditEntry(entry) && !isEditing && (
                         <div style={{display:'flex',gap:'4px',marginLeft:'4px'}}>
+                          {entry.type==='wette' && !entry.options?.length && wzAddOptionsId!==entry.id && (
+                            <button onClick={()=>{setWzAddOptionsId(entry.id);setWzAddOptions(['','']);}}
+                              style={{padding:'3px 8px',borderRadius:'7px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.2)',color:ac,cursor:'pointer',fontSize:'11px',fontWeight:'700',flexShrink:0}}>+ Optionen</button>
+                          )}
                           <button onClick={()=>{setWzEditId(entry.id);setWzEditText(entry.text);}}
                             style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.2)',color:ac,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Pencil size={12}/></button>
                           <button onClick={()=>{if(!window.confirm('Eintrag löschen?'))return;saveWZ(wettenZitate.filter(e=>e.id!==entry.id));}}
@@ -11250,6 +11256,40 @@ export default function TrainingsApp() {
                     ) : (
                       <>
                         <p style={{margin:0,padding:'12px 14px 10px',fontSize:'14px',color:'rgba(255,255,255,0.85)',lineHeight:'1.6',whiteSpace:'pre-wrap'}}>{entry.text}</p>
+                        {wzAddOptionsId===entry.id && (
+                          <div style={{margin:'0 14px 14px',padding:'12px',background:'rgba(251,191,36,0.05)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:'10px'}}>
+                            <span style={{fontSize:'12px',fontWeight:'700',color:'rgba(251,191,36,0.7)',display:'block',marginBottom:'8px'}}>🎯 Optionen hinzufügen (min. 2)</span>
+                            <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+                              {wzAddOptions.map((opt,i)=>(
+                                <div key={i} style={{display:'flex',gap:'6px',alignItems:'center'}}>
+                                  <input value={opt} onChange={e=>{const o=[...wzAddOptions];o[i]=e.target.value;setWzAddOptions(o);}}
+                                    placeholder={`Option ${i+1}…`}
+                                    style={{flex:1,padding:'7px 10px',background:'rgba(0,0,0,0.3)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:'8px',color:'white',fontSize:'13px',outline:'none',fontFamily:'inherit'}}/>
+                                  {wzAddOptions.length>2&&(
+                                    <button onClick={()=>setWzAddOptions(wzAddOptions.filter((_,j)=>j!==i))}
+                                      style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                            {wzAddOptions.length<6&&(
+                              <button onClick={()=>setWzAddOptions([...wzAddOptions,''])}
+                                style={{marginTop:'8px',padding:'5px 12px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:'8px',color:'#fbbf24',fontSize:'12px',fontWeight:'700',cursor:'pointer'}}>+ Option</button>
+                            )}
+                            <div style={{display:'flex',gap:'8px',justifyContent:'flex-end',marginTop:'10px'}}>
+                              <button onClick={()=>setWzAddOptionsId(null)}
+                                style={{padding:'6px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>Abbrechen</button>
+                              <button
+                                disabled={wzAddOptions.filter(o=>o.trim()).length<2}
+                                onClick={()=>{
+                                  const validOpts=wzAddOptions.map(o=>o.trim()).filter(Boolean);
+                                  saveWZ(wettenZitate.map(e=>e.id===entry.id?{...e,options:validOpts,bets:{}}:e));
+                                  setWzAddOptionsId(null);
+                                }}
+                                style={{padding:'6px 16px',background:wzAddOptions.filter(o=>o.trim()).length>=2?`linear-gradient(135deg,${ac},#d97706)`:'rgba(255,255,255,0.1)',border:'none',borderRadius:'8px',color:'white',fontWeight:'700',fontSize:'12px',cursor:wzAddOptions.filter(o=>o.trim()).length>=2?'pointer':'not-allowed',opacity:wzAddOptions.filter(o=>o.trim()).length>=2?1:0.5}}>Speichern</button>
+                            </div>
+                          </div>
+                        )}
                         {entry.options?.length>0 && (() => {
                           const bets = entry.bets || {};
                           const myBet = bets[authorName];
