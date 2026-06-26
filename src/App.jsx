@@ -703,6 +703,7 @@ export default function TrainingsApp() {
   const [pwSuccess, setPwSuccess]               = useState(false); // {sessionId, repeatId, blockSize}
   const [adminRoleDialog, setAdminRoleDialog]   = useState(null); // { uid, newRoles } | null
   const [pendingRoleSelections, setPendingRoleSelections] = useState({}); // { [uid]: roles[] } — local only until Freischalten
+  const [pendingSpecialAccess, setPendingSpecialAccess] = useState({}); // { [uid]: {rompel,pfand,pinnwand}[] }
   const [adminRolePw, setAdminRolePw]           = useState('');
   const [adminRoleError, setAdminRoleError]     = useState('');
 
@@ -1205,8 +1206,9 @@ export default function TrainingsApp() {
   const saveRompelData                   = u => { setRompelData(u);                   setDoc(doc(db,'ttc','rompel'),                        u); };
   const savePfandDaten                   = u => { setPfandDaten(u);                   setDoc(doc(db,'ttc','pfandkasse'),                    u); };
   const saveAktiveSpieler                = d => { setAktiveSpieler(d);               setDoc(doc(db,'ttc','aktiveSpieler'),                  d); };
-  const canAccessRompel = () => userRole === 'admin' || (canEdit() && (appSettings.rompelTrainers || []).includes(user?.uid));
-  const canAccessPfand  = () => userRole === 'admin' || (canEdit() && (appSettings.pfandTrainers  || []).includes(user?.uid));
+  const canAccessRompel    = () => userRole === 'admin' || (appSettings.rompelTrainers  || []).includes(user?.uid);
+  const canAccessPfand     = () => userRole === 'admin' || (appSettings.pfandTrainers   || []).includes(user?.uid);
+  const canAccessPinnwand  = () => userRole === 'admin' || (appSettings.pinnwandUsers   || []).includes(user?.uid);
   const linkPlayerToUser = async (uid, spielerId) => {
     const cur = allUsersRef.current;
     const profile = cur[uid]||{};
@@ -3450,7 +3452,15 @@ export default function TrainingsApp() {
                           const sel=pendingRoleSelections[u.uid];
                           const assigned=sel&&sel.length>0?sel:(u.roles||[u.role]).filter(r=>r!=='pending');
                           saveUserRoles(u.uid,assigned.length>0?assigned:['eltern']);
+                          // Spezialbereiche anwenden
+                          const sa=pendingSpecialAccess[u.uid]||{};
+                          const newSettings={...appSettings};
+                          ['pfandTrainers','rompelTrainers','pinnwandUsers'].forEach(k=>{
+                            if(sa[k]){const cur=newSettings[k]||[];if(!cur.includes(u.uid))newSettings[k]=[...cur,u.uid];}
+                          });
+                          saveAppSettings(newSettings);
                           setPendingRoleSelections(prev=>{const n={...prev};delete n[u.uid];return n;});
+                          setPendingSpecialAccess(prev=>{const n={...prev};delete n[u.uid];return n;});
                         }} style={{padding:'10px 20px',background:'#16a34a',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px',whiteSpace:'nowrap',boxShadow:'0 2px 8px rgba(22,163,74,0.3)'}}>
                           ✓ Freischalten
                         </button>
@@ -3464,6 +3474,14 @@ export default function TrainingsApp() {
                             const next=active?base.filter(r=>r!==key):[...base,key];
                             setPendingRoleSelections(p=>({...p,[u.uid]:next.length>0?next:base}));
                           }} style={{padding:'3px 9px',borderRadius:'20px',border:`2px solid ${cfg.color}`,background:active?cfg.color:cfg.bg,color:active?'white':cfg.color,cursor:'pointer',fontWeight:'600',fontSize:'11px'}}>{cfg.label}</button>;
+                        })}
+                      </div>
+                      <div style={{display:'flex',gap:'5px',flexWrap:'wrap',alignItems:'center',marginTop:'6px'}}>
+                        <span style={{fontSize:'12px',color:'#555',fontWeight:'600'}}>Spezialbereiche:</span>
+                        {[{k:'pfandTrainers',l:'♻️ Pfandkasse'},{k:'rompelTrainers',l:'🖼️ Rompel'},{k:'pinnwandUsers',l:'📋 Pinnwand'}].map(({k,l})=>{
+                          const on=(pendingSpecialAccess[u.uid]||{})[k];
+                          return <button key={k} onClick={()=>setPendingSpecialAccess(p=>({...p,[u.uid]:{...(p[u.uid]||{}),[k]:!on}}))}
+                            style={{padding:'3px 9px',borderRadius:'20px',border:`2px solid ${on?'#16a34a':'#d1d5db'}`,background:on?'#dcfce7':'#f9fafb',color:on?'#16a34a':'#6b7280',cursor:'pointer',fontWeight:'600',fontSize:'11px'}}>{l}</button>;
                         })}
                       </div>
                     </div>
@@ -3679,71 +3697,50 @@ export default function TrainingsApp() {
           );
         })()}
 
-          {/* Pfandkasse Zugang */}
-          {(()=>{
-            const trainers = Object.values(allUsers).filter(u=>(u.roles||[u.role]).includes('trainer')).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-            const currentList = appSettings.pfandTrainers || [];
-            const toggle = uid => {
-              const next = currentList.includes(uid) ? currentList.filter(x=>x!==uid) : [...currentList, uid];
-              saveAppSettings({...appSettings, pfandTrainers: next});
-            };
+          {/* Spezialbereiche Zugang */}
+          {[
+            {key:'pfandTrainers',   icon:'♻️',  label:'Pfandkasse',    color:'#16a34a', accent:'#86efac'},
+            {key:'rompelTrainers',  icon:null,  label:'Rompel Bereich',color:'#be185d', accent:'#fda4af'},
+            {key:'pinnwandUsers',   icon:'📋',  label:'Pinnwand',      color:'#b45309', accent:'#fde68a'},
+          ].map(({key,icon,label,color,accent})=>{
+            const allRegistered = Object.values(allUsers).filter(u=>u.role!=='pending').sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+            const currentList = appSettings[key] || [];
+            const add = uid => { if(!currentList.includes(uid)) saveAppSettings({...appSettings,[key]:[...currentList,uid]}); };
+            const remove = uid => saveAppSettings({...appSettings,[key]:currentList.filter(x=>x!==uid)});
+            const available = allRegistered.filter(u=>!currentList.includes(u.uid));
             return (
-              <div style={{...s.card,marginTop:'16px'}}>
-                <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'14px'}}>
-                  <span style={{fontSize:'24px'}}>♻️</span>
-                  <span style={{fontWeight:'800',color:'#16a34a',fontSize:'14px'}}>Pfandkasse — Trainer-Zugang</span>
+              <div key={key} style={{...s.card,marginTop:'16px'}}>
+                <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'10px'}}>
+                  {key==='rompelTrainers'
+                    ? <img src="/rompel.jpg" alt="" style={{width:'28px',height:'28px',borderRadius:'50%',objectFit:'cover',objectPosition:'center top',border:`2px solid ${accent}`}}/>
+                    : <span style={{fontSize:'22px'}}>{icon}</span>}
+                  <span style={{fontWeight:'800',color,fontSize:'14px'}}>{label} — Zugang</span>
                 </div>
-                <p style={{margin:'0 0 10px',fontSize:'12px',color:'#6b7280'}}>Admins haben immer Zugang. Wähle Trainer aus, die ebenfalls Zugriff erhalten:</p>
-                {trainers.length === 0
-                  ? <p style={{fontSize:'13px',color:'#9ca3af'}}>Keine Trainer registriert.</p>
-                  : <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
-                    {trainers.map(u=>{
-                      const on = currentList.includes(u.uid);
+                <p style={{margin:'0 0 10px',fontSize:'12px',color:'#6b7280'}}>Admins haben immer Zugang. Wähle Nutzer aus:</p>
+                {/* Dropdown */}
+                <select defaultValue="" onChange={e=>{if(e.target.value){add(e.target.value);e.target.value='';}}}
+                  style={{width:'100%',padding:'8px 10px',border:`1px solid ${accent}`,borderRadius:'8px',fontSize:'13px',background:'white',color:'#374151',cursor:'pointer',marginBottom:'10px'}}>
+                  <option value="">+ Nutzer hinzufügen…</option>
+                  {available.map(u=><option key={u.uid} value={u.uid}>{u.name||u.email}</option>)}
+                </select>
+                {/* Tag-Liste der freigeschalteten Nutzer */}
+                {currentList.length===0
+                  ? <p style={{margin:0,fontSize:'12px',color:'#9ca3af',fontStyle:'italic'}}>Noch niemand freigeschaltet.</p>
+                  : <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+                    {currentList.map(uid=>{
+                      const u=allUsers[uid];
                       return (
-                        <button key={u.uid} onClick={()=>toggle(u.uid)}
-                          style={{padding:'7px 14px',borderRadius:'20px',border:`1px solid ${on?'#86efac':'#d1d5db'}`,background:on?'rgba(134,239,172,0.15)':'#f9fafb',color:on?'#16a34a':'#374151',cursor:'pointer',fontWeight:'700',fontSize:'13px',transition:'all 0.15s'}}>
-                          {on?'✓ ':''}{u.name||u.email}
-                        </button>
+                        <span key={uid} style={{display:'inline-flex',alignItems:'center',gap:'5px',padding:'3px 10px 3px 12px',borderRadius:'20px',background:`rgba(${key==='pfandTrainers'?'134,239,172':key==='rompelTrainers'?'253,164,175':'253,230,138'},0.15)`,border:`1px solid ${accent}`,fontSize:'12px',fontWeight:'700',color}}>
+                          {u?.name||u?.email||uid}
+                          <button onClick={()=>remove(uid)} style={{background:'none',border:'none',cursor:'pointer',color,padding:'0',lineHeight:1,fontSize:'14px',fontWeight:'700'}}>×</button>
+                        </span>
                       );
                     })}
                   </div>
                 }
               </div>
             );
-          })()}
-
-          {/* Rompel Bereich Zugang */}
-          {(()=>{
-            const trainers = Object.values(allUsers).filter(u=>(u.roles||[u.role]).includes('trainer')).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-            const currentList = appSettings.rompelTrainers || [];
-            const toggle = uid => {
-              const next = currentList.includes(uid) ? currentList.filter(x=>x!==uid) : [...currentList, uid];
-              saveAppSettings({...appSettings, rompelTrainers: next});
-            };
-            return (
-              <div style={{...s.card,marginTop:'16px'}}>
-                <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'14px'}}>
-                  <img src="/rompel.jpg" alt="" style={{width:'32px',height:'32px',borderRadius:'50%',objectFit:'cover',objectPosition:'center top',border:'2px solid #fda4af'}}/>
-                  <span style={{fontWeight:'800',color:'#fda4af',fontSize:'14px'}}>Rompel Bereich — Trainer-Zugang</span>
-                </div>
-                <p style={{margin:'0 0 10px',fontSize:'12px',color:'#6b7280'}}>Admins haben immer Zugang. Wähle Trainer aus, die ebenfalls Zugriff erhalten:</p>
-                {trainers.length === 0
-                  ? <p style={{fontSize:'13px',color:'#9ca3af'}}>Keine Trainer registriert.</p>
-                  : <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
-                    {trainers.map(u=>{
-                      const on = currentList.includes(u.uid);
-                      return (
-                        <button key={u.uid} onClick={()=>toggle(u.uid)}
-                          style={{padding:'7px 14px',borderRadius:'20px',border:`1px solid ${on?'#fda4af':'#d1d5db'}`,background:on?'rgba(253,164,175,0.15)':'#f9fafb',color:on?'#be185d':'#374151',cursor:'pointer',fontWeight:'700',fontSize:'13px',transition:'all 0.15s'}}>
-                          {on?'✓ ':''}{u.name||u.email}
-                        </button>
-                      );
-                    })}
-                  </div>
-                }
-              </div>
-            );
-          })()}
+          })}
 
         </div>
       </div>
@@ -3838,7 +3835,7 @@ export default function TrainingsApp() {
           {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
           {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>navTo('notifications'), badge: unreadCount},
           {label:'Materialverwaltung',icon:'🏓', color:'#fb923c', bg:'rgba(251,146,60,0.08)', border:'rgba(251,146,60,0.25)',  action:()=>navTo('materialverwaltung')},
-          {label:'Pinnwand',  icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.2)',  action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0},
+          ...(canAccessPinnwand()?[{label:'Pinnwand',  icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.2)',  action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
           ...(canEdit()?[
             {label:'Trikotgrößen', icon:'👕', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.2)', action:()=>navTo('trikotgroessen')},
           ]:[]),
@@ -4159,7 +4156,7 @@ export default function TrainingsApp() {
               {label:'Gegnerlogbuch', icon:'🎯', desc:`${gegnerLogbuch.length} ${gegnerLogbuch.length===1?'Eintrag':'Einträge'} · Taktiken & Hinweise`, color:'#67e8f9', bg:'rgba(8,145,178,0.08)', border:'rgba(8,145,178,0.2)', action:()=>navTo('gegnerlogbuch')},
               {label:'TTC News',        icon:'📰', desc:'Aktuelle Vereinsnachrichten',             color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',  action:()=>{navTo('ttcnews');fetchTtcNews();}},
               {label:'Trainingsmatches',icon:'⚔️', desc:'Duelle & Allzeittabelle',                  color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>navTo('trainingsmatches')},
-              {label:'Pinnwand', icon:'📋', desc:'Wetten, Zitate & Lessons Learned', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0},
+              ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', desc:'Wetten, Zitate & Lessons Learned', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
               {label:'MyTischtennis', icon:'🏓', desc:'Vereinsübersicht auf MyTischtennis',                                                                  color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)',  action:()=>(()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);})()},
             ].map(t=>(
               <button key={t.label} onClick={t.action}
@@ -11049,7 +11046,7 @@ export default function TrainingsApp() {
   }
 
   // ── WETTEN & ZITATE ─────────────────────────────────────────────────────
-  if (view === 'wettenZitate' && ['aktiver','trainer','admin'].includes(userRole)) {
+  if (view === 'wettenZitate' && canAccessPinnwand()) {
     const ac = '#fbbf24';
     const acBorder = 'rgba(251,191,36,0.25)';
     const acBg = 'rgba(251,191,36,0.07)';
