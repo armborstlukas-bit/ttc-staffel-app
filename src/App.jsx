@@ -703,7 +703,8 @@ export default function TrainingsApp() {
   const [pwSuccess, setPwSuccess]               = useState(false); // {sessionId, repeatId, blockSize}
   const [adminRoleDialog, setAdminRoleDialog]   = useState(null); // { uid, newRoles } | null
   const [pendingRoleSelections, setPendingRoleSelections] = useState({}); // { [uid]: roles[] } — local only until Freischalten
-  const [pendingSpecialAccess, setPendingSpecialAccess] = useState({}); // { [uid]: {rompel,pfand,pinnwand}[] }
+  const [pendingSpecialAccess, setPendingSpecialAccess] = useState({});
+  const [adminUsersListOpen, setAdminUsersListOpen] = useState(false); // { [uid]: {rompel,pfand,pinnwand}[] }
   const [adminRolePw, setAdminRolePw]           = useState('');
   const [adminRoleError, setAdminRoleError]     = useState('');
 
@@ -3501,8 +3502,12 @@ export default function TrainingsApp() {
             if(active.length===0) return null;
             return (
               <div>
-                <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.5px'}}>Nutzer ({active.length})</p>
-                <div style={{display:'grid',gap:'6px'}}>
+                <button onClick={()=>setAdminUsersListOpen(o=>!o)}
+                  style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'#f8f9fa',border:'1px solid #e5e7eb',borderRadius:'10px',cursor:'pointer',marginBottom: adminUsersListOpen?'10px':'0'}}>
+                  <span style={{fontSize:'11px',fontWeight:'800',color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.5px'}}>Nutzer ({active.length})</span>
+                  <span style={{fontSize:'13px',color:'#9ca3af'}}>{adminUsersListOpen ? '▲' : '▼'}</span>
+                </button>
+                {adminUsersListOpen && <div style={{display:'grid',gap:'6px'}}>
                   {active.map(u=>{
                     const isOpen = expandedUser===u.uid;
                     const rc=ROLE_CONFIG[u.role]||{};
@@ -3634,7 +3639,7 @@ export default function TrainingsApp() {
                       </div>
                     );
                   })}
-                </div>
+                </div>}
               </div>
             );
           })()}
