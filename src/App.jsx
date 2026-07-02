@@ -2127,7 +2127,7 @@ export default function TrainingsApp() {
       const endD=new Date(sy,sm,1);
       const endYM=`${endD.getFullYear()}-${String(endD.getMonth()+1).padStart(2,'0')}`;
       const winners=sdmCalcWinners(endYM, startYM);
-      if (winners) sdmHistoricMonths.push({period:startYM, winners});
+      if (winners && endYM !== sdmLatestM) sdmHistoricMonths.push({period:endYM, winners});
       sm++; if (sm>12){sm=1;sy++;}
     }
   }
@@ -2136,13 +2136,13 @@ export default function TrainingsApp() {
   for (let i=1;i<sdmYears.length;i++) {
     const cy=sdmYears[i], py=sdmYears[i-1];
     const winners=sdmCalcWinners(`${cy}-01`, `${py}-01`);
-    if (winners) sdmHistoricYears.push({period:py, winners});
+    if (winners && cy !== String(sdmLatestYear)) sdmHistoricYears.push({period:cy, winners});
   }
   const sdmCurrentMonthWinners = sdmLatestM && sdmPrevM ? sdmCalcWinners(sdmLatestM, sdmPrevM) : null;
-  const sdmCurrentMonthLabel = sdmPrevM;
+  const sdmCurrentMonthLabel = sdmLatestM;
   const sdmLatestYear = sdmLatestM ? Number(sdmLatestM.slice(0,4)) : new Date().getFullYear();
   const sdmCurrentYearWinners = sdmCalcWinners(`${sdmLatestYear}-01`, `${sdmLatestYear-1}-01`);
-  const sdmCurrentYearLabel = String(sdmLatestYear - 1);
+  const sdmCurrentYearLabel = String(sdmLatestYear);
   // Build per-child wins map from the same historicMonths/Years data
   const spielerDesMonatsWins = {};
   sdmHistoricMonths.forEach(({period, winners}) => {
