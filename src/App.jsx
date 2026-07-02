@@ -2107,7 +2107,7 @@ export default function TrainingsApp() {
       const curr = sdmGetTtrAt(sorted, endYM);
       const prev = sdmGetTtrAt(sorted, startYM);
       if (!curr || !prev) return;
-      if (prev.month === first.month) return;
+      if (curr.month === prev.month) return;
       const diff = curr.ttr - prev.ttr;
       res.push({child: c, diff, currTtr: curr.ttr, prevTtr: prev.ttr});
     });
@@ -2127,22 +2127,22 @@ export default function TrainingsApp() {
       const endD=new Date(sy,sm,1);
       const endYM=`${endD.getFullYear()}-${String(endD.getMonth()+1).padStart(2,'0')}`;
       const winners=sdmCalcWinners(endYM, startYM);
-      if (winners && endYM !== sdmLatestM) sdmHistoricMonths.push({period:endYM, winners});
+      if (winners) sdmHistoricMonths.push({period:startYM, winners});
       sm++; if (sm>12){sm=1;sy++;}
     }
   }
+  const sdmLatestYear = sdmLatestM ? Number(sdmLatestM.slice(0,4)) : new Date().getFullYear();
   const sdmHistoricYears = []; // [{period:'YYYY', winners:[...]}]
   const sdmYears = [...new Set(sdmAllMs.map(m=>m.slice(0,4)))].sort();
   for (let i=1;i<sdmYears.length;i++) {
     const cy=sdmYears[i], py=sdmYears[i-1];
     const winners=sdmCalcWinners(`${cy}-01`, `${py}-01`);
-    if (winners && cy !== String(sdmLatestYear)) sdmHistoricYears.push({period:cy, winners});
+    if (winners) sdmHistoricYears.push({period:py, winners});
   }
   const sdmCurrentMonthWinners = sdmLatestM && sdmPrevM ? sdmCalcWinners(sdmLatestM, sdmPrevM) : null;
-  const sdmCurrentMonthLabel = sdmLatestM;
-  const sdmLatestYear = sdmLatestM ? Number(sdmLatestM.slice(0,4)) : new Date().getFullYear();
+  const sdmCurrentMonthLabel = sdmPrevM;
   const sdmCurrentYearWinners = sdmCalcWinners(`${sdmLatestYear}-01`, `${sdmLatestYear-1}-01`);
-  const sdmCurrentYearLabel = String(sdmLatestYear);
+  const sdmCurrentYearLabel = String(sdmLatestYear - 1);
   // Build per-child wins map from the same historicMonths/Years data
   const spielerDesMonatsWins = {};
   sdmHistoricMonths.forEach(({period, winners}) => {
