@@ -7539,6 +7539,34 @@ export default function TrainingsApp() {
           {kind:'doppel', aPos:[0,1], bPos:[0,1], label:'Doppel'},
         ];
       }
+      if (teamSize === 3) {
+        return [
+          {kind:'doppel', aPos:[0,1], bPos:[0,1], label:'Doppel (Pos 1+2)'},
+          {kind:'einzel', aPos:[0], bPos:[1], label:'Einzel — A1 vs B2'},
+          {kind:'einzel', aPos:[1], bPos:[0], label:'Einzel — A2 vs B1'},
+          {kind:'einzel', aPos:[0], bPos:[2], label:'Einzel — A1 vs B3'},
+          {kind:'einzel', aPos:[2], bPos:[0], label:'Einzel — A3 vs B1'},
+          {kind:'einzel', aPos:[1], bPos:[2], label:'Einzel — A2 vs B3'},
+          {kind:'einzel', aPos:[2], bPos:[1], label:'Einzel — A3 vs B2'},
+          {kind:'einzel', aPos:[0], bPos:[0], label:'Einzel — A1 vs B1'},
+          {kind:'einzel', aPos:[1], bPos:[1], label:'Einzel — A2 vs B2'},
+          {kind:'einzel', aPos:[2], bPos:[2], label:'Einzel — A3 vs B3'},
+        ];
+      }
+      if (teamSize === 4) {
+        return [
+          {kind:'doppel', aPos:[0,1], bPos:[0,1], label:'Doppel 1 (Pos 1+2)'},
+          {kind:'doppel', aPos:[2,3], bPos:[2,3], label:'Doppel 2 (Pos 3+4)'},
+          {kind:'einzel', aPos:[0], bPos:[1], label:'Einzel — A1 vs B2'},
+          {kind:'einzel', aPos:[1], bPos:[0], label:'Einzel — A2 vs B1'},
+          {kind:'einzel', aPos:[2], bPos:[3], label:'Einzel — A3 vs B4'},
+          {kind:'einzel', aPos:[3], bPos:[2], label:'Einzel — A4 vs B3'},
+          {kind:'einzel', aPos:[0], bPos:[0], label:'Einzel — A1 vs B1'},
+          {kind:'einzel', aPos:[1], bPos:[1], label:'Einzel — A2 vs B2'},
+          {kind:'einzel', aPos:[2], bPos:[2], label:'Einzel — A3 vs B3'},
+          {kind:'einzel', aPos:[3], bPos:[3], label:'Einzel — A4 vs B4'},
+        ];
+      }
       return [];
     };
 
@@ -7720,7 +7748,7 @@ export default function TrainingsApp() {
                   <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.5px'}}>Mannschaftsgröße</p>
                   <div style={{display:'flex',gap:'6px',marginBottom:'18px'}}>
                     {[2,3,4,6].map(n=>{
-                      const enabled = n===2;
+                      const enabled = n!==6;
                       return (
                         <button key={n} disabled={!enabled} onClick={()=>enabled&&setPtCreateForm(f=>({...f,teamSize:n}))}
                           style={{...ptBtn(ptCreateForm.teamSize===n&&enabled),flex:'none',width:'62px',fontSize:'14px',opacity:enabled?1:0.4,cursor:enabled?'pointer':'not-allowed',position:'relative'}}>
@@ -7734,7 +7762,7 @@ export default function TrainingsApp() {
                   <div style={{display:'flex',gap:'8px',marginBottom:'22px'}}>
                     {[
                       {v:'kingsCup',label:'Kings Cup',desc:'2 Einzel (1v1, 2v2) + Doppel'},
-                      {v:'korbylonCup',label:'Corbillon Cup',desc:'Kreuz-Einzel + Doppel + 2 Einzel'},
+                      {v:'korbylonCup',label:'Corbillon Cup',desc:'2 Kreuz-Einzel + Doppel + 2 Einzel'},
                     ].map(opt=>(
                       <button key={opt.v} onClick={()=>setPtCreateForm(f=>({...f,teamSystem:opt.v}))}
                         style={{flex:1,padding:'12px 10px',border:`2px solid ${ptCreateForm.teamSystem===opt.v?'#7c3aed':'#e5e7eb'}`,borderRadius:'12px',background:ptCreateForm.teamSystem===opt.v?'rgba(124,58,237,0.08)':'#f9fafb',cursor:'pointer',textAlign:'left'}}>
@@ -7744,6 +7772,18 @@ export default function TrainingsApp() {
                     ))}
                   </div>
                   </>}
+                  {ptCreateForm.teamSize===3&&(
+                    <div style={{padding:'12px 14px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'12px',marginBottom:'22px'}}>
+                      <p style={{margin:'0 0 4px',fontSize:'13px',fontWeight:'700',color:'#555'}}>Spielsystem: 1 Doppel + 9 Einzel</p>
+                      <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>Doppel (Pos. 1+2), dann alle Kreuz-Einzel, zuletzt 1vs1, 2vs2, 3vs3</p>
+                    </div>
+                  )}
+                  {ptCreateForm.teamSize===4&&(
+                    <div style={{padding:'12px 14px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'12px',marginBottom:'22px'}}>
+                      <p style={{margin:'0 0 4px',fontSize:'13px',fontWeight:'700',color:'#555'}}>Spielsystem: 2 Doppel + 8 Einzel</p>
+                      <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>2 Doppel (Pos. 1+2, Pos. 3+4), dann 1vs2, 2vs1, 3vs4, 4vs3, zuletzt 1vs1, 2vs2, 3vs3, 4vs4</p>
+                    </div>
+                  )}
                   </>}
                   {ptCreateForm.type==='ko_runde'&&(
                     <div style={{display:'flex',alignItems:'flex-start',gap:'12px',marginBottom:'20px',padding:'12px 14px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'12px'}}>
@@ -8017,13 +8057,13 @@ export default function TrainingsApp() {
                           style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',marginBottom:'8px',border:`1px solid ${color}55`,borderRadius:'8px',fontSize:'13px',fontWeight:'800',color,outline:'none'}}/>
                         {order.length===0
                           ? <p style={{margin:0,fontSize:'11px',color:'#9ca3af',fontStyle:'italic'}}>Noch keine Spieler zugeordnet</p>
-                          : <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
+                          : <div style={{display:'flex',flexDirection:'column',gap:'5px'}}>
                             {order.map((key,i)=>{
                               const p = allSeeded.find(x=>x.childId===key);
                               return (
-                                <div key={key} style={{display:'flex',alignItems:'center',gap:'6px',padding:'6px 8px',background:'#f9fafb',borderRadius:'8px'}}>
-                                  <span style={{fontSize:'11px',fontWeight:'900',color,minWidth:'16px'}}>{i+1}.</span>
-                                  <span style={{flex:1,fontSize:'12px',fontWeight:'700',color:'#1f2937',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p?.name||'?'}</span>
+                                <div key={key} style={{display:'flex',alignItems:'center',gap:'8px',padding:'7px 8px',background:'#f9fafb',borderRadius:'8px',border:`1px solid ${color}22`}}>
+                                  <span style={{width:'24px',height:'24px',borderRadius:'50%',background:color,color:'white',fontSize:'12px',fontWeight:'900',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>{i+1}</span>
+                                  <span style={{flex:1,fontSize:'12px',fontWeight:'700',color:'#1f2937',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p?.name||'?'} <span style={{color:'#9ca3af',fontWeight:'600'}}>(Nr. {i+1})</span></span>
                                   <button onClick={()=>setOrder(o=>{const n=[...o];if(i>0){[n[i-1],n[i]]=[n[i],n[i-1]];}return n;})} disabled={i===0}
                                     style={{width:'20px',height:'20px',borderRadius:'5px',background:'#f3f4f6',border:'none',cursor:i===0?'default':'pointer',color:i===0?'#d1d5db':'#6b7280',fontSize:'11px',display:'flex',alignItems:'center',justifyContent:'center'}}>↑</button>
                                   <button onClick={()=>setOrder(o=>{const n=[...o];if(i<n.length-1){[n[i+1],n[i]]=[n[i],n[i+1]];}return n;})} disabled={i===order.length-1}
@@ -8579,7 +8619,7 @@ export default function TrainingsApp() {
     if (pt.type === 'team') {
       const { settings, teamA, teamB, matches } = pt;
       const maxSets = settings.winSets * 2 - 1;
-      const teamNames = (m, side) => (side==='a'?m.aPos:m.bPos).map(i=>(side==='a'?teamA:teamB).players[i]?.name||'?').join(' & ');
+      const teamNames = (m, side) => (side==='a'?m.aPos:m.bPos).map(i=>`${i+1}. ${(side==='a'?teamA:teamB).players[i]?.name||'?'}`).join(' & ');
       const winsA = matches.filter(m=>m.result && m.result.sets1>m.result.sets2).length;
       const winsB = matches.filter(m=>m.result && m.result.sets2>m.result.sets1).length;
       const allDone = matches.every(m=>m.result!==null);
@@ -8645,7 +8685,7 @@ export default function TrainingsApp() {
         savePracticeTournaments(newActive); setActivePracticeId(null); navTo('practiceTournaments');
       };
       const inpStyle = {background:'rgba(255,255,255,0.09)',border:'1px solid rgba(167,139,250,0.25)',borderRadius:'8px',color:'white',fontSize:'20px',fontWeight:'900',textAlign:'center',width:'58px',height:'44px',outline:'none'};
-      const systemLabel = pt.teamSystem==='korbylonCup' ? 'Corbillon Cup' : 'Kings Cup';
+      const systemLabel = pt.teamSize===3 ? '1 Doppel + 9 Einzel' : pt.teamSize===4 ? '2 Doppel + 8 Einzel' : (pt.teamSystem==='korbylonCup' ? 'Corbillon Cup' : 'Kings Cup');
 
       return (
         <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
@@ -8672,15 +8712,27 @@ export default function TrainingsApp() {
             {/* ── Team-Scoreboard ──────────────────────────────── */}
             <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'24px',padding:'18px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(167,139,250,0.15)',borderRadius:'16px'}}>
               <div style={{flex:1,textAlign:'right'}}>
-                <p style={{margin:'0 0 4px',fontWeight:'900',fontSize:isMobile?'14px':'17px',color:teamWinner==='A'?'#4ade80':'white'}}>{teamA.name}</p>
-                <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.3)'}}>{teamA.players.map(p=>p.name).join(', ')}</p>
+                <p style={{margin:'0 0 6px',fontWeight:'900',fontSize:isMobile?'14px':'17px',color:teamWinner==='A'?'#4ade80':'white'}}>{teamA.name}</p>
+                <div style={{display:'flex',flexDirection:'column',gap:'2px',alignItems:'flex-end'}}>
+                  {teamA.players.map((p,i)=>(
+                    <span key={p.childId+i} style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'flex',alignItems:'center',gap:'5px'}}>
+                      {p.name}<span style={{width:'15px',height:'15px',borderRadius:'50%',background:'rgba(124,58,237,0.3)',color:'#c4b5fd',fontSize:'9px',fontWeight:'900',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{i+1}</span>
+                    </span>
+                  ))}
+                </div>
               </div>
               <div style={{textAlign:'center',flexShrink:0,minWidth:'70px'}}>
                 <span style={{fontSize:'26px',fontWeight:'900',color:'white'}}>{winsA}:{winsB}</span>
               </div>
               <div style={{flex:1}}>
-                <p style={{margin:'0 0 4px',fontWeight:'900',fontSize:isMobile?'14px':'17px',color:teamWinner==='B'?'#4ade80':'white'}}>{teamB.name}</p>
-                <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.3)'}}>{teamB.players.map(p=>p.name).join(', ')}</p>
+                <p style={{margin:'0 0 6px',fontWeight:'900',fontSize:isMobile?'14px':'17px',color:teamWinner==='B'?'#4ade80':'white'}}>{teamB.name}</p>
+                <div style={{display:'flex',flexDirection:'column',gap:'2px'}}>
+                  {teamB.players.map((p,i)=>(
+                    <span key={p.childId+i} style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'flex',alignItems:'center',gap:'5px'}}>
+                      <span style={{width:'15px',height:'15px',borderRadius:'50%',background:'rgba(219,39,119,0.3)',color:'#f9a8d4',fontSize:'9px',fontWeight:'900',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{i+1}</span>{p.name}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -9460,8 +9512,8 @@ export default function TrainingsApp() {
                               <p style={{margin:'0 0 6px',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.45)',textTransform:'uppercase',letterSpacing:'1.5px'}}>Partien</p>
                               <div style={{display:'grid',gap:'3px'}}>
                                 {(pt.matches||[]).map((m,mi)=>{
-                                  const nameA=(m.aPos||[]).map(i=>pt.teamA?.players?.[i]?.name||'?').join(' & ');
-                                  const nameB=(m.bPos||[]).map(i=>pt.teamB?.players?.[i]?.name||'?').join(' & ');
+                                  const nameA=(m.aPos||[]).map(i=>`${i+1}. ${pt.teamA?.players?.[i]?.name||'?'}`).join(' & ');
+                                  const nameB=(m.bPos||[]).map(i=>`${i+1}. ${pt.teamB?.players?.[i]?.name||'?'}`).join(' & ');
                                   const res=m.result;
                                   return (
                                     <div key={mi} style={{display:'flex',alignItems:'center',gap:'8px',padding:'6px 10px',background:'rgba(255,255,255,0.03)',borderRadius:'7px'}}>
