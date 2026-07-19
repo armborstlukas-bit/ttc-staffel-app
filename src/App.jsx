@@ -3345,7 +3345,16 @@ export default function TrainingsApp() {
   }
 
   // ── ADMIN ────────────────────────────────────────────────────
-  if (view==='admin') {
+  if (view==='admin' && userRole!=='admin') {
+    return (
+      <div style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'16px',color:'white',padding:'20px',textAlign:'center'}}>
+        <span style={{fontSize:'48px'}}>🔒</span>
+        <p style={{fontSize:'16px',color:'rgba(255,255,255,0.6)',fontWeight:'700',margin:0}}>Nur Admins haben Zugriff auf die Nutzerverwaltung.</p>
+        <button onClick={()=>navTo('home')} style={{padding:'10px 20px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.25)',borderRadius:'10px',color:'#4ade80',cursor:'pointer',fontWeight:'700'}}>← Zurück</button>
+      </div>
+    );
+  }
+  if (view==='admin' && userRole==='admin') {
     const allChildrenList=Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
     const pendingCount=Object.values(allUsers).filter(u=>u.role==='pending').length;
 
@@ -7122,7 +7131,7 @@ export default function TrainingsApp() {
                             <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>{dateStr} Uhr</p>
                           </div>
                           <div style={{display:'flex',gap:'4px',flexShrink:0}}>
-                            <button onClick={()=>navTo('admin')} title="Zur Nutzerverwaltung" style={{padding:'5px 10px',background:'#dc2626',border:'none',borderRadius:'8px',cursor:'pointer',color:'white',fontSize:'12px',fontWeight:'700'}}>Freischalten →</button>
+                            {userRole==='admin'&&<button onClick={()=>navTo('admin')} title="Zur Nutzerverwaltung" style={{padding:'5px 10px',background:'#dc2626',border:'none',borderRadius:'8px',cursor:'pointer',color:'white',fontSize:'12px',fontWeight:'700'}}>Freischalten →</button>}
                             <button onClick={()=>{
                               const tdb = typeof n.trainerDeletedBy==='object'&&n.trainerDeletedBy?{...n.trainerDeletedBy}:{};
                               saveNotifications({...notifications,[n.id]:{...n,trainerDeletedBy:{...tdb,[uid]:true}}});
