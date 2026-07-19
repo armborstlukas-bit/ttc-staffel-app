@@ -995,8 +995,6 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','wettenZitate'), s => setWettenZitate(s.exists()&&Array.isArray(s.data().entries)?s.data().entries:[])),
       onSnapshot(doc(db,'ttc','trikotDaten'), s => setTrikotDaten(s.exists()?s.data():{})),
     ];
-    // Fetch TTC News via rss2json
-    fetchTtcNews();
     if (['admin','aktiver'].includes(userRole))
       unsubs.push(onSnapshot(doc(db,'ttc','users'), s => { const d=s.exists()?s.data():{};allUsersRef.current=d;setAllUsers(d); }));
     return () => unsubs.forEach(u=>u());
