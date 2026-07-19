@@ -812,7 +812,11 @@ export default function TrainingsApp() {
   const [activePracticeId, setActivePracticeId]                     = useState(null);
   const [ptCreating, setPtCreating]                                 = useState(false);
   const [ptCreateStep, setPtCreateStep]                             = useState(1);
-  const [ptCreateForm, setPtCreateForm]                             = useState({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPerTTR:60,handicapMax:6,doubleElim:false});
+  const [ptCreateForm, setPtCreateForm]                             = useState({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPerTTR:60,handicapMax:6,doubleElim:false,teamSize:2,teamSystem:'kingsCup'});
+  const [ptTeamOrderA, setPtTeamOrderA]                             = useState([]);
+  const [ptTeamOrderB, setPtTeamOrderB]                             = useState([]);
+  const [ptTeamNameA, setPtTeamNameA]                               = useState('Mannschaft A');
+  const [ptTeamNameB, setPtTeamNameB]                               = useState('Mannschaft B');
   const [ptSelectedChildren, setPtSelectedChildren]                 = useState([]);
   const [ptSubgroupFilter, setPtSubgroupFilter]                     = useState('all');
   const [ptSelectedAktive, setPtSelectedAktive]                     = useState([]);
@@ -7467,7 +7471,7 @@ export default function TrainingsApp() {
   if (view === 'practiceTournaments') {
     const jugendSubs = Object.values(subgroups).filter(sg => sg.groupId === 'jugend');
     const allPTList = Object.values(practiceTournaments).sort((a,b) => b.createdAt.localeCompare(a.createdAt));
-    const maxPlayers = ptCreateForm.groupSize || 4;
+    const maxPlayers = ptCreateForm.type==='team' ? (ptCreateForm.teamSize*2) : (ptCreateForm.groupSize || 4);
 
     const getSeededPlayers = (ids) => ids
       .map(id => {
@@ -7515,6 +7519,50 @@ export default function TrainingsApp() {
     const resetPtPlayerState = () => {
       setPtSelectedChildren([]); setPtSubgroupFilter('all');
       setPtSelectedAktive([]); setPtManualPlayers([]); setPtPlayerSearch(''); setPtShowManualForm(false);
+      setPtTeamOrderA([]); setPtTeamOrderB([]); setPtTeamNameA('Mannschaft A'); setPtTeamNameB('Mannschaft B');
+    };
+
+    const generateTeamMatches = (teamSize, teamSystem) => {
+      if (teamSize === 2) {
+        if (teamSystem === 'korbylonCup') {
+          return [
+            {kind:'einzel', aPos:[0], bPos:[1], label:'Einzel (Kreuz) — A1 vs B2'},
+            {kind:'doppel', aPos:[0,1], bPos:[0,1], label:'Doppel'},
+            {kind:'einzel', aPos:[0], bPos:[0], label:'Einzel — A1 vs B1'},
+            {kind:'einzel', aPos:[1], bPos:[1], label:'Einzel — A2 vs B2'},
+          ];
+        }
+        return [
+          {kind:'einzel', aPos:[0], bPos:[0], label:'Einzel — Nr.1 vs Nr.1'},
+          {kind:'einzel', aPos:[1], bPos:[1], label:'Einzel — Nr.2 vs Nr.2'},
+          {kind:'doppel', aPos:[0,1], bPos:[0,1], label:'Doppel'},
+        ];
+      }
+      return [];
+    };
+
+    const startTeamTournament = () => {
+      const poolMap = {}; seededPreview.forEach(p=>{poolMap[p.childId]=p;});
+      const teamA = ptTeamOrderA.map(k=>poolMap[k]).filter(Boolean);
+      const teamB = ptTeamOrderB.map(k=>poolMap[k]).filter(Boolean);
+      const id = 'pt_' + Date.now();
+      const matches = generateTeamMatches(ptCreateForm.teamSize, ptCreateForm.teamSystem).map((m,i)=>({...m, idx:i, result:null}));
+      const newPT = {
+        id, type:'team',
+        createdAt: new Date().toISOString(),
+        createdBy: userProfile?.name || user?.email || 'Trainer',
+        settings: { winSets:ptCreateForm.winSets, setLength:ptCreateForm.setLength, deciderLength:ptCreateForm.deciderCustom?ptCreateForm.deciderLength:ptCreateForm.setLength, trackSetScores:ptCreateForm.trackSetScores },
+        teamSize: ptCreateForm.teamSize,
+        teamSystem: ptCreateForm.teamSystem,
+        teamA: {name: ptTeamNameA.trim()||'Mannschaft A', players: teamA},
+        teamB: {name: ptTeamNameB.trim()||'Mannschaft B', players: teamB},
+        matches,
+        status: 'active',
+      };
+      savePracticeTournaments({...practiceTournaments, [id]: newPT});
+      setActivePracticeId(id);
+      setPtCreating(false); setPtCreateStep(1); resetPtPlayerState();
+      navTo('practiceTournamentDetail');
     };
 
     const startKoTournament = () => {
@@ -7545,6 +7593,7 @@ export default function TrainingsApp() {
 
     const startTournament = () => {
       if (ptCreateForm.type === 'ko_runde') { startKoTournament(); return; }
+      if (ptCreateForm.type === 'team') { startTeamTournament(); return; }
       const seeded = getAllSeeded();
       const id = 'pt_' + Date.now();
       const newPT = {
@@ -7603,7 +7652,7 @@ export default function TrainingsApp() {
             <button onClick={()=>{setArchiveTab('practiceTournaments');navTo('archiv');}} style={s.btn('#6d28d9')}>
               <Archive size={14}/> Archiv
             </button>
-            <button onClick={()=>{setPtCreating(true);setPtCreateStep(1);resetPtPlayerState();setPtCreateForm({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPerTTR:60,handicapMax:6,doubleElim:false});}} style={s.btn('#16a34a')}>
+            <button onClick={()=>{setPtCreating(true);setPtCreateStep(1);resetPtPlayerState();setPtCreateForm({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPerTTR:60,handicapMax:6,doubleElim:false,teamSize:2,teamSystem:'kingsCup'});}} style={s.btn('#16a34a')}>
               <Plus size={15}/> Neuer Wettkampf
             </button>
           </div>)}
@@ -7632,7 +7681,7 @@ export default function TrainingsApp() {
                 <>
                   <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.5px'}}>Wettkampftyp</p>
                   <div style={{display:'flex',gap:'8px',marginBottom:'22px'}}>
-                    {[{v:'4er_gruppe',icon:'🎯',label:'Rundenturnier',desc:'Jeder gegen jeden'},{v:'ko_runde',icon:'🏆',label:'KO Runde',desc:'Turnierbaum · Double Elimination'}].map(opt=>(
+                    {[{v:'4er_gruppe',icon:'🎯',label:'Rundenturnier',desc:'Jeder gegen jeden'},{v:'ko_runde',icon:'🏆',label:'KO Runde',desc:'Turnierbaum · Double Elimination'},{v:'team',icon:'🤝',label:'Mannschaftsspiel',desc:'Team gegen Team'}].map(opt=>(
                       <button key={opt.v} onClick={()=>setPtCreateForm(f=>({...f,type:opt.v}))}
                         style={{flex:1,padding:'12px 10px',border:`2px solid ${ptCreateForm.type===opt.v?'#7c3aed':'#e5e7eb'}`,borderRadius:'12px',background:ptCreateForm.type===opt.v?'rgba(124,58,237,0.08)':'#f9fafb',cursor:'pointer',textAlign:'left',transition:'all 0.1s'}}>
                         <div style={{fontSize:'20px',marginBottom:'3px'}}>{opt.icon}</div>
@@ -7641,16 +7690,45 @@ export default function TrainingsApp() {
                       </button>
                     ))}
                   </div>
-                  {ptCreateForm.type!=='ko_runde'&&<>
+                  {ptCreateForm.type!=='ko_runde'&&ptCreateForm.type!=='team'&&<>
                   <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.5px'}}>Gruppengröße</p>
                   <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'22px'}}>
-                    {[3,4,5,6,7,8,9,10].map(n=>(
+                    {Array.from({length:28},(_,i)=>i+3).map(n=>(
                       <button key={n} onClick={()=>setPtCreateForm(f=>({...f,groupSize:n}))}
                         style={{...ptBtn(ptCreateForm.groupSize===n),flex:'none',width:'42px',fontSize:'15px'}}>
                         {n}
                       </button>
                     ))}
                   </div>
+                  </>}
+                  {ptCreateForm.type==='team'&&<>
+                  <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.5px'}}>Mannschaftsgröße</p>
+                  <div style={{display:'flex',gap:'6px',marginBottom:'18px'}}>
+                    {[2,3,4,6].map(n=>{
+                      const enabled = n===2;
+                      return (
+                        <button key={n} disabled={!enabled} onClick={()=>enabled&&setPtCreateForm(f=>({...f,teamSize:n}))}
+                          style={{...ptBtn(ptCreateForm.teamSize===n&&enabled),flex:'none',width:'62px',fontSize:'14px',opacity:enabled?1:0.4,cursor:enabled?'pointer':'not-allowed',position:'relative'}}>
+                          {n}er{!enabled&&<div style={{fontSize:'8px',fontWeight:'700',marginTop:'2px'}}>bald</div>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {ptCreateForm.teamSize===2&&<>
+                  <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.5px'}}>Spielsystem</p>
+                  <div style={{display:'flex',gap:'8px',marginBottom:'22px'}}>
+                    {[
+                      {v:'kingsCup',label:'Kings Cup',desc:'2 Einzel (1v1, 2v2) + Doppel'},
+                      {v:'korbylonCup',label:'Korbylon Cup',desc:'Kreuz-Einzel + Doppel + 2 Einzel'},
+                    ].map(opt=>(
+                      <button key={opt.v} onClick={()=>setPtCreateForm(f=>({...f,teamSystem:opt.v}))}
+                        style={{flex:1,padding:'12px 10px',border:`2px solid ${ptCreateForm.teamSystem===opt.v?'#7c3aed':'#e5e7eb'}`,borderRadius:'12px',background:ptCreateForm.teamSystem===opt.v?'rgba(124,58,237,0.08)':'#f9fafb',cursor:'pointer',textAlign:'left'}}>
+                        <div style={{fontWeight:'800',color:ptCreateForm.teamSystem===opt.v?'#7c3aed':'#1f2937',fontSize:'13px'}}>{opt.label}</div>
+                        <div style={{fontSize:'10px',color:'#9ca3af',marginTop:'1px'}}>{opt.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                  </>}
                   </>}
                   {ptCreateForm.type==='ko_runde'&&(
                     <div style={{display:'flex',alignItems:'flex-start',gap:'12px',marginBottom:'20px',padding:'12px 14px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'12px'}}>
@@ -7730,7 +7808,7 @@ export default function TrainingsApp() {
                   </div>
 
                   {/* Vorgabe */}
-                  <div style={{display:'flex',alignItems:'flex-start',gap:'12px',marginBottom:'20px',padding:'12px 14px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'12px'}}>
+                  {ptCreateForm.type!=='team'&&<div style={{display:'flex',alignItems:'flex-start',gap:'12px',marginBottom:'20px',padding:'12px 14px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'12px'}}>
                     <button onClick={()=>setPtCreateForm(f=>({...f,handicap:!f.handicap}))}
                       style={{width:'22px',height:'22px',borderRadius:'6px',border:`2px solid ${ptCreateForm.handicap?'#7c3aed':'#d1d5db'}`,background:ptCreateForm.handicap?'rgba(124,58,237,0.1)':'transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginTop:'1px'}}>
                       {ptCreateForm.handicap&&<span style={{fontSize:'14px',color:'#7c3aed',lineHeight:1}}>✓</span>}
@@ -7764,7 +7842,7 @@ export default function TrainingsApp() {
                         </div>
                       )}
                     </div>
-                  </div>
+                  </div>}
 
                   <button onClick={()=>setPtCreateStep(2)}
                     style={{width:'100%',padding:'13px',background:'linear-gradient(135deg,#7c3aed,#6d28d9)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'800',fontSize:'15px'}}>
@@ -7776,9 +7854,11 @@ export default function TrainingsApp() {
               {/* Step 2: Spieler */}
               {ptCreateStep===2 && (()=>{
                 const isKo = ptCreateForm.type==='ko_runde';
+                const isTeam = ptCreateForm.type==='team';
                 const allSeeded = seededPreview; // already computed via getAllSeeded()
                 const totalSelected = allSeeded.length;
-                const canStart = isKo ? totalSelected>=3 : totalSelected===maxPlayers;
+                const teamsComplete = ptTeamOrderA.length===ptCreateForm.teamSize && ptTeamOrderB.length===ptCreateForm.teamSize;
+                const canStart = isKo ? totalSelected>=3 : isTeam ? (totalSelected===maxPlayers && teamsComplete) : totalSelected===maxPlayers;
 
                 const searchLower = ptPlayerSearch.toLowerCase().trim();
                 const aktiveList = Object.values(aktiveSpieler).sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
@@ -7911,8 +7991,66 @@ export default function TrainingsApp() {
                       </div>
                   }
 
+                  {/* Team-Zuordnung */}
+                  {isTeam && allSeeded.length>0 && (()=>{
+                    const teamSize = ptCreateForm.teamSize;
+                    const assigned = new Set([...ptTeamOrderA, ...ptTeamOrderB]);
+                    const unassigned = allSeeded.filter(p=>!assigned.has(p.childId));
+                    const TeamCol = ({name,setName,order,setOrder,color,otherOrder}) => (
+                      <div style={{flex:1,minWidth:'200px',border:`2px solid ${color}33`,borderRadius:'12px',padding:'10px'}}>
+                        <input value={name} onChange={e=>setName(e.target.value)}
+                          style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',marginBottom:'8px',border:`1px solid ${color}55`,borderRadius:'8px',fontSize:'13px',fontWeight:'800',color,outline:'none'}}/>
+                        {order.length===0
+                          ? <p style={{margin:0,fontSize:'11px',color:'#9ca3af',fontStyle:'italic'}}>Noch keine Spieler zugeordnet</p>
+                          : <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
+                            {order.map((key,i)=>{
+                              const p = allSeeded.find(x=>x.childId===key);
+                              return (
+                                <div key={key} style={{display:'flex',alignItems:'center',gap:'6px',padding:'6px 8px',background:'#f9fafb',borderRadius:'8px'}}>
+                                  <span style={{fontSize:'11px',fontWeight:'900',color,minWidth:'16px'}}>{i+1}.</span>
+                                  <span style={{flex:1,fontSize:'12px',fontWeight:'700',color:'#1f2937',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p?.name||'?'}</span>
+                                  <button onClick={()=>setOrder(o=>{const n=[...o];if(i>0){[n[i-1],n[i]]=[n[i],n[i-1]];}return n;})} disabled={i===0}
+                                    style={{width:'20px',height:'20px',borderRadius:'5px',background:'#f3f4f6',border:'none',cursor:i===0?'default':'pointer',color:i===0?'#d1d5db':'#6b7280',fontSize:'11px',display:'flex',alignItems:'center',justifyContent:'center'}}>↑</button>
+                                  <button onClick={()=>setOrder(o=>{const n=[...o];if(i<n.length-1){[n[i+1],n[i]]=[n[i],n[i+1]];}return n;})} disabled={i===order.length-1}
+                                    style={{width:'20px',height:'20px',borderRadius:'5px',background:'#f3f4f6',border:'none',cursor:i===order.length-1?'default':'pointer',color:i===order.length-1?'#d1d5db':'#6b7280',fontSize:'11px',display:'flex',alignItems:'center',justifyContent:'center'}}>↓</button>
+                                  <button onClick={()=>setOrder(o=>o.filter(x=>x!==key))}
+                                    style={{width:'20px',height:'20px',borderRadius:'5px',background:'rgba(220,38,38,0.08)',border:'1px solid rgba(220,38,38,0.2)',cursor:'pointer',color:'#f87171',fontSize:'11px',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        }
+                      </div>
+                    );
+                    return (
+                      <div style={{margin:'16px 0'}}>
+                        <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.5px'}}>Teams zusammenstellen ({teamSize} pro Team, Reihenfolge = Position)</p>
+                        <div style={{display:'flex',gap:'12px',flexWrap:'wrap',marginBottom:'12px'}}>
+                          <TeamCol name={ptTeamNameA} setName={setPtTeamNameA} order={ptTeamOrderA} setOrder={setPtTeamOrderA} color="#7c3aed"/>
+                          <TeamCol name={ptTeamNameB} setName={setPtTeamNameB} order={ptTeamOrderB} setOrder={setPtTeamOrderB} color="#db2777"/>
+                        </div>
+                        {unassigned.length>0 && (
+                          <div>
+                            <p style={{margin:'0 0 6px',fontSize:'11px',fontWeight:'700',color:'#6b7280'}}>Nicht zugeordnet:</p>
+                            <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
+                              {unassigned.map(p=>(
+                                <div key={p.childId} style={{display:'flex',alignItems:'center',gap:'8px',padding:'7px 10px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'8px'}}>
+                                  <span style={{flex:1,fontSize:'13px',fontWeight:'700',color:'#1f2937'}}>{p.name}</span>
+                                  <button onClick={()=>setPtTeamOrderA(o=>o.length<teamSize?[...o,p.childId]:o)} disabled={ptTeamOrderA.length>=teamSize}
+                                    style={{padding:'4px 10px',borderRadius:'7px',border:'1px solid #c4b5fd',background:ptTeamOrderA.length>=teamSize?'#f3f4f6':'rgba(124,58,237,0.08)',color:ptTeamOrderA.length>=teamSize?'#d1d5db':'#7c3aed',cursor:ptTeamOrderA.length>=teamSize?'not-allowed':'pointer',fontWeight:'700',fontSize:'11px'}}>→ A</button>
+                                  <button onClick={()=>setPtTeamOrderB(o=>o.length<teamSize?[...o,p.childId]:o)} disabled={ptTeamOrderB.length>=teamSize}
+                                    style={{padding:'4px 10px',borderRadius:'7px',border:'1px solid #f9a8d4',background:ptTeamOrderB.length>=teamSize?'#f3f4f6':'rgba(219,39,119,0.08)',color:ptTeamOrderB.length>=teamSize?'#d1d5db':'#db2777',cursor:ptTeamOrderB.length>=teamSize?'not-allowed':'pointer',fontWeight:'700',fontSize:'11px'}}>→ B</button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {/* Setzungs-Vorschau */}
-                  {allSeeded.length>0&&(
+                  {!isTeam && allSeeded.length>0&&(
                     <div style={{margin:'12px 0',padding:'12px 14px',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:'12px'}}>
                       <p style={{margin:'0 0 8px',fontSize:'10px',fontWeight:'800',color:'#16a34a',textTransform:'uppercase',letterSpacing:'0.4px'}}>Setzung (nach TTR + Errungenschaften)</p>
                       <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
@@ -7930,7 +8068,11 @@ export default function TrainingsApp() {
 
                   <button onClick={startTournament} disabled={!canStart}
                     style={{width:'100%',padding:'14px',background:canStart?'linear-gradient(135deg,#7c3aed,#6d28d9)':'#e5e7eb',color:canStart?'white':'#9ca3af',border:'none',borderRadius:'12px',cursor:canStart?'pointer':'not-allowed',fontWeight:'800',fontSize:'15px',opacity:canStart?1:0.7,transition:'all 0.15s'}}>
-                    {canStart?(isKo?`🏆 KO Turnier starten! (${totalSelected} Spieler)`:'🎮 Wettkampf starten!'):(isKo?`Mind. 3 Spieler auswählen (${totalSelected}/3)`:`Noch ${maxPlayers-totalSelected} Spieler auswählen`)}
+                    {canStart
+                      ?(isKo?`🏆 KO Turnier starten! (${totalSelected} Spieler)`:isTeam?'🤝 Mannschaftsspiel starten!':'🎮 Wettkampf starten!')
+                      :(isKo?`Mind. 3 Spieler auswählen (${totalSelected}/3)`
+                        :isTeam?(totalSelected<maxPlayers?`Noch ${maxPlayers-totalSelected} Spieler auswählen`:`Teams noch nicht vollständig (A: ${ptTeamOrderA.length}/${ptCreateForm.teamSize}, B: ${ptTeamOrderB.length}/${ptCreateForm.teamSize})`)
+                        :`Noch ${maxPlayers-totalSelected} Spieler auswählen`)}
                   </button>
                 </>
                 );
@@ -7948,6 +8090,16 @@ export default function TrainingsApp() {
             if(toAutoArchive.length>0){
               toAutoArchive.forEach(pt=>{
                 const finalStandings2=(()=>{
+                  if (pt.type==='team') {
+                    const winsA=pt.matches.filter(m=>m.result&&m.result.sets1>m.result.sets2).length;
+                    const winsB=pt.matches.filter(m=>m.result&&m.result.sets2>m.result.sets1).length;
+                    const needed2=Math.ceil(pt.matches.length/2);
+                    const winner=winsA>=needed2?'A':winsB>=needed2?'B':(winsA>winsB?'A':winsB>winsA?'B':null);
+                    return [
+                      {place: winner==='A'?1:2, childId:'teamA', name: pt.teamA.name, wins:winsA, losses:winsB, setsWon:winsA, setsLost:winsB, ptsWon:0, ptsLost:0},
+                      {place: winner==='B'?1:2, childId:'teamB', name: pt.teamB.name, wins:winsB, losses:winsA, setsWon:winsB, setsLost:winsA, ptsWon:0, ptsLost:0},
+                    ];
+                  }
                   const stats3=pt.players.map((_,i)=>({idx:i,wins:0,losses:0,setsWon:0,setsLost:0,ptsWon:0,ptsLost:0}));
                   pt.matches.forEach(m=>{if(!m.result)return;const{sets1,sets2,scores}=m.result;stats3[m.p1Idx].setsWon+=sets1;stats3[m.p1Idx].setsLost+=sets2;stats3[m.p2Idx].setsWon+=sets2;stats3[m.p2Idx].setsLost+=sets1;if(sets1>sets2){stats3[m.p1Idx].wins++;}else{stats3[m.p2Idx].wins++;}if(scores)scores.forEach(({s1,s2})=>{stats3[m.p1Idx].ptsWon+=Number(s1||0);stats3[m.p1Idx].ptsLost+=Number(s2||0);stats3[m.p2Idx].ptsWon+=Number(s2||0);stats3[m.p2Idx].ptsLost+=Number(s1||0);});});
                   const sorted3=[...stats3].sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:(b.setsWon-b.setsLost)-(a.setsWon-a.setsLost)||(b.ptsWon-b.ptsLost)-(a.ptsWon-a.ptsLost));
@@ -7979,6 +8131,7 @@ export default function TrainingsApp() {
             };
             const PTCard = ({pt, showBadge}) => {
               const isKoPt = pt.type==='ko_runde';
+              const isTeamPt = pt.type==='team';
               const done = isKoPt ? Object.keys(pt.matchResults||{}).length : (pt.matches||[]).filter(m=>m.result).length;
               const total = isKoPt ? null : (pt.matches||[]).length;
               const allDone2 = isKoPt ? !!(pt.matchResults?.gf) : done===total;
@@ -7991,8 +8144,8 @@ export default function TrainingsApp() {
                     <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'8px',marginBottom:'8px'}}>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:'flex',alignItems:'center',gap:'7px',marginBottom:'4px',flexWrap:'wrap'}}>
-                          <span style={{fontSize:'16px'}}>{isKoPt?'🏆':'🎯'}</span>
-                          <span style={{fontWeight:'800',color:'#1f2937',fontSize:'15px'}}>{isKoPt?`KO Runde · ${pt.players?.length} Spieler`:(pt.players?.length||4)+'er Gruppe'}</span>
+                          <span style={{fontSize:'16px'}}>{isKoPt?'🏆':isTeamPt?'🤝':'🎯'}</span>
+                          <span style={{fontWeight:'800',color:'#1f2937',fontSize:'15px'}}>{isKoPt?`KO Runde · ${pt.players?.length} Spieler`:isTeamPt?`${pt.teamA?.name||'Team A'} vs ${pt.teamB?.name||'Team B'}`:(pt.players?.length||4)+'er Gruppe'}</span>
                           <span style={{fontSize:'10px',fontWeight:'700',color:allDone2?'#16a34a':'#d97706',background:allDone2?'#dcfce7':'#fef9c3',padding:'2px 7px',borderRadius:'10px',border:`1px solid ${allDone2?'#86efac':'#fde68a'}`}}>
                             {allDone2?'✓ Abgeschlossen':'● Laufend'}
                           </span>
@@ -8012,9 +8165,14 @@ export default function TrainingsApp() {
                       </div>
                     </div>
                     <div style={{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'8px'}}>
-                      {pt.players.map(p=>(
-                        <span key={p.childId} style={{fontSize:'11px',fontWeight:'700',color:'#6b7280',background:'#f3f4f6',padding:'2px 7px',borderRadius:'7px',border:'1px solid #e5e7eb'}}>{p.seed}. {p.name}</span>
-                      ))}
+                      {isTeamPt
+                        ? [...(pt.teamA?.players||[]),...(pt.teamB?.players||[])].map((p,i)=>(
+                          <span key={p.childId+i} style={{fontSize:'11px',fontWeight:'700',color:'#6b7280',background:'#f3f4f6',padding:'2px 7px',borderRadius:'7px',border:'1px solid #e5e7eb'}}>{p.name}</span>
+                        ))
+                        : pt.players.map(p=>(
+                          <span key={p.childId} style={{fontSize:'11px',fontWeight:'700',color:'#6b7280',background:'#f3f4f6',padding:'2px 7px',borderRadius:'7px',border:'1px solid #e5e7eb'}}>{p.seed}. {p.name}</span>
+                        ))
+                      }
                     </div>
                     <div style={{height:'4px',background:'#e5e7eb',borderRadius:'99px',overflow:'hidden'}}>
                       <div style={{width:`${(done/total)*100}%`,height:'100%',background:allDone2?'linear-gradient(90deg,#16a34a,#4ade80)':'linear-gradient(90deg,#7c3aed,#a78bfa)',transition:'width 0.4s ease'}}/>
@@ -8401,6 +8559,238 @@ export default function TrainingsApp() {
         </div>
       );
     }
+
+    // ── Mannschaftsspiel Detail ─────────────────────────────────────────────
+    if (pt.type === 'team') {
+      const { settings, teamA, teamB, matches } = pt;
+      const maxSets = settings.winSets * 2 - 1;
+      const teamNames = (m, side) => (side==='a'?m.aPos:m.bPos).map(i=>(side==='a'?teamA:teamB).players[i]?.name||'?').join(' & ');
+      const winsA = matches.filter(m=>m.result && m.result.sets1>m.result.sets2).length;
+      const winsB = matches.filter(m=>m.result && m.result.sets2>m.result.sets1).length;
+      const allDone = matches.every(m=>m.result!==null);
+      const needed = Math.ceil(matches.length/2);
+      const teamWinner = winsA>=needed ? 'A' : winsB>=needed ? 'B' : (allDone ? (winsA>winsB?'A':winsB>winsA?'B':null) : null);
+
+      const updateMatchResult = (matchIdx, result) => {
+        const updMatches = matches.map((m,i) => i===matchIdx ? {...m,result} : m);
+        savePracticeTournaments({...practiceTournaments, [pt.id]: {...pt, matches:updMatches}});
+      };
+      const deleteResult = (matchIdx) => {
+        const updMatches = matches.map((m,i) => i===matchIdx ? {...m,result:null} : m);
+        savePracticeTournaments({...practiceTournaments, [pt.id]: {...pt, matches:updMatches}});
+      };
+      const initDraft = (matchIdx) => {
+        const existing = matches[matchIdx].result;
+        if (settings.trackSetScores) {
+          setPtMatchDraft({mode:'scores', scores:existing?.scores?.map(s=>({s1:String(s.s1),s2:String(s.s2)}))||[{s1:'',s2:''}]});
+        } else {
+          setPtMatchDraft({mode:'simple', sets1:existing?.sets1||0, sets2:existing?.sets2||0});
+        }
+        setPtMatchEditing(matchIdx);
+      };
+      const isDraftValid = () => {
+        if (!ptMatchDraft) return false;
+        if (ptMatchDraft.mode==='scores') {
+          const valid = ptMatchDraft.scores.filter(r=>r.s1!==''&&r.s2!==''&&Number(r.s1)!==Number(r.s2));
+          const s1=valid.filter(r=>Number(r.s1)>Number(r.s2)).length;
+          const s2=valid.filter(r=>Number(r.s2)>Number(r.s1)).length;
+          return s1===settings.winSets||s2===settings.winSets;
+        } else {
+          const {sets1,sets2}=ptMatchDraft;
+          return (sets1===settings.winSets||sets2===settings.winSets)&&sets1!==sets2;
+        }
+      };
+      const saveDraft = () => {
+        if (ptMatchEditing===null||!ptMatchDraft) return;
+        let result;
+        if (ptMatchDraft.mode==='scores') {
+          const validScores = ptMatchDraft.scores.filter(r=>r.s1!==''&&r.s2!=='').map(r=>({s1:Number(r.s1),s2:Number(r.s2)}));
+          const s1=validScores.filter(r=>r.s1>r.s2).length;
+          const s2=validScores.filter(r=>r.s2>r.s1).length;
+          result = {sets1:s1, sets2:s2, scores:validScores};
+        } else {
+          result = {sets1:ptMatchDraft.sets1, sets2:ptMatchDraft.sets2, scores:[]};
+        }
+        updateMatchResult(ptMatchEditing, result);
+        setPtMatchEditing(null); setPtMatchDraft(null);
+      };
+      const archiveTeamTournament = () => {
+        const archivedPT = {...pt, status:'archived', archivedAt:new Date().toISOString(), finalStandings:[
+          {place: teamWinner==='A'?1:2, childId:'teamA', name: teamA.name, wins:winsA, losses:winsB, setsWon:winsA, setsLost:winsB, ptsWon:0, ptsLost:0},
+          {place: teamWinner==='B'?1:2, childId:'teamB', name: teamB.name, wins:winsB, losses:winsA, setsWon:winsB, setsLost:winsA, ptsWon:0, ptsLost:0},
+        ]};
+        const newActive = {...practiceTournaments}; delete newActive[pt.id];
+        savePracticeTournaments(newActive);
+        saveArchivedPracticeTournaments({...archivedPracticeTournaments, [pt.id]: archivedPT});
+        setActivePracticeId(null); navTo('practiceTournaments');
+      };
+      const deleteTeamTournament = () => {
+        if (!window.confirm('Wettkampf wirklich löschen? Alle Ergebnisse gehen verloren.')) return;
+        const newActive = {...practiceTournaments}; delete newActive[pt.id];
+        savePracticeTournaments(newActive); setActivePracticeId(null); navTo('practiceTournaments');
+      };
+      const inpStyle = {background:'rgba(255,255,255,0.09)',border:'1px solid rgba(167,139,250,0.25)',borderRadius:'8px',color:'white',fontSize:'20px',fontWeight:'900',textAlign:'center',width:'58px',height:'44px',outline:'none'};
+      const systemLabel = pt.teamSystem==='korbylonCup' ? 'Korbylon Cup' : 'Kings Cup';
+
+      return (
+        <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+          <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
+
+            {/* Top-Bar */}
+            <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',gap:'14px',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 24px':'0 -24px 28px'}}>
+              <button onClick={()=>{setPtMatchEditing(null);setPtMatchDraft(null);navTo('practiceTournaments');}} style={{width:'38px',height:'38px',borderRadius:'10px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',color:'#4ade80',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <ArrowLeft size={18}/>
+              </button>
+              <div style={{flex:1,minWidth:0}}>
+                <p style={{margin:'0 0 1px',color:'rgba(167,139,250,0.5)',fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>
+                  🤝 Mannschaftsspiel · {systemLabel} · {settings.winSets} Gewinnsätze
+                </p>
+                <h2 style={{margin:0,color:'white',fontWeight:'800',fontSize:isMobile?'14px':'17px',letterSpacing:'-0.2px'}}>
+                  {new Date(pt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})} · {pt.createdBy}
+                </h2>
+              </div>
+              <button onClick={deleteTeamTournament} style={{width:'34px',height:'34px',borderRadius:'8px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <Trash2 size={14}/>
+              </button>
+            </div>
+
+            {/* ── Team-Scoreboard ──────────────────────────────── */}
+            <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'24px',padding:'18px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(167,139,250,0.15)',borderRadius:'16px'}}>
+              <div style={{flex:1,textAlign:'right'}}>
+                <p style={{margin:'0 0 4px',fontWeight:'900',fontSize:isMobile?'14px':'17px',color:teamWinner==='A'?'#4ade80':'white'}}>{teamA.name}</p>
+                <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.3)'}}>{teamA.players.map(p=>p.name).join(', ')}</p>
+              </div>
+              <div style={{textAlign:'center',flexShrink:0,minWidth:'70px'}}>
+                <span style={{fontSize:'26px',fontWeight:'900',color:'white'}}>{winsA}:{winsB}</span>
+              </div>
+              <div style={{flex:1}}>
+                <p style={{margin:'0 0 4px',fontWeight:'900',fontSize:isMobile?'14px':'17px',color:teamWinner==='B'?'#4ade80':'white'}}>{teamB.name}</p>
+                <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.3)'}}>{teamB.players.map(p=>p.name).join(', ')}</p>
+              </div>
+            </div>
+
+            {/* ── Partien ─────────────────────────────────────────── */}
+            <div style={{display:'grid',gap:'8px',marginBottom:'20px'}}>
+              {matches.map((match,matchIdx)=>{
+                const res=match.result;
+                const isEditing=ptMatchEditing===matchIdx;
+                const aWon=res&&res.sets1>res.sets2, bWon=res&&res.sets2>res.sets1;
+                const nameA=teamNames(match,'a'), nameB=teamNames(match,'b');
+                return (
+                  <div key={matchIdx} style={{background:'rgba(255,255,255,0.04)',border:`1.5px solid ${isEditing?'rgba(167,139,250,0.45)':res?'rgba(74,222,128,0.18)':'rgba(255,255,255,0.08)'}`,borderRadius:'14px',overflow:'hidden'}}>
+                    <div style={{padding:'6px 14px 0'}}>
+                      <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>{match.kind==='doppel'?'🤝 ':'🏓 '}{match.label}</span>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 14px 12px'}}>
+                      <div style={{flex:1,textAlign:'right',minWidth:0}}>
+                        <p style={{margin:0,fontWeight:'800',fontSize:isMobile?'13px':'15px',color:aWon?'#4ade80':res?'rgba(255,255,255,0.35)':'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nameA}</p>
+                      </div>
+                      <div style={{minWidth:'64px',textAlign:'center',flexShrink:0}}>
+                        {res ? <span style={{fontSize:'20px',fontWeight:'900',color:'white',letterSpacing:'2px'}}>{res.sets1}:{res.sets2}</span> : <span style={{fontSize:'13px',color:'rgba(255,255,255,0.2)',fontWeight:'600'}}>vs</span>}
+                      </div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <p style={{margin:0,fontWeight:'800',fontSize:isMobile?'13px':'15px',color:bWon?'#4ade80':res?'rgba(255,255,255,0.35)':'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nameB}</p>
+                      </div>
+                      {!isEditing&&(
+                        <button onClick={()=>initDraft(matchIdx)}
+                          style={{flexShrink:0,padding:'6px 10px',background:res?'rgba(255,255,255,0.06)':'rgba(167,139,250,0.12)',border:`1px solid ${res?'rgba(255,255,255,0.1)':'rgba(167,139,250,0.3)'}`,borderRadius:'8px',cursor:'pointer',color:res?'rgba(255,255,255,0.45)':'#c4b5fd',fontSize:'12px',fontWeight:'700',whiteSpace:'nowrap'}}>
+                          {res?'✏️ Edit':'Eintragen'}
+                        </button>
+                      )}
+                    </div>
+
+                    {!isEditing&&res&&res.scores&&res.scores.length>0&&(
+                      <div style={{padding:'0 14px 10px',display:'flex',gap:'10px',flexWrap:'wrap'}}>
+                        {res.scores.map((sc,si)=>(
+                          <span key={si} style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',fontWeight:'700'}}>{si===maxSets-1?'⚡':''} S{si+1}: {sc.s1}:{sc.s2}</span>
+                        ))}
+                      </div>
+                    )}
+
+                    {isEditing&&ptMatchDraft&&(
+                      <div style={{padding:'14px',borderTop:'1px solid rgba(167,139,250,0.15)',background:'rgba(167,139,250,0.05)'}}>
+                        {ptMatchDraft.mode==='scores' ? (
+                          <>
+                            <p style={{margin:'0 0 10px',fontSize:'12px',fontWeight:'700',color:'rgba(167,139,250,0.7)'}}>Satzergebnisse · Satzlänge {settings.setLength} · Entscheidungssatz {settings.deciderLength}</p>
+                            <div style={{display:'grid',gap:'7px',marginBottom:'10px'}}>
+                              {ptMatchDraft.scores.map((row,si)=>{
+                                const isDecider = si===maxSets-1;
+                                const updateRow = (field,val) => { const sc=[...ptMatchDraft.scores]; sc[si]={...sc[si],[field]:val}; setPtMatchDraft(d=>({...d,scores:sc})); };
+                                return (
+                                  <div key={si} style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                                    <span style={{fontSize:'11px',fontWeight:'700',color:isDecider?'#fde68a':'rgba(255,255,255,0.3)',minWidth:'68px'}}>{isDecider?'⚡ Entscheid.':` Satz ${si+1}`}</span>
+                                    <input type="number" min="0" max="99" value={row.s1} onChange={e=>updateRow('s1',e.target.value===''?'':e.target.value)} style={inpStyle} placeholder="0"/>
+                                    <span style={{color:'rgba(255,255,255,0.3)',fontWeight:'900',fontSize:'18px'}}>:</span>
+                                    <input type="number" min="0" max="99" value={row.s2} onChange={e=>updateRow('s2',e.target.value===''?'':e.target.value)} style={inpStyle} placeholder="0"/>
+                                    {ptMatchDraft.scores.length>1&&(
+                                      <button onClick={()=>setPtMatchDraft(d=>({...d,scores:d.scores.filter((_,j)=>j!==si)}))}
+                                        style={{width:'28px',height:'28px',borderRadius:'6px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',fontSize:'16px',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              {ptMatchDraft.scores.length<maxSets&&(
+                                <button onClick={()=>setPtMatchDraft(d=>({...d,scores:[...d.scores,{s1:'',s2:''}]}))}
+                                  style={{padding:'6px 12px',background:'rgba(255,255,255,0.04)',border:'1px dashed rgba(167,139,250,0.3)',borderRadius:'8px',color:'rgba(167,139,250,0.6)',cursor:'pointer',fontSize:'12px',fontWeight:'700',marginTop:'2px'}}>+ Satz hinzufügen</button>
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p style={{margin:'0 0 12px',fontSize:'12px',fontWeight:'700',color:'rgba(167,139,250,0.7)'}}>Gewonnene Sätze (Best of {settings.winSets*2-1})</p>
+                            <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'10px',flexWrap:'wrap'}}>
+                              <div style={{flex:1,minWidth:'130px',textAlign:'center'}}>
+                                <p style={{margin:'0 0 7px',fontSize:'13px',fontWeight:'800',color:'white'}}>{nameA}</p>
+                                <div style={{display:'flex',gap:'5px',justifyContent:'center'}}>
+                                  {Array.from({length:settings.winSets+1},(_,n)=>(
+                                    <button key={n} onClick={()=>setPtMatchDraft(d=>({...d,sets1:n}))}
+                                      style={{width:'38px',height:'38px',borderRadius:'9px',border:`2px solid ${ptMatchDraft.sets1===n?'#a78bfa':'rgba(255,255,255,0.1)'}`,background:ptMatchDraft.sets1===n?'rgba(167,139,250,0.25)':'rgba(255,255,255,0.04)',color:ptMatchDraft.sets1===n?'white':'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'900',fontSize:'17px'}}>{n}</button>
+                                  ))}
+                                </div>
+                              </div>
+                              <span style={{fontWeight:'900',color:'rgba(255,255,255,0.2)',fontSize:'22px',flexShrink:0}}>:</span>
+                              <div style={{flex:1,minWidth:'130px',textAlign:'center'}}>
+                                <p style={{margin:'0 0 7px',fontSize:'13px',fontWeight:'800',color:'white'}}>{nameB}</p>
+                                <div style={{display:'flex',gap:'5px',justifyContent:'center'}}>
+                                  {Array.from({length:settings.winSets+1},(_,n)=>(
+                                    <button key={n} onClick={()=>setPtMatchDraft(d=>({...d,sets2:n}))}
+                                      style={{width:'38px',height:'38px',borderRadius:'9px',border:`2px solid ${ptMatchDraft.sets2===n?'#a78bfa':'rgba(255,255,255,0.1)'}`,background:ptMatchDraft.sets2===n?'rgba(167,139,250,0.25)':'rgba(255,255,255,0.04)',color:ptMatchDraft.sets2===n?'white':'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'900',fontSize:'17px'}}>{n}</button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                        <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>
+                          {res&&<button onClick={()=>{deleteResult(matchIdx);setPtMatchEditing(null);setPtMatchDraft(null);}}
+                            style={{padding:'9px 14px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',borderRadius:'9px',color:'#f87171',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>Löschen</button>}
+                          <button onClick={()=>{setPtMatchEditing(null);setPtMatchDraft(null);}}
+                            style={{padding:'9px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'9px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>Abbrechen</button>
+                          <button onClick={saveDraft} disabled={!isDraftValid()}
+                            style={{padding:'9px 20px',background:isDraftValid()?'linear-gradient(135deg,#7c3aed,#6d28d9)':'rgba(255,255,255,0.06)',border:'none',borderRadius:'9px',color:isDraftValid()?'white':'rgba(255,255,255,0.3)',cursor:isDraftValid()?'pointer':'not-allowed',fontWeight:'800',fontSize:'13px'}}>Speichern</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Abschluss */}
+            {allDone&&(
+              <div style={{padding:'18px 20px',background:'rgba(74,222,128,0.07)',border:'1px solid rgba(74,222,128,0.22)',borderRadius:'16px',textAlign:'center'}}>
+                <p style={{margin:'0 0 6px',fontSize:'17px',fontWeight:'900',color:'#4ade80'}}>🤝 Mannschaftsspiel abgeschlossen!</p>
+                <p style={{margin:'0 0 14px',fontSize:'13px',color:'rgba(255,255,255,0.45)'}}>
+                  {teamWinner ? <>Sieger: <strong style={{color:'#fde68a'}}>{teamWinner==='A'?teamA.name:teamB.name}</strong></> : 'Unentschieden'}
+                </p>
+                <button onClick={archiveTeamTournament} style={{padding:'12px 28px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'800',fontSize:'14px',display:'inline-flex',alignItems:'center',gap:'8px'}}><Archive size={16}/> Archivieren</button>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     // ── Rundenturnier Detail (existing) ────────────────────────────────────
     const { settings, players, matches } = pt;
     const maxSets = settings.winSets * 2 - 1;
@@ -9004,7 +9394,7 @@ export default function TrainingsApp() {
                 {sortedPTs.map(pt=>{
                   const fs2 = pt.finalStandings||[];
                   const expanded = !!ptArchiveExpanded[pt.id];
-                  const groupSize = pt.players ? pt.players.length : 4;
+                  const groupSize = pt.type==='team' ? `${pt.teamSize}v${pt.teamSize}` : (pt.players ? pt.players.length : 4);
                   const dateStr = new Date(pt.archivedAt||pt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
                   return (
                     <div key={pt.id} style={{background:'rgba(167,139,250,0.06)',borderRadius:'14px',border:'1px solid rgba(167,139,250,0.2)',overflow:'hidden'}}>
@@ -9014,7 +9404,7 @@ export default function TrainingsApp() {
                         onMouseEnter={e=>e.currentTarget.style.background='rgba(167,139,250,0.07)'}
                         onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                         <span style={{fontSize:'13px',color:'rgba(167,139,250,0.5)',flexShrink:0,whiteSpace:'nowrap'}}>{dateStr}</span>
-                        <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',flexShrink:0}}>{groupSize}er</span>
+                        <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',flexShrink:0}}>{pt.type==='team'?groupSize:groupSize+'er'}</span>
                         <div style={{flex:1,display:'flex',gap:'5px',flexWrap:'wrap',overflow:'hidden',minWidth:0}}>
                           {fs2.map((s,i)=>(
                             <span key={s.childId} style={{fontSize:'12px',color:i===0?'#fde68a':i===1?'#e2e8f0':i===2?'#fdba74':'rgba(255,255,255,0.4)',fontWeight:i<3?'800':'600',whiteSpace:'nowrap'}}>
@@ -9047,11 +9437,35 @@ export default function TrainingsApp() {
                               </div>
                             ))}
                           </div>
-                          {(()=>{
+                          {pt.type==='team' ? (
+                            <>
+                              <p style={{margin:'0 0 6px',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.45)',textTransform:'uppercase',letterSpacing:'1.5px'}}>Partien</p>
+                              <div style={{display:'grid',gap:'3px'}}>
+                                {(pt.matches||[]).map((m,mi)=>{
+                                  const nameA=(m.aPos||[]).map(i=>pt.teamA?.players?.[i]?.name||'?').join(' & ');
+                                  const nameB=(m.bPos||[]).map(i=>pt.teamB?.players?.[i]?.name||'?').join(' & ');
+                                  const res=m.result;
+                                  return (
+                                    <div key={mi} style={{display:'flex',alignItems:'center',gap:'8px',padding:'6px 10px',background:'rgba(255,255,255,0.03)',borderRadius:'7px'}}>
+                                      <div style={{flex:1,textAlign:'right'}}>
+                                        <span style={{fontSize:'11px',color:res&&res.sets1>res.sets2?'white':'rgba(255,255,255,0.4)',fontWeight:res&&res.sets1>res.sets2?'700':'400'}}>{nameA}</span>
+                                      </div>
+                                      <div style={{textAlign:'center',flexShrink:0}}>
+                                        <span style={{display:'block',fontSize:'12px',fontWeight:'800',color:res?'#a78bfa':'rgba(255,255,255,0.15)',minWidth:'30px'}}>{res?`${res.sets1}:${res.sets2}`:'–:–'}</span>
+                                      </div>
+                                      <div style={{flex:1}}>
+                                        <span style={{fontSize:'11px',color:res&&res.sets2>res.sets1?'white':'rgba(255,255,255,0.4)',fontWeight:res&&res.sets2>res.sets1?'700':'400'}}>{nameB}</span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          ) : (()=>{
                             const ptPlayers=pt.players||[];
                             const ptMatches=pt.matches||[];
                             const numRoundsA=ptPlayers.length%2===0?ptPlayers.length-1:ptPlayers.length;
-                            const roundsA=Array.from({length:numRoundsA},(_,i)=>i+1);
+                            const roundsA=Array.from({length:numRoundsA<0?0:numRoundsA},(_,i)=>i+1);
                             return(<>
                               <p style={{margin:'0 0 6px',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.45)',textTransform:'uppercase',letterSpacing:'1.5px'}}>Spielplan</p>
                               {roundsA.map(round=>(
