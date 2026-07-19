@@ -7734,7 +7734,7 @@ export default function TrainingsApp() {
                   <div style={{display:'flex',gap:'8px',marginBottom:'22px'}}>
                     {[
                       {v:'kingsCup',label:'Kings Cup',desc:'2 Einzel (1v1, 2v2) + Doppel'},
-                      {v:'korbylonCup',label:'Korbylon Cup',desc:'Kreuz-Einzel + Doppel + 2 Einzel'},
+                      {v:'korbylonCup',label:'Corbillon Cup',desc:'Kreuz-Einzel + Doppel + 2 Einzel'},
                     ].map(opt=>(
                       <button key={opt.v} onClick={()=>setPtCreateForm(f=>({...f,teamSystem:opt.v}))}
                         style={{flex:1,padding:'12px 10px',border:`2px solid ${ptCreateForm.teamSystem===opt.v?'#7c3aed':'#e5e7eb'}`,borderRadius:'12px',background:ptCreateForm.teamSystem===opt.v?'rgba(124,58,237,0.08)':'#f9fafb',cursor:'pointer',textAlign:'left'}}>
@@ -8645,7 +8645,7 @@ export default function TrainingsApp() {
         savePracticeTournaments(newActive); setActivePracticeId(null); navTo('practiceTournaments');
       };
       const inpStyle = {background:'rgba(255,255,255,0.09)',border:'1px solid rgba(167,139,250,0.25)',borderRadius:'8px',color:'white',fontSize:'20px',fontWeight:'900',textAlign:'center',width:'58px',height:'44px',outline:'none'};
-      const systemLabel = pt.teamSystem==='korbylonCup' ? 'Korbylon Cup' : 'Kings Cup';
+      const systemLabel = pt.teamSystem==='korbylonCup' ? 'Corbillon Cup' : 'Kings Cup';
 
       return (
         <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
