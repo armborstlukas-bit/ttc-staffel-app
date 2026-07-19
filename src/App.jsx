@@ -753,6 +753,7 @@ export default function TrainingsApp() {
   const [archivedPracticeTournaments, setArchivedPracticeTournaments] = useState({});
   const [gegnerLogbuch, setGegnerLogbuch] = useState([]);
   const [gegnerLogbuchBackups, setGegnerLogbuchBackups] = useState({});
+  const [gegnerVereinSuggestOpen, setGegnerVereinSuggestOpen] = useState(false);
   const [materialverwaltung, setMaterialverwaltung] = useState({});
   const [materialEdit, setMaterialEdit] = useState(null);
   const [materialSearch, setMaterialSearch] = useState('');
@@ -1483,6 +1484,32 @@ export default function TrainingsApp() {
     const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
     const weekNum = 1 + Math.round(((date - firstThursday) / 86400000 - 3 + ((firstThursday.getUTCDay()+6)%7)) / 7);
     return `${date.getUTCFullYear()}-W${String(weekNum).padStart(2,'0')}`;
+  };
+  const levenshteinDist = (a, b) => {
+    const m = a.length, n = b.length;
+    if (m === 0) return n; if (n === 0) return m;
+    const dp = Array.from({length: m+1}, () => new Array(n+1).fill(0));
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+      }
+    }
+    return dp[m][n];
+  };
+  const normName = s => (s||'').trim().toLowerCase().replace(/\s+/g,' ');
+  const findSimilarGegner = (name, excludeId) => {
+    const norm = normName(name);
+    if (!norm) return [];
+    return gegnerLogbuch.filter(x => {
+      if (!x.gegner || x.id===excludeId) return false;
+      const xn = normName(x.gegner);
+      if (xn === norm) return true;
+      if (xn.length>=4 && norm.length>=4 && (xn.includes(norm) || norm.includes(xn))) return true;
+      const dist = levenshteinDist(xn, norm);
+      return dist <= Math.max(1, Math.floor(Math.min(xn.length, norm.length) * 0.25));
+    });
   };
   const saveMaterialverwaltung = data => { setMaterialverwaltung(data); setDoc(doc(db,'ttc','materialverwaltung'), data); };
   const saveTtrHistory = data => { setTtrHistory(data); setDoc(doc(db,'ttc','ttrHistory'), data); };
@@ -11003,18 +11030,47 @@ export default function TrainingsApp() {
                     <input type="date" value={gegnerForm.date} onChange={e=>setGegnerForm(f=>({...f,date:e.target.value}))}
                       style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
                   </div>
-                  <div>
+                  <div style={{position:'relative'}}>
                     <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Verein des Gegners</label>
-                    <input type="text" placeholder="z.B. TTC Musterstadt" value={gegnerForm.verein} onChange={e=>setGegnerForm(f=>({...f,verein:e.target.value}))}
+                    <input type="text" placeholder="z.B. TTC Musterstadt" value={gegnerForm.verein}
+                      onChange={e=>{setGegnerForm(f=>({...f,verein:e.target.value}));setGegnerVereinSuggestOpen(true);}}
+                      onFocus={()=>setGegnerVereinSuggestOpen(true)}
+                      onBlur={()=>setTimeout(()=>setGegnerVereinSuggestOpen(false),150)}
+                      autoComplete="off"
                       style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
+                    {(()=>{
+                      const q = gegnerForm.verein.trim().toLowerCase();
+                      if (!gegnerVereinSuggestOpen || !q) return null;
+                      const uniqueVereine = [...new Map(gegnerLogbuch.filter(x=>x.verein).map(x=>[x.verein.toLowerCase(),x.verein])).values()];
+                      const suggestions = uniqueVereine.filter(v=>v.toLowerCase().includes(q) && v.toLowerCase()!==q).slice(0,6);
+                      if (suggestions.length===0) return null;
+                      return (
+                        <div style={{position:'absolute',top:'100%',left:0,right:0,marginTop:'4px',background:'#0e2a3a',border:`1px solid ${accentBorder}`,borderRadius:'10px',overflow:'hidden',zIndex:10,boxShadow:'0 8px 24px rgba(0,0,0,0.4)'}}>
+                          {suggestions.map(v=>(
+                            <button key={v} type="button" onMouseDown={()=>{setGegnerForm(f=>({...f,verein:v}));setGegnerVereinSuggestOpen(false);}}
+                              style={{display:'block',width:'100%',textAlign:'left',padding:'9px 12px',background:'none',border:'none',borderBottom:'1px solid rgba(255,255,255,0.06)',color:'white',fontSize:'13px',cursor:'pointer'}}>
+                              {v}
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div>
                     <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Name des Gegners</label>
                     <input type="text" placeholder="z.B. Max Mustermann" value={gegnerForm.gegner} onChange={e=>setGegnerForm(f=>({...f,gegner:e.target.value}))}
                       style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
-                    {!gegnerEditId&&gegnerForm.gegner.trim()&&gegnerLogbuch.some(x=>x.gegner?.toLowerCase()===gegnerForm.gegner.trim().toLowerCase())&&(
-                      <p style={{margin:'5px 0 0',fontSize:'11px',color:'#fbbf24',fontWeight:'600'}}>⚠️ Dieser Gegner ist bereits im Logbuch eingetragen.</p>
-                    )}
+                    {gegnerForm.gegner.trim()&&(()=>{
+                      const similar = findSimilarGegner(gegnerForm.gegner, gegnerEditId);
+                      if (similar.length===0) return null;
+                      const exact = similar.some(x=>normName(x.gegner)===normName(gegnerForm.gegner));
+                      return (
+                        <div style={{margin:'5px 0 0',fontSize:'11px',color:'#fbbf24'}}>
+                          <p style={{margin:'0 0 3px',fontWeight:'700'}}>⚠️ {exact?'Dieser Gegner ist bereits im Logbuch eingetragen:':'Ähnliche Einträge bereits vorhanden — evtl. derselbe Spieler?'}</p>
+                          <p style={{margin:0,color:'rgba(251,191,36,0.8)'}}>{similar.map(x=>x.gegner).join(', ')}</p>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'10px'}}>
