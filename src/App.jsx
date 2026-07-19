@@ -77,6 +77,7 @@ if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styl
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
 import { getFirestore, doc, setDoc, updateDoc, deleteField, arrayUnion, onSnapshot, getDoc } from 'firebase/firestore';
+import { getMessaging, getToken as getFcmToken, onMessage, isSupported as isFcmSupported } from 'firebase/messaging';
 import { Check, X, Plus, Trash2, Download, LogOut, ArrowLeft, Clock, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save, Trophy, Home, Archive, MessageSquare, Bell, Send, Pencil } from 'lucide-react';
 
 const firebaseConfig = {
@@ -88,6 +89,10 @@ const firebaseConfig = {
   appId: "1:393124037099:web:74188e37a786b7a81819ae",
   measurementId: "G-20T9EK68WQ"
 };
+
+// TODO: Nach Firebase-Console → Projekteinstellungen → Cloud Messaging → Web-Push-Zertifikate
+// generierten Schlüssel hier eintragen, sobald das Projekt auf den Blaze-Tarif umgestellt ist.
+const FCM_VAPID_KEY = '';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -650,6 +655,8 @@ export default function TrainingsApp() {
   const [userRole, setUserRole]       = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading]         = useState(true);
+  const [notifPermission, setNotifPermission] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported');
+  const [notifBusy, setNotifBusy]     = useState(false);
   const [subgroups, setSubgroups]     = useState({});
   const [children, setChildren]       = useState({});
   const [allUsers, setAllUsers]       = useState({});
@@ -901,6 +908,26 @@ export default function TrainingsApp() {
       setLoading(false);
     });
   }, []);
+
+  // ── FCM: Nachrichten anzeigen, während die App im Vordergrund geöffnet ist ───
+  useEffect(() => {
+    if (!user) return;
+    let unsub;
+    (async () => {
+      try {
+        if (!(await isFcmSupported())) return;
+        const messaging = getMessaging(app);
+        unsub = onMessage(messaging, (payload) => {
+          const title = payload.notification?.title || 'TTC Grün-Weiß Staffel';
+          const body = payload.notification?.body || '';
+          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            new Notification(title, { body, icon: '/logo.png' });
+          }
+        });
+      } catch {}
+    })();
+    return () => { if (unsub) unsub(); };
+  }, [user]);
 
   // ── Aktivitäts-Tracking (Auto-Logout nach 24h Inaktivität) ───
   useEffect(() => {
@@ -1221,6 +1248,82 @@ export default function TrainingsApp() {
   const canAccessRompel    = () => userRole === 'admin' || (appSettings.rompelTrainers  || []).includes(user?.uid);
   const canAccessPfand     = () => userRole === 'admin' || (appSettings.pfandTrainers   || []).includes(user?.uid);
   const canAccessPinnwand  = () => userRole === 'admin' || (appSettings.pinnwandUsers   || []).includes(user?.uid);
+  const enablePushNotifications = async () => {
+    if (notifBusy) return;
+    setNotifBusy(true);
+    try {
+      const supported = typeof window !== 'undefined' && await isFcmSupported();
+      if (!supported) {
+        alert('Push-Benachrichtigungen werden von diesem Browser/Gerät leider nicht unterstützt (z.B. iPhone: App muss zum Home-Bildschirm hinzugefügt sein).');
+        return;
+      }
+      const permission = await Notification.requestPermission();
+      setNotifPermission(permission);
+      if (permission !== 'granted') return;
+      if (!FCM_VAPID_KEY) {
+        alert('Push-Benachrichtigungen sind serverseitig noch nicht vollständig eingerichtet. Bitte wende dich an den Admin.');
+        return;
+      }
+      const messaging = getMessaging(app);
+      const token = await getFcmToken(messaging, { vapidKey: FCM_VAPID_KEY });
+      if (token && user?.uid) {
+        await setDoc(doc(db,'users',user.uid), { fcmTokens: arrayUnion(token) }, { merge:true });
+        setUserProfile(p => ({...(p||{}), fcmTokens: [...new Set([...(p?.fcmTokens||[]), token])]}));
+      }
+    } catch (e) {
+      alert('Aktivierung fehlgeschlagen: ' + (e?.message||e));
+    } finally {
+      setNotifBusy(false);
+    }
+  };
+
+  const toggleNotifPref = async (key) => {
+    if (!user?.uid) return;
+    const cur = userProfile?.notifPrefs || { training:true, achievements:true, other:true };
+    const next = { ...cur, [key]: !cur[key] };
+    setUserProfile(p => ({...(p||{}), notifPrefs: next}));
+    await setDoc(doc(db,'users',user.uid), { notifPrefs: next }, { merge:true });
+  };
+
+  const renderNotifSettings = (dark=true) => {
+    const prefs = userProfile?.notifPrefs || { training:true, achievements:true, other:true };
+    const hasToken = (userProfile?.fcmTokens||[]).length > 0;
+    const textCol = dark ? 'rgba(255,255,255,0.75)' : '#333';
+    const rowBg = dark ? 'rgba(255,255,255,0.04)' : '#f9fafb';
+    const rowBorder = dark ? 'rgba(255,255,255,0.08)' : '#e5e7eb';
+    const uncheckedBorder = dark ? 'rgba(255,255,255,0.25)' : '#d1d5db';
+    return (
+      <div style={{marginBottom:'18px'}}>
+        <h4 style={{margin:'0 0 10px',color:'#16a34a',fontSize:'13px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.5px'}}>🔔 Push-Benachrichtigungen</h4>
+        {notifPermission==='granted' && hasToken ? (
+          <p style={{margin:'0 0 10px',fontSize:'12px',color:'#16a34a',fontWeight:'600'}}>✅ Aktiviert auf diesem Gerät</p>
+        ) : notifPermission==='denied' ? (
+          <p style={{margin:'0 0 10px',fontSize:'12px',color:'#dc2626'}}>Blockiert – bitte in den Browser-Einstellungen für diese Seite erlauben.</p>
+        ) : (
+          <button onClick={enablePushNotifications} disabled={notifBusy}
+            style={{width:'100%',padding:'10px',marginBottom:'10px',background:'rgba(74,222,128,0.12)',border:'1px solid rgba(74,222,128,0.3)',borderRadius:'10px',color:'#16a34a',cursor:notifBusy?'default':'pointer',fontWeight:'700',fontSize:'13px',opacity:notifBusy?0.6:1}}>
+            {notifBusy?'Wird aktiviert…':'Push-Benachrichtigungen aktivieren'}
+          </button>
+        )}
+        <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+          {[
+            {key:'training',label:'Trainings-Erinnerung / Abstimmung'},
+            {key:'achievements',label:'Neue Errungenschaften'},
+            {key:'other',label:'Sonstige Nachrichten'},
+          ].map(({key,label})=>(
+            <button key={key} onClick={()=>toggleNotifPref(key)}
+              style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 10px',background:rowBg,border:`1px solid ${rowBorder}`,borderRadius:'9px',cursor:'pointer',textAlign:'left'}}>
+              <div style={{width:'18px',height:'18px',borderRadius:'5px',border:`2px solid ${prefs[key]!==false?'#16a34a':uncheckedBorder}`,background:prefs[key]!==false?'rgba(74,222,128,0.15)':'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                {prefs[key]!==false && <span style={{fontSize:'12px',color:'#16a34a',lineHeight:1}}>✓</span>}
+              </div>
+              <span style={{fontSize:'13px',color:textCol,fontWeight:'600'}}>{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const linkPlayerToUser = async (uid, spielerId) => {
     const cur = allUsersRef.current;
     const profile = cur[uid]||{};
@@ -2770,6 +2873,7 @@ export default function TrainingsApp() {
                   Passwort ändern
                 </button>
               </div>
+              {renderNotifSettings(false)}
               <button onClick={()=>{setShowProfile(false);setPwError('');setPwSuccess(false);setPwCurrent('');setPwNew('');setPwConfirm('');}}
                 style={{width:'100%',padding:'10px',background:'#f3f4f6',color:'#333',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
                 Schließen
@@ -3948,6 +4052,7 @@ export default function TrainingsApp() {
                 <input type="password" placeholder="Neues Passwort bestätigen" value={pwConfirm} onChange={e=>setPwConfirm(e.target.value)} onKeyPress={e=>e.key==='Enter'&&handleChangePassword()} style={inputStyle}/>
                 <button onClick={handleChangePassword} style={{padding:'11px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>Passwort ändern</button>
               </div>
+              {renderNotifSettings()}
               <button onClick={()=>{setShowProfile(false);setPwError('');setPwSuccess(false);setPwCurrent('');setPwNew('');setPwConfirm('');}}
                 style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.5)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button>
             </div>
@@ -4178,6 +4283,7 @@ export default function TrainingsApp() {
                 <input type="password" placeholder="Neues Passwort bestätigen" value={pwConfirm} onChange={e=>setPwConfirm(e.target.value)} style={inputStyle}/>
                 <button onClick={handleChangePassword} style={{padding:'11px',background:`linear-gradient(135deg,${accentColor},#0e7490)`,color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>Passwort ändern</button>
               </div>
+              {renderNotifSettings()}
               <button onClick={()=>{setShowProfile(false);setPwError('');setPwSuccess(false);setPwCurrent('');setPwNew('');setPwConfirm('');}}
                 style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.5)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button>
             </div>
@@ -4636,7 +4742,7 @@ export default function TrainingsApp() {
             {renderSubContent()}
           </div>
           {/* Profil-Modal */}
-          {showProfile&&(<Modal><div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}><div style={{background:'#0a2210',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'20px',padding:'28px',maxWidth:'400px',width:'100%',boxShadow:'0 32px 80px rgba(0,0,0,0.7)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}><h3 style={{margin:'0 0 2px',color:'white',fontSize:'20px',fontWeight:'800'}}>Mein Profil</h3><p style={{margin:'0 0 22px',color:'rgba(255,255,255,0.35)',fontSize:'13px'}}>{user?.email}</p><h4 style={{margin:'0 0 10px',color:'#4ade80',fontSize:'13px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.5px'}}>Passwort ändern</h4>{pwSuccess&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(74,222,128,0.12)',border:'1px solid rgba(74,222,128,0.25)',borderRadius:'10px',fontSize:'13px',color:'#4ade80',fontWeight:'600'}}>✅ Passwort erfolgreich geändert!</div>}{pwError&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',fontSize:'13px',color:'#fca5a5'}}>{pwError}</div>}<div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'18px'}}><input type="password" placeholder="Aktuelles Passwort" value={pwCurrent} onChange={e=>setPwCurrent(e.target.value)} style={inputStyle}/><input type="password" placeholder="Neues Passwort (min. 6 Zeichen)" value={pwNew} onChange={e=>setPwNew(e.target.value)} style={inputStyle}/><input type="password" placeholder="Neues Passwort bestätigen" value={pwConfirm} onChange={e=>setPwConfirm(e.target.value)} onKeyPress={e=>e.key==='Enter'&&handleChangePassword()} style={inputStyle}/><button onClick={handleChangePassword} style={{padding:'11px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>Passwort ändern</button></div><button onClick={()=>{setShowProfile(false);setPwError('');setPwSuccess(false);setPwCurrent('');setPwNew('');setPwConfirm('');}} style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.5)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button></div></div></Modal>)}
+          {showProfile&&(<Modal><div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}><div style={{background:'#0a2210',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'20px',padding:'28px',maxWidth:'400px',width:'100%',boxShadow:'0 32px 80px rgba(0,0,0,0.7)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}><h3 style={{margin:'0 0 2px',color:'white',fontSize:'20px',fontWeight:'800'}}>Mein Profil</h3><p style={{margin:'0 0 22px',color:'rgba(255,255,255,0.35)',fontSize:'13px'}}>{user?.email}</p><h4 style={{margin:'0 0 10px',color:'#4ade80',fontSize:'13px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.5px'}}>Passwort ändern</h4>{pwSuccess&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(74,222,128,0.12)',border:'1px solid rgba(74,222,128,0.25)',borderRadius:'10px',fontSize:'13px',color:'#4ade80',fontWeight:'600'}}>✅ Passwort erfolgreich geändert!</div>}{pwError&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',fontSize:'13px',color:'#fca5a5'}}>{pwError}</div>}<div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'18px'}}><input type="password" placeholder="Aktuelles Passwort" value={pwCurrent} onChange={e=>setPwCurrent(e.target.value)} style={inputStyle}/><input type="password" placeholder="Neues Passwort (min. 6 Zeichen)" value={pwNew} onChange={e=>setPwNew(e.target.value)} style={inputStyle}/><input type="password" placeholder="Neues Passwort bestätigen" value={pwConfirm} onChange={e=>setPwConfirm(e.target.value)} onKeyPress={e=>e.key==='Enter'&&handleChangePassword()} style={inputStyle}/><button onClick={handleChangePassword} style={{padding:'11px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>Passwort ändern</button></div>{renderNotifSettings()}<button onClick={()=>{setShowProfile(false);setPwError('');setPwSuccess(false);setPwCurrent('');setPwNew('');setPwConfirm('');}} style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.5)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button></div></div></Modal>)}
         </div>
       );
     }
@@ -4661,6 +4767,7 @@ export default function TrainingsApp() {
                 <input type="password" placeholder="Neues Passwort bestätigen" value={pwConfirm} onChange={e=>setPwConfirm(e.target.value)} onKeyPress={e=>e.key==='Enter'&&handleChangePassword()} style={inputStyle}/>
                 <button onClick={handleChangePassword} style={{padding:'11px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>Passwort ändern</button>
               </div>
+              {renderNotifSettings()}
               <button onClick={()=>{setShowProfile(false);setPwError('');setPwSuccess(false);setPwCurrent('');setPwNew('');setPwConfirm('');}}
                 style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.5)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button>
             </div>
