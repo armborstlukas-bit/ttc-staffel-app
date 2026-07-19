@@ -1321,7 +1321,7 @@ export default function TrainingsApp() {
         )}
         <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
           {[
-            {key:'training',label:'Trainings-Erinnerung / Abstimmung'},
+            {key:'training',label:'Trainings-Hinweise (z.B. unentschuldigtes Fehlen)'},
             {key:'achievements',label:'Neue Errungenschaften'},
             {key:'other',label:'Sonstige Nachrichten'},
           ].map(({key,label})=>(
@@ -1992,6 +1992,14 @@ export default function TrainingsApp() {
             trainerDeletedBy: {},
           }
         });
+        // Push an alle Admins
+        try {
+          const idToken = await cred.user.getIdToken();
+          fetch('/api/notify-new-registration', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+          }).catch(()=>{});
+        } catch {}
       } catch (err) {
         console.warn('Registrierungs-Benachrichtigung konnte nicht gespeichert werden:', err);
       }
