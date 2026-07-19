@@ -753,7 +753,6 @@ export default function TrainingsApp() {
   const [archivedPracticeTournaments, setArchivedPracticeTournaments] = useState({});
   const [gegnerLogbuch, setGegnerLogbuch] = useState([]);
   const [gegnerLogbuchBackups, setGegnerLogbuchBackups] = useState({});
-  const [gegnerBackupsOpen, setGegnerBackupsOpen] = useState(false);
   const [materialverwaltung, setMaterialverwaltung] = useState({});
   const [materialEdit, setMaterialEdit] = useState(null);
   const [materialSearch, setMaterialSearch] = useState('');
@@ -9373,7 +9372,7 @@ export default function TrainingsApp() {
         <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
           {/* Tabs */}
           <div style={{display:'flex',gap:'8px',marginBottom:'20px'}}>
-            {[['sessions','🏋️ Training'],['tournaments','🏆 Turniere'],['practiceTournaments','🎮 Übungswettkämpfe'],['rangliste','🏅 Ranglisten']].map(([key,label])=>(
+            {[['sessions','🏋️ Training'],['tournaments','🏆 Turniere'],['practiceTournaments','🎮 Übungswettkämpfe'],['rangliste','🏅 Ranglisten'],['gegnerlogbuchBackups','🎯 Gegnerlogbuch']].map(([key,label])=>(
               <button key={key} onClick={()=>setArchiveTab(key)}
                 style={{padding:'10px 20px',borderRadius:'10px',border:'none',cursor:'pointer',fontWeight:'700',fontSize:'14px',
                   background:archiveTab===key?'white':'rgba(255,255,255,0.2)',
@@ -9789,6 +9788,63 @@ export default function TrainingsApp() {
                     </div>
                   );
                 })}
+              </div>
+            );
+          })()}
+
+          {/* ── GEGNERLOGBUCH SICHERUNGEN TAB ── */}
+          {archiveTab==='gegnerlogbuchBackups' && (()=>{
+            const createGegnerBackupNow = () => {
+              const weekKey = getIsoWeekKey(new Date())+'-manuell-'+Date.now();
+              saveGegnerLogbuchBackups({...gegnerLogbuchBackups, [weekKey]: {savedAt:new Date().toISOString(), entries:gegnerLogbuch, manual:true}});
+            };
+            const restoreGegnerBackup = (weekKey) => {
+              const backup = gegnerLogbuchBackups[weekKey];
+              if (!backup) return;
+              if (!window.confirm(`Gegnerlogbuch auf diesen Sicherungsstand zurücksetzen? Der aktuelle Stand wird dabei überschrieben (vorher wird zur Sicherheit ebenfalls eine Sicherung angelegt).`)) return;
+              const nowKey = getIsoWeekKey(new Date())+'-vor-restore-'+Date.now();
+              saveGegnerLogbuchBackups({...gegnerLogbuchBackups, [nowKey]: {savedAt:new Date().toISOString(), entries:gegnerLogbuch}});
+              saveGegnerLogbuch(backup.entries);
+            };
+            const deleteGegnerBackup = (weekKey) => {
+              if(!window.confirm('Diese Sicherung endgültig löschen?')) return;
+              const u = {...gegnerLogbuchBackups}; delete u[weekKey]; saveGegnerLogbuchBackups(u);
+            };
+            const sortedBackups = Object.entries(gegnerLogbuchBackups).sort((a,b)=>b[1].savedAt.localeCompare(a[1].savedAt));
+            return (
+              <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
+                {userRole==='admin' && (
+                  <button onClick={createGegnerBackupNow}
+                    style={{padding:'12px',background:'rgba(8,145,178,0.15)',border:'1px solid rgba(8,145,178,0.35)',borderRadius:'12px',color:'#67e8f9',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px'}}>
+                    🗄️ Sicherheitskopie erstellen
+                  </button>
+                )}
+                {sortedBackups.length === 0 && (
+                  <div style={{background:'rgba(255,255,255,0.1)',borderRadius:'12px',padding:'30px',textAlign:'center',color:'rgba(255,255,255,0.7)'}}>
+                    <div style={{fontSize:'40px',marginBottom:'10px'}}>🎯</div>
+                    <p style={{margin:'0 0 4px',fontWeight:'700'}}>Noch keine Sicherung vorhanden</p>
+                    <p style={{margin:0,fontSize:'13px',opacity:0.7}}>Jeden Montag ab 8 Uhr wird automatisch eine Sicherung angelegt. Admins können zusätzlich jederzeit manuell sichern.</p>
+                  </div>
+                )}
+                {sortedBackups.map(([weekKey,backup])=>(
+                  <div key={weekKey} style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 16px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px'}}>
+                    <span style={{fontSize:'22px',flexShrink:0}}>{backup.manual?'✋':'🗓️'}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <p style={{margin:0,fontSize:'14px',fontWeight:'700',color:'white'}}>{backup.entries.length} {backup.entries.length===1?'Eintrag':'Einträge'}{backup.manual?' · Manuell':''}</p>
+                      <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>Gesichert am {new Date(backup.savedAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</p>
+                    </div>
+                    {userRole==='admin' && (<>
+                      <button onClick={()=>restoreGegnerBackup(weekKey)}
+                        style={{padding:'7px 14px',borderRadius:'8px',background:'rgba(8,145,178,0.12)',border:'1px solid rgba(8,145,178,0.3)',color:'#67e8f9',cursor:'pointer',fontSize:'12px',fontWeight:'700',whiteSpace:'nowrap'}}>
+                        ↺ Wiederherstellen
+                      </button>
+                      <button onClick={()=>deleteGegnerBackup(weekKey)}
+                        style={{width:'32px',height:'32px',borderRadius:'8px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                        <Trash2 size={13}/>
+                      </button>
+                    </>)}
+                  </div>
+                ))}
               </div>
             );
           })()}
@@ -10910,22 +10966,17 @@ export default function TrainingsApp() {
       saveGegnerLogbuch(gegnerLogbuch.map(x=>x.id===id?{...x,[field]:value}:x));
     };
 
-    // Wöchentliche Sicherheitskopie: einmal pro ISO-Woche wird der aktuelle Stand automatisch archiviert
+    // Automatische wöchentliche Sicherung: ab Montag 8 Uhr wird für die laufende ISO-Woche
+    // einmalig eine Sicherung angelegt, sobald jemand mit Zugriff die Ansicht öffnet.
     (()=>{
       if (gegnerLogbuch.length===0) return;
-      const weekKey = getIsoWeekKey(new Date());
+      const now = new Date();
+      const beforeMondayEightAm = now.getDay() === 1 && now.getHours() < 8;
+      if (beforeMondayEightAm) return;
+      const weekKey = getIsoWeekKey(now);
       if (gegnerLogbuchBackups[weekKey]) return;
-      saveGegnerLogbuchBackups({...gegnerLogbuchBackups, [weekKey]: {savedAt:new Date().toISOString(), entries:gegnerLogbuch}});
+      saveGegnerLogbuchBackups({...gegnerLogbuchBackups, [weekKey]: {savedAt:now.toISOString(), entries:gegnerLogbuch}});
     })();
-
-    const restoreGegnerBackup = (weekKey) => {
-      const backup = gegnerLogbuchBackups[weekKey];
-      if (!backup) return;
-      if (!window.confirm(`Gegnerlogbuch auf den Stand von Woche ${weekKey} zurücksetzen? Der aktuelle Stand wird dabei überschrieben (vorher wird zur Sicherheit ebenfalls eine Sicherung angelegt).`)) return;
-      const nowKey = getIsoWeekKey(new Date())+'-vor-restore-'+Date.now();
-      saveGegnerLogbuchBackups({...gegnerLogbuchBackups, [nowKey]: {savedAt:new Date().toISOString(), entries:gegnerLogbuch}});
-      saveGegnerLogbuch(backup.entries);
-    };
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#0c1a2e 0%,#0e2a3a 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
@@ -11066,35 +11117,6 @@ export default function TrainingsApp() {
             </div>
           )}
 
-          {/* Admin: Wöchentliche Sicherungen */}
-          {userRole==='admin' && (
-            <div style={{marginTop:'24px'}}>
-              <button onClick={()=>setGegnerBackupsOpen(o=>!o)}
-                style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer'}}>
-                <span style={{fontSize:'12px',fontWeight:'800',color:'rgba(255,255,255,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>🗄️ Wöchentliche Sicherungen ({Object.keys(gegnerLogbuchBackups).length})</span>
-                <span style={{fontSize:'12px',color:'rgba(255,255,255,0.3)'}}>{gegnerBackupsOpen?'▲':'▼'}</span>
-              </button>
-              {gegnerBackupsOpen && (
-                <div style={{marginTop:'8px',display:'grid',gap:'6px'}}>
-                  {Object.keys(gegnerLogbuchBackups).length===0
-                    ? <p style={{fontSize:'12px',color:'rgba(255,255,255,0.25)',textAlign:'center',padding:'12px'}}>Noch keine Sicherung vorhanden.</p>
-                    : Object.entries(gegnerLogbuchBackups).sort((a,b)=>b[1].savedAt.localeCompare(a[1].savedAt)).map(([weekKey,backup])=>(
-                      <div key={weekKey} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 12px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'9px'}}>
-                        <div style={{flex:1,minWidth:0}}>
-                          <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'white'}}>{weekKey}</p>
-                          <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{backup.entries.length} Einträge · gesichert am {new Date(backup.savedAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</p>
-                        </div>
-                        <button onClick={()=>restoreGegnerBackup(weekKey)}
-                          style={{padding:'6px 12px',borderRadius:'8px',background:accentBg,border:`1px solid ${accentBorder}`,color:'#67e8f9',cursor:'pointer',fontSize:'12px',fontWeight:'700',whiteSpace:'nowrap'}}>
-                          ↺ Wiederherstellen
-                        </button>
-                      </div>
-                    ))
-                  }
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
     );
