@@ -1051,9 +1051,14 @@ export default function TrainingsApp() {
           const key = `ttr_auto_${childId}_${val}`;
           if (Object.values(notifications).some(n => n.key === key)) return;
           const id = 'notif_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-          newNotifs[id] = { id, childId, type: 'achievement', title: '🏓 TTR-Meilenstein erreicht!',
-            message: `Glückwunsch ${child.name}! Du hast einen TTR-Wert von ${val} erreicht. ${ACHIEVEMENT_DESCRIPTIONS.ttr(val)}`,
+          const title = '🏓 TTR-Meilenstein erreicht!';
+          const message = `Glückwunsch ${child.name}! Du hast einen TTR-Wert von ${val} erreicht. ${ACHIEVEMENT_DESCRIPTIONS.ttr(val)}`;
+          newNotifs[id] = { id, childId, type: 'achievement', title, message,
             createdAt: new Date().toISOString(), trashedAt: null, key, batchId: null, trainerTrashedAt: {}, trainerDeletedBy: {} };
+          const targetUserIds = getLinkedUserIds(childId);
+          if (targetUserIds.length) {
+            triggerPushNotification({ userIds: targetUserIds, title, body: message, url: '/', category: 'achievements' });
+          }
         });
       }
     });
@@ -1690,6 +1695,12 @@ export default function TrainingsApp() {
     const id = 'notif_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
     const notif = { id, childId, type, title, message, createdAt: now, trashedAt: null, key, batchId: null, trainerTrashedAt: {}, trainerDeletedBy: {} };
     saveNotifications({ ...notifications, [id]: notif });
+    if (type === 'achievement') {
+      const targetUserIds = getLinkedUserIds(childId);
+      if (targetUserIds.length) {
+        triggerPushNotification({ userIds: targetUserIds, title, body: message, url: '/', category: 'achievements' });
+      }
+    }
   };
 
   // Child-side trash (only affects child's inbox)
