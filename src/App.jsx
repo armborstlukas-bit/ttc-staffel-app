@@ -7527,6 +7527,7 @@ export default function TrainingsApp() {
         if (teamSystem === 'korbylonCup') {
           return [
             {kind:'einzel', aPos:[0], bPos:[1], label:'Einzel (Kreuz) — A1 vs B2'},
+            {kind:'einzel', aPos:[1], bPos:[0], label:'Einzel (Kreuz) — A2 vs B1'},
             {kind:'doppel', aPos:[0,1], bPos:[0,1], label:'Doppel'},
             {kind:'einzel', aPos:[0], bPos:[0], label:'Einzel — A1 vs B1'},
             {kind:'einzel', aPos:[1], bPos:[1], label:'Einzel — A2 vs B2'},
@@ -7546,12 +7547,26 @@ export default function TrainingsApp() {
       const teamA = ptTeamOrderA.map(k=>poolMap[k]).filter(Boolean);
       const teamB = ptTeamOrderB.map(k=>poolMap[k]).filter(Boolean);
       const id = 'pt_' + Date.now();
-      const matches = generateTeamMatches(ptCreateForm.teamSize, ptCreateForm.teamSystem).map((m,i)=>({...m, idx:i, result:null}));
+      const avgTTR = (side, positions) => {
+        const arr = positions.map(i=>side[i]?.maxTTR||0);
+        return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
+      };
+      const matches = generateTeamMatches(ptCreateForm.teamSize, ptCreateForm.teamSystem).map((m,i)=>{
+        let handicap = null;
+        if (ptCreateForm.handicap) {
+          const ttrA = avgTTR(teamA, m.aPos), ttrB = avgTTR(teamB, m.bPos);
+          const diff = ttrA - ttrB;
+          const raw = Math.floor(Math.abs(diff) / (ptCreateForm.handicapPerTTR||60));
+          const pts = Math.min(raw, ptCreateForm.handicapMax);
+          if (pts > 0) handicap = diff > 0 ? {beneficiary:'b', points:pts} : {beneficiary:'a', points:pts};
+        }
+        return {...m, idx:i, result:null, ...(handicap?{handicap}:{})};
+      });
       const newPT = {
         id, type:'team',
         createdAt: new Date().toISOString(),
         createdBy: userProfile?.name || user?.email || 'Trainer',
-        settings: { winSets:ptCreateForm.winSets, setLength:ptCreateForm.setLength, deciderLength:ptCreateForm.deciderCustom?ptCreateForm.deciderLength:ptCreateForm.setLength, trackSetScores:ptCreateForm.trackSetScores },
+        settings: { winSets:ptCreateForm.winSets, setLength:ptCreateForm.setLength, deciderLength:ptCreateForm.deciderCustom?ptCreateForm.deciderLength:ptCreateForm.setLength, trackSetScores:ptCreateForm.trackSetScores, handicap:ptCreateForm.handicap, handicapPerTTR:ptCreateForm.handicapPerTTR||60, handicapMax:ptCreateForm.handicapMax },
         teamSize: ptCreateForm.teamSize,
         teamSystem: ptCreateForm.teamSystem,
         teamA: {name: ptTeamNameA.trim()||'Mannschaft A', players: teamA},
@@ -7808,7 +7823,7 @@ export default function TrainingsApp() {
                   </div>
 
                   {/* Vorgabe */}
-                  {ptCreateForm.type!=='team'&&<div style={{display:'flex',alignItems:'flex-start',gap:'12px',marginBottom:'20px',padding:'12px 14px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'12px'}}>
+                  <div style={{display:'flex',alignItems:'flex-start',gap:'12px',marginBottom:'20px',padding:'12px 14px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'12px'}}>
                     <button onClick={()=>setPtCreateForm(f=>({...f,handicap:!f.handicap}))}
                       style={{width:'22px',height:'22px',borderRadius:'6px',border:`2px solid ${ptCreateForm.handicap?'#7c3aed':'#d1d5db'}`,background:ptCreateForm.handicap?'rgba(124,58,237,0.1)':'transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginTop:'1px'}}>
                       {ptCreateForm.handicap&&<span style={{fontSize:'14px',color:'#7c3aed',lineHeight:1}}>✓</span>}
@@ -7842,7 +7857,7 @@ export default function TrainingsApp() {
                         </div>
                       )}
                     </div>
-                  </div>}
+                  </div>
 
                   <button onClick={()=>setPtCreateStep(2)}
                     style={{width:'100%',padding:'13px',background:'linear-gradient(135deg,#7c3aed,#6d28d9)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'800',fontSize:'15px'}}>
@@ -8684,12 +8699,15 @@ export default function TrainingsApp() {
                     <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 14px 12px'}}>
                       <div style={{flex:1,textAlign:'right',minWidth:0}}>
                         <p style={{margin:0,fontWeight:'800',fontSize:isMobile?'13px':'15px',color:aWon?'#4ade80':res?'rgba(255,255,255,0.35)':'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nameA}</p>
+                        {match.handicap?.beneficiary==='a'&&<p style={{margin:0,fontSize:'10px',color:'#fde68a',fontWeight:'700'}}>+{match.handicap.points}P</p>}
                       </div>
                       <div style={{minWidth:'64px',textAlign:'center',flexShrink:0}}>
                         {res ? <span style={{fontSize:'20px',fontWeight:'900',color:'white',letterSpacing:'2px'}}>{res.sets1}:{res.sets2}</span> : <span style={{fontSize:'13px',color:'rgba(255,255,255,0.2)',fontWeight:'600'}}>vs</span>}
+                        {match.handicap&&<p style={{margin:'2px 0 0',fontSize:'10px',color:'rgba(253,230,138,0.6)',fontWeight:'600'}}>Vorgabe {match.handicap.points}P</p>}
                       </div>
                       <div style={{flex:1,minWidth:0}}>
                         <p style={{margin:0,fontWeight:'800',fontSize:isMobile?'13px':'15px',color:bWon?'#4ade80':res?'rgba(255,255,255,0.35)':'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nameB}</p>
+                        {match.handicap?.beneficiary==='b'&&<p style={{margin:0,fontSize:'10px',color:'#fde68a',fontWeight:'700'}}>+{match.handicap.points}P</p>}
                       </div>
                       {!isEditing&&(
                         <button onClick={()=>initDraft(matchIdx)}
