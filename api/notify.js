@@ -28,12 +28,15 @@ export default async function handler(req, res) {
     }
 
     const { userIds, title, body, url, category } = req.body || {};
+    console.log('[notify] caller:', callerUid, 'body:', req.body);
     if (!Array.isArray(userIds) || userIds.length === 0 || !title || !body || !ALLOWED_CATEGORIES.includes(category)) {
+      console.log('[notify] ungültige Anfrage', { userIds, title, body, category });
       res.status(400).json({ error: 'Ungültige Anfrage' });
       return;
     }
 
     const result = await sendPushToUsers(db, adminMessaging(), { userIds, title, body, url, category });
+    console.log('[notify] Ergebnis:', result);
     res.status(200).json(result);
   } catch (e) {
     res.status(500).json({ error: String(e?.message || e) });
