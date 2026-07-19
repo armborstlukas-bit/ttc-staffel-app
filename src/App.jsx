@@ -6462,9 +6462,9 @@ export default function TrainingsApp() {
                       {/* Kompakte Kopfzeile */}
                       <div style={{display:'flex',alignItems:'center',gap:'6px',padding:'8px 10px'}}>
                         <span style={{fontSize:'11px',fontWeight:'700',color:'#92400e',flexShrink:0}}>#{defIdx+1}</span>
-                        <span style={{fontSize:'13px',fontWeight:'800',color:'#1f2937',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{def?.name||'?'}</span>
+                        <span style={{fontSize:isMobile?'12px':'13px',fontWeight:'800',color:'#1f2937',flex:1,minWidth:0,overflowWrap:'break-word',wordBreak:'break-word',whiteSpace:'normal',lineHeight:'1.25'}}>{def?.name||'?'}</span>
                         <span style={{fontSize:'12px',color:'#9ca3af',fontWeight:'700',flexShrink:0}}>vs</span>
-                        <span style={{fontSize:'13px',fontWeight:'800',color:'#1f2937',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textAlign:'right'}}>{chal?.name||'?'}</span>
+                        <span style={{fontSize:isMobile?'12px':'13px',fontWeight:'800',color:'#1f2937',flex:1,minWidth:0,overflowWrap:'break-word',wordBreak:'break-word',whiteSpace:'normal',lineHeight:'1.25',textAlign:'right'}}>{chal?.name||'?'}</span>
                         <span style={{fontSize:'11px',fontWeight:'700',color:'#ea580c',flexShrink:0}}>#{chalIdx+1}</span>
                         <button onClick={()=>deleteSpiel(spiel.id)} style={{width:'22px',height:'22px',borderRadius:'5px',background:'#fee2e2',border:'none',cursor:'pointer',color:'#dc2626',fontSize:'11px',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginLeft:'2px'}}>✕</button>
                       </div>
@@ -8097,7 +8097,7 @@ export default function TrainingsApp() {
                               return (
                                 <div key={key} style={{display:'flex',alignItems:'center',gap:'8px',padding:'7px 8px',background:'#f9fafb',borderRadius:'8px',border:`1px solid ${color}22`}}>
                                   <span style={{width:'24px',height:'24px',borderRadius:'50%',background:color,color:'white',fontSize:'12px',fontWeight:'900',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>{i+1}</span>
-                                  <span style={{flex:1,fontSize:'12px',fontWeight:'700',color:'#1f2937',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p?.name||'?'} <span style={{color:'#9ca3af',fontWeight:'600'}}>(Nr. {i+1})</span></span>
+                                  <span style={{flex:1,minWidth:0,fontSize:isMobile?'11px':'12px',fontWeight:'700',color:'#1f2937',overflowWrap:'break-word',wordBreak:'break-word',whiteSpace:'normal',lineHeight:'1.25'}}>{p?.name||'?'} <span style={{color:'#9ca3af',fontWeight:'600'}}>(Nr. {i+1})</span></span>
                                   <button onClick={()=>setOrder(o=>{const n=[...o];if(i>0){[n[i-1],n[i]]=[n[i],n[i-1]];}return n;})} disabled={i===0}
                                     style={{width:'20px',height:'20px',borderRadius:'5px',background:'#f3f4f6',border:'none',cursor:i===0?'default':'pointer',color:i===0?'#d1d5db':'#6b7280',fontSize:'11px',display:'flex',alignItems:'center',justifyContent:'center'}}>↑</button>
                                   <button onClick={()=>setOrder(o=>{const n=[...o];if(i<n.length-1){[n[i+1],n[i]]=[n[i],n[i+1]];}return n;})} disabled={i===order.length-1}
@@ -8115,8 +8115,8 @@ export default function TrainingsApp() {
                       <div style={{margin:'16px 0'}}>
                         <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.5px'}}>Teams zusammenstellen ({teamSize} pro Team, Reihenfolge = Position)</p>
                         <div style={{display:'flex',gap:'12px',flexWrap:'wrap',marginBottom:'12px'}}>
-                          <TeamCol name={ptTeamNameA} setName={setPtTeamNameA} order={ptTeamOrderA} setOrder={setPtTeamOrderA} color="#7c3aed"/>
-                          <TeamCol name={ptTeamNameB} setName={setPtTeamNameB} order={ptTeamOrderB} setOrder={setPtTeamOrderB} color="#db2777"/>
+                          {TeamCol({name:ptTeamNameA, setName:setPtTeamNameA, order:ptTeamOrderA, setOrder:setPtTeamOrderA, color:"#7c3aed"})}
+                          {TeamCol({name:ptTeamNameB, setName:setPtTeamNameB, order:ptTeamOrderB, setOrder:setPtTeamOrderB, color:"#db2777"})}
                         </div>
                         {unassigned.length>0 && (
                           <div>
@@ -8145,6 +8145,7 @@ export default function TrainingsApp() {
                     const DoublesCol = ({order,teamName,seq,setSeq,color}) => {
                       const pairs = chunkDoublesPairs(seq);
                       const pairLabels = teamSize===6 ? ['D1','D2','D3'] : teamSize===4 ? ['Doppel 1','Doppel 2'] : ['Doppel'];
+                      const shortLabels = teamSize===6 ? ['D1','D2','D3'] : teamSize===4 ? ['D1','D2'] : ['D'];
                       return (
                         <div style={{flex:1,minWidth:'220px',border:`2px solid ${color}33`,borderRadius:'12px',padding:'10px'}}>
                           <p style={{margin:'0 0 8px',fontSize:'13px',fontWeight:'800',color}}>{teamName}</p>
@@ -8154,13 +8155,14 @@ export default function TrainingsApp() {
                               const selIdx = seq.indexOf(i);
                               const selected = selIdx!==-1;
                               const full = seq.length>=need;
+                              const pairLabel = selected ? shortLabels[Math.floor(selIdx/2)] : null;
                               return (
                                 <button key={key} disabled={!selected&&full} onClick={()=>{
                                   if(selected){ setSeq(s=>s.filter(x=>x!==i)); }
                                   else if(!full){ setSeq(s=>[...s,i]); }
                                 }} style={{padding:'6px 10px',borderRadius:'8px',border:`2px solid ${selected?color:'#e5e7eb'}`,background:selected?`${color}15`:'#f9fafb',color:selected?color:'#6b7280',cursor:(!selected&&full)?'not-allowed':'pointer',fontWeight:'700',fontSize:'12px',opacity:(!selected&&full)?0.4:1,display:'flex',alignItems:'center',gap:'5px'}}>
                                   <span style={{width:'18px',height:'18px',borderRadius:'50%',background:selected?color:'#d1d5db',color:'white',fontSize:'10px',fontWeight:'900',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{i+1}</span>
-                                  {p?.name||'?'}{selected&&<span style={{fontSize:'10px',opacity:0.7}}>#{selIdx+1}</span>}
+                                  {p?.name||'?'}{pairLabel&&<span style={{fontSize:'10px',fontWeight:'900',opacity:0.8}}>{pairLabel}</span>}
                                 </button>
                               );
                             })}
@@ -8186,8 +8188,8 @@ export default function TrainingsApp() {
                         <p style={{margin:'0 0 4px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.5px'}}>Doppelaufstellung festlegen</p>
                         <p style={{margin:'0 0 10px',fontSize:'11px',color:'#9ca3af'}}>Klicke die Spieler in der Reihenfolge an, in der sie Doppelpaare bilden sollen (jeweils 2 zusammen = 1 Paar).{teamSize===6?' D1 frei wählbar, D2 sollte stärker als D3 sein.':''}</p>
                         <div style={{display:'flex',gap:'12px',flexWrap:'wrap'}}>
-                          <DoublesCol order={ptTeamOrderA} teamName={ptTeamNameA} seq={ptDoublesSeqA} setSeq={setPtDoublesSeqA} color="#7c3aed"/>
-                          <DoublesCol order={ptTeamOrderB} teamName={ptTeamNameB} seq={ptDoublesSeqB} setSeq={setPtDoublesSeqB} color="#db2777"/>
+                          {DoublesCol({order:ptTeamOrderA, teamName:ptTeamNameA, seq:ptDoublesSeqA, setSeq:setPtDoublesSeqA, color:"#7c3aed"})}
+                          {DoublesCol({order:ptTeamOrderB, teamName:ptTeamNameB, seq:ptDoublesSeqB, setSeq:setPtDoublesSeqB, color:"#db2777"})}
                         </div>
                       </div>
                     );
@@ -8545,7 +8547,7 @@ export default function TrainingsApp() {
           <div style={{background:isFinal?'rgba(253,230,138,0.05)':isBye?'rgba(255,255,255,0.01)':'rgba(255,255,255,0.04)',border:`1.5px solid ${borderCol}`,borderRadius:'14px',overflow:'hidden',opacity:isBye?0.5:1}}>
             <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'11px 14px'}}>
               <div style={{flex:1,textAlign:'right',minWidth:0}}>
-                <p style={{margin:0,fontWeight:'800',fontSize:'14px',color:p1Won?'#4ade80':res&&!p1Won?'rgba(255,255,255,0.3)':p1===undefined?'rgba(255,255,255,0.25)':'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p1Name}</p>
+                <p style={{margin:0,fontWeight:'800',fontSize:isMobile?'12px':'14px',color:p1Won?'#4ade80':res&&!p1Won?'rgba(255,255,255,0.3)':p1===undefined?'rgba(255,255,255,0.25)':'white',overflowWrap:'break-word',wordBreak:'break-word',whiteSpace:'normal',lineHeight:'1.25'}}>{p1Name}</p>
                 {p1!=null&&p1!==undefined&&<p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.2)'}}>#{players[p1]?.seed}{hcap?.b==='p1'?<span style={{color:'#fde68a',fontWeight:'700'}}> +{hcap.pts}P</span>:null}</p>}
               </div>
               <div style={{minWidth:'60px',textAlign:'center',flexShrink:0}}>
@@ -8555,7 +8557,7 @@ export default function TrainingsApp() {
                 {hcap&&!isBye&&<p style={{margin:'2px 0 0',fontSize:'10px',color:'rgba(253,230,138,0.6)',fontWeight:'600'}}>{hcap.pts}P Vorgabe</p>}
               </div>
               <div style={{flex:1,minWidth:0}}>
-                <p style={{margin:0,fontWeight:'800',fontSize:'14px',color:p2Won?'#4ade80':res&&!p2Won?'rgba(255,255,255,0.3)':p2===undefined?'rgba(255,255,255,0.25)':'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p2Name}</p>
+                <p style={{margin:0,fontWeight:'800',fontSize:isMobile?'12px':'14px',color:p2Won?'#4ade80':res&&!p2Won?'rgba(255,255,255,0.3)':p2===undefined?'rgba(255,255,255,0.25)':'white',overflowWrap:'break-word',wordBreak:'break-word',whiteSpace:'normal',lineHeight:'1.25'}}>{p2Name}</p>
                 {p2!=null&&p2!==undefined&&<p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.2)'}}>#{players[p2]?.seed}{hcap?.b==='p2'?<span style={{color:'#fde68a',fontWeight:'700'}}> +{hcap.pts}P</span>:null}</p>}
               </div>
               {canPlay&&!isEditing&&(
@@ -8841,7 +8843,7 @@ export default function TrainingsApp() {
                     </div>
                     <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 14px 12px'}}>
                       <div style={{flex:1,textAlign:'right',minWidth:0}}>
-                        <p style={{margin:0,fontWeight:'800',fontSize:isMobile?'13px':'15px',color:aWon?'#4ade80':res?'rgba(255,255,255,0.35)':'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nameA}</p>
+                        <p style={{margin:0,fontWeight:'800',fontSize:isMobile?'12px':'15px',color:aWon?'#4ade80':res?'rgba(255,255,255,0.35)':'white',overflowWrap:'break-word',wordBreak:'break-word',whiteSpace:'normal',lineHeight:'1.25'}}>{nameA}</p>
                         {match.handicap?.beneficiary==='a'&&<p style={{margin:0,fontSize:'10px',color:'#fde68a',fontWeight:'700'}}>+{match.handicap.points}P</p>}
                       </div>
                       <div style={{minWidth:'64px',textAlign:'center',flexShrink:0}}>
@@ -8849,7 +8851,7 @@ export default function TrainingsApp() {
                         {match.handicap&&<p style={{margin:'2px 0 0',fontSize:'10px',color:'rgba(253,230,138,0.6)',fontWeight:'600'}}>Vorgabe {match.handicap.points}P</p>}
                       </div>
                       <div style={{flex:1,minWidth:0}}>
-                        <p style={{margin:0,fontWeight:'800',fontSize:isMobile?'13px':'15px',color:bWon?'#4ade80':res?'rgba(255,255,255,0.35)':'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nameB}</p>
+                        <p style={{margin:0,fontWeight:'800',fontSize:isMobile?'12px':'15px',color:bWon?'#4ade80':res?'rgba(255,255,255,0.35)':'white',overflowWrap:'break-word',wordBreak:'break-word',whiteSpace:'normal',lineHeight:'1.25'}}>{nameB}</p>
                         {match.handicap?.beneficiary==='b'&&<p style={{margin:0,fontSize:'10px',color:'#fde68a',fontWeight:'700'}}>+{match.handicap.points}P</p>}
                       </div>
                       {!isEditing&&(
@@ -9142,7 +9144,7 @@ export default function TrainingsApp() {
                       <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 14px'}}>
                         {/* Spieler 1 */}
                         <div style={{flex:1,textAlign:'right',minWidth:0}}>
-                          <p style={{margin:0,fontWeight:'800',fontSize:isMobile?'13px':'15px',color:p1Won?'#4ade80':res?'rgba(255,255,255,0.35)':'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p1.name}</p>
+                          <p style={{margin:0,fontWeight:'800',fontSize:isMobile?'12px':'15px',color:p1Won?'#4ade80':res?'rgba(255,255,255,0.35)':'white',overflowWrap:'break-word',wordBreak:'break-word',whiteSpace:'normal',lineHeight:'1.25'}}>{p1.name}</p>
                           <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>#{p1.seed}{match.handicap?.beneficiary===match.p1Idx?<span style={{color:'#fde68a',fontWeight:'700'}}> +{match.handicap.points}P</span>:null}</p>
                         </div>
 
@@ -9157,7 +9159,7 @@ export default function TrainingsApp() {
 
                         {/* Spieler 2 */}
                         <div style={{flex:1,minWidth:0}}>
-                          <p style={{margin:0,fontWeight:'800',fontSize:isMobile?'13px':'15px',color:p2Won?'#4ade80':res?'rgba(255,255,255,0.35)':'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p2.name}</p>
+                          <p style={{margin:0,fontWeight:'800',fontSize:isMobile?'12px':'15px',color:p2Won?'#4ade80':res?'rgba(255,255,255,0.35)':'white',overflowWrap:'break-word',wordBreak:'break-word',whiteSpace:'normal',lineHeight:'1.25'}}>{p2.name}</p>
                           <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>#{p2.seed}{match.handicap?.beneficiary===match.p2Idx?<span style={{color:'#fde68a',fontWeight:'700'}}> +{match.handicap.points}P</span>:null}</p>
                         </div>
 
@@ -11169,7 +11171,7 @@ export default function TrainingsApp() {
             : data.map((row,i)=>(
               <div key={row.name} style={{display:'grid',gridTemplateColumns:cols,gap:'4px',padding:'10px 14px',borderBottom:i<data.length-1?'1px solid rgba(255,255,255,0.04)':'none',alignItems:'center'}}>
                 <span style={{fontSize:'12px',fontWeight:'800',color:i===0?'#fbbf24':i===1?'rgba(255,255,255,0.5)':i===2?'#cd7c32':'rgba(255,255,255,0.25)'}}>{i+1}</span>
-                <span style={{fontSize:'13px',fontWeight:'700',color:'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{row.name}</span>
+                <span style={{fontSize:isMobile?'12px':'13px',fontWeight:'700',color:'white',minWidth:0,overflowWrap:'break-word',wordBreak:'break-word',whiteSpace:'normal',lineHeight:'1.25'}}>{row.name}</span>
                 <span style={{textAlign:'center',fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>{row.matches}</span>
                 <span style={{textAlign:'center',fontSize:'13px',color:'#86efac',fontWeight:'700'}}>{row.wins}</span>
                 <span style={{textAlign:'center',fontSize:'13px',color:'#fca5a5'}}>{row.losses}</span>
@@ -11537,7 +11539,7 @@ export default function TrainingsApp() {
                   return (
                   <div key={row.name} style={{display:'grid',gridTemplateColumns:'28px 1fr 50px 50px 50px 56px',gap:'4px',padding:'10px 14px',borderBottom:i<tableData.length-1?'1px solid rgba(255,255,255,0.04)':'none',alignItems:'center',background:isMe?'rgba(244,114,182,0.07)':'transparent'}}>
                     <span style={{fontSize:'12px',fontWeight:'800',color:i===0?'#fbbf24':i===1?'rgba(255,255,255,0.5)':i===2?'#cd7c32':'rgba(255,255,255,0.25)'}}>{i+1}</span>
-                    <span style={{fontSize:'14px',fontWeight:'700',color:isMe?ac:'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{row.name}{isMe&&<span style={{fontSize:'10px',marginLeft:'5px',opacity:0.6}}>» ich</span>}</span>
+                    <span style={{fontSize:isMobile?'12px':'14px',fontWeight:'700',color:isMe?ac:'white',minWidth:0,overflowWrap:'break-word',wordBreak:'break-word',whiteSpace:'normal',lineHeight:'1.25'}}>{row.name}{isMe&&<span style={{fontSize:'10px',marginLeft:'5px',opacity:0.6}}>» ich</span>}</span>
                     <span style={{textAlign:'center',fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>{row.matches}</span>
                     <span style={{textAlign:'center',fontSize:'13px',color:'#86efac',fontWeight:'700'}}>{row.wins}</span>
                     <span style={{textAlign:'center',fontSize:'13px',color:'#fca5a5'}}>{row.losses}</span>
