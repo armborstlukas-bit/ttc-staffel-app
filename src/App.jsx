@@ -11020,12 +11020,12 @@ export default function TrainingsApp() {
                 <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'10px'}}>
                   <div>
                     <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Taktikhinweise</label>
-                    <textarea placeholder="Wie spielt der Gegner? Was hat funktioniert?" value={gegnerForm.taktik} onChange={e=>setGegnerForm(f=>({...f,taktik:e.target.value}))}
+                    <textarea placeholder="So spiele ich gegen ihn/sie..." value={gegnerForm.taktik} onChange={e=>setGegnerForm(f=>({...f,taktik:e.target.value}))}
                       rows={4} style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',resize:'vertical',boxSizing:'border-box',fontFamily:'inherit'}}/>
                   </div>
                   <div>
                     <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Spielweise</label>
-                    <textarea placeholder="Wie spielt der Gegner? Beidhändig, Abwehr, Angriff, Aufschläge..." value={gegnerForm.spielweise} onChange={e=>setGegnerForm(f=>({...f,spielweise:e.target.value}))}
+                    <textarea placeholder="So spielt er/sie..." value={gegnerForm.spielweise} onChange={e=>setGegnerForm(f=>({...f,spielweise:e.target.value}))}
                       rows={4} style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',resize:'vertical',boxSizing:'border-box',fontFamily:'inherit'}}/>
                   </div>
                 </div>
@@ -11086,7 +11086,7 @@ export default function TrainingsApp() {
                               value={gegnerTaktikDraft[e.id] !== undefined ? gegnerTaktikDraft[e.id] : (e.taktik||'')}
                               onChange={ev=>setGegnerTaktikDraft(d=>({...d,[e.id]:ev.target.value}))}
                               onBlur={ev=>{ updateGegnerField(e.id,'taktik',ev.target.value); setGegnerTaktikDraft(d=>{const n={...d}; delete n[e.id]; return n;}); }}
-                              placeholder="Wie spielt der Gegner? Was hat funktioniert?"
+                              placeholder="So spiele ich gegen ihn/sie..."
                               rows={4} style={{width:'100%',boxSizing:'border-box',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'8px',padding:'8px 10px',color:'white',fontSize:'13px',lineHeight:'1.6',resize:'vertical',outline:'none',fontFamily:'inherit'}}/>
                           </div>
                           <div>
@@ -11095,7 +11095,7 @@ export default function TrainingsApp() {
                               value={gegnerSpielweiseDraft[e.id] !== undefined ? gegnerSpielweiseDraft[e.id] : (e.spielweise||'')}
                               onChange={ev=>setGegnerSpielweiseDraft(d=>({...d,[e.id]:ev.target.value}))}
                               onBlur={ev=>{ updateGegnerField(e.id,'spielweise',ev.target.value); setGegnerSpielweiseDraft(d=>{const n={...d}; delete n[e.id]; return n;}); }}
-                              placeholder="Wie spielt der Gegner? Beidhändig, Abwehr, Angriff, Aufschläge..."
+                              placeholder="So spielt er/sie..."
                               rows={4} style={{width:'100%',boxSizing:'border-box',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'8px',padding:'8px 10px',color:'white',fontSize:'13px',lineHeight:'1.6',resize:'vertical',outline:'none',fontFamily:'inherit'}}/>
                           </div>
                         </div>
