@@ -1322,6 +1322,32 @@ export default function TrainingsApp() {
     );
   };
 
+  // Löst serverseitig den Versand einer Push-Benachrichtigung aus (Vercel-Funktion /api/notify).
+  // Fire-and-forget: Fehler werden nur in der Konsole geloggt, blockieren die UI nicht.
+  const triggerPushNotification = async ({ userIds, title, body, url, category }) => {
+    if (!userIds?.length || !user) return;
+    try {
+      const idToken = await user.getIdToken();
+      await fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ userIds, title, body, url, category }),
+      });
+    } catch (e) {
+      console.error('Push-Versand fehlgeschlagen', e);
+    }
+  };
+
+  // Findet alle Nutzer-UIDs, die mit einem Kind verknüpft sind (Eltern/Jugendlich-Accounts).
+  const getLinkedUserIds = (childId) => {
+    return Object.values(allUsers)
+      .filter(u => {
+        const linkedIds = u.linkedChildIds?.length > 0 ? u.linkedChildIds : (u.linkedChildId ? [u.linkedChildId] : []);
+        return linkedIds.includes(childId);
+      })
+      .map(u => u.uid);
+  };
+
   const linkPlayerToUser = async (uid, spielerId) => {
     const cur = allUsersRef.current;
     const profile = cur[uid]||{};
@@ -2322,8 +2348,27 @@ export default function TrainingsApp() {
     setChildren(prev => {
       const prevChild = prev[childId];
       if (!prevChild) return prev;
+      const oldAch = prevChild.achievements || {};
+      const hasNewAchievement = Object.keys(newAch||{}).some(key => {
+        const oldVal = oldAch[key], newVal = newAch[key];
+        if (Array.isArray(newVal)) return newVal.length > (Array.isArray(oldVal)?oldVal.length:0);
+        if (typeof newVal === 'number') return newVal > (Number(oldVal)||0);
+        return false;
+      });
       const updated = { ...prev, [childId]: { ...prevChild, achievements: newAch } };
       setDoc(doc(db,'ttc','children'), updated);
+      if (hasNewAchievement) {
+        const targetUserIds = getLinkedUserIds(childId);
+        if (targetUserIds.length) {
+          triggerPushNotification({
+            userIds: targetUserIds,
+            title: '🏅 Neue Errungenschaft!',
+            body: `${prevChild.name||'Dein Kind'} hat eine neue Errungenschaft freigeschaltet.`,
+            url: '/',
+            category: 'achievements',
+          });
+        }
+      }
       return updated;
     });
   };
@@ -7121,6 +7166,16 @@ export default function TrainingsApp() {
         updated[id] = { id, childId, type:'trainer_message', title:notifComposeTitle.trim(), message:notifComposeText.trim(), createdAt:now, trashedAt:null, key:null, batchId, trainerTrashedAt:null, recipientLabel };
       });
       saveNotifications(updated);
+      const targetUserIds = [...new Set(targets.flatMap(childId => getLinkedUserIds(childId)))];
+      if (targetUserIds.length) {
+        triggerPushNotification({
+          userIds: targetUserIds,
+          title: notifComposeTitle.trim(),
+          body: notifComposeText.trim(),
+          url: '/',
+          category: 'other',
+        });
+      }
       setNotifComposeTitle('');
       setNotifComposeText('');
       alert(`✅ Nachricht an ${targets.length} Empfänger gesendet!`);
