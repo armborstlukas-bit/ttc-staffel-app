@@ -90,9 +90,7 @@ const firebaseConfig = {
   measurementId: "G-20T9EK68WQ"
 };
 
-// TODO: Nach Firebase-Console → Projekteinstellungen → Cloud Messaging → Web-Push-Zertifikate
-// generierten Schlüssel hier eintragen, sobald das Projekt auf den Blaze-Tarif umgestellt ist.
-const FCM_VAPID_KEY = '';
+const FCM_VAPID_KEY = 'BNqhPGMKeYd43TNeiFQNcGkEqz6fDob0frezRRJTB6RDbrq3boMXQPF_vy9jyuGn_dEbdvi6ApFtyIGE4uaRfkw';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
