@@ -5887,6 +5887,23 @@ export default function TrainingsApp() {
       const att = { ...(child.attendance||{}), [sessionDate]: next };
       if (next===null) delete att[sessionDate];
       saveChildren({ ...children, [childId]: { ...child, attendance: att } });
+
+      // Erinnerung: Kind war X mal unentschuldigt abwesend (nicht vorher abgemeldet)
+      if (next === 'absent_unexcused') {
+        const unexcusedCount = Object.values(att).filter(s => s === 'absent_unexcused').length;
+        if (unexcusedCount > 0 && unexcusedCount % 3 === 0) {
+          const targetUserIds = getLinkedUserIds(childId);
+          if (targetUserIds.length) {
+            triggerPushNotification({
+              userIds: targetUserIds,
+              title: '⚠️ Bitte ans Abmelden denken',
+              body: `${child?.name||'Dein Kind'} hat jetzt ${unexcusedCount}x unentschuldigt beim Training gefehlt. Bitte bei Verhinderung rechtzeitig abmelden.`,
+              url: '/',
+              category: 'training',
+            });
+          }
+        }
+      }
     };
 
     const presentCount = allKids.filter(c=>(children[c.id]?.attendance||{})[sessionDate]==='present').length;
