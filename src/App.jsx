@@ -551,7 +551,7 @@ function RanglisteTile({ rangliste, myChildId, children: childMap, subgroups, al
   );
 }
 
-function RlAchPanel({ rangliste, ranglisteAch, children: childMap, kidsWithSub, saveRanglisteAch, rlAchEditChild, setRlAchEditChild }) {
+function RlAchPanel({ rangliste, ranglisteAch, children: childMap, kidsWithSub, saveRanglisteAch, rlAchEditChild, setRlAchEditChild, createNotification }) {
   const [open, setOpen] = useState(false);
   const editKid = rlAchEditChild ? (childMap[rlAchEditChild] || null) : null;
   const getAch = (childId) => ranglisteAch[childId] || { reached: {}, weeks: {} };
@@ -572,8 +572,17 @@ function RlAchPanel({ rangliste, ranglisteAch, children: childMap, kidsWithSub, 
   const toggleReached = (childId, key) => {
     const prev = ranglisteAch[childId] || {};
     const reached = { ...(prev.reached||{}) };
-    if (reached[key]) delete reached[key]; else reached[key] = new Date().toISOString().slice(0,10);
+    const wasReached = !!reached[key];
+    if (wasReached) delete reached[key]; else reached[key] = new Date().toISOString().slice(0,10);
     saveRanglisteAch({ ...ranglisteAch, [childId]: { ...prev, reached } });
+    if (!wasReached) {
+      const tier = RANK_TIERS.find(t=>t.key===key);
+      const child = childMap[childId];
+      if (tier && child) {
+        createNotification(childId, 'achievement', `${tier.icon} Ranglisten-Rang erreicht!`,
+          `Glückwunsch ${child.name}! Du hast in der Rangliste "${tier.label}" erreicht. Weiter so! 🎉`);
+      }
+    }
   };
 
   return (
@@ -6976,6 +6985,7 @@ export default function TrainingsApp() {
             saveRanglisteAch={saveRanglisteAch}
             rlAchEditChild={rlAchEditChild}
             setRlAchEditChild={setRlAchEditChild}
+            createNotification={createNotification}
           />
 
           {filteredKids.length===0
