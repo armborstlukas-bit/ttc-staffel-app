@@ -752,6 +752,8 @@ export default function TrainingsApp() {
   const [practiceTournaments, setPracticeTournaments]               = useState({});
   const [archivedPracticeTournaments, setArchivedPracticeTournaments] = useState({});
   const [gegnerLogbuch, setGegnerLogbuch] = useState([]);
+  const [gegnerLogbuchBackups, setGegnerLogbuchBackups] = useState({});
+  const [gegnerBackupsOpen, setGegnerBackupsOpen] = useState(false);
   const [materialverwaltung, setMaterialverwaltung] = useState({});
   const [materialEdit, setMaterialEdit] = useState(null);
   const [materialSearch, setMaterialSearch] = useState('');
@@ -776,7 +778,9 @@ export default function TrainingsApp() {
   const [elternSubView, setElternSubView] = useState(null);
   const [ttcNews, setTtcNews] = useState([]);
   const [ttcNewsLoading, setTtcNewsLoading] = useState(false);
-  const [gegnerForm, setGegnerForm] = useState({date:'', verein:'', gegner:'', taktik:''});
+  const [gegnerForm, setGegnerForm] = useState({date:'', verein:'', gegner:'', taktik:'', spielweise:''});
+  const [gegnerTaktikDraft, setGegnerTaktikDraft] = useState({});
+  const [gegnerSpielweiseDraft, setGegnerSpielweiseDraft] = useState({});
   const [gegnerAdding, setGegnerAdding] = useState(false);
   const [gegnerEditId, setGegnerEditId] = useState(null);
   const [gegnerWeitereId, setGegnerWeitereId] = useState(null);
@@ -940,6 +944,7 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','practiceTournaments'),          s => setPracticeTournaments(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','archivedPracticeTournaments'),  s => setArchivedPracticeTournaments(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','gegnerLogbuch'), s => setGegnerLogbuch(s.exists()&&Array.isArray(s.data().entries)?s.data().entries:[])),
+      onSnapshot(doc(db,'ttc','gegnerLogbuchBackups'), s => setGegnerLogbuchBackups(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','materialverwaltung'), s => setMaterialverwaltung(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','ttrHistory'), s => setTtrHistory(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','trainingsmatches'), s => setTrainingsmatches(s.exists()&&Array.isArray(s.data().matches)?s.data().matches:[])),
@@ -1471,6 +1476,15 @@ export default function TrainingsApp() {
   const savePracticeTournaments          = u => { setPracticeTournaments(u);          setDoc(doc(db,'ttc','practiceTournaments'),          u); };
   const saveArchivedPracticeTournaments  = u => { setArchivedPracticeTournaments(u);  setDoc(doc(db,'ttc','archivedPracticeTournaments'),  u); };
   const saveGegnerLogbuch = entries => { setGegnerLogbuch(entries); setDoc(doc(db,'ttc','gegnerLogbuch'), {entries}); };
+  const saveGegnerLogbuchBackups = data => { setGegnerLogbuchBackups(data); setDoc(doc(db,'ttc','gegnerLogbuchBackups'), data); };
+  const getIsoWeekKey = (d) => {
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dayNum = (date.getUTCDay() + 6) % 7; // Mo=0..So=6
+    date.setUTCDate(date.getUTCDate() - dayNum + 3);
+    const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
+    const weekNum = 1 + Math.round(((date - firstThursday) / 86400000 - 3 + ((firstThursday.getUTCDay()+6)%7)) / 7);
+    return `${date.getUTCFullYear()}-W${String(weekNum).padStart(2,'0')}`;
+  };
   const saveMaterialverwaltung = data => { setMaterialverwaltung(data); setDoc(doc(db,'ttc','materialverwaltung'), data); };
   const saveTtrHistory = data => { setTtrHistory(data); setDoc(doc(db,'ttc','ttrHistory'), data); };
 
@@ -4764,6 +4778,7 @@ export default function TrainingsApp() {
                 label:'Sonstiges', color:'rgba(226,232,240,0.35)',
                 links:[
                   {label:'TTC News', icon:'📰', color:'#86efac', bg:'rgba(134,239,172,0.1)', border:'rgba(134,239,172,0.25)', action:()=>{navTo('ttcnews');fetchTtcNews();}},
+                  ...(isJugend ? [{label:'Gegnerlogbuch', icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.1)', border:'rgba(8,145,178,0.25)', action:()=>navTo('gegnerlogbuch')}] : []),
                 ],
               },
             ];
@@ -10862,7 +10877,7 @@ export default function TrainingsApp() {
   }
 
   // ── GEGNERLOGBUCH VIEW (Admin-Direktzugang) ─────────────────────────────
-  if (view === 'gegnerlogbuch') {
+  if (view === 'gegnerlogbuch' && ['admin','trainer','aktiver','jugendlich'].includes(userRole)) {
     const accentColor = '#0891b2';
     const accentBorder= 'rgba(8,145,178,0.2)';
     const accentBg    = 'rgba(8,145,178,0.08)';
@@ -10875,6 +10890,7 @@ export default function TrainingsApp() {
         verein: gegnerForm.verein.trim(),
         gegner: gegnerForm.gegner.trim(),
         taktik: gegnerForm.taktik.trim(),
+        spielweise: gegnerForm.spielweise.trim(),
         createdBy: userProfile?.name || user?.email || 'Admin',
         createdAt: new Date().toISOString(),
       };
@@ -10884,11 +10900,32 @@ export default function TrainingsApp() {
       } else {
         saveGegnerLogbuch([entry, ...gegnerLogbuch]);
       }
-      setGegnerForm({date:'',verein:'',gegner:'',taktik:''});
+      setGegnerForm({date:'',verein:'',gegner:'',taktik:'',spielweise:''});
       setGegnerAdding(false);
     };
 
     const deleteGegnerAdmin = id => { if(!window.confirm('Eintrag löschen?'))return; saveGegnerLogbuch(gegnerLogbuch.filter(e=>e.id!==id)); };
+
+    const updateGegnerField = (id, field, value) => {
+      saveGegnerLogbuch(gegnerLogbuch.map(x=>x.id===id?{...x,[field]:value}:x));
+    };
+
+    // Wöchentliche Sicherheitskopie: einmal pro ISO-Woche wird der aktuelle Stand automatisch archiviert
+    (()=>{
+      if (gegnerLogbuch.length===0) return;
+      const weekKey = getIsoWeekKey(new Date());
+      if (gegnerLogbuchBackups[weekKey]) return;
+      saveGegnerLogbuchBackups({...gegnerLogbuchBackups, [weekKey]: {savedAt:new Date().toISOString(), entries:gegnerLogbuch}});
+    })();
+
+    const restoreGegnerBackup = (weekKey) => {
+      const backup = gegnerLogbuchBackups[weekKey];
+      if (!backup) return;
+      if (!window.confirm(`Gegnerlogbuch auf den Stand von Woche ${weekKey} zurücksetzen? Der aktuelle Stand wird dabei überschrieben (vorher wird zur Sicherheit ebenfalls eine Sicherung angelegt).`)) return;
+      const nowKey = getIsoWeekKey(new Date())+'-vor-restore-'+Date.now();
+      saveGegnerLogbuchBackups({...gegnerLogbuchBackups, [nowKey]: {savedAt:new Date().toISOString(), entries:gegnerLogbuch}});
+      saveGegnerLogbuch(backup.entries);
+    };
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#0c1a2e 0%,#0e2a3a 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
@@ -10900,7 +10937,7 @@ export default function TrainingsApp() {
           <p style={{margin:'0 0 14px',fontSize:'13px',color:'rgba(255,255,255,0.35)'}}>Kollaborative Taktikdatenbank aller Aktiven · {gegnerLogbuch.length} {gegnerLogbuch.length===1?'Eintrag':'Einträge'}</p>
 
           {/* Neuer Eintrag Button */}
-          {!gegnerAdding&&<button onClick={()=>{setGegnerAdding(true);setGegnerEditId(null);setGegnerForm({date:TODAY,verein:'',gegner:'',taktik:''}); }}
+          {!gegnerAdding&&<button onClick={()=>{setGegnerAdding(true);setGegnerEditId(null);setGegnerForm({date:TODAY,verein:'',gegner:'',taktik:'',spielweise:''}); }}
             style={{width:'100%',padding:'12px',background:`linear-gradient(135deg,${accentColor},#0e7490)`,color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',marginBottom:'14px'}}>
             <Plus size={16}/> Neuer Eintrag
           </button>}
@@ -10929,13 +10966,20 @@ export default function TrainingsApp() {
                     )}
                   </div>
                 </div>
-                <div>
-                  <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Taktikhinweise</label>
-                  <textarea placeholder="Wie spielt der Gegner? Was hat funktioniert?" value={gegnerForm.taktik} onChange={e=>setGegnerForm(f=>({...f,taktik:e.target.value}))}
-                    rows={4} style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',resize:'vertical',boxSizing:'border-box',fontFamily:'inherit'}}/>
+                <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'10px'}}>
+                  <div>
+                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Taktikhinweise</label>
+                    <textarea placeholder="Wie spielt der Gegner? Was hat funktioniert?" value={gegnerForm.taktik} onChange={e=>setGegnerForm(f=>({...f,taktik:e.target.value}))}
+                      rows={4} style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',resize:'vertical',boxSizing:'border-box',fontFamily:'inherit'}}/>
+                  </div>
+                  <div>
+                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Spielweise</label>
+                    <textarea placeholder="Wie spielt der Gegner? Beidhändig, Abwehr, Angriff, Aufschläge..." value={gegnerForm.spielweise} onChange={e=>setGegnerForm(f=>({...f,spielweise:e.target.value}))}
+                      rows={4} style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',resize:'vertical',boxSizing:'border-box',fontFamily:'inherit'}}/>
+                  </div>
                 </div>
                 <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>
-                  <button onClick={()=>{setGegnerAdding(false);setGegnerEditId(null);setGegnerForm({date:'',verein:'',gegner:'',taktik:''}); }}
+                  <button onClick={()=>{setGegnerAdding(false);setGegnerEditId(null);setGegnerForm({date:'',verein:'',gegner:'',taktik:'',spielweise:''}); }}
                     style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
                   <button onClick={submitGegnerAdmin} disabled={!gegnerForm.verein.trim()||!gegnerForm.date}
                     style={{padding:'9px 20px',background:gegnerForm.verein.trim()&&gegnerForm.date?`linear-gradient(135deg,${accentColor},#0e7490)`:'rgba(255,255,255,0.1)',color:'white',border:'none',borderRadius:'10px',cursor:gegnerForm.verein.trim()&&gegnerForm.date?'pointer':'not-allowed',fontWeight:'700',fontSize:'13px',opacity:gegnerForm.verein.trim()&&gegnerForm.date?1:0.5}}>
@@ -10972,7 +11016,6 @@ export default function TrainingsApp() {
               {[...gegnerLogbuch].sort((a,b)=>(a.gegner||a.verein||'').localeCompare(b.gegner||b.verein||'','de')).filter(e=>e.id!==gegnerEditId&&(!gegnerSearchPlayer||e.gegner?.toLowerCase().includes(gegnerSearchPlayer.toLowerCase()))&&(!gegnerSearchVerein||e.verein?.toLowerCase().includes(gegnerSearchVerein.toLowerCase()))).map(e=>{
                 const expandedA = gegnerExpandedId===e.id;
                 const dateStrGA = e.date?new Date(e.date+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
-                const meIdA = userProfile?.name||user?.email;
                 return (
                   <div key={e.id} style={{background:'rgba(255,255,255,0.03)',border:`1px solid ${expandedA?accentBorder:'rgba(255,255,255,0.07)'}`,borderRadius:'12px',overflow:'hidden'}}>
                     <button onClick={()=>setGegnerExpandedId(expandedA?null:e.id)}
@@ -10983,54 +11026,73 @@ export default function TrainingsApp() {
                     {expandedA&&(
                       <div style={{padding:'0 16px 14px'}}>
                         <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>
-                          {[e.verein,dateStrGA,e.createdBy].filter(Boolean).join(' · ')}
+                          {[e.verein,dateStrGA].filter(Boolean).join(' · ')}
                         </p>
-                        {e.taktik&&(
-                          <div style={{background:accentBg,border:`1px solid ${accentBorder}`,borderRadius:'10px',padding:'10px 12px',marginBottom:'10px'}}>
-                            <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'800',color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px'}}>Taktikhinweise</p>
-                            <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.75)',lineHeight:'1.6',whiteSpace:'pre-wrap'}}>{e.taktik}</p>
+                        <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'10px',marginBottom:'10px'}}>
+                          <div>
+                            <label style={{display:'block',fontSize:'10px',fontWeight:'800',color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:'5px'}}>Taktikhinweise</label>
+                            <textarea
+                              value={gegnerTaktikDraft[e.id] !== undefined ? gegnerTaktikDraft[e.id] : (e.taktik||'')}
+                              onChange={ev=>setGegnerTaktikDraft(d=>({...d,[e.id]:ev.target.value}))}
+                              onBlur={ev=>{ updateGegnerField(e.id,'taktik',ev.target.value); setGegnerTaktikDraft(d=>{const n={...d}; delete n[e.id]; return n;}); }}
+                              placeholder="Wie spielt der Gegner? Was hat funktioniert?"
+                              rows={4} style={{width:'100%',boxSizing:'border-box',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'8px',padding:'8px 10px',color:'white',fontSize:'13px',lineHeight:'1.6',resize:'vertical',outline:'none',fontFamily:'inherit'}}/>
                           </div>
-                        )}
+                          <div>
+                            <label style={{display:'block',fontSize:'10px',fontWeight:'800',color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:'5px'}}>Spielweise</label>
+                            <textarea
+                              value={gegnerSpielweiseDraft[e.id] !== undefined ? gegnerSpielweiseDraft[e.id] : (e.spielweise||'')}
+                              onChange={ev=>setGegnerSpielweiseDraft(d=>({...d,[e.id]:ev.target.value}))}
+                              onBlur={ev=>{ updateGegnerField(e.id,'spielweise',ev.target.value); setGegnerSpielweiseDraft(d=>{const n={...d}; delete n[e.id]; return n;}); }}
+                              placeholder="Wie spielt der Gegner? Beidhändig, Abwehr, Angriff, Aufschläge..."
+                              rows={4} style={{width:'100%',boxSizing:'border-box',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'8px',padding:'8px 10px',color:'white',fontSize:'13px',lineHeight:'1.6',resize:'vertical',outline:'none',fontFamily:'inherit'}}/>
+                          </div>
+                        </div>
                         <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                          <button onClick={()=>{setGegnerEditId(e.id);setGegnerForm({date:e.date,verein:e.verein,gegner:e.gegner||'',taktik:e.taktik||''});setGegnerAdding(true);setGegnerExpandedId(null);}}
+                          <button onClick={()=>{setGegnerEditId(e.id);setGegnerForm({date:e.date,verein:e.verein,gegner:e.gegner||'',taktik:e.taktik||'',spielweise:e.spielweise||''});setGegnerAdding(true);setGegnerExpandedId(null);}}
                             style={{display:'flex',alignItems:'center',gap:'5px',padding:'6px 12px',borderRadius:'8px',background:accentBg,border:`1px solid ${accentBorder}`,color:'#67e8f9',cursor:'pointer',fontSize:'12px',fontWeight:'600'}}>
-                            <Pencil size={11}/> Bearbeiten
+                            <Pencil size={11}/> Verein/Gegner/Datum bearbeiten
                           </button>
                           <button onClick={()=>deleteGegnerAdmin(e.id)}
                             style={{display:'flex',alignItems:'center',gap:'5px',padding:'6px 12px',borderRadius:'8px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',fontSize:'12px',fontWeight:'600'}}>
                             <Trash2 size={11}/> Löschen
                           </button>
-                          <button onClick={()=>{setGegnerWeitereId(gegnerWeitereId===e.id?null:e.id);setGegnerWeitereText('');}}
-                            style={{padding:'6px 12px',borderRadius:'8px',background:accentBg,border:`1px solid ${accentBorder}`,color:'#67e8f9',cursor:'pointer',fontSize:'12px',fontWeight:'600'}}>
-                            + Taktikhinweise
-                          </button>
                         </div>
-                        {gegnerWeitereId===e.id&&(
-                          <div style={{marginTop:'10px'}}>
-                            <textarea value={gegnerWeitereText} onChange={ev=>setGegnerWeitereText(ev.target.value)} placeholder="Weitere Taktikhinweise..."
-                              style={{width:'100%',boxSizing:'border-box',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'8px',padding:'8px 10px',color:'white',fontSize:'13px',resize:'vertical',minHeight:'70px',outline:'none'}}/>
-                            <div style={{display:'flex',gap:'6px',marginTop:'6px'}}>
-                              <button onClick={()=>{
-                                if(!gegnerWeitereText.trim())return;
-                                const note=`\n\n[${meIdA}]: ${gegnerWeitereText.trim()}`;
-                                saveGegnerLogbuch(gegnerLogbuch.map(x=>x.id===e.id?{...x,taktik:(x.taktik||'')+note}:x));
-                                setGegnerWeitereId(null);setGegnerWeitereText('');
-                              }} disabled={!gegnerWeitereText.trim()}
-                                style={{flex:1,padding:'6px',borderRadius:'7px',background:accentColor,border:'none',color:'white',fontSize:'12px',fontWeight:'700',cursor:'pointer',opacity:gegnerWeitereText.trim()?1:0.5}}>
-                                Speichern
-                              </button>
-                              <button onClick={()=>{setGegnerWeitereId(null);setGegnerWeitereText('');}}
-                                style={{padding:'6px 10px',borderRadius:'7px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.6)',fontSize:'12px',cursor:'pointer'}}>
-                                Abbrechen
-                              </button>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Admin: Wöchentliche Sicherungen */}
+          {userRole==='admin' && (
+            <div style={{marginTop:'24px'}}>
+              <button onClick={()=>setGegnerBackupsOpen(o=>!o)}
+                style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer'}}>
+                <span style={{fontSize:'12px',fontWeight:'800',color:'rgba(255,255,255,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>🗄️ Wöchentliche Sicherungen ({Object.keys(gegnerLogbuchBackups).length})</span>
+                <span style={{fontSize:'12px',color:'rgba(255,255,255,0.3)'}}>{gegnerBackupsOpen?'▲':'▼'}</span>
+              </button>
+              {gegnerBackupsOpen && (
+                <div style={{marginTop:'8px',display:'grid',gap:'6px'}}>
+                  {Object.keys(gegnerLogbuchBackups).length===0
+                    ? <p style={{fontSize:'12px',color:'rgba(255,255,255,0.25)',textAlign:'center',padding:'12px'}}>Noch keine Sicherung vorhanden.</p>
+                    : Object.entries(gegnerLogbuchBackups).sort((a,b)=>b[1].savedAt.localeCompare(a[1].savedAt)).map(([weekKey,backup])=>(
+                      <div key={weekKey} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 12px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'9px'}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'white'}}>{weekKey}</p>
+                          <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{backup.entries.length} Einträge · gesichert am {new Date(backup.savedAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</p>
+                        </div>
+                        <button onClick={()=>restoreGegnerBackup(weekKey)}
+                          style={{padding:'6px 12px',borderRadius:'8px',background:accentBg,border:`1px solid ${accentBorder}`,color:'#67e8f9',cursor:'pointer',fontSize:'12px',fontWeight:'700',whiteSpace:'nowrap'}}>
+                          ↺ Wiederherstellen
+                        </button>
+                      </div>
+                    ))
+                  }
+                </div>
+              )}
             </div>
           )}
         </div>
