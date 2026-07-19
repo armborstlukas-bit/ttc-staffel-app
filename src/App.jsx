@@ -1064,7 +1064,7 @@ export default function TrainingsApp() {
             createdAt: new Date().toISOString(), trashedAt: null, key, batchId: null, trainerTrashedAt: {}, trainerDeletedBy: {} };
           const targetUserIds = getLinkedUserIds(childId);
           if (targetUserIds.length) {
-            triggerPushNotification({ userIds: targetUserIds, title, body: message, url: '/', category: 'achievements' });
+            triggerPushNotification({ userIds: targetUserIds, title, body: message, url: `/?notif=achievement&childId=${childId}`, category: 'achievements' });
           }
         });
       }
@@ -1705,7 +1705,7 @@ export default function TrainingsApp() {
     if (type === 'achievement') {
       const targetUserIds = getLinkedUserIds(childId);
       if (targetUserIds.length) {
-        triggerPushNotification({ userIds: targetUserIds, title, body: message, url: '/', category: 'achievements' });
+        triggerPushNotification({ userIds: targetUserIds, title, body: message, url: `/?notif=achievement&childId=${childId}`, category: 'achievements' });
       }
     }
   };
@@ -1821,6 +1821,42 @@ export default function TrainingsApp() {
       }).catch(()=>{}).finally(()=>setTtcNewsLoading(false));
   };
   const navTo = (v) => { setView(v); setViewKey(k => k + 1); setGegnerAdding(false); setGegnerEditId(null); setGegnerForm({date:'',verein:'',gegner:'',taktik:''}); setElternSubView(null); };
+
+  // ── Deep-Link beim Klick auf eine Push-Benachrichtigung ───────
+  // Liest ?notif=...&childId=... aus der URL und springt direkt zur passenden Stelle.
+  const deepLinkHandled = useRef(false);
+  useEffect(() => {
+    if (deepLinkHandled.current) return;
+    if (!user || !userRole) return;
+    const params = new URLSearchParams(window.location.search);
+    const notif = params.get('notif');
+    if (!notif) return;
+    const childId = params.get('childId');
+    const isJugendRole = ['eltern','jugendlich'].includes(userRole);
+
+    if (notif === 'achievement' || notif === 'training') {
+      if (isJugendRole) {
+        navTo('home');
+        if (notif === 'achievement') setElternSubView('errungenschaften');
+      } else if (['admin','trainer'].includes(userRole)) {
+        // Auf Kinder-Daten warten, bevor der Deep-Link als erledigt markiert wird
+        if (Object.keys(children).length === 0) return;
+        if (childId && children[childId]) { setActiveChild(children[childId]); navTo('childHistory'); }
+      }
+    } else if (notif === 'message') {
+      if (isJugendRole) { navTo('home'); setElternSubView('benachrichtigungen'); }
+      else if (['admin','trainer'].includes(userRole)) navTo('notifications');
+    } else if (notif === 'registration' && userRole === 'admin') {
+      navTo('admin');
+    } else if (notif === 'news') {
+      navTo('ttcnews');
+      fetchTtcNews();
+    }
+
+    deepLinkHandled.current = true;
+    // Query-Parameter aus der URL entfernen, damit ein Neuladen nicht erneut springt
+    window.history.replaceState({}, '', window.location.pathname);
+  }, [user, userRole, children]);
 
   const canEdit = () => ['admin','trainer'].includes(userRole);
 
@@ -2414,7 +2450,7 @@ export default function TrainingsApp() {
             userIds: targetUserIds,
             title: '🏅 Neue Errungenschaft!',
             body: `${prevChild.name||'Dein Kind'} hat eine neue Errungenschaft freigeschaltet.`,
-            url: '/',
+            url: `/?notif=achievement&childId=${childId}`,
             category: 'achievements',
           });
         }
@@ -5932,7 +5968,7 @@ export default function TrainingsApp() {
               userIds: targetUserIds,
               title: '⚠️ Bitte ans Abmelden denken',
               body: `${child?.name||'Dein Kind'} hat jetzt ${unexcusedCount}x unentschuldigt beim Training gefehlt. Bitte bei Verhinderung rechtzeitig abmelden.`,
-              url: '/',
+              url: `/?notif=training&childId=${childId}`,
               category: 'training',
             });
           }
@@ -7240,7 +7276,7 @@ export default function TrainingsApp() {
           userIds: targetUserIds,
           title: notifComposeTitle.trim(),
           body: notifComposeText.trim(),
-          url: '/',
+          url: '/?notif=message',
           category: 'other',
         });
       }

@@ -46,7 +46,7 @@ export default async function handler(req, res) {
       userIds: adminUserIds,
       title: '🆕 Neue Registrierung',
       body: `${caller.name || caller.email} (${userType}) wartet auf Freischaltung.`,
-      url: '/',
+      url: '/?notif=registration',
       category: 'other',
     });
 
