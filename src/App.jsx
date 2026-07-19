@@ -916,12 +916,20 @@ export default function TrainingsApp() {
       try {
         if (!(await isFcmSupported())) return;
         const messaging = getMessaging(app);
-        unsub = onMessage(messaging, (payload) => {
+        unsub = onMessage(messaging, async (payload) => {
           const title = payload.data?.title || 'TTC Grün-Weiß Staffel';
           const body = payload.data?.body || '';
-          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-            new Notification(title, { body, icon: '/logo.png' });
-          }
+          if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+          try {
+            // Android erlaubt keine direkte "new Notification()" im Vordergrund –
+            // muss über die Service-Worker-Registrierung laufen.
+            const reg = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+            if (reg) {
+              reg.showNotification(title, { body, icon: '/logo.png', badge: '/logo.png', data: payload.data||{} });
+            } else {
+              new Notification(title, { body, icon: '/logo.png' });
+            }
+          } catch {}
         });
       } catch {}
     })();
