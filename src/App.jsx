@@ -1643,10 +1643,20 @@ export default function TrainingsApp() {
     return children[id] || null;
   };
 
+  // Trainingstermine einer Gruppe, ohne die von der Anwesenheitsquote ausgeschlossenen Termine
+  const getQuotaTrainingDates = (subgroupId) => {
+    const sub = subgroups[subgroupId];
+    if (!sub) return [];
+    const dates = sub.trainingDates || [];
+    const allSess = [...Object.values(sessions), ...Object.values(archivedSessions)];
+    const excluded = new Set(allSess.filter(s=>s.excludeFromQuota && (s.subgroupIds||[]).includes(subgroupId)).map(s=>s.date));
+    return dates.filter(d=>!excluded.has(d));
+  };
+
   const getAttendanceStats = (childId, subgroupId) => {
     const child=children[childId], sub=subgroups[subgroupId];
     if (!child||!sub) return {present:0,unexcused:0,excused:0,total:0,percent:0};
-    const dates=sub.trainingDates||[], att=child.attendance||{};
+    const dates=getQuotaTrainingDates(subgroupId), att=child.attendance||{};
     const present=dates.filter(d=>att[d]==='present').length;
     const unexcused=dates.filter(d=>att[d]==='absent_unexcused').length;
     const excused=dates.filter(d=>att[d]==='absent_excused').length;
@@ -2183,7 +2193,7 @@ export default function TrainingsApp() {
     const child = children[childId];
     if (!child) return null;
     const allSess = [...Object.values(sessions), ...Object.values(archivedSessions)];
-    const monthSess = allSess.filter(s => (s.date||'').startsWith(yearMonth) && (s.subgroupIds||[]).includes(child.subgroupId));
+    const monthSess = allSess.filter(s => (s.date||'').startsWith(yearMonth) && (s.subgroupIds||[]).includes(child.subgroupId) && !s.excludeFromQuota);
     if (monthSess.length === 0) return null;
     const present = monthSess.filter(s => (child.attendance||{})[s.date] === 'present').length;
     const pct = Math.round((present / monthSess.length) * 100);
@@ -2210,14 +2220,16 @@ export default function TrainingsApp() {
   const getTotalTrainingsAttended = (childId) => {
     const child = children[childId];
     if (!child) return 0;
-    return Object.values(child.attendance||{}).filter(s=>s==='present').length;
+    const allSess = [...Object.values(sessions), ...Object.values(archivedSessions)];
+    const excludedDates = new Set(allSess.filter(s=>s.excludeFromQuota && (s.subgroupIds||[]).includes(child.subgroupId)).map(s=>s.date));
+    return Object.entries(child.attendance||{}).filter(([date,st])=>st==='present' && !excludedDates.has(date)).length;
   };
 
   const getLongestStreak = (childId) => {
     const child = children[childId];
     if (!child) return 0;
     const allSess = [...Object.values(sessions), ...Object.values(archivedSessions)]
-      .filter(s => (s.subgroupIds||[]).includes(child.subgroupId))
+      .filter(s => (s.subgroupIds||[]).includes(child.subgroupId) && !s.excludeFromQuota)
       .sort((a,b) => (a.date||'').localeCompare(b.date||''));
     let max=0, cur=0;
     allSess.forEach(s => {
@@ -3967,6 +3979,7 @@ export default function TrainingsApp() {
                           <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'4px',alignItems:'center'}}>
                             {sessionSubs.map(sub=>{const g=FIXED_GROUPS.find(x=>x.id===sub.groupId);return <span key={sub.id} style={{fontSize:'12px',fontWeight:'700',color:g?.color||'#ccc'}}>{g?.emoji} {sub.name}</span>;})}
                             {archivable&&<span style={{fontSize:'10px',background:'rgba(55,65,81,0.6)',color:'#9ca3af',padding:'1px 7px',borderRadius:'20px',fontWeight:'600'}}>📦 Archivierbar</span>}
+                            {session.excludeFromQuota&&<span style={{fontSize:'10px',background:'rgba(251,191,36,0.15)',color:'#fbbf24',padding:'1px 7px',borderRadius:'20px',fontWeight:'600',border:'1px solid rgba(251,191,36,0.3)'}}>⚠️ Zählt nicht zur Quote</span>}
                           </div>
                           <span style={{fontSize:'13px',color:'rgba(255,255,255,0.5)',fontWeight:'500'}}>{new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'})} · {session.time} Uhr</span>
                         </div>
@@ -3993,6 +4006,7 @@ export default function TrainingsApp() {
                           <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'4px',alignItems:'center'}}>
                             {sessionSubs.map(sub=>{const g=FIXED_GROUPS.find(x=>x.id===sub.groupId);return <span key={sub.id} style={{fontSize:'12px',fontWeight:'700',color:g?.color||'#ccc'}}>{g?.emoji} {sub.name}</span>;})}
                             {isToday&&<span style={{fontSize:'10px',background:'rgba(74,222,128,0.2)',color:'#4ade80',padding:'2px 9px',borderRadius:'20px',fontWeight:'800'}}>Heute</span>}
+                            {session.excludeFromQuota&&<span style={{fontSize:'10px',background:'rgba(251,191,36,0.15)',color:'#fbbf24',padding:'1px 7px',borderRadius:'20px',fontWeight:'600',border:'1px solid rgba(251,191,36,0.3)'}}>⚠️ Zählt nicht zur Quote</span>}
                           </div>
                           <span style={{fontSize:'13px',color:'rgba(255,255,255,0.5)',fontWeight:'500'}}>{new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'})} · {session.time} Uhr</span>
                         </div>
@@ -5453,7 +5467,7 @@ export default function TrainingsApp() {
               : subs.map(sub=>{
                 const kids=getChildrenForSubgroup(sub.id);
                 const presentToday=kids.filter(c=>(c.attendance||{})[trainingDate]==='present').length;
-                const totalSess=(sub.trainingDates||[]).length;
+                const totalSess=getQuotaTrainingDates(sub.id).length;
                 const totalPres=kids.reduce((s2,c)=>s2+getAttendanceStats(c.id,sub.id).present,0);
                 const avgPct=kids.length>0&&totalSess>0?Math.round((totalPres/(kids.length*totalSess))*100):null;
                 return (
@@ -5506,7 +5520,7 @@ export default function TrainingsApp() {
     const retiredKids=kids.filter(c=>c.nachwuchsKarriereBeendet);
     const allSubs=Object.values(subgroups);
     const totalPresent=activeKids.reduce((sum,c)=>sum+getAttendanceStats(c.id,sub.id).present,0);
-    const totalSessions=(sub.trainingDates||[]).length;
+    const totalSessions=getQuotaTrainingDates(sub.id).length;
     const avgPct=activeKids.length>0&&totalSessions>0?Math.round((totalPresent/(activeKids.length*totalSessions))*100):0;
 
     const DI = {background:'rgba(255,255,255,0.07)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'12px',color:'white',fontSize:'14px',outline:'none'};
@@ -5664,6 +5678,12 @@ export default function TrainingsApp() {
     const excusedCount = allKids.filter(c=>(children[c.id]?.attendance||{})[sessionDate]==='absent_excused').length;
     const openCount2 = allKids.length - presentCount - absentCount - excusedCount;
 
+    const toggleExcludeFromQuota = () => {
+      if (!session?.id || !sessions[session.id]) return;
+      const cur = sessions[session.id];
+      saveSessions({...sessions, [session.id]: {...cur, excludeFromQuota: !cur.excludeFromQuota}});
+    };
+
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
@@ -5694,6 +5714,18 @@ export default function TrainingsApp() {
               <Info size={14} color="#93c5fd" style={{flexShrink:0,marginTop:'2px'}}/>
               <p style={{margin:0,fontSize:'13px',color:'#93c5fd'}}>{session.info}</p>
             </div>}
+            {canEdit()&&sessions[session?.id]&&(
+              <button onClick={toggleExcludeFromQuota}
+                style={{display:'flex',alignItems:'center',gap:'8px',marginTop:'10px',padding:'9px 12px',width:'100%',boxSizing:'border-box',background:session.excludeFromQuota?'rgba(251,191,36,0.1)':'rgba(255,255,255,0.03)',border:`1px solid ${session.excludeFromQuota?'rgba(251,191,36,0.35)':'rgba(255,255,255,0.1)'}`,borderRadius:'10px',cursor:'pointer',textAlign:'left'}}>
+                <div style={{width:'20px',height:'20px',borderRadius:'6px',border:`2px solid ${session.excludeFromQuota?'#fbbf24':'rgba(255,255,255,0.25)'}`,background:session.excludeFromQuota?'rgba(251,191,36,0.15)':'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                  {session.excludeFromQuota&&<span style={{fontSize:'13px',color:'#fbbf24',lineHeight:1}}>✓</span>}
+                </div>
+                <div>
+                  <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:session.excludeFromQuota?'#fbbf24':'rgba(255,255,255,0.7)'}}>Zählt nicht zur Anwesenheitsquote</p>
+                  <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{session.excludeFromQuota?'Dieses Training wird bei Quote, Gold/Silber/Bronze und Streak nicht mitgezählt':'z.B. bei Sondertrainings, Feriencamps o.ä.'}</p>
+                </div>
+              </button>
+            )}
           </div>
 
           {/* Statistik */}
