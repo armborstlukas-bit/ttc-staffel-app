@@ -655,6 +655,7 @@ export default function TrainingsApp() {
   const [loading, setLoading]         = useState(true);
   const [notifPermission, setNotifPermission] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported');
   const [notifBusy, setNotifBusy]     = useState(false);
+  const [notifError, setNotifError]   = useState('');
   const [subgroups, setSubgroups]     = useState({});
   const [children, setChildren]       = useState({});
   const [allUsers, setAllUsers]       = useState({});
@@ -1249,27 +1250,37 @@ export default function TrainingsApp() {
   const enablePushNotifications = async () => {
     if (notifBusy) return;
     setNotifBusy(true);
+    setNotifError('');
     try {
       const supported = typeof window !== 'undefined' && await isFcmSupported();
       if (!supported) {
-        alert('Push-Benachrichtigungen werden von diesem Browser/Gerät leider nicht unterstützt (z.B. iPhone: App muss zum Home-Bildschirm hinzugefügt sein).');
+        setNotifError('Push-Benachrichtigungen werden von diesem Browser/Gerät leider nicht unterstützt (z.B. iPhone: App muss zum Home-Bildschirm hinzugefügt sein).');
         return;
       }
       const permission = await Notification.requestPermission();
       setNotifPermission(permission);
-      if (permission !== 'granted') return;
-      if (!FCM_VAPID_KEY) {
-        alert('Push-Benachrichtigungen sind serverseitig noch nicht vollständig eingerichtet. Bitte wende dich an den Admin.');
+      if (permission !== 'granted') {
+        setNotifError('Berechtigung wurde nicht erteilt (Status: ' + permission + ').');
         return;
       }
+      if (!FCM_VAPID_KEY) {
+        setNotifError('Push-Benachrichtigungen sind serverseitig noch nicht vollständig eingerichtet.');
+        return;
+      }
+      const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      await navigator.serviceWorker.ready;
       const messaging = getMessaging(app);
-      const token = await getFcmToken(messaging, { vapidKey: FCM_VAPID_KEY });
-      if (token && user?.uid) {
+      const token = await getFcmToken(messaging, { vapidKey: FCM_VAPID_KEY, serviceWorkerRegistration: swReg });
+      if (!token) {
+        setNotifError('Kein Token erhalten (unbekannter Grund). Bitte Seite neu laden und erneut versuchen.');
+        return;
+      }
+      if (user?.uid) {
         await setDoc(doc(db,'users',user.uid), { fcmTokens: arrayUnion(token) }, { merge:true });
         setUserProfile(p => ({...(p||{}), fcmTokens: [...new Set([...(p?.fcmTokens||[]), token])]}));
       }
     } catch (e) {
-      alert('Aktivierung fehlgeschlagen: ' + (e?.message||e));
+      setNotifError((e?.code ? `[${e.code}] ` : '') + (e?.message || String(e)));
     } finally {
       setNotifBusy(false);
     }
@@ -1302,6 +1313,11 @@ export default function TrainingsApp() {
             style={{width:'100%',padding:'10px',marginBottom:'10px',background:'rgba(74,222,128,0.12)',border:'1px solid rgba(74,222,128,0.3)',borderRadius:'10px',color:'#16a34a',cursor:notifBusy?'default':'pointer',fontWeight:'700',fontSize:'13px',opacity:notifBusy?0.6:1}}>
             {notifBusy?'Wird aktiviert…':'Push-Benachrichtigungen aktivieren'}
           </button>
+        )}
+        {notifError && (
+          <div style={{margin:'0 0 10px',padding:'8px 10px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.3)',borderRadius:'8px'}}>
+            <p style={{margin:0,fontSize:'11px',color:'#dc2626',fontWeight:'600',wordBreak:'break-word'}}>⚠️ {notifError}</p>
+          </div>
         )}
         <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
           {[
