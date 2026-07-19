@@ -817,6 +817,8 @@ export default function TrainingsApp() {
   const [ptTeamOrderB, setPtTeamOrderB]                             = useState([]);
   const [ptTeamNameA, setPtTeamNameA]                               = useState('Mannschaft A');
   const [ptTeamNameB, setPtTeamNameB]                               = useState('Mannschaft B');
+  const [ptDoublesSeqA, setPtDoublesSeqA]                           = useState([]);
+  const [ptDoublesSeqB, setPtDoublesSeqB]                           = useState([]);
   const [ptSelectedChildren, setPtSelectedChildren]                 = useState([]);
   const [ptSubgroupFilter, setPtSubgroupFilter]                     = useState('all');
   const [ptSelectedAktive, setPtSelectedAktive]                     = useState([]);
@@ -7520,9 +7522,15 @@ export default function TrainingsApp() {
       setPtSelectedChildren([]); setPtSubgroupFilter('all');
       setPtSelectedAktive([]); setPtManualPlayers([]); setPtPlayerSearch(''); setPtShowManualForm(false);
       setPtTeamOrderA([]); setPtTeamOrderB([]); setPtTeamNameA('Mannschaft A'); setPtTeamNameB('Mannschaft B');
+      setPtDoublesSeqA([]); setPtDoublesSeqB([]);
     };
 
-    const generateTeamMatches = (teamSize, teamSystem) => {
+    // Anzahl Doppelpaare pro Mannschaftsgröße
+    const teamDoublesCount = (teamSize) => teamSize===2?1:teamSize===3?1:teamSize===4?2:teamSize===6?3:0;
+    // Doppel-Sequenz (Klick-Reihenfolge der Positions-Indices) in Paare zerlegen
+    const chunkDoublesPairs = (seq) => { const pairs=[]; for(let i=0;i<seq.length-1;i+=2) pairs.push([seq[i],seq[i+1]]); return pairs; };
+
+    const generateTeamMatches = (teamSize, teamSystem, doublesA, doublesB) => {
       if (teamSize === 2) {
         if (teamSystem === 'korbylonCup') {
           return [
@@ -7541,7 +7549,7 @@ export default function TrainingsApp() {
       }
       if (teamSize === 3) {
         return [
-          {kind:'doppel', aPos:[0,1], bPos:[0,1], label:'Doppel (Pos 1+2)'},
+          {kind:'doppel', aPos:doublesA[0], bPos:doublesB[0], label:'Doppel'},
           {kind:'einzel', aPos:[0], bPos:[1], label:'Einzel — A1 vs B2'},
           {kind:'einzel', aPos:[1], bPos:[0], label:'Einzel — A2 vs B1'},
           {kind:'einzel', aPos:[0], bPos:[2], label:'Einzel — A1 vs B3'},
@@ -7555,8 +7563,8 @@ export default function TrainingsApp() {
       }
       if (teamSize === 4) {
         return [
-          {kind:'doppel', aPos:[0,1], bPos:[0,1], label:'Doppel 1 (Pos 1+2)'},
-          {kind:'doppel', aPos:[2,3], bPos:[2,3], label:'Doppel 2 (Pos 3+4)'},
+          {kind:'doppel', aPos:doublesA[0], bPos:doublesB[0], label:'Doppel 1'},
+          {kind:'doppel', aPos:doublesA[1], bPos:doublesB[1], label:'Doppel 2'},
           {kind:'einzel', aPos:[0], bPos:[1], label:'Einzel — A1 vs B2'},
           {kind:'einzel', aPos:[1], bPos:[0], label:'Einzel — A2 vs B1'},
           {kind:'einzel', aPos:[2], bPos:[3], label:'Einzel — A3 vs B4'},
@@ -7565,6 +7573,25 @@ export default function TrainingsApp() {
           {kind:'einzel', aPos:[1], bPos:[1], label:'Einzel — A2 vs B2'},
           {kind:'einzel', aPos:[2], bPos:[2], label:'Einzel — A3 vs B3'},
           {kind:'einzel', aPos:[3], bPos:[3], label:'Einzel — A4 vs B4'},
+        ];
+      }
+      if (teamSize === 6) {
+        return [
+          {kind:'doppel', aPos:doublesA[0], bPos:doublesB[1], label:'Doppel — A D1 vs B D2'},
+          {kind:'doppel', aPos:doublesA[1], bPos:doublesB[0], label:'Doppel — A D2 vs B D1'},
+          {kind:'doppel', aPos:doublesA[2], bPos:doublesB[2], label:'Doppel — A D3 vs B D3'},
+          {kind:'einzel', aPos:[0], bPos:[1], label:'Einzel — A1 vs B2'},
+          {kind:'einzel', aPos:[1], bPos:[0], label:'Einzel — A2 vs B1'},
+          {kind:'einzel', aPos:[2], bPos:[3], label:'Einzel — A3 vs B4'},
+          {kind:'einzel', aPos:[3], bPos:[2], label:'Einzel — A4 vs B3'},
+          {kind:'einzel', aPos:[4], bPos:[5], label:'Einzel — A5 vs B6'},
+          {kind:'einzel', aPos:[5], bPos:[4], label:'Einzel — A6 vs B5'},
+          {kind:'einzel', aPos:[0], bPos:[0], label:'Einzel — A1 vs B1'},
+          {kind:'einzel', aPos:[1], bPos:[1], label:'Einzel — A2 vs B2'},
+          {kind:'einzel', aPos:[2], bPos:[2], label:'Einzel — A3 vs B3'},
+          {kind:'einzel', aPos:[3], bPos:[3], label:'Einzel — A4 vs B4'},
+          {kind:'einzel', aPos:[4], bPos:[4], label:'Einzel — A5 vs B5'},
+          {kind:'einzel', aPos:[5], bPos:[5], label:'Einzel — A6 vs B6'},
         ];
       }
       return [];
@@ -7579,7 +7606,9 @@ export default function TrainingsApp() {
         const arr = positions.map(i=>side[i]?.maxTTR||0);
         return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
       };
-      const matches = generateTeamMatches(ptCreateForm.teamSize, ptCreateForm.teamSystem).map((m,i)=>{
+      const doublesA = ptCreateForm.teamSize===2 ? [[0,1]] : chunkDoublesPairs(ptDoublesSeqA);
+      const doublesB = ptCreateForm.teamSize===2 ? [[0,1]] : chunkDoublesPairs(ptDoublesSeqB);
+      const matches = generateTeamMatches(ptCreateForm.teamSize, ptCreateForm.teamSystem, doublesA, doublesB).map((m,i)=>{
         let handicap = null;
         if (ptCreateForm.handicap) {
           const ttrA = avgTTR(teamA, m.aPos), ttrB = avgTTR(teamB, m.bPos);
@@ -7747,15 +7776,12 @@ export default function TrainingsApp() {
                   {ptCreateForm.type==='team'&&<>
                   <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.5px'}}>Mannschaftsgröße</p>
                   <div style={{display:'flex',gap:'6px',marginBottom:'18px'}}>
-                    {[2,3,4,6].map(n=>{
-                      const enabled = n!==6;
-                      return (
-                        <button key={n} disabled={!enabled} onClick={()=>enabled&&setPtCreateForm(f=>({...f,teamSize:n}))}
-                          style={{...ptBtn(ptCreateForm.teamSize===n&&enabled),flex:'none',width:'62px',fontSize:'14px',opacity:enabled?1:0.4,cursor:enabled?'pointer':'not-allowed',position:'relative'}}>
-                          {n}er{!enabled&&<div style={{fontSize:'8px',fontWeight:'700',marginTop:'2px'}}>bald</div>}
-                        </button>
-                      );
-                    })}
+                    {[2,3,4,6].map(n=>(
+                      <button key={n} onClick={()=>setPtCreateForm(f=>({...f,teamSize:n}))}
+                        style={{...ptBtn(ptCreateForm.teamSize===n),flex:'none',width:'62px',fontSize:'14px'}}>
+                        {n}er
+                      </button>
+                    ))}
                   </div>
                   {ptCreateForm.teamSize===2&&<>
                   <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.5px'}}>Spielsystem</p>
@@ -7775,13 +7801,19 @@ export default function TrainingsApp() {
                   {ptCreateForm.teamSize===3&&(
                     <div style={{padding:'12px 14px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'12px',marginBottom:'22px'}}>
                       <p style={{margin:'0 0 4px',fontSize:'13px',fontWeight:'700',color:'#555'}}>Spielsystem: 1 Doppel + 9 Einzel</p>
-                      <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>Doppel (Pos. 1+2), dann alle Kreuz-Einzel, zuletzt 1vs1, 2vs2, 3vs3</p>
+                      <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>Doppel (Aufstellung frei wählbar, Schritt 2), dann alle Kreuz-Einzel, zuletzt 1vs1, 2vs2, 3vs3</p>
                     </div>
                   )}
                   {ptCreateForm.teamSize===4&&(
                     <div style={{padding:'12px 14px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'12px',marginBottom:'22px'}}>
                       <p style={{margin:'0 0 4px',fontSize:'13px',fontWeight:'700',color:'#555'}}>Spielsystem: 2 Doppel + 8 Einzel</p>
-                      <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>2 Doppel (Pos. 1+2, Pos. 3+4), dann 1vs2, 2vs1, 3vs4, 4vs3, zuletzt 1vs1, 2vs2, 3vs3, 4vs4</p>
+                      <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>2 Doppel (Aufstellung frei wählbar, Schritt 2), dann 1vs2, 2vs1, 3vs4, 4vs3, zuletzt 1vs1, 2vs2, 3vs3, 4vs4</p>
+                    </div>
+                  )}
+                  {ptCreateForm.teamSize===6&&(
+                    <div style={{padding:'12px 14px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'12px',marginBottom:'22px'}}>
+                      <p style={{margin:'0 0 4px',fontSize:'13px',fontWeight:'700',color:'#555'}}>Spielsystem: 3 Doppel + 12 Einzel</p>
+                      <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>Doppelaufstellung (D1, D2, D3) in Schritt 2 festlegen — D1 frei wählbar, D2 sollte stärker als D3 sein. Es spielt A-D1 gegen B-D2, A-D2 gegen B-D1, A-D3 gegen B-D3. Danach 1vs2, 2vs1, 3vs4, 4vs3, 5vs6, 6vs5, zuletzt 1vs1 bis 6vs6</p>
                     </div>
                   )}
                   </>}
@@ -7913,7 +7945,9 @@ export default function TrainingsApp() {
                 const allSeeded = seededPreview; // already computed via getAllSeeded()
                 const totalSelected = allSeeded.length;
                 const teamsComplete = ptTeamOrderA.length===ptCreateForm.teamSize && ptTeamOrderB.length===ptCreateForm.teamSize;
-                const canStart = isKo ? totalSelected>=3 : isTeam ? (totalSelected===maxPlayers && teamsComplete) : totalSelected===maxPlayers;
+                const doublesNeed = ptCreateForm.teamSize===2 ? 0 : teamDoublesCount(ptCreateForm.teamSize)*2;
+                const doublesComplete = doublesNeed===0 || (ptDoublesSeqA.length===doublesNeed && ptDoublesSeqB.length===doublesNeed);
+                const canStart = isKo ? totalSelected>=3 : isTeam ? (totalSelected===maxPlayers && teamsComplete && doublesComplete) : totalSelected===maxPlayers;
 
                 const searchLower = ptPlayerSearch.toLowerCase().trim();
                 const aktiveList = Object.values(aktiveSpieler).sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
@@ -8104,6 +8138,61 @@ export default function TrainingsApp() {
                     );
                   })()}
 
+                  {/* Doppelaufstellung */}
+                  {isTeam && ptCreateForm.teamSize!==2 && ptTeamOrderA.length===ptCreateForm.teamSize && ptTeamOrderB.length===ptCreateForm.teamSize && (()=>{
+                    const teamSize = ptCreateForm.teamSize;
+                    const need = teamDoublesCount(teamSize)*2;
+                    const DoublesCol = ({order,teamName,seq,setSeq,color}) => {
+                      const pairs = chunkDoublesPairs(seq);
+                      const pairLabels = teamSize===6 ? ['D1','D2','D3'] : teamSize===4 ? ['Doppel 1','Doppel 2'] : ['Doppel'];
+                      return (
+                        <div style={{flex:1,minWidth:'220px',border:`2px solid ${color}33`,borderRadius:'12px',padding:'10px'}}>
+                          <p style={{margin:'0 0 8px',fontSize:'13px',fontWeight:'800',color}}>{teamName}</p>
+                          <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'10px'}}>
+                            {order.map((key,i)=>{
+                              const p = allSeeded.find(x=>x.childId===key);
+                              const selIdx = seq.indexOf(i);
+                              const selected = selIdx!==-1;
+                              const full = seq.length>=need;
+                              return (
+                                <button key={key} disabled={!selected&&full} onClick={()=>{
+                                  if(selected){ setSeq(s=>s.filter(x=>x!==i)); }
+                                  else if(!full){ setSeq(s=>[...s,i]); }
+                                }} style={{padding:'6px 10px',borderRadius:'8px',border:`2px solid ${selected?color:'#e5e7eb'}`,background:selected?`${color}15`:'#f9fafb',color:selected?color:'#6b7280',cursor:(!selected&&full)?'not-allowed':'pointer',fontWeight:'700',fontSize:'12px',opacity:(!selected&&full)?0.4:1,display:'flex',alignItems:'center',gap:'5px'}}>
+                                  <span style={{width:'18px',height:'18px',borderRadius:'50%',background:selected?color:'#d1d5db',color:'white',fontSize:'10px',fontWeight:'900',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{i+1}</span>
+                                  {p?.name||'?'}{selected&&<span style={{fontSize:'10px',opacity:0.7}}>#{selIdx+1}</span>}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div style={{display:'flex',flexDirection:'column',gap:'3px'}}>
+                            {pairLabels.map((lbl,pi)=>{
+                              const pair = pairs[pi];
+                              const n1 = pair ? allSeeded.find(x=>x.childId===order[pair[0]])?.name : null;
+                              const n2 = pair ? allSeeded.find(x=>x.childId===order[pair[1]])?.name : null;
+                              return (
+                                <p key={pi} style={{margin:0,fontSize:'11px',color: pair?'#1f2937':'#9ca3af',fontWeight:pair?'700':'400'}}>
+                                  {lbl}: {pair ? `${n1} & ${n2}` : '– noch auswählen –'}
+                                </p>
+                              );
+                            })}
+                          </div>
+                          {seq.length>0&&<button onClick={()=>setSeq([])} style={{marginTop:'8px',padding:'4px 10px',background:'#f3f4f6',border:'1px solid #e5e7eb',borderRadius:'7px',color:'#6b7280',cursor:'pointer',fontSize:'11px',fontWeight:'600'}}>Zurücksetzen</button>}
+                        </div>
+                      );
+                    };
+                    return (
+                      <div style={{margin:'16px 0'}}>
+                        <p style={{margin:'0 0 4px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.5px'}}>Doppelaufstellung festlegen</p>
+                        <p style={{margin:'0 0 10px',fontSize:'11px',color:'#9ca3af'}}>Klicke die Spieler in der Reihenfolge an, in der sie Doppelpaare bilden sollen (jeweils 2 zusammen = 1 Paar).{teamSize===6?' D1 frei wählbar, D2 sollte stärker als D3 sein.':''}</p>
+                        <div style={{display:'flex',gap:'12px',flexWrap:'wrap'}}>
+                          <DoublesCol order={ptTeamOrderA} teamName={ptTeamNameA} seq={ptDoublesSeqA} setSeq={setPtDoublesSeqA} color="#7c3aed"/>
+                          <DoublesCol order={ptTeamOrderB} teamName={ptTeamNameB} seq={ptDoublesSeqB} setSeq={setPtDoublesSeqB} color="#db2777"/>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Setzungs-Vorschau */}
                   {!isTeam && allSeeded.length>0&&(
                     <div style={{margin:'12px 0',padding:'12px 14px',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:'12px'}}>
@@ -8126,7 +8215,9 @@ export default function TrainingsApp() {
                     {canStart
                       ?(isKo?`🏆 KO Turnier starten! (${totalSelected} Spieler)`:isTeam?'🤝 Mannschaftsspiel starten!':'🎮 Wettkampf starten!')
                       :(isKo?`Mind. 3 Spieler auswählen (${totalSelected}/3)`
-                        :isTeam?(totalSelected<maxPlayers?`Noch ${maxPlayers-totalSelected} Spieler auswählen`:`Teams noch nicht vollständig (A: ${ptTeamOrderA.length}/${ptCreateForm.teamSize}, B: ${ptTeamOrderB.length}/${ptCreateForm.teamSize})`)
+                        :isTeam?(totalSelected<maxPlayers?`Noch ${maxPlayers-totalSelected} Spieler auswählen`
+                          :!teamsComplete?`Teams noch nicht vollständig (A: ${ptTeamOrderA.length}/${ptCreateForm.teamSize}, B: ${ptTeamOrderB.length}/${ptCreateForm.teamSize})`
+                          :`Doppelaufstellung noch nicht vollständig (A: ${ptDoublesSeqA.length}/${doublesNeed}, B: ${ptDoublesSeqB.length}/${doublesNeed})`)
                         :`Noch ${maxPlayers-totalSelected} Spieler auswählen`)}
                   </button>
                 </>
@@ -8685,7 +8776,7 @@ export default function TrainingsApp() {
         savePracticeTournaments(newActive); setActivePracticeId(null); navTo('practiceTournaments');
       };
       const inpStyle = {background:'rgba(255,255,255,0.09)',border:'1px solid rgba(167,139,250,0.25)',borderRadius:'8px',color:'white',fontSize:'20px',fontWeight:'900',textAlign:'center',width:'58px',height:'44px',outline:'none'};
-      const systemLabel = pt.teamSize===3 ? '1 Doppel + 9 Einzel' : pt.teamSize===4 ? '2 Doppel + 8 Einzel' : (pt.teamSystem==='korbylonCup' ? 'Corbillon Cup' : 'Kings Cup');
+      const systemLabel = pt.teamSize===3 ? '1 Doppel + 9 Einzel' : pt.teamSize===4 ? '2 Doppel + 8 Einzel' : pt.teamSize===6 ? '3 Doppel + 12 Einzel' : (pt.teamSystem==='korbylonCup' ? 'Corbillon Cup' : 'Kings Cup');
 
       return (
         <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
