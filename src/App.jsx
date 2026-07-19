@@ -917,8 +917,8 @@ export default function TrainingsApp() {
         if (!(await isFcmSupported())) return;
         const messaging = getMessaging(app);
         unsub = onMessage(messaging, (payload) => {
-          const title = payload.notification?.title || 'TTC Grün-Weiß Staffel';
-          const body = payload.notification?.body || '';
+          const title = payload.data?.title || 'TTC Grün-Weiß Staffel';
+          const body = payload.data?.body || '';
           if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
             new Notification(title, { body, icon: '/logo.png' });
           }

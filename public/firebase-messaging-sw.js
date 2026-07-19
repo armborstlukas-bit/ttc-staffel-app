@@ -14,10 +14,12 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// Reine Daten-Nachrichten (kein "notification"-Feld im Payload) – sonst zeigen
+// manche Browser die Benachrichtigung doppelt an (einmal automatisch, einmal hier).
 messaging.onBackgroundMessage((payload) => {
-  const title = payload.notification?.title || 'TTC Grün-Weiß Staffel';
+  const title = payload.data?.title || 'TTC Grün-Weiß Staffel';
   const options = {
-    body: payload.notification?.body || '',
+    body: payload.data?.body || '',
     icon: '/logo.png',
     badge: '/logo.png',
     data: payload.data || {},

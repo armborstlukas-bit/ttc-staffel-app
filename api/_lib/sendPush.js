@@ -28,8 +28,7 @@ export async function sendPushToUsers(db, messaging, { userIds, title, body, url
   for (const chunk of chunks) {
     const response = await messaging.sendEachForMulticast({
       tokens: chunk.map(t => t.token),
-      notification: { title, body },
-      data: { url: url || '/', category },
+      data: { title, body, url: url || '/', category },
       webpush: { fcmOptions: { link: url || '/' } },
     });
     response.responses.forEach((r, i) => {
