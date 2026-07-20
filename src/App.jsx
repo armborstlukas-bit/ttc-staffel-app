@@ -2249,7 +2249,31 @@ export default function TrainingsApp() {
 
   const deleteSession = (id) => {
     if (!window.confirm('Diese Trainingseinheit löschen?')) return;
+    const session = sessions[id];
     const u={...sessions}; delete u[id]; saveSessions(u);
+
+    // Anwesenheit ist pro Datum gespeichert. Ohne Aufräumen würde ein neu angelegtes Training
+    // am selben Datum die Status-Reste dieses gelöschten Trainings übernehmen. Da nach dem
+    // Löschen kein anderes Training mehr für dieses Datum+diese Gruppe existieren kann
+    // (Kollisionssperre beim Anlegen), können wir die Anwesenheitseinträge hier sicher entfernen.
+    if (session?.date) {
+      const affectedKids = [
+        ...(session.subgroupIds||[]).flatMap(sid => getChildrenForSubgroup(sid)),
+        ...(session.extraPlayerIds||[]).map(cid => children[cid]).filter(Boolean),
+      ];
+      const updatedChildren = { ...children };
+      let changed = false;
+      affectedKids.forEach(c => {
+        const child = updatedChildren[c.id];
+        if (child?.attendance && session.date in child.attendance) {
+          const att = { ...child.attendance };
+          delete att[session.date];
+          updatedChildren[c.id] = { ...child, attendance: att };
+          changed = true;
+        }
+      });
+      if (changed) saveChildren(updatedChildren);
+    }
   };
 
   const deleteRecurringTemplate = (templateId) => {
