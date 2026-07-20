@@ -77,7 +77,7 @@ if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styl
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
 import { getFirestore, doc, setDoc, updateDoc, deleteField, arrayUnion, arrayRemove, onSnapshot, getDoc } from 'firebase/firestore';
-import { getMessaging, getToken as getFcmToken, deleteToken as deleteFcmToken, onMessage, isSupported as isFcmSupported } from 'firebase/messaging';
+import { getMessaging, getToken as getFcmToken, onMessage, isSupported as isFcmSupported } from 'firebase/messaging';
 import { Check, X, Plus, Trash2, Download, LogOut, ArrowLeft, Clock, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save, Trophy, Home, Archive, MessageSquare, Bell, Send, Pencil } from 'lucide-react';
 
 const firebaseConfig = {
@@ -1335,8 +1335,9 @@ export default function TrainingsApp() {
         const messaging = getMessaging(app);
         const token = await getFcmToken(messaging, { vapidKey: FCM_VAPID_KEY, serviceWorkerRegistration: reg }).catch(()=>null);
         if (token) {
-          // Token bei Firebase selbst ungültig machen (nicht nur aus unserer Liste entfernen)
-          await deleteFcmToken(messaging).catch(()=>{});
+          // Bewusst KEIN deleteToken() hier: das würde Firebase intern durcheinanderbringen,
+          // falls in derselben Sitzung danach wieder aktiviert wird (bekannter SDK-Nebeneffekt).
+          // Entfernen aus unserer eigenen Liste reicht aus, um den Versand zu stoppen.
           const emptyPrefs = { training:false, achievements:false, other:false };
           await updateDoc(doc(db,'users',user.uid), { fcmTokens: arrayRemove(token), notifPrefs: emptyPrefs });
           setUserProfile(p => ({...(p||{}), fcmTokens: (p?.fcmTokens||[]).filter(t=>t!==token), notifPrefs: emptyPrefs}));
