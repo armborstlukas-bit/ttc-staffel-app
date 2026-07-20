@@ -1887,6 +1887,8 @@ export default function TrainingsApp() {
     return session?.trainer || '';
   };
 
+  const formatSessionTime = (session) => session?.endTime ? `${session.time}–${session.endTime}` : session?.time;
+
   const canEdit = () => ['admin','trainer'].includes(userRole);
 
   // Groups this user may access: admins see all, trainers only their assigned groups
@@ -3402,7 +3404,7 @@ export default function TrainingsApp() {
                             {sessionIsPast&&<span style={{fontSize:'11px',fontWeight:'700',color:'white',background:'#dc2626',padding:'2px 8px',borderRadius:'20px'}}>Vergangen</span>}
                           </div>
                           <p style={{margin:'0 0 2px',fontWeight:'600',color:'#333'}}>
-                            {new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'})} · {session.time} Uhr
+                            {new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'})} · {formatSessionTime(session)} Uhr
                           </p>
                           {getTrainerNames(session)&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'#555'}}>👤 Trainer: {getTrainerNames(session)}</p>}
                           {session.info&&<p style={{margin:'0 0 4px',fontSize:'13px',color:'#0369a1',display:'flex',alignItems:'center',gap:'4px'}}><Info size={13}/> {session.info}</p>}
@@ -4326,7 +4328,7 @@ export default function TrainingsApp() {
                             {archivable&&<span style={{fontSize:'10px',background:'rgba(55,65,81,0.6)',color:'#9ca3af',padding:'1px 7px',borderRadius:'20px',fontWeight:'600'}}>📦 Archivierbar</span>}
                             {session.excludeFromQuota&&<span style={{fontSize:'10px',background:'rgba(251,191,36,0.15)',color:'#fbbf24',padding:'1px 7px',borderRadius:'20px',fontWeight:'600',border:'1px solid rgba(251,191,36,0.3)'}}>⚠️ Zählt nicht zur Quote</span>}
                           </div>
-                          <span style={{fontSize:'13px',color:'rgba(255,255,255,0.5)',fontWeight:'500'}}>{new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'})} · {session.time} Uhr</span>
+                          <span style={{fontSize:'13px',color:'rgba(255,255,255,0.5)',fontWeight:'500'}}>{new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'})} · {formatSessionTime(session)} Uhr</span>
                         </div>
                         {allKids2.length>0&&<div style={{textAlign:'right',flexShrink:0}}>
                           <p style={{margin:'0 0 2px',fontSize:'15px',fontWeight:'800',color:allDone?'#4ade80':'#fca5a5'}}>{recorded}/{allKids2.length}</p>
@@ -4353,7 +4355,7 @@ export default function TrainingsApp() {
                             {isToday&&<span style={{fontSize:'10px',background:'rgba(74,222,128,0.2)',color:'#4ade80',padding:'2px 9px',borderRadius:'20px',fontWeight:'800'}}>Heute</span>}
                             {session.excludeFromQuota&&<span style={{fontSize:'10px',background:'rgba(251,191,36,0.15)',color:'#fbbf24',padding:'1px 7px',borderRadius:'20px',fontWeight:'600',border:'1px solid rgba(251,191,36,0.3)'}}>⚠️ Zählt nicht zur Quote</span>}
                           </div>
-                          <span style={{fontSize:'13px',color:'rgba(255,255,255,0.5)',fontWeight:'500'}}>{new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'})} · {session.time} Uhr</span>
+                          <span style={{fontSize:'13px',color:'rgba(255,255,255,0.5)',fontWeight:'500'}}>{new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'})} · {formatSessionTime(session)} Uhr</span>
                         </div>
                         <ChevronRight size={16} color={isToday?'rgba(74,222,128,0.45)':'rgba(255,255,255,0.18)'}/>
                       </div>
@@ -5057,7 +5059,7 @@ export default function TrainingsApp() {
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',marginBottom:'3px'}}>
                           <span style={{fontWeight:'800',color:'white',fontSize:'15px'}}>{new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'})}</span>
-                          <span style={{fontWeight:'700',color:'rgba(74,222,128,0.8)',fontSize:'14px'}}>{session.time} Uhr</span>
+                          <span style={{fontWeight:'700',color:'rgba(74,222,128,0.8)',fontSize:'14px'}}>{formatSessionTime(session)} Uhr</span>
                           {isToday&&<span style={{fontSize:'10px',background:'rgba(74,222,128,0.2)',color:'#4ade80',padding:'2px 8px',borderRadius:'20px',fontWeight:'800'}}>Heute</span>}
                         </div>
                         {getTrainerNames(session)&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>👤 {getTrainerNames(session)}</p>}
@@ -5230,7 +5232,7 @@ export default function TrainingsApp() {
                         <div key={session.id} style={{padding:'14px 16px',borderRadius:'14px',border:`1px solid ${isComing?'rgba(74,222,128,0.3)':isMissing?'rgba(248,113,113,0.3)':'rgba(255,255,255,0.08)'}`,background:isComing?'rgba(74,222,128,0.07)':isMissing?'rgba(248,113,113,0.07)':'rgba(255,255,255,0.025)'}}>
                           <div style={{marginBottom:'12px'}}>
                             <p style={{margin:'0 0 3px',fontWeight:'700',color:'white',fontSize:'15px'}}>
-                              {new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})} · {session.time} Uhr
+                              {new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})} · {formatSessionTime(session)} Uhr
                             </p>
                             {sessGrpNames.length>0&&<p style={{margin:'0 0 2px',fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>📂 {sessGrpNames.join(', ')}</p>}
                             {getTrainerNames(session)&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>👤 {getTrainerNames(session)}</p>}
@@ -9765,7 +9767,7 @@ export default function TrainingsApp() {
                           </span>
                           {session.cancelled&&<span style={{fontSize:'11px',fontWeight:'700',background:'#fee2e2',color:'#dc2626',padding:'2px 7px',borderRadius:'20px',border:'1px solid #fca5a5'}}>Ausgefallen</span>}
                         </div>
-                        <div style={{fontSize:'12px',color:'#888'}}>{session.time||''} Uhr{session.trainer||session.trainerName ? ` · ${session.trainer||session.trainerName}` : ''}</div>
+                        <div style={{fontSize:'12px',color:'#888'}}>{formatSessionTime(session)||''} Uhr{getTrainerNames(session)||session.trainerName ? ` · ${getTrainerNames(session)||session.trainerName}` : ''}</div>
                       </div>
                       {/* Subgroup badges */}
                       <div style={{display:'flex',gap:'4px',flexWrap:'wrap',flex:1}}>
