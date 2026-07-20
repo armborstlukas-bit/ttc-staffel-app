@@ -29,7 +29,12 @@ export async function sendPushToUsers(db, messaging, { userIds, title, body, url
     const response = await messaging.sendEachForMulticast({
       tokens: chunk.map(t => t.token),
       data: { title, body, url: url || '/', category },
-      webpush: { fcmOptions: { link: url || '/' } },
+      android: { priority: 'high' },
+      webpush: {
+        fcmOptions: { link: url || '/' },
+        headers: { Urgency: 'high', TTL: '86400' },
+      },
+      apns: { headers: { 'apns-priority': '10' } },
     });
     response.responses.forEach((r, i) => {
       if (r.success) {
