@@ -1,6 +1,18 @@
 import { adminDb, adminMessaging } from './_lib/firebaseAdmin.js';
 import { sendPushToUsers } from './_lib/sendPush.js';
 
+// Wandelt "Wanduhrzeit" in Berlin (z.B. 09:55 an einem bestimmten Datum) korrekt in
+// einen UTC-Zeitpunkt um — berücksichtigt Sommer-/Winterzeit automatisch.
+// (Vercel-Funktionen laufen intern in UTC, ein einfaches `new Date("...T09:55:00")`
+// würde die Uhrzeit fälschlich als UTC statt als deutsche Zeit interpretieren.)
+function berlinWallTimeToUtc(dateStr, timeStr) {
+  const asUTC = new Date(`${dateStr}T${timeStr}:00.000Z`);
+  const berlinStr = asUTC.toLocaleString('en-US', { timeZone: 'Europe/Berlin' });
+  const utcStr = asUTC.toLocaleString('en-US', { timeZone: 'UTC' });
+  const offset = new Date(utcStr).getTime() - new Date(berlinStr).getTime();
+  return new Date(asUTC.getTime() + offset);
+}
+
 // Wird von einem externen Cron-Dienst (z.B. cron-job.org) alle paar Minuten aufgerufen.
 // Prüft, welche Trainingseinheiten gerade zeitlich beendet wurden, und erinnert die
 // zugeordneten Trainer daran, die Anwesenheit einzutragen — aber nur einmal pro Einheit
@@ -32,10 +44,10 @@ export default async function handler(req, res) {
       // Ende = explizite Endzeit, sonst Startzeit + 2 Stunden als Annahme
       let endDateTime;
       if (session.endTime) {
-        endDateTime = new Date(`${session.date}T${session.endTime}:00`);
+        endDateTime = berlinWallTimeToUtc(session.date, session.endTime);
       } else {
-        endDateTime = new Date(`${session.date}T${session.time}:00`);
-        endDateTime.setHours(endDateTime.getHours() + 2);
+        endDateTime = berlinWallTimeToUtc(session.date, session.time);
+        endDateTime = new Date(endDateTime.getTime() + 2*60*60*1000);
       }
       if (endDateTime > now) continue; // noch nicht vorbei
 
