@@ -1326,22 +1326,30 @@ export default function TrainingsApp() {
   // Entfernt den Push-Token dieses Geräts, ohne den Account abzumelden —
   // für den "Benachrichtigungen deaktivieren"-Button in den Einstellungen.
   const disablePushNotifications = async () => {
-    if (notifBusy) return;
+    if (notifBusy || !user?.uid) return;
     setNotifBusy(true);
     setNotifError('');
     try {
-      if (user?.uid && FCM_VAPID_KEY && await isFcmSupported()) {
-        const reg = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
-        const messaging = getMessaging(app);
-        const token = await getFcmToken(messaging, { vapidKey: FCM_VAPID_KEY, serviceWorkerRegistration: reg }).catch(()=>null);
-        if (token) {
-          // Bewusst KEIN deleteToken() hier: das würde Firebase intern durcheinanderbringen,
-          // falls in derselben Sitzung danach wieder aktiviert wird (bekannter SDK-Nebeneffekt).
-          // Entfernen aus unserer eigenen Liste reicht aus, um den Versand zu stoppen.
-          const emptyPrefs = { training:false, achievements:false, other:false };
-          await updateDoc(doc(db,'users',user.uid), { fcmTokens: arrayRemove(token), notifPrefs: emptyPrefs });
-          setUserProfile(p => ({...(p||{}), fcmTokens: (p?.fcmTokens||[]).filter(t=>t!==token), notifPrefs: emptyPrefs}));
+      let tokenToRemove = null;
+      try {
+        if (FCM_VAPID_KEY && await isFcmSupported()) {
+          const reg = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+          const messaging = getMessaging(app);
+          tokenToRemove = await getFcmToken(messaging, { vapidKey: FCM_VAPID_KEY, serviceWorkerRegistration: reg }).catch(()=>null);
         }
+      } catch {}
+      // Bewusst KEIN deleteToken() hier: das würde Firebase intern durcheinanderbringen,
+      // falls in derselben Sitzung danach wieder aktiviert wird (bekannter SDK-Nebeneffekt).
+      const emptyPrefs = { training:false, achievements:false, other:false };
+      if (tokenToRemove) {
+        // Präziser Fall: genau diesen Geräte-Token entfernen
+        await updateDoc(doc(db,'users',user.uid), { fcmTokens: arrayRemove(tokenToRemove), notifPrefs: emptyPrefs });
+        setUserProfile(p => ({...(p||{}), fcmTokens: (p?.fcmTokens||[]).filter(t=>t!==tokenToRemove), notifPrefs: emptyPrefs}));
+      } else {
+        // Fallback: kein gültiger Token mehr abrufbar (z.B. nach Löschen der Website-Daten) —
+        // dann alle gespeicherten Tokens dieses Accounts entfernen, damit der Button nicht hängen bleibt.
+        await updateDoc(doc(db,'users',user.uid), { fcmTokens: [], notifPrefs: emptyPrefs });
+        setUserProfile(p => ({...(p||{}), fcmTokens: [], notifPrefs: emptyPrefs}));
       }
     } catch (e) {
       setNotifError((e?.code ? `[${e.code}] ` : '') + (e?.message || String(e)));
