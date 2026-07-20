@@ -897,8 +897,9 @@ export default function TrainingsApp() {
           const profile = { ...data, uid: u.uid, roles };
           setUserProfile(profile);
           const selectableRoles = roles.filter(r => r !== 'pending');
+          const primaryRole = (data.primaryRole && selectableRoles.includes(data.primaryRole)) ? data.primaryRole : selectableRoles[0];
           if (selectableRoles.length > 1) {
-            setUserRole(selectableRoles[0]);
+            setUserRole(primaryRole);
             setShowRolePicker(true);
           } else {
             setUserRole(roles[0]);
@@ -1901,26 +1902,37 @@ export default function TrainingsApp() {
     if (!notif) return;
     const childId = params.get('childId');
     const sessionId = params.get('sessionId');
-    const isJugendRole = ['eltern','jugendlich'].includes(userRole);
+    // Ein Account kann mehrere Rollen haben (z.B. Admin + Trainer, oder Trainer + Jugendlich).
+    // Die Benachrichtigung soll immer in den zu ihr passenden Bereich springen, unabhängig davon,
+    // welche Rolle gerade aktiv ist — die aktive Rolle wird dafür bei Bedarf automatisch umgeschaltet.
+    const myRoles = (userProfile?.roles || [userRole]).filter(r => r !== 'pending');
+    const hasJugendRole = myRoles.some(r => ['eltern','jugendlich'].includes(r));
+    const hasStaffRole = myRoles.some(r => ['admin','trainer'].includes(r));
+    const switchToJugendRole = () => { if (!['eltern','jugendlich'].includes(userRole)) setUserRole(myRoles.includes('jugendlich') ? 'jugendlich' : 'eltern'); };
+    const switchToStaffRole = () => { if (!['admin','trainer'].includes(userRole)) setUserRole(myRoles.includes('admin') ? 'admin' : 'trainer'); };
 
     if (notif === 'attendance') {
-      if (['admin','trainer'].includes(userRole)) {
+      if (hasStaffRole) {
         if (Object.keys(sessions).length === 0) return;
+        switchToStaffRole();
         if (sessionId && sessions[sessionId]) { setActiveSession(sessions[sessionId]); navTo('sessionAttendance'); }
       }
     } else if (notif === 'achievement' || notif === 'training') {
-      if (isJugendRole) {
+      if (hasJugendRole) {
+        switchToJugendRole();
         navTo('home');
         setElternSubView(notif === 'achievement' ? 'errungenschaften' : 'trainingsverlauf');
-      } else if (['admin','trainer'].includes(userRole)) {
+      } else if (hasStaffRole) {
         // Auf Kinder-Daten warten, bevor der Deep-Link als erledigt markiert wird
         if (Object.keys(children).length === 0) return;
+        switchToStaffRole();
         if (childId && children[childId]) { setActiveChild(children[childId]); navTo('childHistory'); }
       }
     } else if (notif === 'message') {
-      if (isJugendRole) { navTo('home'); setElternSubView('benachrichtigungen'); }
-      else if (['admin','trainer'].includes(userRole)) navTo('notifications');
-    } else if (notif === 'registration' && userRole === 'admin') {
+      if (hasJugendRole) { switchToJugendRole(); navTo('home'); setElternSubView('benachrichtigungen'); }
+      else if (hasStaffRole) { switchToStaffRole(); navTo('notifications'); }
+    } else if (notif === 'registration' && myRoles.includes('admin')) {
+      if (userRole !== 'admin') setUserRole('admin');
       navTo('admin');
     } else if (notif === 'news') {
       navTo('ttcnews');
@@ -1930,7 +1942,7 @@ export default function TrainingsApp() {
     deepLinkHandled.current = true;
     // Query-Parameter aus der URL entfernen, damit ein Neuladen nicht erneut springt
     window.history.replaceState({}, '', window.location.pathname);
-  }, [user, userRole, children, sessions]);
+  }, [user, userRole, userProfile, children, sessions]);
 
   const getTrainerNames = (session) => {
     if (session?.trainerUids?.length) {
@@ -2194,6 +2206,17 @@ export default function TrainingsApp() {
     if (!time || subgroupIds.length===0) { alert('Bitte mindestens eine Untergruppe auswählen!'); return; }
     if (!isRecurring && !date) { alert('Bitte ein Datum auswählen!'); return; }
     const extras = extraPlayerIds||[];
+
+    // Anwesenheit wird pro Datum gespeichert (nicht pro Trainingseinheit) — ein zweites Training
+    // derselben Gruppe am selben Tag würde daher automatisch den bereits erfassten Status
+    // (z.B. "abwesend") vom ersten Training übernehmen. Das verhindern wir hier.
+    if (!isRecurring && !repeat) {
+      const collision = Object.values(sessions).find(s => s.date === date && (s.subgroupIds||[]).some(sid => subgroupIds.includes(sid)));
+      if (collision) {
+        alert('Für diese Gruppe existiert an diesem Datum bereits ein Training. Ein zweites Training am selben Tag ist aktuell nicht möglich, da die Anwesenheit pro Datum (nicht pro Trainingseinheit) gespeichert wird — die Erfassung würde sich sonst überschneiden. Bitte das bestehende Training bearbeiten oder ein anderes Datum wählen.');
+        return;
+      }
+    }
 
     if (isRecurring) {
       const dayOfWeek = new Date(date+'T12:00:00').getDay();
@@ -2700,11 +2723,21 @@ export default function TrainingsApp() {
 
   // Save roles array for a user (admin function)
   const saveUserRoles = async (uid, roles) => {
-    // Keep legacy `role` field as first role for backwards compat
-    const primaryRole = roles[0] || 'pending';
-    const updated = { ...allUsers, [uid]: { ...allUsers[uid], roles, role: primaryRole } };
+    // Oberrolle beibehalten, falls sie noch unter den neuen Rollen ist, sonst auf erste Rolle zurückfallen
+    const existingPrimary = allUsers[uid]?.primaryRole;
+    const primaryRole = (existingPrimary && roles.includes(existingPrimary)) ? existingPrimary : (roles[0] || 'pending');
+    const updated = { ...allUsers, [uid]: { ...allUsers[uid], roles, role: primaryRole, primaryRole } };
     await setDoc(doc(db,'ttc','users'), updated);
-    await setDoc(doc(db,'users',uid), { ...allUsers[uid], roles, role: primaryRole });
+    await setDoc(doc(db,'users',uid), { ...allUsers[uid], roles, role: primaryRole, primaryRole });
+    setAllUsers(updated);
+  };
+
+  // Setzt die "Oberrolle" eines Nutzers (admin function) — bestimmt die Standard-Rolle beim Login
+  // und in welchen Bereich eine Push-Benachrichtigung springt, wenn keine speziellere Unterrolle gemeint ist.
+  const saveUserPrimaryRole = async (uid, primaryRole) => {
+    const updated = { ...allUsers, [uid]: { ...allUsers[uid], primaryRole, role: primaryRole } };
+    await setDoc(doc(db,'ttc','users'), updated);
+    await setDoc(doc(db,'users',uid), { ...allUsers[uid], primaryRole, role: primaryRole });
     setAllUsers(updated);
   };
 
@@ -3970,6 +4003,20 @@ export default function TrainingsApp() {
                                 })}
                               </div>
                             </div>
+
+                            {/* Oberrolle (bestimmt Standard-Rolle beim Login & Push-Ziel) */}
+                            {userRoles.filter(r=>r!=='pending').length>1&&(()=>{
+                              const cur=userRoles.filter(r=>r!=='pending');
+                              const primary=cur.includes(u.primaryRole)?u.primaryRole:cur[0];
+                              return (
+                                <div style={{marginBottom:'10px'}}>
+                                  <span style={{fontSize:'12px',color:'#555',fontWeight:'600',display:'block',marginBottom:'6px'}}>Oberrolle:</span>
+                                  <select value={primary} onChange={e=>saveUserPrimaryRole(u.uid,e.target.value)} style={{padding:'6px 10px',border:'1px solid #d1d5db',borderRadius:'8px',fontSize:'13px',cursor:'pointer',color:'#333',background:'white',width:'100%'}}>
+                                    {cur.map(r=><option key={r} value={r}>{ROLE_CONFIG[r]?.label||r}</option>)}
+                                  </select>
+                                </div>
+                              );
+                            })()}
 
                             {/* Kinder zuordnen (Dropdown + Chips) */}
                             {userRoles.some(r=>['eltern','jugendlich'].includes(r))&&(()=>{
