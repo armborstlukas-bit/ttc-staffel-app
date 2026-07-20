@@ -6350,6 +6350,22 @@ export default function TrainingsApp() {
       const att={...(child.attendance||{}),[date]:next};
       if (next===null) delete att[date];
       saveChildren({...children,[child.id]:{...child,attendance:att}});
+
+      if (next === 'absent_unexcused') {
+        const unexcusedCount = Object.values(att).filter(s => s === 'absent_unexcused').length;
+        if (unexcusedCount > 0 && unexcusedCount % 3 === 0) {
+          const targetUserIds = getLinkedUserIds(child.id);
+          if (targetUserIds.length) {
+            triggerPushNotification({
+              userIds: targetUserIds,
+              title: '⚠️ Bitte ans Abmelden denken',
+              body: `${child?.name||'Dein Kind'} hat jetzt ${unexcusedCount}x unentschuldigt beim Training gefehlt. Bitte bei Verhinderung rechtzeitig abmelden.`,
+              url: `/?notif=training&childId=${child.id}`,
+              category: 'training',
+            });
+          }
+        }
+      }
     };
 
     const deleteTrainingDate = (date) => {
