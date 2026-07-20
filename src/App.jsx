@@ -1908,8 +1908,10 @@ export default function TrainingsApp() {
     const myRoles = (userProfile?.roles || [userRole]).filter(r => r !== 'pending');
     const hasJugendRole = myRoles.some(r => ['eltern','jugendlich'].includes(r));
     const hasStaffRole = myRoles.some(r => ['admin','trainer'].includes(r));
-    const switchToJugendRole = () => { if (!['eltern','jugendlich'].includes(userRole)) setUserRole(myRoles.includes('jugendlich') ? 'jugendlich' : 'eltern'); };
-    const switchToStaffRole = () => { if (!['admin','trainer'].includes(userRole)) setUserRole(myRoles.includes('admin') ? 'admin' : 'trainer'); };
+    // Der Rollen-Auswahlbildschirm würde sonst die Weiterleitung blockieren
+    setShowRolePicker(false);
+    const switchToJugendRole = () => { if (!['eltern','jugendlich'].includes(userRole)) setUserRole(myRoles.includes('jugendlich') ? 'jugendlich' : 'eltern'); setShowRolePicker(false); };
+    const switchToStaffRole = () => { if (!['admin','trainer'].includes(userRole)) setUserRole(myRoles.includes('admin') ? 'admin' : 'trainer'); setShowRolePicker(false); };
 
     if (notif === 'attendance') {
       if (hasStaffRole) {
