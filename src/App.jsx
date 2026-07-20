@@ -1911,7 +1911,7 @@ export default function TrainingsApp() {
     } else if (notif === 'achievement' || notif === 'training') {
       if (isJugendRole) {
         navTo('home');
-        if (notif === 'achievement') setElternSubView('errungenschaften');
+        setElternSubView(notif === 'achievement' ? 'errungenschaften' : 'trainingsverlauf');
       } else if (['admin','trainer'].includes(userRole)) {
         // Auf Kinder-Daten warten, bevor der Deep-Link als erledigt markiert wird
         if (Object.keys(children).length === 0) return;
