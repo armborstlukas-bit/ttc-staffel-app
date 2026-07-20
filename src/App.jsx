@@ -1322,6 +1322,29 @@ export default function TrainingsApp() {
     await signOut(auth);
   };
 
+  // Entfernt den Push-Token dieses Geräts, ohne den Account abzumelden —
+  // für den "Benachrichtigungen deaktivieren"-Button in den Einstellungen.
+  const disablePushNotifications = async () => {
+    if (notifBusy) return;
+    setNotifBusy(true);
+    setNotifError('');
+    try {
+      if (user?.uid && FCM_VAPID_KEY && await isFcmSupported()) {
+        const reg = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+        const messaging = getMessaging(app);
+        const token = await getFcmToken(messaging, { vapidKey: FCM_VAPID_KEY, serviceWorkerRegistration: reg }).catch(()=>null);
+        if (token) {
+          await updateDoc(doc(db,'users',user.uid), { fcmTokens: arrayRemove(token) });
+          setUserProfile(p => ({...(p||{}), fcmTokens: (p?.fcmTokens||[]).filter(t=>t!==token)}));
+        }
+      }
+    } catch (e) {
+      setNotifError((e?.code ? `[${e.code}] ` : '') + (e?.message || String(e)));
+    } finally {
+      setNotifBusy(false);
+    }
+  };
+
   const toggleNotifPref = async (key) => {
     if (!user?.uid) return;
     const cur = userProfile?.notifPrefs || { training:true, achievements:true, other:true };
@@ -1341,7 +1364,13 @@ export default function TrainingsApp() {
       <div style={{marginBottom:'18px'}}>
         <h4 style={{margin:'0 0 10px',color:'#16a34a',fontSize:'13px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.5px'}}>🔔 Push-Benachrichtigungen</h4>
         {notifPermission==='granted' && hasToken ? (
-          <p style={{margin:'0 0 10px',fontSize:'12px',color:'#16a34a',fontWeight:'600'}}>✅ Aktiviert auf diesem Gerät</p>
+          <>
+            <p style={{margin:'0 0 6px',fontSize:'12px',color:'#16a34a',fontWeight:'600'}}>✅ Aktiviert auf diesem Gerät</p>
+            <button onClick={disablePushNotifications} disabled={notifBusy}
+              style={{width:'100%',padding:'10px',marginBottom:'10px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.3)',borderRadius:'10px',color:'#dc2626',cursor:notifBusy?'default':'pointer',fontWeight:'700',fontSize:'13px',opacity:notifBusy?0.6:1}}>
+              {notifBusy?'Wird deaktiviert…':'🔕 Benachrichtigungen deaktivieren'}
+            </button>
+          </>
         ) : notifPermission==='denied' ? (
           <p style={{margin:'0 0 10px',fontSize:'12px',color:'#dc2626'}}>Blockiert – bitte in den Browser-Einstellungen für diese Seite erlauben.</p>
         ) : (
