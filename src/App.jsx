@@ -120,7 +120,7 @@ const ROLE_CONFIG = {
 
 const WEEKDAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
 
-const emptySession = { subgroupIds: [], extraPlayerIds: [], date: new Date().toISOString().split('T')[0], time: '17:00', trainer: '', info: '', repeat: false, repeatWeeks: 8, isRecurring: false };
+const emptySession = { subgroupIds: [], extraPlayerIds: [], date: new Date().toISOString().split('T')[0], time: '17:00', endTime: '', trainer: '', trainerUids: [], info: '', repeat: false, repeatWeeks: 8, isRecurring: false };
 
 const TODAY = new Date().toISOString().split('T')[0];
 const emptyTournament = { name: '', location: '', dateFrom: TODAY, dateTo: TODAY, konkurrenzen: [] };
@@ -995,7 +995,7 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','wettenZitate'), s => setWettenZitate(s.exists()&&Array.isArray(s.data().entries)?s.data().entries:[])),
       onSnapshot(doc(db,'ttc','trikotDaten'), s => setTrikotDaten(s.exists()?s.data():{})),
     ];
-    if (['admin','aktiver'].includes(userRole))
+    if (['admin','aktiver','trainer'].includes(userRole))
       unsubs.push(onSnapshot(doc(db,'ttc','users'), s => { const d=s.exists()?s.data():{};allUsersRef.current=d;setAllUsers(d); }));
     return () => unsubs.forEach(u=>u());
   }, [user, userRole]);
@@ -1832,9 +1832,15 @@ export default function TrainingsApp() {
     const notif = params.get('notif');
     if (!notif) return;
     const childId = params.get('childId');
+    const sessionId = params.get('sessionId');
     const isJugendRole = ['eltern','jugendlich'].includes(userRole);
 
-    if (notif === 'achievement' || notif === 'training') {
+    if (notif === 'attendance') {
+      if (['admin','trainer'].includes(userRole)) {
+        if (Object.keys(sessions).length === 0) return;
+        if (sessionId && sessions[sessionId]) { setActiveSession(sessions[sessionId]); navTo('sessionAttendance'); }
+      }
+    } else if (notif === 'achievement' || notif === 'training') {
       if (isJugendRole) {
         navTo('home');
         if (notif === 'achievement') setElternSubView('errungenschaften');
@@ -1856,7 +1862,14 @@ export default function TrainingsApp() {
     deepLinkHandled.current = true;
     // Query-Parameter aus der URL entfernen, damit ein Neuladen nicht erneut springt
     window.history.replaceState({}, '', window.location.pathname);
-  }, [user, userRole, children]);
+  }, [user, userRole, children, sessions]);
+
+  const getTrainerNames = (session) => {
+    if (session?.trainerUids?.length) {
+      return session.trainerUids.map(uid => allUsers[uid]?.name || allUsers[uid]?.email).filter(Boolean).join(', ');
+    }
+    return session?.trainer || '';
+  };
 
   const canEdit = () => ['admin','trainer'].includes(userRole);
 
@@ -2088,7 +2101,7 @@ export default function TrainingsApp() {
         const existsArchived = Object.values(archivedSessions).some(s => s.templateId === tmpl.id && s.date === dateStr);
         if(!existsActive && !existsArchived) {
           const id = 'session_rt_' + tmpl.id + '_' + dateStr;
-          updated[id] = { id, subgroupIds: tmpl.subgroupIds, extraPlayerIds: tmpl.extraPlayerIds||[], date: dateStr, time: tmpl.time, trainer: tmpl.trainer, info: tmpl.info, templateId: tmpl.id, repeatId: null, responses: {} };
+          updated[id] = { id, subgroupIds: tmpl.subgroupIds, extraPlayerIds: tmpl.extraPlayerIds||[], date: dateStr, time: tmpl.time, endTime: tmpl.endTime, trainer: tmpl.trainer, trainerUids: tmpl.trainerUids||[], info: tmpl.info, templateId: tmpl.id, repeatId: null, responses: {} };
           changed = true;
         }
         cur.setDate(cur.getDate() + 7);
@@ -2107,7 +2120,7 @@ export default function TrainingsApp() {
 
   // ── Training anlegen ─────────────────────────────────────────
   const createSession = () => {
-    const { subgroupIds, extraPlayerIds, date, time, trainer, info, repeat, repeatWeeks, isRecurring } = newSession;
+    const { subgroupIds, extraPlayerIds, date, time, endTime, trainer, trainerUids, info, repeat, repeatWeeks, isRecurring } = newSession;
     if (!time || subgroupIds.length===0) { alert('Bitte mindestens eine Untergruppe auswählen!'); return; }
     if (!isRecurring && !date) { alert('Bitte ein Datum auswählen!'); return; }
     const extras = extraPlayerIds||[];
@@ -2115,7 +2128,7 @@ export default function TrainingsApp() {
     if (isRecurring) {
       const dayOfWeek = new Date(date+'T12:00:00').getDay();
       const id = 'rt_' + Date.now();
-      const tmpl = { id, subgroupIds, extraPlayerIds: extras, dayOfWeek, time, trainer, info, startDate: date, createdAt: new Date().toISOString() };
+      const tmpl = { id, subgroupIds, extraPlayerIds: extras, dayOfWeek, time, endTime, trainer, trainerUids, info, startDate: date, createdAt: new Date().toISOString() };
       const updatedTemplates = { ...recurringTemplates, [id]: tmpl };
       saveRecurringTemplates(updatedTemplates);
       materializeRecurringSessions(updatedTemplates, sessions);
@@ -2131,11 +2144,11 @@ export default function TrainingsApp() {
         d.setDate(d.getDate()+i*7);
         const dateStr = d.toISOString().split('T')[0];
         const id = 'session_'+Date.now()+'_'+i;
-        updated[id] = { id, subgroupIds, extraPlayerIds: extras, date:dateStr, time, trainer, info, repeatId, responses:{} };
+        updated[id] = { id, subgroupIds, extraPlayerIds: extras, date:dateStr, time, endTime, trainer, trainerUids, info, repeatId, responses:{} };
       }
     } else {
       const id = 'session_'+Date.now();
-      updated[id] = { id, subgroupIds, extraPlayerIds: extras, date, time, trainer, info, repeatId:null, responses:{} };
+      updated[id] = { id, subgroupIds, extraPlayerIds: extras, date, time, endTime, trainer, trainerUids, info, repeatId:null, responses:{} };
     }
     saveSessions(updated);
     setNewSession(emptySession);
@@ -2172,11 +2185,11 @@ export default function TrainingsApp() {
       // Alle Einheiten der Reihe bearbeiten (nur Zeit/Trainer/Info/Untergruppen, nicht Datum)
       Object.keys(updated).forEach(key => {
         if (updated[key].repeatId===editForm.repeatId) {
-          updated[key] = { ...updated[key], time:editForm.time, trainer:editForm.trainer, info:editForm.info, subgroupIds:editForm.subgroupIds };
+          updated[key] = { ...updated[key], time:editForm.time, endTime:editForm.endTime, trainer:editForm.trainer, trainerUids:editForm.trainerUids, info:editForm.info, subgroupIds:editForm.subgroupIds, attendanceReminderSent:false };
         }
       });
     } else {
-      updated[editForm.id] = { ...editForm };
+      updated[editForm.id] = { ...editForm, attendanceReminderSent:false };
     }
     saveSessions(updated);
     setEditingSession(null);
@@ -3190,19 +3203,36 @@ export default function TrainingsApp() {
             )}
           </div>
 
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',marginBottom:'12px'}}>
-            <div>
-              <label style={s.label}>Trainer</label>
-              <input style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} placeholder="Name des Trainers" value={newSession.trainer} onChange={e=>setNewSession({...newSession,trainer:e.target.value})}/>
+          <div style={{marginBottom:'12px'}}>
+            <label style={s.label}>Trainer</label>
+            <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+              {Object.values(allUsers).filter(u=>(u.roles||[u.role]).includes('trainer')).sort((a,b)=>(a.name||'').localeCompare(b.name||'','de')).map(u=>{
+                const sel = (newSession.trainerUids||[]).includes(u.uid);
+                return (
+                  <button key={u.uid} type="button" onClick={()=>{
+                    const cur = newSession.trainerUids||[];
+                    setNewSession({...newSession, trainerUids: sel?cur.filter(x=>x!==u.uid):[...cur,u.uid]});
+                  }} style={{padding:'7px 14px',borderRadius:'20px',border:`1.5px solid ${sel?'#15803d':'#d1d5db'}`,background:sel?'rgba(21,128,61,0.1)':'#f9fafb',color:sel?'#15803d':'#374151',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>
+                    {sel?'✓ ':''}{u.name||u.email}
+                  </button>
+                );
+              })}
+              {Object.values(allUsers).filter(u=>(u.roles||[u.role]).includes('trainer')).length===0&&
+                <p style={{margin:0,fontSize:'12px',color:'#9ca3af'}}>Keine Trainer-Accounts gefunden.</p>}
             </div>
-            <div></div>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'12px',marginBottom:'12px'}}>
             <div>
               <label style={s.label}>Datum</label>
               <input type="date" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={newSession.date} onChange={e=>setNewSession({...newSession,date:e.target.value})}/>
             </div>
             <div>
-              <label style={s.label}>Uhrzeit</label>
+              <label style={s.label}>Beginn</label>
               <input type="time" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={newSession.time} onChange={e=>setNewSession({...newSession,time:e.target.value})}/>
+            </div>
+            <div>
+              <label style={s.label}>Ende</label>
+              <input type="time" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}} value={newSession.endTime} onChange={e=>setNewSession({...newSession,endTime:e.target.value})}/>
             </div>
           </div>
 
@@ -3314,11 +3344,27 @@ export default function TrainingsApp() {
                             })}
                           </div>
                         </div>
-                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'8px'}}>
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'8px',marginBottom:'8px'}}>
                           <div><label style={s.label}>Datum</label><input type="date" value={editForm.date} onChange={e=>setEditForm({...editForm,date:e.target.value})} style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/></div>
-                          <div><label style={s.label}>Uhrzeit</label><input type="time" value={editForm.time} onChange={e=>setEditForm({...editForm,time:e.target.value})} style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/></div>
+                          <div><label style={s.label}>Beginn</label><input type="time" value={editForm.time} onChange={e=>setEditForm({...editForm,time:e.target.value})} style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/></div>
+                          <div><label style={s.label}>Ende</label><input type="time" value={editForm.endTime||''} onChange={e=>setEditForm({...editForm,endTime:e.target.value})} style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/></div>
                         </div>
-                        <div style={{marginBottom:'8px'}}><label style={s.label}>Trainer</label><input value={editForm.trainer||''} onChange={e=>setEditForm({...editForm,trainer:e.target.value})} style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/></div>
+                        <div style={{marginBottom:'8px'}}>
+                          <label style={s.label}>Trainer</label>
+                          <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                            {Object.values(allUsers).filter(u=>(u.roles||[u.role]).includes('trainer')).sort((a,b)=>(a.name||'').localeCompare(b.name||'','de')).map(u=>{
+                              const sel = (editForm.trainerUids||[]).includes(u.uid);
+                              return (
+                                <button key={u.uid} type="button" onClick={()=>{
+                                  const cur = editForm.trainerUids||[];
+                                  setEditForm({...editForm, trainerUids: sel?cur.filter(x=>x!==u.uid):[...cur,u.uid]});
+                                }} style={{padding:'5px 12px',borderRadius:'20px',border:`1.5px solid ${sel?'#15803d':'#d1d5db'}`,background:sel?'rgba(21,128,61,0.1)':'#f9fafb',color:sel?'#15803d':'#374151',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>
+                                  {sel?'✓ ':''}{u.name||u.email}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
                         <div style={{marginBottom:'12px'}}><label style={s.label}>Info</label><textarea value={editForm.info||''} onChange={e=>setEditForm({...editForm,info:e.target.value})} style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box',resize:'vertical',minHeight:'50px'}}/></div>
                         <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
                           <button onClick={()=>saveEdit(false)} style={s.btn('#358941',undefined,true)}><Save size={14}/> Diese speichern</button>
@@ -3342,7 +3388,7 @@ export default function TrainingsApp() {
                           <p style={{margin:'0 0 2px',fontWeight:'600',color:'#333'}}>
                             {new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'})} · {session.time} Uhr
                           </p>
-                          {session.trainer&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'#555'}}>👤 Trainer: {session.trainer}</p>}
+                          {getTrainerNames(session)&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'#555'}}>👤 Trainer: {getTrainerNames(session)}</p>}
                           {session.info&&<p style={{margin:'0 0 4px',fontSize:'13px',color:'#0369a1',display:'flex',alignItems:'center',gap:'4px'}}><Info size={13}/> {session.info}</p>}
                           {missing>0&&<p style={{margin:0,fontSize:'12px',color:'#94a3b8'}}>✗ {missing} abgemeldet</p>}
                         </div>
@@ -4998,7 +5044,7 @@ export default function TrainingsApp() {
                           <span style={{fontWeight:'700',color:'rgba(74,222,128,0.8)',fontSize:'14px'}}>{session.time} Uhr</span>
                           {isToday&&<span style={{fontSize:'10px',background:'rgba(74,222,128,0.2)',color:'#4ade80',padding:'2px 8px',borderRadius:'20px',fontWeight:'800'}}>Heute</span>}
                         </div>
-                        {session.trainer&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>👤 {session.trainer}</p>}
+                        {getTrainerNames(session)&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>👤 {getTrainerNames(session)}</p>}
                       </div>
                       <button onClick={()=>respondToSession(session.id,'missing')}
                         style={{flexShrink:0,padding:'12px 20px',border:`2px solid ${isMissing?'#dc2626':'rgba(248,113,113,0.5)'}`,background:isMissing?'#dc2626':'rgba(220,38,38,0.08)',color:isMissing?'white':'#f87171',borderRadius:'12px',cursor:'pointer',fontWeight:'800',fontSize:'15px',whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:'6px'}}>
@@ -5171,7 +5217,7 @@ export default function TrainingsApp() {
                               {new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})} · {session.time} Uhr
                             </p>
                             {sessGrpNames.length>0&&<p style={{margin:'0 0 2px',fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>📂 {sessGrpNames.join(', ')}</p>}
-                            {session.trainer&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>👤 {session.trainer}</p>}
+                            {getTrainerNames(session)&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>👤 {getTrainerNames(session)}</p>}
                             {session.info&&<div style={{display:'flex',alignItems:'flex-start',gap:'6px',marginTop:'8px',padding:'8px 10px',background:'rgba(96,165,250,0.08)',border:'1px solid rgba(96,165,250,0.2)',borderRadius:'8px'}}><Info size={14} color="#93c5fd" style={{marginTop:'2px',flexShrink:0}}/><p style={{margin:0,fontSize:'13px',color:'#93c5fd'}}>{session.info}</p></div>}
                           </div>
                           <div style={{display:'flex'}}>
@@ -6012,7 +6058,7 @@ export default function TrainingsApp() {
                 return <span key={sub.id} style={{fontSize:'12px',fontWeight:'700',color:grp?.color||'#4ade80',background:'rgba(74,222,128,0.08)',padding:'4px 12px',borderRadius:'20px',border:`1px solid rgba(74,222,128,0.2)`}}>{grp?.emoji} {sub.name}</span>;
               })}
             </div>
-            {session?.trainer&&<p style={{margin:'0 0 4px',fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>👤 Trainer: {session.trainer}</p>}
+            {getTrainerNames(session)&&<p style={{margin:'0 0 4px',fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>👤 Trainer: {getTrainerNames(session)}</p>}
             {session?.info&&<div style={{display:'flex',gap:'6px',padding:'10px 12px',background:'rgba(96,165,250,0.08)',border:'1px solid rgba(96,165,250,0.2)',borderRadius:'10px',marginTop:'8px'}}>
               <Info size={14} color="#93c5fd" style={{flexShrink:0,marginTop:'2px'}}/>
               <p style={{margin:0,fontSize:'13px',color:'#93c5fd'}}>{session.info}</p>
