@@ -2300,9 +2300,19 @@ export default function TrainingsApp() {
     const newVal = curStatus === response ? null : { status: response, by };
     const updatedSessions = { ...sessions, [sessionId]: { ...session, responses: { ...(session.responses||{}), [childId]: newVal } } };
     saveSessions(updatedSessions);
-    // Auto-set attendance to absent_excused when marking as missing
-    if (response === 'missing' && curStatus !== 'missing' && myChild) {
-      saveChildren({ ...children, [myChild.id]: { ...myChild, attendance: { ...(myChild.attendance||{}), [session.date]: 'absent_excused' } } });
+    if (response === 'missing' && myChild) {
+      if (curStatus !== 'missing') {
+        // Auto-set attendance to absent_excused when marking as missing
+        saveChildren({ ...children, [myChild.id]: { ...myChild, attendance: { ...(myChild.attendance||{}), [session.date]: 'absent_excused' } } });
+      } else {
+        // "Fehlt"-Meldung wieder zurückgenommen: automatisch gesetzten Status wieder entfernen
+        // (nur falls er seitdem nicht manuell vom Trainer geändert wurde)
+        const att = { ...(myChild.attendance||{}) };
+        if (att[session.date] === 'absent_excused') {
+          delete att[session.date];
+          saveChildren({ ...children, [myChild.id]: { ...myChild, attendance: att } });
+        }
+      }
     }
   };
 
