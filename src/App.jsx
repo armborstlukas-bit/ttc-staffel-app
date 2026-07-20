@@ -77,7 +77,7 @@ if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styl
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
 import { getFirestore, doc, setDoc, updateDoc, deleteField, arrayUnion, arrayRemove, onSnapshot, getDoc } from 'firebase/firestore';
-import { getMessaging, getToken as getFcmToken, onMessage, isSupported as isFcmSupported } from 'firebase/messaging';
+import { getMessaging, getToken as getFcmToken, deleteToken as deleteFcmToken, onMessage, isSupported as isFcmSupported } from 'firebase/messaging';
 import { Check, X, Plus, Trash2, Download, LogOut, ArrowLeft, Clock, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save, Trophy, Home, Archive, MessageSquare, Bell, Send, Pencil } from 'lucide-react';
 
 const firebaseConfig = {
@@ -1296,8 +1296,9 @@ export default function TrainingsApp() {
         return;
       }
       if (user?.uid) {
-        await setDoc(doc(db,'users',user.uid), { fcmTokens: arrayUnion(token) }, { merge:true });
-        setUserProfile(p => ({...(p||{}), fcmTokens: [...new Set([...(p?.fcmTokens||[]), token])]}));
+        const freshPrefs = { training:true, achievements:true, other:true };
+        await setDoc(doc(db,'users',user.uid), { fcmTokens: arrayUnion(token), notifPrefs: freshPrefs }, { merge:true });
+        setUserProfile(p => ({...(p||{}), fcmTokens: [...new Set([...(p?.fcmTokens||[]), token])], notifPrefs: freshPrefs}));
       }
     } catch (e) {
       setNotifError((e?.code ? `[${e.code}] ` : '') + (e?.message || String(e)));
@@ -1334,8 +1335,11 @@ export default function TrainingsApp() {
         const messaging = getMessaging(app);
         const token = await getFcmToken(messaging, { vapidKey: FCM_VAPID_KEY, serviceWorkerRegistration: reg }).catch(()=>null);
         if (token) {
-          await updateDoc(doc(db,'users',user.uid), { fcmTokens: arrayRemove(token) });
-          setUserProfile(p => ({...(p||{}), fcmTokens: (p?.fcmTokens||[]).filter(t=>t!==token)}));
+          // Token bei Firebase selbst ungültig machen (nicht nur aus unserer Liste entfernen)
+          await deleteFcmToken(messaging).catch(()=>{});
+          const emptyPrefs = { training:false, achievements:false, other:false };
+          await updateDoc(doc(db,'users',user.uid), { fcmTokens: arrayRemove(token), notifPrefs: emptyPrefs });
+          setUserProfile(p => ({...(p||{}), fcmTokens: (p?.fcmTokens||[]).filter(t=>t!==token), notifPrefs: emptyPrefs}));
         }
       }
     } catch (e) {
