@@ -1371,17 +1371,27 @@ export default function TrainingsApp() {
           <>
             <p style={{margin:'0 0 6px',fontSize:'12px',color:'#16a34a',fontWeight:'600'}}>✅ Aktiviert auf diesem Gerät</p>
             <button onClick={disablePushNotifications} disabled={notifBusy}
-              style={{width:'100%',padding:'10px',marginBottom:'10px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.3)',borderRadius:'10px',color:'#dc2626',cursor:notifBusy?'default':'pointer',fontWeight:'700',fontSize:'13px',opacity:notifBusy?0.6:1}}>
+              style={{width:'100%',padding:'10px',marginBottom:'6px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.3)',borderRadius:'10px',color:'#dc2626',cursor:notifBusy?'default':'pointer',fontWeight:'700',fontSize:'13px',opacity:notifBusy?0.6:1}}>
               {notifBusy?'Wird deaktiviert…':'🔕 Benachrichtigungen deaktivieren'}
             </button>
+            <p style={{margin:'0 0 10px',fontSize:'11px',color:dark?'rgba(255,255,255,0.4)':'#6b7280',lineHeight:'1.5'}}>
+              Stoppt alle Push-Nachrichten an dieses Gerät für diesen Account. Die grundsätzliche Browser-Erlaubnis für diese Website bleibt dabei bestehen — komplett zurücksetzen geht nur direkt in den Website-Einstellungen deines Browsers.
+            </p>
           </>
         ) : notifPermission==='denied' ? (
           <p style={{margin:'0 0 10px',fontSize:'12px',color:'#dc2626'}}>Blockiert – bitte in den Browser-Einstellungen für diese Seite erlauben.</p>
         ) : (
-          <button onClick={enablePushNotifications} disabled={notifBusy}
-            style={{width:'100%',padding:'10px',marginBottom:'10px',background:'rgba(74,222,128,0.12)',border:'1px solid rgba(74,222,128,0.3)',borderRadius:'10px',color:'#16a34a',cursor:notifBusy?'default':'pointer',fontWeight:'700',fontSize:'13px',opacity:notifBusy?0.6:1}}>
-            {notifBusy?'Wird aktiviert…':'Push-Benachrichtigungen aktivieren'}
-          </button>
+          <>
+            <button onClick={enablePushNotifications} disabled={notifBusy}
+              style={{width:'100%',padding:'10px',marginBottom:'6px',background:'rgba(74,222,128,0.12)',border:'1px solid rgba(74,222,128,0.3)',borderRadius:'10px',color:'#16a34a',cursor:notifBusy?'default':'pointer',fontWeight:'700',fontSize:'13px',opacity:notifBusy?0.6:1}}>
+              {notifBusy?'Wird aktiviert…':'Push-Benachrichtigungen aktivieren'}
+            </button>
+            <p style={{margin:'0 0 10px',fontSize:'11px',color:dark?'rgba(255,255,255,0.4)':'#6b7280',lineHeight:'1.5'}}>
+              {notifPermission==='granted'
+                ? 'Dein Browser hat diese Website schon einmal erlaubt bekommen — es erscheint deshalb kein neues Abfrage-Fenster, die Aktivierung passiert direkt.'
+                : 'Beim Klick fragt dein Browser einmalig um Erlaubnis.'}
+            </p>
+          </>
         )}
         {notifError && (
           <div style={{margin:'0 0 10px',padding:'8px 10px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.3)',borderRadius:'8px'}}>
