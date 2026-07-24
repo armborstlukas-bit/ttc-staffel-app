@@ -11880,9 +11880,9 @@ export default function TrainingsApp() {
                   out.push(
                     <div key={i} style={{display:'flex',alignItems:'center',gap:'8px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'9px',padding:'7px 10px',fontSize:'12px',flexWrap:'wrap'}}>
                       {it.liga&&<span style={{padding:'2px 7px',borderRadius:'6px',fontSize:'10px',fontWeight:'800',flexShrink:0,background:'rgba(147,197,253,0.15)',color:'#93c5fd'}}>{it.liga}</span>}
-                      <span style={{color:'rgba(255,255,255,0.5)',fontWeight:'700',flexShrink:0}}>{fmtDate(it.datum)}{it.zeit?` ${it.zeit}`:''}</span>
+                      <span style={{color:'rgba(255,255,255,0.5)',fontWeight:'700',flexShrink:0}}>{fmtDate(it.datum)}{it.zeit?` ${it.zeit}`:''}{it.treffpunkt?` (${it.isHeimspiel?'Treffpunkt':'Abfahrt'}: ${it.treffpunkt})`:''}</span>
                       <span style={{color:'white',fontWeight:'600',flex:'1 1 auto',minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.heim} <span style={{color:'rgba(255,255,255,0.3)'}}>–</span> {it.gast}</span>
-                      {it.halle&&<span style={{color:'rgba(255,255,255,0.3)',flexShrink:0,marginLeft:'auto',fontSize:'11px'}}>{it.halle}</span>}
+                      <span style={{color:'#4ade80',fontWeight:'700',flexShrink:0,marginLeft:'auto'}}>👤 {it.fahrer || '–'}</span>
                     </div>
                   );
                 });

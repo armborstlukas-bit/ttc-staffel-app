@@ -1,7 +1,9 @@
 // TEST-Endpunkt: liest den offiziellen Spielplan von mytischtennis.de (click-tt) statt
-// des bisherigen Google-Sheets. Liefert nur Nachwuchs-Spiele (Liga-Kuerzel beginnt mit "J").
-// Enthaelt (noch) keine Fahrer/Betreuer- oder Treffpunkt-Angaben, da diese nur im Google-Sheet
-// manuell gepflegt werden.
+// des bisherigen Google-Sheets fuer Termine/Teams/Halle. Fahrer/Betreuer und Treffpunkt
+// werden weiterhin nur im Google-Sheet manuell gepflegt — die werden hier per Datum+Liga
+// (Fallback: Datum+Teams) automatisch aus dem Sheet zugeordnet, bei jedem Aufruf neu.
+import { fetchFahrplanSheetItems } from './_lib/fetchFahrplanSheet.js';
+
 const SPIELPLAN_URL = 'https://www.mytischtennis.de/click-tt/HeTTV/26--27/verein/33066/TTC_G.-W._Staffel_1953/spielplan?date_start=2026-08-01&date_end=2027-05-31';
 
 export default async function handler(req, res) {
@@ -21,6 +23,18 @@ export default async function handler(req, res) {
     if (!routeKey) throw new Error('Spielplan-Route nicht gefunden');
     const byDate = ctx.state.loaderData[routeKey].data || {};
 
+    // Fahrer/Betreuer + Treffpunkt kommen weiterhin aus dem Google-Sheet — hier per
+    // Datum+Liga nachschlagen (Fallback: Datum+Heimteam+Gastteam, falls sich der Liga-Code
+    // mal unterscheiden sollte).
+    let sheetItems = [];
+    try { sheetItems = await fetchFahrplanSheetItems(); } catch { /* Sheet optional, ohne Abgleich weitermachen */ }
+    const byLiga = new Map();
+    const byTeams = new Map();
+    sheetItems.forEach(s => {
+      byLiga.set(`${s.datum}|${s.liga}`, s);
+      byTeams.set(`${s.datum}|${s.heim}|${s.gast}`, s);
+    });
+
     const items = [];
     Object.values(byDate).forEach(dayGames => {
       (dayGames || []).forEach(g => {
@@ -29,10 +43,12 @@ export default async function handler(req, res) {
         const heim = g.team_home || '';
         const gast = g.team_away || '';
         const dateMatch = (g.formattedDay || '').match(/(\d{2}\.\d{2}\.\d{4})/);
+        const datum = dateMatch ? dateMatch[1] : '';
         const isHeimspiel = /TTC G\.?-?W\.? Staffel/i.test(heim);
         const ourTeam = isHeimspiel ? heim : (/TTC G\.?-?W\.? Staffel/i.test(gast) ? gast : '');
+        const match = byLiga.get(`${datum}|${ligaCode}`) || byTeams.get(`${datum}|${heim}|${gast}`);
         items.push({
-          datum: dateMatch ? dateMatch[1] : '',
+          datum,
           zeit: g.formattedTime || '',
           liga: ligaCode,
           ligaName: g.league_name || '',
@@ -41,8 +57,8 @@ export default async function handler(req, res) {
           gast,
           isHeimspiel,
           ourTeam,
-          fahrer: '',
-          treffpunkt: '',
+          fahrer: match?.fahrer || '',
+          treffpunkt: match?.treffpunkt || '',
         });
       });
     });
