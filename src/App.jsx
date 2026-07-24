@@ -800,6 +800,7 @@ export default function TrainingsApp() {
   const [fahrplanTest, setFahrplanTest] = useState([]);
   const [fahrplanTestLoading, setFahrplanTestLoading] = useState(false);
   const [fahrplanTestTeamFilter, setFahrplanTestTeamFilter] = useState('');
+  const [fahrplanTestFahrerFilter, setFahrplanTestFahrerFilter] = useState('');
   const [gegnerForm, setGegnerForm] = useState({date:'', verein:'', gegner:'', taktik:'', spielweise:''});
   const [gegnerTaktikDraft, setGegnerTaktikDraft] = useState({});
   const [gegnerSpielweiseDraft, setGegnerSpielweiseDraft] = useState({});
@@ -11837,7 +11838,13 @@ export default function TrainingsApp() {
       team,
       ligas: [...new Set(upcoming.filter(it=>it.ourTeam===team).map(it=>it.liga).filter(Boolean))].join('/'),
     }));
-    const filtered = upcoming.filter(it => !fahrplanTestTeamFilter || it.ourTeam === fahrplanTestTeamFilter);
+    const fahrerOptions = [...new Set(upcoming.map(it=>it.fahrer).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de'));
+    const filtered = upcoming.filter(it =>
+      (!fahrplanTestTeamFilter || it.ourTeam === fahrplanTestTeamFilter) &&
+      (!fahrplanTestFahrerFilter || it.fahrer === fahrplanTestFahrerFilter)
+    );
+    const myEmail = (user?.email||'').trim().toLowerCase();
+    const myAssignments = myEmail ? upcoming.filter(it => (it.fahrer||'').trim().toLowerCase()===myEmail) : [];
     const selectStyle = {padding:'7px 10px',background:'#132a1c',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'9px',color:'white',fontSize:'12px',fontWeight:'600',cursor:'pointer',flex:'1 1 160px',minWidth:0};
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#0a1628 0%,#0d1f12 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
@@ -11854,7 +11861,25 @@ export default function TrainingsApp() {
               <option value="" style={{background:'#132a1c',color:'white'}}>Alle Mannschaften</option>
               {teamOptions.map(({team,ligas})=><option key={team} value={team} style={{background:'#132a1c',color:'white'}}>{team}{ligas?` (${ligas})`:''}</option>)}
             </select>
+            <select value={fahrplanTestFahrerFilter} onChange={e=>setFahrplanTestFahrerFilter(e.target.value)} style={selectStyle}>
+              <option value="" style={{background:'#132a1c',color:'white'}}>Alle Fahrer/Betreuer</option>
+              {fahrerOptions.map(f=><option key={f} value={f} style={{background:'#132a1c',color:'white'}}>{f}</option>)}
+            </select>
           </div>
+          {myAssignments.length>0&&(
+            <div style={{marginBottom:'16px',padding:'12px 14px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'12px'}}>
+              <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'800',color:'#fbbf24',textTransform:'uppercase',letterSpacing:'0.5px'}}>🚗 Deine Betreuungen</p>
+              <div style={{display:'grid',gap:'5px'}}>
+                {myAssignments.slice(0,5).map((it,i)=>(
+                  <div key={i} style={{fontSize:'12px',color:'white',fontWeight:'600'}}>
+                    {it.liga&&<span style={{color:'#93c5fd'}}>[{it.liga}] </span>}
+                    {fmtDate(it.datum)}{it.zeit?` ${it.zeit}`:''} · {it.heim} – {it.gast}
+                    {it.treffpunkt&&<span style={{color:'#fbbf24'}}> ({it.isHeimspiel?'Treffpunkt':'Abfahrt'}: {it.treffpunkt})</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {fahrplanTestLoading?(
             <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.3)'}}>
               <div style={{fontSize:'36px',marginBottom:'12px'}}>⏳</div>
