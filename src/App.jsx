@@ -11731,7 +11731,10 @@ export default function TrainingsApp() {
     const fmtDate = d => { const dt=parseD(d); return dt ? dt.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}) : d; };
     const todayStart = new Date(); todayStart.setHours(0,0,0,0);
     const upcoming = fahrplan.filter(it => { const dt=parseD(it.datum); return dt && dt>=todayStart; });
-    const teamOptions = [...new Set(upcoming.map(it=>it.ourTeam).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de'));
+    const teamOptions = [...new Set(upcoming.map(it=>it.ourTeam).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de')).map(team => ({
+      team,
+      ligas: [...new Set(upcoming.filter(it=>it.ourTeam===team).map(it=>it.liga).filter(Boolean))].join('/'),
+    }));
     const fahrerOptions = [...new Set(upcoming.map(it=>it.fahrer).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de'));
     const filtered = upcoming.filter(it =>
       (!fahrplanTeamFilter || it.ourTeam === fahrplanTeamFilter) &&
@@ -11750,7 +11753,7 @@ export default function TrainingsApp() {
           <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
             <select value={fahrplanTeamFilter} onChange={e=>setFahrplanTeamFilter(e.target.value)} style={selectStyle}>
               <option value="" style={{background:'#132a1c',color:'white'}}>Alle Mannschaften</option>
-              {teamOptions.map(t=><option key={t} value={t} style={{background:'#132a1c',color:'white'}}>{t}</option>)}
+              {teamOptions.map(({team,ligas})=><option key={team} value={team} style={{background:'#132a1c',color:'white'}}>{team}{ligas?` (${ligas})`:''}</option>)}
             </select>
             <select value={fahrplanFahrerFilter} onChange={e=>setFahrplanFahrerFilter(e.target.value)} style={selectStyle}>
               <option value="" style={{background:'#132a1c',color:'white'}}>Alle Fahrer/Betreuer</option>
@@ -11763,6 +11766,7 @@ export default function TrainingsApp() {
               <div style={{display:'grid',gap:'5px'}}>
                 {myAssignments.slice(0,3).map((it,i)=>(
                   <div key={i} style={{fontSize:'12px',color:'white',fontWeight:'600'}}>
+                    {it.liga&&<span style={{color:'#93c5fd'}}>[{it.liga}] </span>}
                     {fmtDate(it.datum)}{it.zeit?` ${it.zeit}`:''} · {it.heim} – {it.gast}
                     {it.treffpunkt&&<span style={{color:'#fbbf24'}}> ({it.isHeimspiel?'Treffpunkt':'Abfahrt'}: {it.treffpunkt})</span>}
                   </div>
@@ -11796,6 +11800,7 @@ export default function TrainingsApp() {
                   out.push(
                     <div key={i} style={{display:'flex',alignItems:'center',gap:'8px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'9px',padding:'7px 10px',fontSize:'12px',flexWrap:'wrap'}}>
                       <span style={{padding:'2px 7px',borderRadius:'20px',fontSize:'10px',fontWeight:'800',flexShrink:0,background:it.isHeimspiel?'rgba(74,222,128,0.15)':'rgba(251,191,36,0.15)',color:it.isHeimspiel?'#4ade80':'#fbbf24'}}>{it.isHeimspiel?'🏠':'🚌'}</span>
+                      {it.liga&&<span style={{padding:'2px 7px',borderRadius:'6px',fontSize:'10px',fontWeight:'800',flexShrink:0,background:'rgba(147,197,253,0.15)',color:'#93c5fd'}}>{it.liga}</span>}
                       <span style={{color:'rgba(255,255,255,0.5)',fontWeight:'700',flexShrink:0}}>{fmtDate(it.datum)}{it.zeit?` ${it.zeit}`:''}{it.treffpunkt?` (${it.isHeimspiel?'Treffpunkt':'Abfahrt'}: ${it.treffpunkt})`:''}</span>
                       <span style={{color:'white',fontWeight:'600',flex:'1 1 auto',minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.heim} <span style={{color:'rgba(255,255,255,0.3)'}}>–</span> {it.gast}</span>
                       <span style={{color:accentColor,fontWeight:'700',flexShrink:0,marginLeft:'auto'}}>👤 {it.fahrer || '–'}</span>

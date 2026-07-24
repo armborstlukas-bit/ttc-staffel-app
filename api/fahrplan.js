@@ -50,6 +50,7 @@ export default async function handler(req, res) {
       return {
         datum,
         zeit: zeit || anpfiff,
+        liga: code,
         heim,
         gast,
         isHeimspiel,
