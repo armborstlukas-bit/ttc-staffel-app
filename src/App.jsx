@@ -1906,6 +1906,19 @@ export default function TrainingsApp() {
       }).catch(()=>{}).finally(()=>setFahrplanLoading(false));
   };
 
+  const setFahrplanTestFahrer = async (meetingId, fahrer) => {
+    if (!meetingId) return;
+    setFahrplanTest(prev => prev.map(it => it.meetingId===meetingId ? {...it, fahrer} : it));
+    try {
+      const idToken = await user.getIdToken();
+      await fetch('/api/fahrplan-set-fahrer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ meetingId, fahrer }),
+      });
+    } catch (e) { console.error('Fahrer speichern fehlgeschlagen', e); }
+  };
+
   const fetchFahrplanTest = () => {
     setFahrplanTestLoading(true);
     fetch('/api/fahrplan-test?_='+Date.now())
@@ -11846,6 +11859,8 @@ export default function TrainingsApp() {
     const myEmail = (user?.email||'').trim().toLowerCase();
     const myAssignments = myEmail ? upcoming.filter(it => (it.fahrer||'').trim().toLowerCase()===myEmail) : [];
     const selectStyle = {padding:'7px 10px',background:'#132a1c',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'9px',color:'white',fontSize:'12px',fontWeight:'600',cursor:'pointer',flex:'1 1 160px',minWidth:0};
+    const canEditFahrer = ['admin','trainer'].includes(userRole);
+    const rowFahrerSelectStyle = {padding:'3px 6px',background:'#0a1f13',border:'1px solid rgba(74,222,128,0.3)',borderRadius:'6px',color:'#4ade80',fontSize:'11px',fontWeight:'700',cursor:'pointer',flexShrink:0,marginLeft:'auto',maxWidth:'160px'};
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#0a1628 0%,#0d1f12 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
@@ -11907,7 +11922,14 @@ export default function TrainingsApp() {
                       {it.liga&&<span style={{padding:'2px 7px',borderRadius:'6px',fontSize:'10px',fontWeight:'800',flexShrink:0,background:'rgba(147,197,253,0.15)',color:'#93c5fd'}}>{it.liga}</span>}
                       <span style={{color:'rgba(255,255,255,0.5)',fontWeight:'700',flexShrink:0}}>{fmtDate(it.datum)}{it.zeit?` ${it.zeit}`:''}{it.treffpunkt?` (${it.isHeimspiel?'Treffpunkt':'Abfahrt'}: ${it.treffpunkt})`:''}</span>
                       <span style={{color:'white',fontWeight:'600',flex:'1 1 auto',minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.heim} <span style={{color:'rgba(255,255,255,0.3)'}}>–</span> {it.gast}</span>
-                      <span style={{color:'#4ade80',fontWeight:'700',flexShrink:0,marginLeft:'auto'}}>👤 {it.fahrer || '–'}</span>
+                      {canEditFahrer ? (
+                        <select value={it.fahrer||''} onChange={e=>setFahrplanTestFahrer(it.meetingId, e.target.value)} style={rowFahrerSelectStyle}>
+                          <option value="" style={{background:'#0a1f13',color:'#4ade80'}}>– kein Fahrer –</option>
+                          {fahrerOptions.map(f=><option key={f} value={f} style={{background:'#0a1f13',color:'#4ade80'}}>{f}</option>)}
+                        </select>
+                      ) : (
+                        <span style={{color:'#4ade80',fontWeight:'700',flexShrink:0,marginLeft:'auto'}}>👤 {it.fahrer || '–'}</span>
+                      )}
                     </div>
                   );
                 });

@@ -3,6 +3,7 @@
 // werden weiterhin nur im Google-Sheet manuell gepflegt — die werden hier per Datum+Liga
 // (Fallback: Datum+Teams) automatisch aus dem Sheet zugeordnet, bei jedem Aufruf neu.
 import { fetchFahrplanSheetItems } from './_lib/fetchFahrplanSheet.js';
+import { adminDb } from './_lib/firebaseAdmin.js';
 
 const SPIELPLAN_URL = 'https://www.mytischtennis.de/click-tt/HeTTV/26--27/verein/33066/TTC_G.-W._Staffel_1953/spielplan?date_start=2026-08-01&date_end=2027-05-31';
 
@@ -35,6 +36,14 @@ export default async function handler(req, res) {
       byTeams.set(`${s.datum}|${s.heim}|${s.gast}`, s);
     });
 
+    // Manuelle Fahrer-Zuweisungen aus der App (von Trainern per Dropdown gesetzt) —
+    // haben Vorrang vor dem automatischen Sheet-Abgleich, gespeichert je Spiel (meeting_id).
+    let overrides = {};
+    try {
+      const snap = await adminDb().collection('ttc').doc('fahrplanOverrides').get();
+      overrides = snap.exists ? (snap.data() || {}) : {};
+    } catch { /* Overrides optional */ }
+
     const items = [];
     Object.values(byDate).forEach(dayGames => {
       (dayGames || []).forEach(g => {
@@ -47,7 +56,10 @@ export default async function handler(req, res) {
         const isHeimspiel = /TTC G\.?-?W\.? Staffel/i.test(heim);
         const ourTeam = isHeimspiel ? heim : (/TTC G\.?-?W\.? Staffel/i.test(gast) ? gast : '');
         const match = byLiga.get(`${datum}|${ligaCode}`) || byTeams.get(`${datum}|${heim}|${gast}`);
+        const meetingId = g.meeting_id || '';
+        const override = meetingId ? overrides[meetingId] : null;
         items.push({
+          meetingId,
           datum,
           zeit: g.formattedTime || '',
           liga: ligaCode,
@@ -57,7 +69,7 @@ export default async function handler(req, res) {
           gast,
           isHeimspiel,
           ourTeam,
-          fahrer: match?.fahrer || '',
+          fahrer: override != null ? override : (match?.fahrer || ''),
           treffpunkt: match?.treffpunkt || '',
         });
       });
