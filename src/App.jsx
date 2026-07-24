@@ -11847,19 +11847,15 @@ export default function TrainingsApp() {
     const fmtDate = d => { const dt=parseD(d); return dt ? dt.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}) : d; };
     const todayStart = new Date(); todayStart.setHours(0,0,0,0);
     const upcoming = fahrplanTest.filter(it => { const dt=parseD(it.datum); return dt && dt>=todayStart; });
-    // Nach der eindeutigen Mannschafts-ID gruppieren (nicht nach Team-Namenstext, der bei
-    // mehreren Ligen derselben Mannschaft mehrdeutig sein kann).
+    // Die Liga-Abkürzung (blaues Badge) ist die eindeutige Mannschaftskennung — danach filtern.
     const teamOptionsMap = new Map();
-    upcoming.filter(it=>it.ourTeamId).forEach(it => {
-      if (!teamOptionsMap.has(it.ourTeamId)) teamOptionsMap.set(it.ourTeamId, { id: it.ourTeamId, team: it.ourTeam, ligas: new Set() });
-      teamOptionsMap.get(it.ourTeamId).ligas.add(it.liga);
+    upcoming.filter(it=>it.liga).forEach(it => {
+      if (!teamOptionsMap.has(it.liga)) teamOptionsMap.set(it.liga, { liga: it.liga, team: it.ourTeam });
     });
-    const teamOptions = [...teamOptionsMap.values()]
-      .map(t => ({...t, ligas: [...t.ligas].join('/')}))
-      .sort((a,b)=>a.team.localeCompare(b.team,'de') || a.ligas.localeCompare(b.ligas,'de'));
+    const teamOptions = [...teamOptionsMap.values()].sort((a,b)=>a.liga.localeCompare(b.liga,'de'));
     const fahrerOptions = [...new Set(upcoming.map(it=>it.fahrer).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de'));
     const filtered = upcoming.filter(it =>
-      (!fahrplanTestTeamFilter || it.ourTeamId === fahrplanTestTeamFilter) &&
+      (!fahrplanTestTeamFilter || it.liga === fahrplanTestTeamFilter) &&
       (!fahrplanTestFahrerFilter || it.fahrer === fahrplanTestFahrerFilter)
     );
     const myEmail = (user?.email||'').trim().toLowerCase();
@@ -11880,7 +11876,7 @@ export default function TrainingsApp() {
           <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
             <select value={fahrplanTestTeamFilter} onChange={e=>setFahrplanTestTeamFilter(e.target.value)} style={selectStyle}>
               <option value="" style={{background:'#132a1c',color:'white'}}>Alle Mannschaften</option>
-              {teamOptions.map(({id,team,ligas})=><option key={id} value={id} style={{background:'#132a1c',color:'white'}}>{team}{ligas?` (${ligas})`:''}</option>)}
+              {teamOptions.map(({liga,team})=><option key={liga} value={liga} style={{background:'#132a1c',color:'white'}}>{liga} – {team}</option>)}
             </select>
             <select value={fahrplanTestFahrerFilter} onChange={e=>setFahrplanTestFahrerFilter(e.target.value)} style={selectStyle}>
               <option value="" style={{background:'#132a1c',color:'white'}}>Alle Fahrer/Betreuer</option>
