@@ -797,6 +797,9 @@ export default function TrainingsApp() {
   const [fahrplanLoading, setFahrplanLoading] = useState(false);
   const [fahrplanTeamFilter, setFahrplanTeamFilter] = useState('');
   const [fahrplanFahrerFilter, setFahrplanFahrerFilter] = useState('');
+  const [fahrplanTest, setFahrplanTest] = useState([]);
+  const [fahrplanTestLoading, setFahrplanTestLoading] = useState(false);
+  const [fahrplanTestTeamFilter, setFahrplanTestTeamFilter] = useState('');
   const [gegnerForm, setGegnerForm] = useState({date:'', verein:'', gegner:'', taktik:'', spielweise:''});
   const [gegnerTaktikDraft, setGegnerTaktikDraft] = useState({});
   const [gegnerSpielweiseDraft, setGegnerSpielweiseDraft] = useState({});
@@ -1900,6 +1903,14 @@ export default function TrainingsApp() {
       .then(r=>r.json()).then(d=>{
         setFahrplan(Array.isArray(d.items)?d.items:[]);
       }).catch(()=>{}).finally(()=>setFahrplanLoading(false));
+  };
+
+  const fetchFahrplanTest = () => {
+    setFahrplanTestLoading(true);
+    fetch('/api/fahrplan-test?_='+Date.now())
+      .then(r=>r.json()).then(d=>{
+        setFahrplanTest(Array.isArray(d.items)?d.items:[]);
+      }).catch(()=>{}).finally(()=>setFahrplanTestLoading(false));
   };
   const navTo = (v) => { setView(v); setViewKey(k => k + 1); setGegnerAdding(false); setGegnerEditId(null); setGegnerForm({date:'',verein:'',gegner:'',taktik:''}); setElternSubView(null); };
 
@@ -4352,6 +4363,7 @@ export default function TrainingsApp() {
           {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>navTo('notifications'), badge: unreadCount},
           {label:'TTC News',         icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',   action:()=>{navTo('ttcnews');fetchTtcNews();}},
           {label:'Wer fährt wann',   icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
+          ...(userRole==='admin'?[{label:'Fahrplan (Test)', icon:'🧪', color:'#fbbf24', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)', action:()=>{navTo('fahrplanTest');fetchFahrplanTest();}}]:[]),
           {label:'Materialverwaltung',icon:'🏓', color:'#fb923c', bg:'rgba(251,146,60,0.08)', border:'rgba(251,146,60,0.25)',  action:()=>navTo('materialverwaltung')},
           ...(canAccessPinnwand()?[{label:'Pinnwand',  icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.2)',  action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
           ...(canEdit()?[
@@ -11803,6 +11815,74 @@ export default function TrainingsApp() {
                       <span style={{color:'rgba(255,255,255,0.5)',fontWeight:'700',flexShrink:0}}>{fmtDate(it.datum)}{it.zeit?` ${it.zeit}`:''}{it.treffpunkt?` (${it.isHeimspiel?'Treffpunkt':'Abfahrt'}: ${it.treffpunkt})`:''}</span>
                       <span style={{color:'white',fontWeight:'600',flex:'1 1 auto',minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.heim} <span style={{color:'rgba(255,255,255,0.3)'}}>–</span> {it.gast}</span>
                       <span style={{color:accentColor,fontWeight:'700',flexShrink:0,marginLeft:'auto'}}>👤 {it.fahrer || '–'}</span>
+                    </div>
+                  );
+                });
+                return out;
+              })()}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── FAHRPLAN TEST (Quelle: mytischtennis.de statt Google Sheet) — nur Admin ──
+  if (view === 'fahrplanTest' && userRole === 'admin') {
+    const parseD = d => { const [dd,mm,yyyy]=(d||'').split('.'); return dd&&mm&&yyyy ? new Date(`${yyyy}-${mm}-${dd}T12:00:00`) : null; };
+    const fmtDate = d => { const dt=parseD(d); return dt ? dt.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}) : d; };
+    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+    const upcoming = fahrplanTest.filter(it => { const dt=parseD(it.datum); return dt && dt>=todayStart; });
+    const teamOptions = [...new Set(upcoming.map(it=>it.ourTeam).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de')).map(team => ({
+      team,
+      ligas: [...new Set(upcoming.filter(it=>it.ourTeam===team).map(it=>it.liga).filter(Boolean))].join('/'),
+    }));
+    const filtered = upcoming.filter(it => !fahrplanTestTeamFilter || it.ourTeam === fahrplanTestTeamFilter);
+    const selectStyle = {padding:'7px 10px',background:'#132a1c',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'9px',color:'white',fontSize:'12px',fontWeight:'600',cursor:'pointer',flex:'1 1 160px',minWidth:0};
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#0a1628 0%,#0d1f12 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
+          <button onClick={()=>navTo('home')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'9px',color:'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:'600'}}><Home size={15}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🧪 Fahrplan (Test: mytischtennis.de)</h1>
+        </div>
+        <div style={{padding:'16px 14px',maxWidth:'820px',margin:'0 auto'}}>
+          <div style={{marginBottom:'14px',padding:'10px 12px',background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'10px',fontSize:'12px',color:'#fbbf24'}}>
+            Testansicht: Spielplan wird von mytischtennis.de gezogen (offizielle Daten). Fahrer/Betreuer &amp; Treffpunkt fehlen hier noch, da diese Angaben bisher nur im Google-Sheet gepflegt werden.
+          </div>
+          <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
+            <select value={fahrplanTestTeamFilter} onChange={e=>setFahrplanTestTeamFilter(e.target.value)} style={selectStyle}>
+              <option value="" style={{background:'#132a1c',color:'white'}}>Alle Mannschaften</option>
+              {teamOptions.map(({team,ligas})=><option key={team} value={team} style={{background:'#132a1c',color:'white'}}>{team}{ligas?` (${ligas})`:''}</option>)}
+            </select>
+          </div>
+          {fahrplanTestLoading?(
+            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.3)'}}>
+              <div style={{fontSize:'36px',marginBottom:'12px'}}>⏳</div>
+              <p style={{margin:0}}>Spielplan wird geladen…</p>
+            </div>
+          ):filtered.length===0?(
+            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.2)'}}>
+              <div style={{fontSize:'36px',marginBottom:'12px'}}>📭</div>
+              <p style={{margin:0,fontWeight:'600'}}>Keine Spiele gefunden</p>
+            </div>
+          ):(
+            <div style={{display:'grid',gap:'5px'}}>
+              {(()=>{
+                let lastMonth = null;
+                const out = [];
+                filtered.forEach((it,i)=>{
+                  const dt = parseD(it.datum);
+                  const monthKey = dt ? `${dt.getFullYear()}-${dt.getMonth()}` : null;
+                  if (monthKey && monthKey !== lastMonth) {
+                    lastMonth = monthKey;
+                    out.push(<p key={'m'+monthKey} style={{margin:i===0?'0 0 2px':'10px 0 2px',fontSize:'11px',fontWeight:'800',color:'rgba(255,255,255,0.35)',textTransform:'uppercase',letterSpacing:'0.5px'}}>{dt.toLocaleDateString('de-DE',{month:'long',year:'numeric'})}</p>);
+                  }
+                  out.push(
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:'8px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'9px',padding:'7px 10px',fontSize:'12px',flexWrap:'wrap'}}>
+                      {it.liga&&<span style={{padding:'2px 7px',borderRadius:'6px',fontSize:'10px',fontWeight:'800',flexShrink:0,background:'rgba(147,197,253,0.15)',color:'#93c5fd'}}>{it.liga}</span>}
+                      <span style={{color:'rgba(255,255,255,0.5)',fontWeight:'700',flexShrink:0}}>{fmtDate(it.datum)}{it.zeit?` ${it.zeit}`:''}</span>
+                      <span style={{color:'white',fontWeight:'600',flex:'1 1 auto',minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.heim} <span style={{color:'rgba(255,255,255,0.3)'}}>–</span> {it.gast}</span>
+                      {it.halle&&<span style={{color:'rgba(255,255,255,0.3)',flexShrink:0,marginLeft:'auto',fontSize:'11px'}}>{it.halle}</span>}
                     </div>
                   );
                 });
