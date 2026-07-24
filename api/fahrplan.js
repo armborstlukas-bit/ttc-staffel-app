@@ -37,6 +37,7 @@ export default async function handler(req, res) {
     // lesen wir daher aus der Spiel-ID (Format "CODE_Heimteam_Gastteam_").
     const items = rows.slice(1).filter(r => r.some(c => c && c.trim())).map(r => {
       const idParts = (r[0] || '').split('_');
+      const code = (idParts[0] || '').trim();
       const heim = (idParts[1] || '').trim();
       const gast = (idParts[2] || '').trim();
       const datum = r[1] || '';
@@ -53,8 +54,11 @@ export default async function handler(req, res) {
         isHeimspiel,
         ourTeam,
         fahrer: fahrer && fahrer !== '#N/A' ? fahrer : '',
+        // Nachwuchs-Spielklassen beginnen mit "J" (z.B. J11, J13, J15BOL, J19HL) —
+        // Erwachsenen-Klassen (Herren/Damen/Erwachsene) starten mit anderen Buchstaben (E, H, D, ...).
+        isJugend: /^J/i.test(code),
       };
-    }).filter(it => it.datum && it.heim && it.gast);
+    }).filter(it => it.datum && it.heim && it.gast && it.isJugend);
 
     res.status(200).json({ items });
   } catch (e) {

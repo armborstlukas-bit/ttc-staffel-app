@@ -11764,14 +11764,28 @@ export default function TrainingsApp() {
             </div>
           ):(
             <div style={{display:'grid',gap:'5px'}}>
-              {filtered.map((it,i)=>(
-                <div key={i} style={{display:'flex',alignItems:'center',gap:'8px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'9px',padding:'7px 10px',fontSize:'12px',flexWrap:'wrap'}}>
-                  <span style={{padding:'2px 7px',borderRadius:'20px',fontSize:'10px',fontWeight:'800',flexShrink:0,background:it.isHeimspiel?'rgba(74,222,128,0.15)':'rgba(251,191,36,0.15)',color:it.isHeimspiel?'#4ade80':'#fbbf24'}}>{it.isHeimspiel?'🏠':'🚌'}</span>
-                  <span style={{color:'rgba(255,255,255,0.5)',fontWeight:'700',flexShrink:0}}>{fmtDate(it.datum)}{it.zeit?` ${it.zeit}`:''}</span>
-                  <span style={{color:'white',fontWeight:'600',flex:'1 1 auto',minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.heim} <span style={{color:'rgba(255,255,255,0.3)'}}>–</span> {it.gast}</span>
-                  <span style={{color:accentColor,fontWeight:'700',flexShrink:0,marginLeft:'auto'}}>👤 {it.fahrer || '–'}</span>
-                </div>
-              ))}
+              {(()=>{
+                const parseD = d => { const [dd,mm,yyyy]=(d||'').split('.'); return dd&&mm&&yyyy ? new Date(`${yyyy}-${mm}-${dd}T12:00:00`) : null; };
+                let lastMonth = null;
+                const out = [];
+                filtered.forEach((it,i)=>{
+                  const dt = parseD(it.datum);
+                  const monthKey = dt ? `${dt.getFullYear()}-${dt.getMonth()}` : null;
+                  if (monthKey && monthKey !== lastMonth) {
+                    lastMonth = monthKey;
+                    out.push(<p key={'m'+monthKey} style={{margin:i===0?'0 0 2px':'10px 0 2px',fontSize:'11px',fontWeight:'800',color:'rgba(255,255,255,0.35)',textTransform:'uppercase',letterSpacing:'0.5px'}}>{dt.toLocaleDateString('de-DE',{month:'long',year:'numeric'})}</p>);
+                  }
+                  out.push(
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:'8px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'9px',padding:'7px 10px',fontSize:'12px',flexWrap:'wrap'}}>
+                      <span style={{padding:'2px 7px',borderRadius:'20px',fontSize:'10px',fontWeight:'800',flexShrink:0,background:it.isHeimspiel?'rgba(74,222,128,0.15)':'rgba(251,191,36,0.15)',color:it.isHeimspiel?'#4ade80':'#fbbf24'}}>{it.isHeimspiel?'🏠':'🚌'}</span>
+                      <span style={{color:'rgba(255,255,255,0.5)',fontWeight:'700',flexShrink:0}}>{fmtDate(it.datum)}{it.zeit?` ${it.zeit}`:''}</span>
+                      <span style={{color:'white',fontWeight:'600',flex:'1 1 auto',minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.heim} <span style={{color:'rgba(255,255,255,0.3)'}}>–</span> {it.gast}</span>
+                      <span style={{color:accentColor,fontWeight:'700',flexShrink:0,marginLeft:'auto'}}>👤 {it.fahrer || '–'}</span>
+                    </div>
+                  );
+                });
+                return out;
+              })()}
             </div>
           )}
         </div>
