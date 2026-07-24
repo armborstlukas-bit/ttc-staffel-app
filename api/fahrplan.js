@@ -44,6 +44,7 @@ export default async function handler(req, res) {
       const zeit = r[3] || '';
       const fahrer = r[r.length - 3] || '';
       const anpfiff = r[r.length - 2] || '';
+      const treffpunkt = (r[r.length - 1] || '').replace(/:00$/, '');
       const isHeimspiel = /TTC G\.?-?W\.? Staffel/i.test(heim);
       const ourTeam = isHeimspiel ? heim : (/TTC G\.?-?W\.? Staffel/i.test(gast) ? gast : '');
       return {
@@ -54,6 +55,7 @@ export default async function handler(req, res) {
         isHeimspiel,
         ourTeam,
         fahrer: fahrer && fahrer !== '#N/A' ? fahrer : '',
+        treffpunkt: treffpunkt && treffpunkt !== '#N/A' ? treffpunkt : '',
         // Nachwuchs-Spielklassen beginnen mit "J" (z.B. J11, J13, J15BOL, J19HL) —
         // Erwachsenen-Klassen (Herren/Damen/Erwachsene) starten mit anderen Buchstaben (E, H, D, ...).
         isJugend: /^J/i.test(code),
