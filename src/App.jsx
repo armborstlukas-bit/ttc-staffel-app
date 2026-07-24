@@ -11759,7 +11759,7 @@ export default function TrainingsApp() {
           </div>
           {myAssignments.length>0&&(
             <div style={{marginBottom:'16px',padding:'12px 14px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'12px'}}>
-              <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'800',color:'#fbbf24',textTransform:'uppercase',letterSpacing:'0.5px'}}>🚗 Deine nächste(n) Betreuung(en)</p>
+              <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'800',color:'#fbbf24',textTransform:'uppercase',letterSpacing:'0.5px'}}>🚗 Deine Betreuungen</p>
               <div style={{display:'grid',gap:'5px'}}>
                 {myAssignments.slice(0,3).map((it,i)=>(
                   <div key={i} style={{fontSize:'12px',color:'white',fontWeight:'600'}}>
