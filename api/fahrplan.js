@@ -31,23 +31,28 @@ export default async function handler(req, res) {
     const rows = parseCsv(text);
     if (rows.length < 2) { res.status(200).json({ items: [] }); return; }
 
+    // Manche Zeilen haben ein leeres "Halle"-Feld, wodurch sich die mittleren Spalten
+    // verschieben. Zuverlässig bleiben nur: die ersten Spalten (Spiel-ID, Datum, Zeit)
+    // und die letzten 3 Spalten (Fahrer/Betreuer, Anpfiff, Treffpunkt). Heim-/Gastteam
+    // lesen wir daher aus der Spiel-ID (Format "CODE_Heimteam_Gastteam_").
     const items = rows.slice(1).filter(r => r.some(c => c && c.trim())).map(r => {
+      const idParts = (r[0] || '').split('_');
+      const heim = (idParts[1] || '').trim();
+      const gast = (idParts[2] || '').trim();
       const datum = r[1] || '';
-      const zeit = r[3] || r[12] || '';
-      const heim = r[5] || '';
-      const gast = r[6] || '';
-      const fahrer = r[11] || '';
+      const zeit = r[3] || '';
+      const fahrer = r[r.length - 3] || '';
+      const anpfiff = r[r.length - 2] || '';
       const isHeimspiel = /TTC G\.?-?W\.? Staffel/i.test(heim);
       return {
         datum,
-        zeit,
-        halle: r[4] || '',
+        zeit: zeit || anpfiff,
         heim,
         gast,
         isHeimspiel,
         fahrer: fahrer && fahrer !== '#N/A' ? fahrer : '',
       };
-    }).filter(it => it.datum);
+    }).filter(it => it.datum && it.heim && it.gast);
 
     res.status(200).json({ items });
   } catch (e) {
