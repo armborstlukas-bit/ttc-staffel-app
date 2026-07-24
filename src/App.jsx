@@ -795,6 +795,8 @@ export default function TrainingsApp() {
   const [ttcNewsLoading, setTtcNewsLoading] = useState(false);
   const [fahrplan, setFahrplan] = useState([]);
   const [fahrplanLoading, setFahrplanLoading] = useState(false);
+  const [fahrplanTeamFilter, setFahrplanTeamFilter] = useState('');
+  const [fahrplanFahrerFilter, setFahrplanFahrerFilter] = useState('');
   const [gegnerForm, setGegnerForm] = useState({date:'', verein:'', gegner:'', taktik:'', spielweise:''});
   const [gegnerTaktikDraft, setGegnerTaktikDraft] = useState({});
   const [gegnerSpielweiseDraft, setGegnerSpielweiseDraft] = useState({});
@@ -11725,35 +11727,49 @@ export default function TrainingsApp() {
     const accentColor = isAktiver ? '#0891b2' : '#4ade80';
     const accentBorder = isAktiver ? 'rgba(8,145,178,0.2)' : 'rgba(74,222,128,0.2)';
     const bgGrad = isAktiver ? 'linear-gradient(135deg,#0c1a2e 0%,#0e2a3a 100%)' : 'linear-gradient(135deg,#0a1628 0%,#0d1f12 100%)';
-    const fmtDate = d => { const [dd,mm,yyyy]=(d||'').split('.'); return dd&&mm&&yyyy ? new Date(`${yyyy}-${mm}-${dd}T12:00:00`).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'}) : d; };
+    const fmtDate = d => { const [dd,mm,yyyy]=(d||'').split('.'); return dd&&mm&&yyyy ? new Date(`${yyyy}-${mm}-${dd}T12:00:00`).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}) : d; };
+    const teamOptions = [...new Set(fahrplan.map(it=>it.ourTeam).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de'));
+    const fahrerOptions = [...new Set(fahrplan.map(it=>it.fahrer).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de'));
+    const filtered = fahrplan.filter(it =>
+      (!fahrplanTeamFilter || it.ourTeam === fahrplanTeamFilter) &&
+      (!fahrplanFahrerFilter || it.fahrer === fahrplanFahrerFilter)
+    );
+    const selectStyle = {padding:'7px 10px',background:'rgba(255,255,255,0.06)',border:`1px solid ${accentBorder}`,borderRadius:'9px',color:'white',fontSize:'12px',fontWeight:'600',cursor:'pointer',flex:'1 1 160px',minWidth:0};
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:bgGrad,fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
           <button onClick={()=>navTo('home')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'9px',color:'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:'600'}}><Home size={15}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🚗 Wer fährt wann</h1>
         </div>
-        <div style={{padding:'20px',maxWidth:'760px',margin:'0 auto'}}>
-          <p style={{margin:'0 0 20px',fontSize:'13px',color:'rgba(255,255,255,0.35)'}}>Spielplan mit Fahrer/Betreuer je Spiel</p>
+        <div style={{padding:'16px 14px',maxWidth:'820px',margin:'0 auto'}}>
+          <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
+            <select value={fahrplanTeamFilter} onChange={e=>setFahrplanTeamFilter(e.target.value)} style={selectStyle}>
+              <option value="">Alle Mannschaften</option>
+              {teamOptions.map(t=><option key={t} value={t}>{t}</option>)}
+            </select>
+            <select value={fahrplanFahrerFilter} onChange={e=>setFahrplanFahrerFilter(e.target.value)} style={selectStyle}>
+              <option value="">Alle Fahrer/Betreuer</option>
+              {fahrerOptions.map(f=><option key={f} value={f}>{f}</option>)}
+            </select>
+          </div>
           {fahrplanLoading?(
             <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.3)'}}>
               <div style={{fontSize:'36px',marginBottom:'12px'}}>⏳</div>
               <p style={{margin:0}}>Spielplan wird geladen…</p>
             </div>
-          ):fahrplan.length===0?(
+          ):filtered.length===0?(
             <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.2)'}}>
               <div style={{fontSize:'36px',marginBottom:'12px'}}>📭</div>
               <p style={{margin:0,fontWeight:'600'}}>Keine Spiele gefunden</p>
             </div>
           ):(
-            <div style={{display:'grid',gap:'10px'}}>
-              {fahrplan.map((it,i)=>(
-                <div key={i} style={{background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'14px',padding:'16px 18px'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px',flexWrap:'wrap'}}>
-                    <span style={{padding:'3px 10px',borderRadius:'20px',fontSize:'11px',fontWeight:'800',textTransform:'uppercase',letterSpacing:'0.5px',background:it.isHeimspiel?'rgba(74,222,128,0.15)':'rgba(251,191,36,0.15)',color:it.isHeimspiel?'#4ade80':'#fbbf24'}}>{it.isHeimspiel?'🏠 Heimspiel':'🚌 Auswärtsspiel'}</span>
-                    <span style={{fontSize:'13px',color:'rgba(255,255,255,0.5)',fontWeight:'600'}}>{fmtDate(it.datum)}{it.zeit?` · ${it.zeit} Uhr`:''}</span>
-                  </div>
-                  <p style={{margin:'0 0 4px',fontSize:'14px',fontWeight:'700',color:'white'}}>{it.heim} <span style={{color:'rgba(255,255,255,0.35)',fontWeight:'600'}}>vs.</span> {it.gast}</p>
-                  <p style={{margin:0,fontSize:'13px',color:accentColor,fontWeight:'700'}}>👤 {it.fahrer || 'Noch kein Fahrer eingetragen'}</p>
+            <div style={{display:'grid',gap:'5px'}}>
+              {filtered.map((it,i)=>(
+                <div key={i} style={{display:'flex',alignItems:'center',gap:'8px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'9px',padding:'7px 10px',fontSize:'12px',flexWrap:'wrap'}}>
+                  <span style={{padding:'2px 7px',borderRadius:'20px',fontSize:'10px',fontWeight:'800',flexShrink:0,background:it.isHeimspiel?'rgba(74,222,128,0.15)':'rgba(251,191,36,0.15)',color:it.isHeimspiel?'#4ade80':'#fbbf24'}}>{it.isHeimspiel?'🏠':'🚌'}</span>
+                  <span style={{color:'rgba(255,255,255,0.5)',fontWeight:'700',flexShrink:0}}>{fmtDate(it.datum)}{it.zeit?` ${it.zeit}`:''}</span>
+                  <span style={{color:'white',fontWeight:'600',flex:'1 1 auto',minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.heim} <span style={{color:'rgba(255,255,255,0.3)'}}>–</span> {it.gast}</span>
+                  <span style={{color:accentColor,fontWeight:'700',flexShrink:0,marginLeft:'auto'}}>👤 {it.fahrer || '–'}</span>
                 </div>
               ))}
             </div>

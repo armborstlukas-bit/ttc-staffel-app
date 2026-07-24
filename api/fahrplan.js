@@ -44,12 +44,14 @@ export default async function handler(req, res) {
       const fahrer = r[r.length - 3] || '';
       const anpfiff = r[r.length - 2] || '';
       const isHeimspiel = /TTC G\.?-?W\.? Staffel/i.test(heim);
+      const ourTeam = isHeimspiel ? heim : (/TTC G\.?-?W\.? Staffel/i.test(gast) ? gast : '');
       return {
         datum,
         zeit: zeit || anpfiff,
         heim,
         gast,
         isHeimspiel,
+        ourTeam,
         fahrer: fahrer && fahrer !== '#N/A' ? fahrer : '',
       };
     }).filter(it => it.datum && it.heim && it.gast);
