@@ -793,6 +793,8 @@ export default function TrainingsApp() {
   const [elternSubView, setElternSubView] = useState(null);
   const [ttcNews, setTtcNews] = useState([]);
   const [ttcNewsLoading, setTtcNewsLoading] = useState(false);
+  const [fahrplan, setFahrplan] = useState([]);
+  const [fahrplanLoading, setFahrplanLoading] = useState(false);
   const [gegnerForm, setGegnerForm] = useState({date:'', verein:'', gegner:'', taktik:'', spielweise:''});
   const [gegnerTaktikDraft, setGegnerTaktikDraft] = useState({});
   const [gegnerSpielweiseDraft, setGegnerSpielweiseDraft] = useState({});
@@ -1888,6 +1890,14 @@ export default function TrainingsApp() {
       .then(r=>r.json()).then(d=>{
         setTtcNews(Array.isArray(d.items)?d.items:[]);
       }).catch(()=>{}).finally(()=>setTtcNewsLoading(false));
+  };
+
+  const fetchFahrplan = () => {
+    setFahrplanLoading(true);
+    fetch('/api/fahrplan?_='+Date.now())
+      .then(r=>r.json()).then(d=>{
+        setFahrplan(Array.isArray(d.items)?d.items:[]);
+      }).catch(()=>{}).finally(()=>setFahrplanLoading(false));
   };
   const navTo = (v) => { setView(v); setViewKey(k => k + 1); setGegnerAdding(false); setGegnerEditId(null); setGegnerForm({date:'',verein:'',gegner:'',taktik:''}); setElternSubView(null); };
 
@@ -4339,6 +4349,7 @@ export default function TrainingsApp() {
           {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
           {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>navTo('notifications'), badge: unreadCount},
           {label:'TTC News',         icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',   action:()=>{navTo('ttcnews');fetchTtcNews();}},
+          {label:'Wer fährt wann',   icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
           {label:'Materialverwaltung',icon:'🏓', color:'#fb923c', bg:'rgba(251,146,60,0.08)', border:'rgba(251,146,60,0.25)',  action:()=>navTo('materialverwaltung')},
           ...(canAccessPinnwand()?[{label:'Pinnwand',  icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.2)',  action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
           ...(canEdit()?[
@@ -4532,7 +4543,7 @@ export default function TrainingsApp() {
 
 
   // ── AKTIVER DASHBOARD ────────────────────────────────────────────────────
-  if (userRole === 'aktiver' && !['gegnerlogbuch','ttcnews','trainingsmatches','wettenZitate'].includes(view)) {
+  if (userRole === 'aktiver' && !['gegnerlogbuch','ttcnews','trainingsmatches','wettenZitate','fahrplan'].includes(view)) {
     const dateLabel = new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
     const greeting = new Date().getHours()<12?'Guten Morgen':new Date().getHours()<18?'Hallo':'Guten Abend';
 
@@ -4664,6 +4675,7 @@ export default function TrainingsApp() {
             {[
               {label:'Gegnerlogbuch', icon:'🎯', desc:`${gegnerLogbuch.length} ${gegnerLogbuch.length===1?'Eintrag':'Einträge'} · Taktiken & Hinweise`, color:'#67e8f9', bg:'rgba(8,145,178,0.08)', border:'rgba(8,145,178,0.2)', action:()=>navTo('gegnerlogbuch')},
               {label:'TTC News',        icon:'📰', desc:'Aktuelle Vereinsnachrichten',             color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',  action:()=>{navTo('ttcnews');fetchTtcNews();}},
+              {label:'Wer fährt wann',  icon:'🚗', desc:'Spielplan mit Fahrer je Spiel',            color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.2)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
               {label:'Trainingsmatches',icon:'⚔️', desc:'Duelle & Allzeittabelle',                  color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>navTo('trainingsmatches')},
               ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', desc:'Wetten, Zitate & Lessons Learned', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
               {label:'MyTischtennis', icon:'🏓', desc:'Vereinsübersicht auf MyTischtennis',                                                                  color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)',  action:()=>(()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);})()},
@@ -5240,6 +5252,7 @@ export default function TrainingsApp() {
                 label:'Sonstiges', color:'rgba(226,232,240,0.35)',
                 links:[
                   {label:'TTC News', icon:'📰', color:'#86efac', bg:'rgba(134,239,172,0.1)', border:'rgba(134,239,172,0.25)', action:()=>{navTo('ttcnews');fetchTtcNews();}},
+                  {label:'Wer fährt wann', icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.1)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
                   ...(isJugend ? [{label:'Gegnerlogbuch', icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.1)', border:'rgba(8,145,178,0.25)', action:()=>navTo('gegnerlogbuch')}] : []),
                 ],
               },
@@ -11699,6 +11712,50 @@ export default function TrainingsApp() {
                   </a>
                 );
               })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── FAHRPLAN ("Wer fährt wann") VIEW ─────────────────────────────────────
+  if (view === 'fahrplan') {
+    const isAktiver = userRole === 'aktiver';
+    const accentColor = isAktiver ? '#0891b2' : '#4ade80';
+    const accentBorder = isAktiver ? 'rgba(8,145,178,0.2)' : 'rgba(74,222,128,0.2)';
+    const bgGrad = isAktiver ? 'linear-gradient(135deg,#0c1a2e 0%,#0e2a3a 100%)' : 'linear-gradient(135deg,#0a1628 0%,#0d1f12 100%)';
+    const fmtDate = d => { const [dd,mm,yyyy]=(d||'').split('.'); return dd&&mm&&yyyy ? new Date(`${yyyy}-${mm}-${dd}T12:00:00`).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'}) : d; };
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:bgGrad,fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
+          <button onClick={()=>navTo('home')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'9px',color:'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:'600'}}><Home size={15}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🚗 Wer fährt wann</h1>
+        </div>
+        <div style={{padding:'20px',maxWidth:'760px',margin:'0 auto'}}>
+          <p style={{margin:'0 0 20px',fontSize:'13px',color:'rgba(255,255,255,0.35)'}}>Spielplan mit Fahrer/Betreuer je Spiel</p>
+          {fahrplanLoading?(
+            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.3)'}}>
+              <div style={{fontSize:'36px',marginBottom:'12px'}}>⏳</div>
+              <p style={{margin:0}}>Spielplan wird geladen…</p>
+            </div>
+          ):fahrplan.length===0?(
+            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.2)'}}>
+              <div style={{fontSize:'36px',marginBottom:'12px'}}>📭</div>
+              <p style={{margin:0,fontWeight:'600'}}>Keine Spiele gefunden</p>
+            </div>
+          ):(
+            <div style={{display:'grid',gap:'10px'}}>
+              {fahrplan.map((it,i)=>(
+                <div key={i} style={{background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'14px',padding:'16px 18px'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px',flexWrap:'wrap'}}>
+                    <span style={{padding:'3px 10px',borderRadius:'20px',fontSize:'11px',fontWeight:'800',textTransform:'uppercase',letterSpacing:'0.5px',background:it.isHeimspiel?'rgba(74,222,128,0.15)':'rgba(251,191,36,0.15)',color:it.isHeimspiel?'#4ade80':'#fbbf24'}}>{it.isHeimspiel?'🏠 Heimspiel':'🚌 Auswärtsspiel'}</span>
+                    <span style={{fontSize:'13px',color:'rgba(255,255,255,0.5)',fontWeight:'600'}}>{fmtDate(it.datum)}{it.zeit?` · ${it.zeit} Uhr`:''}</span>
+                  </div>
+                  <p style={{margin:'0 0 4px',fontSize:'14px',fontWeight:'700',color:'white'}}>{it.heim} <span style={{color:'rgba(255,255,255,0.35)',fontWeight:'600'}}>vs.</span> {it.gast}</p>
+                  <p style={{margin:0,fontSize:'13px',color:accentColor,fontWeight:'700'}}>👤 {it.fahrer || 'Noch kein Fahrer eingetragen'}</p>
+                </div>
+              ))}
             </div>
           )}
         </div>
