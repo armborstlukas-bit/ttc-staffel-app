@@ -55,6 +55,10 @@ export default async function handler(req, res) {
         const datum = dateMatch ? dateMatch[1] : '';
         const isHeimspiel = /TTC G\.?-?W\.? Staffel/i.test(heim);
         const ourTeam = isHeimspiel ? heim : (/TTC G\.?-?W\.? Staffel/i.test(gast) ? gast : '');
+        // team_home_id/team_away_id sind stabile, eindeutige click-tt Mannschafts-IDs —
+        // zuverlässiger als der Team-Name als Text (der bei mehreren Ligen pro Mannschaft
+        // gleich lauten kann, z.B. wenn dieselbe Mannschaft in zwei Altersklassen spielt).
+        const ourTeamId = isHeimspiel ? (g.team_home_id || '') : (g.team_away_id || '');
         const match = byLiga.get(`${datum}|${ligaCode}`) || byTeams.get(`${datum}|${heim}|${gast}`);
         const meetingId = g.meeting_id || '';
         const override = meetingId ? overrides[meetingId] : null;
@@ -69,6 +73,7 @@ export default async function handler(req, res) {
           gast,
           isHeimspiel,
           ourTeam,
+          ourTeamId,
           fahrer: override != null ? override : (match?.fahrer || ''),
           treffpunkt: match?.treffpunkt || '',
         });
