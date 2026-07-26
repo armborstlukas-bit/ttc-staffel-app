@@ -802,6 +802,7 @@ export default function TrainingsApp() {
   const [myTipps, setMyTipps] = useState({});
   const [allTipps, setAllTipps] = useState(null);
   const [tippspielImporting, setTippspielImporting] = useState(false);
+  const [tippspielJustSaved, setTippspielJustSaved] = useState(false);
   const [gegnerForm, setGegnerForm] = useState({date:'', verein:'', gegner:'', taktik:'', spielweise:''});
   const [gegnerTaktikDraft, setGegnerTaktikDraft] = useState({});
   const [gegnerSpielweiseDraft, setGegnerSpielweiseDraft] = useState({});
@@ -1934,11 +1935,22 @@ export default function TrainingsApp() {
     const nextRanks = { ...myTipps, [teamId]: rank };
     if (!rank) delete nextRanks[teamId];
     setMyTipps(nextRanks);
+    setTippspielJustSaved(false);
     await setDoc(doc(db,'ttc','tippspiel','tipps',user.uid), {
       ranks: nextRanks,
       name: userProfile?.name || user?.email || '',
       updatedAt: new Date().toISOString(),
     }, { merge: true });
+  };
+
+  const saveAllTipps = async () => {
+    if (!user?.uid) return;
+    await setDoc(doc(db,'ttc','tippspiel','tipps',user.uid), {
+      ranks: myTipps,
+      name: userProfile?.name || user?.email || '',
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+    setTippspielJustSaved(true);
   };
 
   const importTippspielTeams = async () => {
@@ -11864,6 +11876,25 @@ export default function TrainingsApp() {
                   </div>
                 ))}
               </div>
+
+              {canEdit&&(()=>{
+                const allFilled = teams.length>0 && teams.every(t=>myTipps[t.teamId]);
+                return (
+                  <div style={{marginBottom:'20px'}}>
+                    <button onClick={saveAllTipps} disabled={!allFilled}
+                      style={{width:'100%',padding:'14px',background:allFilled?'linear-gradient(135deg,#16a34a,#15803d)':'rgba(255,255,255,0.06)',color:allFilled?'white':'rgba(255,255,255,0.35)',border:allFilled?'none':'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',cursor:allFilled?'pointer':'not-allowed',fontWeight:'800',fontSize:'15px'}}>
+                      💾 Zwischenspeichern
+                    </button>
+                    <p style={{margin:'8px 0 0',fontSize:'12px',color:'rgba(255,255,255,0.4)',textAlign:'center'}}>
+                      {!allFilled
+                        ? 'Bitte für alle Mannschaften einen Rang eintragen, dann kannst du zwischenspeichern.'
+                        : tippspielJustSaved
+                          ? `✅ Zwischengespeichert! Du kannst deine Tipps bis zum ${deadlineLabel||'Fristdatum'} noch beliebig ändern.`
+                          : `Alle Ränge eingetragen — bis zum ${deadlineLabel||'Fristdatum'} kannst du noch alles ändern.`}
+                    </p>
+                  </div>
+                );
+              })()}
 
               {revealed&&allTipps&&(
                 <div style={{marginBottom:'20px'}}>

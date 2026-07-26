@@ -23,6 +23,8 @@ export default async function handler(req, res) {
 
     const teams = clubTeams
       .filter(t => !(t.season || '').trim().startsWith('P'))
+      // Seniorenmannschaften (Senioren 40, Seniorinnen 50 etc.) sollen nicht getippt werden
+      .filter(t => !/^Senior/i.test((t.team_name || '').trim()))
       .map(t => ({
         teamId: t.team_id,
         name: t.team_name,
