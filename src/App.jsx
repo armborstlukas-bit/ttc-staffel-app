@@ -11883,6 +11883,10 @@ export default function TrainingsApp() {
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🎱 TTC Tippspiel</h1>
         </div>
         <div style={{padding:'16px 14px',maxWidth:'820px',margin:'0 auto'}}>
+          <div style={{marginBottom:'16px',padding:'12px 14px',background:'rgba(244,114,182,0.08)',border:`1px solid ${accentBorder}`,borderRadius:'12px'}}>
+            <p style={{margin:'0 0 6px',fontSize:'13px',color:'white',lineHeight:'1.5'}}>Wer schafft es, unseren Präsidenten vom Tippthron zu stoßen? 👑 Tippe die Endplatzierungen aller TTC-Mannschaften + 5 Bonusfragen. Abgabeschluss: <b>31.08.2026</b>.</p>
+            <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.6)',lineHeight:'1.5'}}>🏆 1. Platz: Wanderpokal + 25€ Gutschein · 2. Platz: 15€ · 3. Platz: 10€ Fanshop-Gutschein<br/>Teilnahme auch in Papierform bei Lilly möglich. Viel Erfolg! — Eure Lilly & euer Lukas 💚🤍</p>
+          </div>
           {userRole==='admin'&&(
             <div style={{marginBottom:'16px',padding:'12px 14px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'12px',display:'grid',gap:'10px'}}>
               <p style={{margin:0,fontSize:'12px',fontWeight:'800',color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px'}}>⚙️ Admin-Steuerung</p>
