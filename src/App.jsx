@@ -818,6 +818,7 @@ export default function TrainingsApp() {
   const [allTipps, setAllTipps] = useState(null);
   const [tippspielImporting, setTippspielImporting] = useState(false);
   const [tippspielJustSaved, setTippspielJustSaved] = useState(false);
+  const [expandedTipper, setExpandedTipper] = useState(null);
   const [gegnerForm, setGegnerForm] = useState({date:'', verein:'', gegner:'', taktik:'', spielweise:''});
   const [gegnerTaktikDraft, setGegnerTaktikDraft] = useState({});
   const [gegnerSpielweiseDraft, setGegnerSpielweiseDraft] = useState({});
@@ -2002,6 +2003,11 @@ export default function TrainingsApp() {
   const saveTippspielDeadline = async (deadline) => {
     await setDoc(doc(db,'ttc','tippspiel'), { deadline }, { merge: true });
     setTippspielConfig(c => ({ ...(c||{}), deadline }));
+  };
+
+  const saveBonusAnswer = async (key, value) => {
+    await setDoc(doc(db,'ttc','tippspiel'), { bonusAnswers: { ...(tippspielConfig?.bonusAnswers||{}), [key]: value } }, { merge: true });
+    setTippspielConfig(c => ({ ...(c||{}), bonusAnswers: { ...(c?.bonusAnswers||{}), [key]: value } }));
   };
 
   const deleteAllTipps = async () => {
@@ -11981,16 +11987,94 @@ export default function TrainingsApp() {
                     <h3 style={{margin:'0 0 4px',color:'white',fontSize:'15px',fontWeight:'800'}}>📊 Live-Ranking (ohne Bonuspunkte)</h3>
                     <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>Basiert auf der aktuellen Live-Tabelle, nicht auf der finalen Endplatzierung — die zählt erst am Saisonende, ebenso wie die Bonustipps.</p>
                     <div style={{display:'grid',gap:'5px'}}>
-                      {ranking.map((r,i)=>(
-                        <div key={r.uid} style={{display:'flex',alignItems:'center',gap:'10px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'9px',padding:'8px 12px'}}>
-                          <span style={{fontSize:'12px',fontWeight:'800',color:'rgba(255,255,255,0.35)',width:'22px',flexShrink:0}}>{i+1}.</span>
-                          <span style={{flex:'1 1 auto',fontSize:'13px',fontWeight:'700',color:'white'}}>{r.name}</span>
-                          <span style={{fontSize:'14px',fontWeight:'800',color:accentColor}}>{r.total} P</span>
-                        </div>
-                      ))}
+                      {ranking.map((r,i)=>{
+                        const isOpen = expandedTipper===r.uid;
+                        const t = allTipps[r.uid];
+                        return (
+                          <div key={r.uid} style={{background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'9px',overflow:'hidden'}}>
+                            <div onClick={()=>setExpandedTipper(isOpen?null:r.uid)} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',cursor:'pointer'}}>
+                              <span style={{fontSize:'12px',fontWeight:'800',color:'rgba(255,255,255,0.35)',width:'22px',flexShrink:0}}>{i+1}.</span>
+                              <span style={{flex:'1 1 auto',fontSize:'13px',fontWeight:'700',color:'white'}}>{r.name}</span>
+                              <span style={{fontSize:'14px',fontWeight:'800',color:accentColor}}>{r.total} P</span>
+                              <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',flexShrink:0}}>{isOpen?'▲':'▼'}</span>
+                            </div>
+                            {isOpen&&(
+                              <div style={{padding:'0 12px 12px',display:'grid',gap:'8px'}}>
+                                <div style={{display:'grid',gap:'3px'}}>
+                                  {teams.map(team=>{
+                                    const guess = t.ranks?.[team.teamId];
+                                    const pts = scoreForGuess(guess, team.currentRank);
+                                    return (
+                                      <div key={team.teamId} style={{display:'flex',justifyContent:'space-between',fontSize:'11px'}}>
+                                        <span style={{color:'rgba(255,255,255,0.6)'}}>{team.name}</span>
+                                        <span style={{color:'white',fontWeight:'600'}}>{guess ?? '–'}{pts!=null&&<span style={{color:pts>0?'#4ade80':'rgba(255,255,255,0.25)'}}> ({pts}P)</span>}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                <div style={{borderTop:'1px solid rgba(255,255,255,0.08)',paddingTop:'8px',display:'grid',gap:'4px'}}>
+                                  <p style={{margin:'0 0 2px',fontSize:'11px',fontWeight:'800',color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px'}}>🎁 Bonustipps</p>
+                                  {TIPPSPIEL_BONUS_QUESTIONS.map(q=>(
+                                    <div key={q.key} style={{display:'flex',justifyContent:'space-between',fontSize:'11px',gap:'8px'}}>
+                                      <span style={{color:'rgba(255,255,255,0.6)',flex:'1 1 auto'}}>{q.label}</span>
+                                      <span style={{color:'white',fontWeight:'600',flexShrink:0}}>{t.bonus?.[q.key] || '–'}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                     {userRole==='admin'&&(
                       <button onClick={deleteAllTipps} style={{marginTop:'14px',padding:'9px 14px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.3)',borderRadius:'9px',color:'#fca5a5',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>🗑️ Alle Tipps löschen</button>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {userRole==='admin'&&allTipps&&(()=>{
+                const bonusAnswers = tippspielConfig?.bonusAnswers || {};
+                const normalize = v => (v||'').toString().trim().toLowerCase();
+                const bonusScore = (q, given) => {
+                  const correct = bonusAnswers[q.key];
+                  if (!correct || !given) return null;
+                  return normalize(given)===normalize(correct) ? 2 : 0;
+                };
+                return (
+                  <div style={{marginBottom:'20px',padding:'14px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'12px'}}>
+                    <p style={{margin:'0 0 10px',fontSize:'12px',fontWeight:'800',color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px'}}>⚙️ Auswertung Bonustipps (Admin)</p>
+                    <div style={{display:'grid',gap:'10px',marginBottom:'14px'}}>
+                      {TIPPSPIEL_BONUS_QUESTIONS.map(q=>(
+                        <div key={q.key}>
+                          <p style={{margin:'0 0 4px',fontSize:'12px',color:'rgba(255,255,255,0.6)'}}>{q.label}</p>
+                          {q.type==='text'?(
+                            <input type="text" value={bonusAnswers[q.key]||''} onChange={e=>saveBonusAnswer(q.key,e.target.value)} placeholder="Richtige Antwort…"
+                              style={{width:'100%',boxSizing:'border-box',padding:'7px 10px',background:'#1a0a14',border:`1px solid ${accentBorder}`,borderRadius:'7px',color:'white',fontSize:'13px'}}/>
+                          ):(
+                            <select value={bonusAnswers[q.key]||''} onChange={e=>saveBonusAnswer(q.key,e.target.value)}
+                              style={{width:'100%',boxSizing:'border-box',padding:'7px 10px',background:'#1a0a14',border:`1px solid ${accentBorder}`,borderRadius:'7px',color:'white',fontSize:'13px',colorScheme:'dark'}}>
+                              <option value="">– richtige Antwort auswählen –</option>
+                              {q.options.map(o=><option key={o} value={o}>{o}</option>)}
+                            </select>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {Object.keys(bonusAnswers).length>0&&(
+                      <div style={{display:'grid',gap:'5px'}}>
+                        <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>Bonuspunkte je Person (automatisch berechnet):</p>
+                        {Object.entries(allTipps).map(([uid,t])=>{
+                          const total = TIPPSPIEL_BONUS_QUESTIONS.reduce((sum,q)=>sum+(bonusScore(q,t.bonus?.[q.key])||0),0);
+                          return (
+                            <div key={uid} style={{display:'flex',justifyContent:'space-between',fontSize:'12px',padding:'5px 8px',background:'rgba(255,255,255,0.03)',borderRadius:'7px'}}>
+                              <span style={{color:'white',fontWeight:'600'}}>{t.name||uid}</span>
+                              <span style={{color:accentColor,fontWeight:'800'}}>{total} P</span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
                 );
