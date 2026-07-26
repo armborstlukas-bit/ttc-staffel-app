@@ -11757,9 +11757,9 @@ export default function TrainingsApp() {
     );
     const myEmail = (user?.email||'').trim().toLowerCase();
     const myAssignments = myEmail ? upcoming.filter(it => (it.fahrer||'').trim().toLowerCase()===myEmail) : [];
-    const selectStyle = {padding:'7px 10px',background:'#132a1c',border:`1px solid ${accentBorder}`,borderRadius:'9px',color:'white',fontSize:'12px',fontWeight:'600',cursor:'pointer',flex:'1 1 160px',minWidth:0};
+    const selectStyle = {padding:isMobile?'10px 10px':'7px 10px',background:'#132a1c',border:`1px solid ${accentBorder}`,borderRadius:'9px',color:'white',fontSize:isMobile?'13px':'12px',fontWeight:'600',cursor:'pointer',flex:isMobile?'1 1 100%':'1 1 160px',minWidth:0};
     const canEditFahrer = ['admin','trainer'].includes(userRole);
-    const rowFahrerSelectStyle = {padding:'3px 6px',background:'#0a1f13',border:'1px solid rgba(74,222,128,0.3)',borderRadius:'6px',color:accentColor,fontSize:'11px',fontWeight:'700',cursor:'pointer',flexShrink:0,marginLeft:'auto',maxWidth:'160px'};
+    const rowFahrerSelectStyle = {padding:isMobile?'8px 8px':'3px 6px',background:'#0a1f13',border:'1px solid rgba(74,222,128,0.3)',borderRadius:'6px',color:accentColor,fontSize:isMobile?'12px':'11px',fontWeight:'700',cursor:'pointer',flexShrink:0,marginLeft:'auto',maxWidth:'160px'};
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:bgGrad,fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
@@ -11813,21 +11813,32 @@ export default function TrainingsApp() {
                     lastMonth = monthKey;
                     out.push(<p key={'m'+monthKey} style={{margin:i===0?'0 0 2px':'10px 0 2px',fontSize:'11px',fontWeight:'800',color:'rgba(255,255,255,0.35)',textTransform:'uppercase',letterSpacing:'0.5px'}}>{dt.toLocaleDateString('de-DE',{month:'long',year:'numeric'})}</p>);
                   }
-                  out.push(
+                  const fahrerNode = canEditFahrer ? (
+                    <select value={it.fahrer||''} onChange={e=>setFahrplanFahrer(it.meetingId, e.target.value)} style={isMobile?{...rowFahrerSelectStyle,marginLeft:0,maxWidth:'none',width:'100%'}:rowFahrerSelectStyle}>
+                      <option value="" style={{background:'#0a1f13',color:accentColor}}>– kein Fahrer –</option>
+                      {fahrerOptions.map(f=><option key={f} value={f} style={{background:'#0a1f13',color:accentColor}}>{f}</option>)}
+                    </select>
+                  ) : (
+                    <span style={{color:accentColor,fontWeight:'700',flexShrink:0,marginLeft:isMobile?0:'auto'}}>👤 {it.fahrer || '–'}</span>
+                  );
+                  out.push(isMobile ? (
+                    <div key={i} style={{display:'flex',flexDirection:'column',gap:'5px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'10px',padding:'10px 12px',fontSize:'12px'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
+                        {it.liga&&<span style={{padding:'2px 7px',borderRadius:'6px',fontSize:'10px',fontWeight:'800',flexShrink:0,background:'rgba(147,197,253,0.15)',color:'#93c5fd'}}>{it.liga}</span>}
+                        <span style={{color:'rgba(255,255,255,0.5)',fontWeight:'700'}}>{fmtDate(it.datum)}{it.zeit?` ${it.zeit}`:''}</span>
+                      </div>
+                      {it.treffpunkt&&<div style={{color:'#fbbf24',fontSize:'11px',fontWeight:'600'}}>{it.isHeimspiel?'Treffpunkt':'Abfahrt'}: {it.treffpunkt}</div>}
+                      <div style={{color:'white',fontWeight:'600',lineHeight:'1.35'}}>{it.heim} <span style={{color:'rgba(255,255,255,0.3)'}}>–</span> {it.gast}</div>
+                      {fahrerNode}
+                    </div>
+                  ) : (
                     <div key={i} style={{display:'flex',alignItems:'center',gap:'8px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'9px',padding:'7px 10px',fontSize:'12px',flexWrap:'wrap'}}>
                       {it.liga&&<span style={{padding:'2px 7px',borderRadius:'6px',fontSize:'10px',fontWeight:'800',flexShrink:0,background:'rgba(147,197,253,0.15)',color:'#93c5fd'}}>{it.liga}</span>}
                       <span style={{color:'rgba(255,255,255,0.5)',fontWeight:'700',flexShrink:0}}>{fmtDate(it.datum)}{it.zeit?` ${it.zeit}`:''}{it.treffpunkt?` (${it.isHeimspiel?'Treffpunkt':'Abfahrt'}: ${it.treffpunkt})`:''}</span>
                       <span style={{color:'white',fontWeight:'600',flex:'1 1 auto',minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.heim} <span style={{color:'rgba(255,255,255,0.3)'}}>–</span> {it.gast}</span>
-                      {canEditFahrer ? (
-                        <select value={it.fahrer||''} onChange={e=>setFahrplanFahrer(it.meetingId, e.target.value)} style={rowFahrerSelectStyle}>
-                          <option value="" style={{background:'#0a1f13',color:accentColor}}>– kein Fahrer –</option>
-                          {fahrerOptions.map(f=><option key={f} value={f} style={{background:'#0a1f13',color:accentColor}}>{f}</option>)}
-                        </select>
-                      ) : (
-                        <span style={{color:accentColor,fontWeight:'700',flexShrink:0,marginLeft:'auto'}}>👤 {it.fahrer || '–'}</span>
-                      )}
+                      {fahrerNode}
                     </div>
-                  );
+                  ));
                 });
                 return out;
               })()}
