@@ -76,7 +76,7 @@ if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styl
 }
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
-import { getFirestore, doc, setDoc, updateDoc, deleteField, arrayUnion, arrayRemove, onSnapshot, getDoc } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, updateDoc, deleteField, arrayUnion, arrayRemove, onSnapshot, getDoc, collection, getDocs } from 'firebase/firestore';
 import { getMessaging, getToken as getFcmToken, onMessage, isSupported as isFcmSupported } from 'firebase/messaging';
 import { Check, X, Plus, Trash2, Download, LogOut, ArrowLeft, Clock, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save, Trophy, Home, Archive, MessageSquare, Bell, Send, Pencil } from 'lucide-react';
 
@@ -797,6 +797,11 @@ export default function TrainingsApp() {
   const [fahrplanLoading, setFahrplanLoading] = useState(false);
   const [fahrplanTeamFilter, setFahrplanTeamFilter] = useState('');
   const [fahrplanFahrerFilter, setFahrplanFahrerFilter] = useState('');
+  const [tippspielConfig, setTippspielConfig] = useState(null);
+  const [tippspielLoading, setTippspielLoading] = useState(false);
+  const [myTipps, setMyTipps] = useState({});
+  const [allTipps, setAllTipps] = useState(null);
+  const [tippspielImporting, setTippspielImporting] = useState(false);
   const [gegnerForm, setGegnerForm] = useState({date:'', verein:'', gegner:'', taktik:'', spielweise:''});
   const [gegnerTaktikDraft, setGegnerTaktikDraft] = useState({});
   const [gegnerSpielweiseDraft, setGegnerSpielweiseDraft] = useState({});
@@ -1900,6 +1905,68 @@ export default function TrainingsApp() {
       .then(r=>r.json()).then(d=>{
         setFahrplan(Array.isArray(d.items)?d.items:[]);
       }).catch(()=>{}).finally(()=>setFahrplanLoading(false));
+  };
+
+  const fetchTippspiel = async () => {
+    setTippspielLoading(true);
+    try {
+      const cfgSnap = await getDoc(doc(db,'ttc','tippspiel'));
+      const cfg = cfgSnap.exists() ? cfgSnap.data() : null;
+      setTippspielConfig(cfg);
+      if (user?.uid) {
+        const myTippSnap = await getDoc(doc(db,'ttc','tippspiel','tipps',user.uid));
+        setMyTipps(myTippSnap.exists() ? (myTippSnap.data().ranks || {}) : {});
+      }
+      if (cfg?.revealed) {
+        const allSnap = await getDocs(collection(db,'ttc','tippspiel','tipps'));
+        const all = {};
+        allSnap.forEach(d => { all[d.id] = d.data(); });
+        setAllTipps(all);
+      } else {
+        setAllTipps(null);
+      }
+    } catch (e) { console.error('Tippspiel laden fehlgeschlagen', e); }
+    finally { setTippspielLoading(false); }
+  };
+
+  const saveTipp = async (teamId, rank) => {
+    if (!user?.uid) return;
+    const nextRanks = { ...myTipps, [teamId]: rank };
+    if (!rank) delete nextRanks[teamId];
+    setMyTipps(nextRanks);
+    await setDoc(doc(db,'ttc','tippspiel','tipps',user.uid), {
+      ranks: nextRanks,
+      name: userProfile?.name || user?.email || '',
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+  };
+
+  const importTippspielTeams = async () => {
+    setTippspielImporting(true);
+    try {
+      const r = await fetch('/api/tippspiel-teams?_='+Date.now());
+      const d = await r.json();
+      if (!Array.isArray(d.teams)) throw new Error(d.error || 'Keine Teams erhalten');
+      await setDoc(doc(db,'ttc','tippspiel'), {
+        teams: d.teams,
+        deadline: tippspielConfig?.deadline || '2026-08-31',
+        revealed: tippspielConfig?.revealed || false,
+      }, { merge: true });
+      await fetchTippspiel();
+    } catch (e) { alert('Import fehlgeschlagen: ' + (e?.message || e)); }
+    finally { setTippspielImporting(false); }
+  };
+
+  const saveTippspielDeadline = async (deadline) => {
+    await setDoc(doc(db,'ttc','tippspiel'), { deadline }, { merge: true });
+    setTippspielConfig(c => ({ ...(c||{}), deadline }));
+  };
+
+  const toggleTippspielRevealed = async () => {
+    const next = !tippspielConfig?.revealed;
+    await setDoc(doc(db,'ttc','tippspiel'), { revealed: next }, { merge: true });
+    setTippspielConfig(c => ({ ...(c||{}), revealed: next }));
+    await fetchTippspiel();
   };
 
   const setFahrplanFahrer = async (meetingId, fahrer) => {
@@ -4365,6 +4432,7 @@ export default function TrainingsApp() {
           {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>navTo('notifications'), badge: unreadCount},
           {label:'TTC News',         icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',   action:()=>{navTo('ttcnews');fetchTtcNews();}},
           {label:'Wer fährt wann',   icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
+          {label:'TTC Tippspiel',   icon:'🎱', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.25)', action:()=>{navTo('tippspiel');fetchTippspiel();}},
           {label:'Materialverwaltung',icon:'🏓', color:'#fb923c', bg:'rgba(251,146,60,0.08)', border:'rgba(251,146,60,0.25)',  action:()=>navTo('materialverwaltung')},
           ...(canAccessPinnwand()?[{label:'Pinnwand',  icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.2)',  action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
           ...(canEdit()?[
@@ -4558,7 +4626,7 @@ export default function TrainingsApp() {
 
 
   // ── AKTIVER DASHBOARD ────────────────────────────────────────────────────
-  if (userRole === 'aktiver' && !['gegnerlogbuch','ttcnews','trainingsmatches','wettenZitate','fahrplan'].includes(view)) {
+  if (userRole === 'aktiver' && !['gegnerlogbuch','ttcnews','trainingsmatches','wettenZitate','fahrplan','tippspiel'].includes(view)) {
     const dateLabel = new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
     const greeting = new Date().getHours()<12?'Guten Morgen':new Date().getHours()<18?'Hallo':'Guten Abend';
 
@@ -4691,6 +4759,7 @@ export default function TrainingsApp() {
               {label:'Gegnerlogbuch', icon:'🎯', desc:`${gegnerLogbuch.length} ${gegnerLogbuch.length===1?'Eintrag':'Einträge'} · Taktiken & Hinweise`, color:'#67e8f9', bg:'rgba(8,145,178,0.08)', border:'rgba(8,145,178,0.2)', action:()=>navTo('gegnerlogbuch')},
               {label:'TTC News',        icon:'📰', desc:'Aktuelle Vereinsnachrichten',             color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',  action:()=>{navTo('ttcnews');fetchTtcNews();}},
               {label:'Wer fährt wann',  icon:'🚗', desc:'Spielplan mit Fahrer je Spiel',            color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.2)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
+              {label:'TTC Tippspiel',  icon:'🎱', desc:'Endplatzierungen tippen',                    color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>{navTo('tippspiel');fetchTippspiel();}},
               {label:'Trainingsmatches',icon:'⚔️', desc:'Duelle & Allzeittabelle',                  color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>navTo('trainingsmatches')},
               ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', desc:'Wetten, Zitate & Lessons Learned', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
               {label:'MyTischtennis', icon:'🏓', desc:'Vereinsübersicht auf MyTischtennis',                                                                  color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)',  action:()=>(()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);})()},
@@ -5268,6 +5337,7 @@ export default function TrainingsApp() {
                 links:[
                   {label:'TTC News', icon:'📰', color:'#86efac', bg:'rgba(134,239,172,0.1)', border:'rgba(134,239,172,0.25)', action:()=>{navTo('ttcnews');fetchTtcNews();}},
                   {label:'Wer fährt wann', icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.1)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
+                  {label:'TTC Tippspiel', icon:'🎱', color:'#f9a8d4', bg:'rgba(244,114,182,0.1)', border:'rgba(244,114,182,0.25)', action:()=>{navTo('tippspiel');fetchTippspiel();}},
                   ...(isJugend ? [{label:'Gegnerlogbuch', icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.1)', border:'rgba(8,145,178,0.25)', action:()=>navTo('gegnerlogbuch')}] : []),
                 ],
               },
@@ -11728,6 +11798,101 @@ export default function TrainingsApp() {
                 );
               })}
             </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── TTC TIPPSPIEL VIEW ────────────────────────────────────────────────────
+  if (view === 'tippspiel') {
+    const isAktiver = userRole === 'aktiver';
+    const accentColor = isAktiver ? '#0891b2' : '#f9a8d4';
+    const accentBorder = isAktiver ? 'rgba(8,145,178,0.2)' : 'rgba(244,114,182,0.2)';
+    const bgGrad = isAktiver ? 'linear-gradient(135deg,#0c1a2e 0%,#0e2a3a 100%)' : 'linear-gradient(135deg,#1a0a14 0%,#0d0a1f 100%)';
+    const teams = tippspielConfig?.teams || [];
+    const deadline = tippspielConfig?.deadline || '';
+    const revealed = !!tippspielConfig?.revealed;
+    const deadlinePassed = deadline ? new Date(deadline+'T23:59:59') < new Date() : false;
+    const canEdit = !deadlinePassed;
+    const deadlineLabel = deadline ? new Date(deadline+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'}) : '';
+    const inputStyleT = {width:isMobile?'70px':'56px',padding:isMobile?'8px':'5px 6px',background:'#1a0a14',border:`1px solid ${accentBorder}`,borderRadius:'7px',color:'white',fontSize:isMobile?'14px':'13px',fontWeight:'700',textAlign:'center'};
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:bgGrad,fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
+          <button onClick={()=>navTo('home')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'9px',color:'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:'600'}}><Home size={15}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🎱 TTC Tippspiel</h1>
+        </div>
+        <div style={{padding:'16px 14px',maxWidth:'820px',margin:'0 auto'}}>
+          {userRole==='admin'&&(
+            <div style={{marginBottom:'16px',padding:'12px 14px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'12px',display:'grid',gap:'10px'}}>
+              <p style={{margin:0,fontSize:'12px',fontWeight:'800',color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px'}}>⚙️ Admin-Steuerung</p>
+              <div style={{display:'flex',gap:'8px',flexWrap:'wrap',alignItems:'center'}}>
+                <button onClick={importTippspielTeams} disabled={tippspielImporting} style={{padding:'9px 14px',background:'linear-gradient(135deg,#db2777,#be185d)',color:'white',border:'none',borderRadius:'9px',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>{tippspielImporting?'Lädt…':(teams.length>0?'🔄 Mannschaften neu importieren':'⬆️ Mannschaften importieren')}</button>
+                <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',color:'rgba(255,255,255,0.6)'}}>
+                  Frist:
+                  <input type="date" value={deadline} onChange={e=>saveTippspielDeadline(e.target.value)} style={{padding:'6px 8px',background:'#1a0a14',border:`1px solid ${accentBorder}`,borderRadius:'7px',color:'white',fontSize:'12px'}}/>
+                </label>
+                <button onClick={toggleTippspielRevealed} style={{padding:'9px 14px',background:revealed?'rgba(74,222,128,0.15)':'rgba(255,255,255,0.06)',border:`1px solid ${revealed?'rgba(74,222,128,0.4)':accentBorder}`,borderRadius:'9px',color:revealed?'#4ade80':'rgba(255,255,255,0.6)',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>{revealed?'✅ Tipps sind veröffentlicht':'🔒 Tipps veröffentlichen'}</button>
+              </div>
+              <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>Solange nicht veröffentlicht, sieht jeder nur seine eigenen Tipps. Nach der Frist automatisch keine Bearbeitung mehr möglich — Veröffentlichen musst du hier manuell anstoßen.</p>
+            </div>
+          )}
+
+          {teams.length===0?(
+            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.2)'}}>
+              <div style={{fontSize:'36px',marginBottom:'12px'}}>🎱</div>
+              <p style={{margin:0,fontWeight:'600'}}>{tippspielLoading?'Lädt…':'Noch keine Mannschaften importiert.'}</p>
+            </div>
+          ):(
+            <>
+              <div style={{marginBottom:'16px',padding:'12px 14px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'12px'}}>
+                <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.7)'}}>Tippe für jede Mannschaft die <b>Endplatzierung</b> in ihrer Liga. Punkte: genau richtig = 3, ±1 Rang = 2, ±2 Ränge = 1, mehr daneben = 0.</p>
+                <p style={{margin:'8px 0 0',fontSize:'12px',fontWeight:'700',color:deadlinePassed?'#f87171':accentColor}}>{deadlinePassed?'🔒 Frist abgelaufen — Tipps sind eingefroren.':`⏳ Änderbar bis ${deadlineLabel||'(Frist noch nicht gesetzt)'}`}</p>
+              </div>
+
+              <div style={{display:'grid',gap:'6px',marginBottom:'20px'}}>
+                {teams.map(t=>(
+                  <div key={t.teamId} style={{display:'flex',alignItems:'center',gap:'10px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'10px',padding:isMobile?'10px 12px':'8px 12px',flexWrap:'wrap'}}>
+                    <div style={{flex:'1 1 auto',minWidth:0}}>
+                      <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'white'}}>{t.name}</p>
+                      <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>{t.league}</p>
+                    </div>
+                    <input type="number" min="1" max="20" placeholder="Rang" value={myTipps[t.teamId]||''} disabled={!canEdit}
+                      onChange={e=>saveTipp(t.teamId, e.target.value?parseInt(e.target.value,10):null)}
+                      style={{...inputStyleT, opacity: canEdit?1:0.5}}/>
+                  </div>
+                ))}
+              </div>
+
+              {revealed&&allTipps&&(
+                <div style={{marginBottom:'20px'}}>
+                  <h3 style={{margin:'0 0 10px',color:'white',fontSize:'15px',fontWeight:'800'}}>👥 Alle Tipps</h3>
+                  <div style={{overflowX:'auto'}}>
+                    <table style={{borderCollapse:'collapse',width:'100%',fontSize:'12px'}}>
+                      <thead>
+                        <tr>
+                          <th style={{textAlign:'left',padding:'6px 8px',color:'rgba(255,255,255,0.4)',position:'sticky',left:0,background:isAktiver?'#0c1a2e':'#1a0a14'}}>Mannschaft</th>
+                          {Object.entries(allTipps).map(([uid,t])=>(
+                            <th key={uid} style={{padding:'6px 8px',color:accentColor,whiteSpace:'nowrap'}}>{t.name || uid}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {teams.map(team=>(
+                          <tr key={team.teamId} style={{borderTop:'1px solid rgba(255,255,255,0.08)'}}>
+                            <td style={{padding:'6px 8px',color:'white',fontWeight:'600',position:'sticky',left:0,background:isAktiver?'#0c1a2e':'#1a0a14'}}>{team.name}</td>
+                            {Object.entries(allTipps).map(([uid,t])=>(
+                              <td key={uid} style={{padding:'6px 8px',textAlign:'center',color:'rgba(255,255,255,0.7)'}}>{t.ranks?.[team.teamId] ?? '–'}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

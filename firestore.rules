@@ -23,5 +23,16 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
+    // ── Tippspiel: eigene Tipps sind geheim, bis der Admin sie freigibt ────
+    // Jeder darf nur seine eigenen Tipps lesen/schreiben, solange
+    // ttc/tippspiel.revealed nicht true ist. Danach dürfen alle alle Tipps lesen.
+    match /ttc/tippspiel/tipps/{uid} {
+      allow read: if request.auth != null && (
+        request.auth.uid == uid ||
+        get(/databases/$(database)/documents/ttc/tippspiel).data.revealed == true
+      );
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
   }
 }
