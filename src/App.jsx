@@ -11831,7 +11831,7 @@ export default function TrainingsApp() {
                 <button onClick={importTippspielTeams} disabled={tippspielImporting} style={{padding:'9px 14px',background:'linear-gradient(135deg,#db2777,#be185d)',color:'white',border:'none',borderRadius:'9px',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>{tippspielImporting?'Lädt…':(teams.length>0?'🔄 Mannschaften neu importieren':'⬆️ Mannschaften importieren')}</button>
                 <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',color:'rgba(255,255,255,0.6)'}}>
                   Frist:
-                  <input type="date" value={deadline} onChange={e=>saveTippspielDeadline(e.target.value)} style={{padding:'6px 8px',background:'#1a0a14',border:`1px solid ${accentBorder}`,borderRadius:'7px',color:'white',fontSize:'12px'}}/>
+                  <input type="date" value={deadline} onChange={e=>saveTippspielDeadline(e.target.value)} style={{padding:'8px 10px',background:'#1a0a14',border:`1px solid ${accentBorder}`,borderRadius:'7px',color:'white',fontSize:'13px',colorScheme:'dark',cursor:'pointer'}}/>
                 </label>
                 <button onClick={toggleTippspielRevealed} style={{padding:'9px 14px',background:revealed?'rgba(74,222,128,0.15)':'rgba(255,255,255,0.06)',border:`1px solid ${revealed?'rgba(74,222,128,0.4)':accentBorder}`,borderRadius:'9px',color:revealed?'#4ade80':'rgba(255,255,255,0.6)',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>{revealed?'✅ Tipps sind veröffentlicht':'🔒 Tipps veröffentlichen'}</button>
               </div>
