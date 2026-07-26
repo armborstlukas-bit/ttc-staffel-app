@@ -122,6 +122,20 @@ const WEEKDAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag
 
 const emptySession = { subgroupIds: [], extraPlayerIds: [], date: new Date().toISOString().split('T')[0], time: '17:00', endTime: '', trainer: '', trainerUids: [], info: '', repeat: false, repeatWeeks: 8, isRecurring: false };
 
+// Erzeugt Bereichsoptionen in Zehnerschritten für Dropdown-Bonusfragen, z.B. "0-10","11-20",...
+const rangeOptions = (max) => {
+  const opts = ['0-10'];
+  for (let start = 11; start <= max; start += 10) opts.push(`${start}-${Math.min(start+9, max)}`);
+  return opts;
+};
+const TIPPSPIEL_BONUS_QUESTIONS = [
+  { key: 'q1', type: 'text', label: 'Wer landet diese Saison in einer Liga unter den Top 3 der Rangliste?' },
+  { key: 'q2', type: 'text', label: 'Welche Doppelpaarung gewinnt diese Saison die meisten Spiele?' },
+  { key: 'q3', type: 'text', label: 'Wer macht in der Saison 26/27 die meisten Einsätze für den TTC?' },
+  { key: 'q4', type: 'select', label: 'Wie viele Spieler:innen bestreiten in der Saison 26/27 mindestens ein Punktspiel?', options: rangeOptions(150) },
+  { key: 'q5', type: 'select', label: 'Wie viele unterschiedliche Doppelpaarungen gibt es mannschaftsübergreifend in der Saison 26/27?', options: rangeOptions(250) },
+];
+
 const TODAY = new Date().toISOString().split('T')[0];
 const emptyTournament = { name: '', location: '', dateFrom: TODAY, dateTo: TODAY, konkurrenzen: [] };
 const emptyKonkurrenz = () => ({ id: 'konk_' + Date.now() + '_' + Math.random().toString(36).slice(2,6), name: '', date: '', time: '10:00', participantIds: [], departureTimes: {} });
@@ -800,6 +814,7 @@ export default function TrainingsApp() {
   const [tippspielConfig, setTippspielConfig] = useState(null);
   const [tippspielLoading, setTippspielLoading] = useState(false);
   const [myTipps, setMyTipps] = useState({});
+  const [myBonus, setMyBonus] = useState({});
   const [allTipps, setAllTipps] = useState(null);
   const [tippspielImporting, setTippspielImporting] = useState(false);
   const [tippspielJustSaved, setTippspielJustSaved] = useState(false);
@@ -1917,6 +1932,7 @@ export default function TrainingsApp() {
       if (user?.uid) {
         const myTippSnap = await getDoc(doc(db,'ttc','tippspiel','tipps',user.uid));
         setMyTipps(myTippSnap.exists() ? (myTippSnap.data().ranks || {}) : {});
+        setMyBonus(myTippSnap.exists() ? (myTippSnap.data().bonus || {}) : {});
       }
       if (cfg?.revealed) {
         const allSnap = await getDocs(collection(db,'ttc','tippspiel','tipps'));
@@ -1947,10 +1963,24 @@ export default function TrainingsApp() {
     if (!user?.uid) return;
     await setDoc(doc(db,'ttc','tippspiel','tipps',user.uid), {
       ranks: myTipps,
+      bonus: myBonus,
       name: userProfile?.name || user?.email || '',
       updatedAt: new Date().toISOString(),
     }, { merge: true });
     setTippspielJustSaved(true);
+  };
+
+  const saveBonus = async (key, value) => {
+    if (!user?.uid) return;
+    const nextBonus = { ...myBonus, [key]: value };
+    if (!value) delete nextBonus[key];
+    setMyBonus(nextBonus);
+    setTippspielJustSaved(false);
+    await setDoc(doc(db,'ttc','tippspiel','tipps',user.uid), {
+      bonus: nextBonus,
+      name: userProfile?.name || user?.email || '',
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
   };
 
   const importTippspielTeams = async () => {
@@ -11875,6 +11905,28 @@ export default function TrainingsApp() {
                       style={{...inputStyleT, opacity: canEdit?1:0.5}}/>
                   </div>
                 ))}
+              </div>
+
+              <div style={{marginBottom:'20px'}}>
+                <h3 style={{margin:'0 0 4px',color:'white',fontSize:'15px',fontWeight:'800'}}>🎁 Bonustipps</h3>
+                <p style={{margin:'0 0 12px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>Jeder richtige Bonustipp bringt 2 Punkte extra.</p>
+                <div style={{display:'grid',gap:'10px'}}>
+                  {TIPPSPIEL_BONUS_QUESTIONS.map(q=>(
+                    <div key={q.key} style={{background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'10px',padding:'10px 12px'}}>
+                      <p style={{margin:'0 0 8px',fontSize:'13px',fontWeight:'600',color:'white'}}>{q.label}</p>
+                      {q.type==='text'?(
+                        <input type="text" disabled={!canEdit} value={myBonus[q.key]||''} onChange={e=>saveBonus(q.key,e.target.value)} placeholder="Antwort…"
+                          style={{width:'100%',boxSizing:'border-box',padding:'8px 10px',background:'#1a0a14',border:`1px solid ${accentBorder}`,borderRadius:'7px',color:'white',fontSize:'13px',opacity:canEdit?1:0.5}}/>
+                      ):(
+                        <select disabled={!canEdit} value={myBonus[q.key]||''} onChange={e=>saveBonus(q.key,e.target.value)}
+                          style={{width:'100%',boxSizing:'border-box',padding:'8px 10px',background:'#1a0a14',border:`1px solid ${accentBorder}`,borderRadius:'7px',color:'white',fontSize:'13px',opacity:canEdit?1:0.5,colorScheme:'dark'}}>
+                          <option value="">– auswählen –</option>
+                          {q.options.map(o=><option key={o} value={o}>{o}</option>)}
+                        </select>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {canEdit&&(()=>{
