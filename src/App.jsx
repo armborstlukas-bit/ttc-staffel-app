@@ -76,7 +76,7 @@ if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styl
 }
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
-import { getFirestore, doc, setDoc, updateDoc, deleteField, arrayUnion, arrayRemove, onSnapshot, getDoc, collection, getDocs } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, updateDoc, deleteDoc, deleteField, arrayUnion, arrayRemove, onSnapshot, getDoc, collection, getDocs } from 'firebase/firestore';
 import { getMessaging, getToken as getFcmToken, onMessage, isSupported as isFcmSupported } from 'firebase/messaging';
 import { Check, X, Plus, Trash2, Download, LogOut, ArrowLeft, Clock, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save, Trophy, Home, Archive, MessageSquare, Bell, Send, Pencil } from 'lucide-react';
 
@@ -2002,6 +2002,15 @@ export default function TrainingsApp() {
   const saveTippspielDeadline = async (deadline) => {
     await setDoc(doc(db,'ttc','tippspiel'), { deadline }, { merge: true });
     setTippspielConfig(c => ({ ...(c||{}), deadline }));
+  };
+
+  const deleteAllTipps = async () => {
+    if (!window.confirm('Wirklich ALLE abgegebenen Tipps aller Nutzer unwiderruflich löschen?')) return;
+    const allSnap = await getDocs(collection(db,'ttc','tippspiel','tipps'));
+    await Promise.all(allSnap.docs.map(d => deleteDoc(d.ref)));
+    setMyTipps({});
+    setMyBonus({});
+    setAllTipps({});
   };
 
   const toggleTippspielRevealed = async () => {
@@ -11859,6 +11868,14 @@ export default function TrainingsApp() {
     const canEdit = !deadlinePassed;
     const deadlineLabel = deadline ? new Date(deadline+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'}) : '';
     const inputStyleT = {width:isMobile?'70px':'56px',padding:isMobile?'8px':'5px 6px',background:'#1a0a14',border:`1px solid ${accentBorder}`,borderRadius:'7px',color:'white',fontSize:isMobile?'14px':'13px',fontWeight:'700',textAlign:'center'};
+    const scoreForGuess = (guess, actual) => {
+      if (!guess || !actual) return null;
+      const diff = Math.abs(guess - actual);
+      if (diff === 0) return 3;
+      if (diff === 1) return 2;
+      if (diff === 2) return 1;
+      return 0;
+    };
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:bgGrad,fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
@@ -11898,7 +11915,8 @@ export default function TrainingsApp() {
                   <div key={t.teamId} style={{display:'flex',alignItems:'center',gap:'10px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'10px',padding:isMobile?'10px 12px':'8px 12px',flexWrap:'wrap'}}>
                     <div style={{flex:'1 1 auto',minWidth:0}}>
                       <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'white'}}>{t.name}</p>
-                      <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>{t.league}</p>
+                      <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>{t.league}{t.leagueSize?` · ${t.leagueSize} Teams`:''}</p>
+                      {t.currentRank&&<p style={{margin:'2px 0 0',fontSize:'11px',fontWeight:'700',color:accentColor}}>📊 Aktuell: Platz {t.currentRank}{t.leagueSize?` von ${t.leagueSize}`:''}</p>}
                     </div>
                     <input type="number" min="1" max="20" placeholder="Rang" value={myTipps[t.teamId]||''} disabled={!canEdit}
                       onChange={e=>saveTipp(t.teamId, e.target.value?parseInt(e.target.value,10):null)}
@@ -11964,15 +11982,32 @@ export default function TrainingsApp() {
                       <tbody>
                         {teams.map(team=>(
                           <tr key={team.teamId} style={{borderTop:'1px solid rgba(255,255,255,0.08)'}}>
-                            <td style={{padding:'6px 8px',color:'white',fontWeight:'600',position:'sticky',left:0,background:isAktiver?'#0c1a2e':'#1a0a14'}}>{team.name}</td>
-                            {Object.entries(allTipps).map(([uid,t])=>(
-                              <td key={uid} style={{padding:'6px 8px',textAlign:'center',color:'rgba(255,255,255,0.7)'}}>{t.ranks?.[team.teamId] ?? '–'}</td>
-                            ))}
+                            <td style={{padding:'6px 8px',color:'white',fontWeight:'600',position:'sticky',left:0,background:isAktiver?'#0c1a2e':'#1a0a14'}}>{team.name}{team.currentRank?<span style={{color:'rgba(255,255,255,0.35)',fontWeight:'500'}}> (akt. {team.currentRank})</span>:null}</td>
+                            {Object.entries(allTipps).map(([uid,t])=>{
+                              const guess = t.ranks?.[team.teamId];
+                              const pts = scoreForGuess(guess, team.currentRank);
+                              return (
+                                <td key={uid} style={{padding:'6px 8px',textAlign:'center',color:'rgba(255,255,255,0.7)'}}>
+                                  {guess ?? '–'}{pts!=null&&<span style={{color:pts>0?'#4ade80':'rgba(255,255,255,0.25)',fontWeight:'700'}}> ({pts}P)</span>}
+                                </td>
+                              );
+                            })}
                           </tr>
                         ))}
+                        <tr style={{borderTop:'2px solid rgba(255,255,255,0.2)'}}>
+                          <td style={{padding:'6px 8px',color:accentColor,fontWeight:'800',position:'sticky',left:0,background:isAktiver?'#0c1a2e':'#1a0a14'}}>Gesamt (Live)</td>
+                          {Object.entries(allTipps).map(([uid,t])=>{
+                            const total = teams.reduce((sum,team)=>sum+(scoreForGuess(t.ranks?.[team.teamId], team.currentRank)||0),0);
+                            return <td key={uid} style={{padding:'6px 8px',textAlign:'center',color:accentColor,fontWeight:'800'}}>{total}</td>;
+                          })}
+                        </tr>
                       </tbody>
                     </table>
                   </div>
+                  <p style={{margin:'8px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>Punkte basieren auf der aktuellen Live-Tabelle, nicht auf der finalen Endplatzierung — die zählt erst am Saisonende. Bonustipps werden separat am Saisonende gewertet.</p>
+                  {userRole==='admin'&&(
+                    <button onClick={deleteAllTipps} style={{marginTop:'12px',padding:'9px 14px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.3)',borderRadius:'9px',color:'#fca5a5',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>🗑️ Alle Tipps löschen</button>
+                  )}
                 </div>
               )}
             </>
