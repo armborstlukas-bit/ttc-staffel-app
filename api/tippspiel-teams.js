@@ -66,6 +66,10 @@ export default async function handler(req, res) {
       };
     }));
 
+    // Reihenfolge: erst Damen, dann Herren/Erwachsene, dann Nachwuchs
+    const groupOf = name => /^Damen/i.test(name) ? 0 : /^Erwachsene/i.test(name) ? 1 : 2;
+    teams.sort((a, b) => groupOf(a.name) - groupOf(b.name));
+
     res.status(200).json({ teams });
   } catch (e) {
     res.status(500).json({ error: String(e?.message || e) });

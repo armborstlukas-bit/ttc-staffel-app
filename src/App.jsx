@@ -11970,50 +11970,31 @@ export default function TrainingsApp() {
                 );
               })()}
 
-              {revealed&&allTipps&&(
-                <div style={{marginBottom:'20px'}}>
-                  <h3 style={{margin:'0 0 10px',color:'white',fontSize:'15px',fontWeight:'800'}}>👥 Alle Tipps</h3>
-                  <div style={{overflowX:'auto'}}>
-                    <table style={{borderCollapse:'collapse',width:'100%',fontSize:'12px'}}>
-                      <thead>
-                        <tr>
-                          <th style={{textAlign:'left',padding:'6px 8px',color:'rgba(255,255,255,0.4)',position:'sticky',left:0,background:isAktiver?'#0c1a2e':'#1a0a14'}}>Mannschaft</th>
-                          {Object.entries(allTipps).map(([uid,t])=>(
-                            <th key={uid} style={{padding:'6px 8px',color:accentColor,whiteSpace:'nowrap'}}>{t.name || uid}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {teams.map(team=>(
-                          <tr key={team.teamId} style={{borderTop:'1px solid rgba(255,255,255,0.08)'}}>
-                            <td style={{padding:'6px 8px',color:'white',fontWeight:'600',position:'sticky',left:0,background:isAktiver?'#0c1a2e':'#1a0a14'}}>{team.name}{team.currentRank?<span style={{color:'rgba(255,255,255,0.35)',fontWeight:'500'}}> (akt. {team.currentRank})</span>:null}</td>
-                            {Object.entries(allTipps).map(([uid,t])=>{
-                              const guess = t.ranks?.[team.teamId];
-                              const pts = scoreForGuess(guess, team.currentRank);
-                              return (
-                                <td key={uid} style={{padding:'6px 8px',textAlign:'center',color:'rgba(255,255,255,0.7)'}}>
-                                  {guess ?? '–'}{pts!=null&&<span style={{color:pts>0?'#4ade80':'rgba(255,255,255,0.25)',fontWeight:'700'}}> ({pts}P)</span>}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                        <tr style={{borderTop:'2px solid rgba(255,255,255,0.2)'}}>
-                          <td style={{padding:'6px 8px',color:accentColor,fontWeight:'800',position:'sticky',left:0,background:isAktiver?'#0c1a2e':'#1a0a14'}}>Gesamt (Live)</td>
-                          {Object.entries(allTipps).map(([uid,t])=>{
-                            const total = teams.reduce((sum,team)=>sum+(scoreForGuess(t.ranks?.[team.teamId], team.currentRank)||0),0);
-                            return <td key={uid} style={{padding:'6px 8px',textAlign:'center',color:accentColor,fontWeight:'800'}}>{total}</td>;
-                          })}
-                        </tr>
-                      </tbody>
-                    </table>
+              {revealed&&allTipps&&(()=>{
+                const ranking = Object.entries(allTipps).map(([uid,t])=>({
+                  uid,
+                  name: t.name || uid,
+                  total: teams.reduce((sum,team)=>sum+(scoreForGuess(t.ranks?.[team.teamId], team.currentRank)||0),0),
+                })).sort((a,b)=>b.total-a.total);
+                return (
+                  <div style={{marginBottom:'20px'}}>
+                    <h3 style={{margin:'0 0 4px',color:'white',fontSize:'15px',fontWeight:'800'}}>📊 Live-Ranking (ohne Bonuspunkte)</h3>
+                    <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>Basiert auf der aktuellen Live-Tabelle, nicht auf der finalen Endplatzierung — die zählt erst am Saisonende, ebenso wie die Bonustipps.</p>
+                    <div style={{display:'grid',gap:'5px'}}>
+                      {ranking.map((r,i)=>(
+                        <div key={r.uid} style={{display:'flex',alignItems:'center',gap:'10px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'9px',padding:'8px 12px'}}>
+                          <span style={{fontSize:'12px',fontWeight:'800',color:'rgba(255,255,255,0.35)',width:'22px',flexShrink:0}}>{i+1}.</span>
+                          <span style={{flex:'1 1 auto',fontSize:'13px',fontWeight:'700',color:'white'}}>{r.name}</span>
+                          <span style={{fontSize:'14px',fontWeight:'800',color:accentColor}}>{r.total} P</span>
+                        </div>
+                      ))}
+                    </div>
+                    {userRole==='admin'&&(
+                      <button onClick={deleteAllTipps} style={{marginTop:'14px',padding:'9px 14px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.3)',borderRadius:'9px',color:'#fca5a5',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>🗑️ Alle Tipps löschen</button>
+                    )}
                   </div>
-                  <p style={{margin:'8px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>Punkte basieren auf der aktuellen Live-Tabelle, nicht auf der finalen Endplatzierung — die zählt erst am Saisonende. Bonustipps werden separat am Saisonende gewertet.</p>
-                  {userRole==='admin'&&(
-                    <button onClick={deleteAllTipps} style={{marginTop:'12px',padding:'9px 14px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.3)',borderRadius:'9px',color:'#fca5a5',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>🗑️ Alle Tipps löschen</button>
-                  )}
-                </div>
-              )}
+                );
+              })()}
             </>
           )}
         </div>
