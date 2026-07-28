@@ -94,6 +94,22 @@ export default async function handler(req, res) {
           }
         }
 
+        // Bei Heimspielen ohne hinterlegten Treffpunkt: Standard-Vorlauf nach Liga-Typ.
+        // Hessenliga/Bezirksoberliga (HL/BOL) -> 60 Min. vorher, Kreisliga/Kreisklasse (KL/KK) -> 45 Min. vorher.
+        if (isHeimspiel && !treffpunkt && g.formattedTime) {
+          const codeUpper = ligaCode.toUpperCase();
+          let defaultLead = null;
+          if (codeUpper.includes('HL') || codeUpper.includes('BOL')) defaultLead = 60;
+          else if (codeUpper.includes('KL') || codeUpper.includes('KK')) defaultLead = 45;
+          if (defaultLead != null) {
+            const [hh, mm] = g.formattedTime.split(':').map(Number);
+            const total = hh * 60 + mm - defaultLead;
+            const dh = Math.floor(((total % 1440) + 1440) % 1440 / 60);
+            const dm = ((total % 60) + 60) % 60;
+            treffpunkt = `${String(dh).padStart(2,'0')}:${String(dm).padStart(2,'0')}`;
+          }
+        }
+
         items.push({
           meetingId,
           datum,
