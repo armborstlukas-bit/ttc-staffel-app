@@ -811,6 +811,10 @@ export default function TrainingsApp() {
   const [fahrplanLoading, setFahrplanLoading] = useState(false);
   const [fahrplanTeamFilter, setFahrplanTeamFilter] = useState('');
   const [fahrplanFahrerFilter, setFahrplanFahrerFilter] = useState('');
+  const [showAbfahrtManager, setShowAbfahrtManager] = useState(false);
+  const [abfahrtClubs, setAbfahrtClubs] = useState({});
+  const [newAbfahrtClub, setNewAbfahrtClub] = useState('');
+  const [newAbfahrtMinutes, setNewAbfahrtMinutes] = useState('');
   const [tippspielConfig, setTippspielConfig] = useState(null);
   const [tippspielLoading, setTippspielLoading] = useState(false);
   const [myTipps, setMyTipps] = useState({});
@@ -2024,6 +2028,29 @@ export default function TrainingsApp() {
     await setDoc(doc(db,'ttc','tippspiel'), { revealed: next }, { merge: true });
     setTippspielConfig(c => ({ ...(c||{}), revealed: next }));
     await fetchTippspiel();
+  };
+
+  const fetchAbfahrtClubs = async () => {
+    const snap = await getDoc(doc(db,'ttc','abfahrtszeiten'));
+    setAbfahrtClubs(snap.exists() ? (snap.data().clubs || {}) : {});
+  };
+
+  const saveAbfahrtClub = async (club, minutes) => {
+    const next = { ...abfahrtClubs };
+    if (minutes==null || minutes==='') delete next[club];
+    else next[club] = minutes;
+    setAbfahrtClubs(next);
+    await setDoc(doc(db,'ttc','abfahrtszeiten'), { clubs: next }, { merge: false });
+    fetchFahrplan();
+  };
+
+  const addAbfahrtClub = async () => {
+    const club = newAbfahrtClub.trim();
+    const minutes = parseInt(newAbfahrtMinutes,10);
+    if (!club || !minutes) return;
+    await saveAbfahrtClub(club, minutes);
+    setNewAbfahrtClub('');
+    setNewAbfahrtMinutes('');
   };
 
   const setFahrplanFahrer = async (meetingId, fahrer) => {
@@ -12128,7 +12155,40 @@ export default function TrainingsApp() {
               <option value="" style={{background:'#132a1c',color:'white'}}>Alle Fahrer/Betreuer</option>
               {fahrerOptions.map(f=><option key={f} value={f} style={{background:'#132a1c',color:'white'}}>{f}</option>)}
             </select>
+            {canEditFahrer&&(
+              <button onClick={()=>{ setShowAbfahrtManager(v=>!v); if (!showAbfahrtManager) fetchAbfahrtClubs(); }}
+                style={{padding:isMobile?'10px 10px':'7px 12px',background:showAbfahrtManager?'rgba(251,191,36,0.15)':'rgba(255,255,255,0.06)',border:`1px solid ${showAbfahrtManager?'rgba(251,191,36,0.4)':accentBorder}`,borderRadius:'9px',color:showAbfahrtManager?'#fbbf24':'white',fontSize:isMobile?'13px':'12px',fontWeight:'700',cursor:'pointer',flex:isMobile?'1 1 100%':'0 0 auto'}}>
+                🕐 Abfahrtszeitenmanager
+              </button>
+            )}
           </div>
+
+          {showAbfahrtManager&&canEditFahrer&&(
+            <div style={{marginBottom:'16px',padding:'14px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'12px'}}>
+              <p style={{margin:'0 0 4px',fontSize:'12px',fontWeight:'800',color:'#fbbf24',textTransform:'uppercase',letterSpacing:'0.5px'}}>🕐 Abfahrtszeitenmanager</p>
+              <p style={{margin:'0 0 12px',fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>Vorlaufzeit je gegnerischem Verein (Minuten vor Anpfiff). Die Abfahrtszeit bei Auswärtsspielen wird daraus automatisch berechnet: Anpfiff − Minuten.</p>
+              <div style={{display:'grid',gap:'6px',marginBottom:'14px',maxHeight:'320px',overflowY:'auto'}}>
+                {Object.entries(abfahrtClubs).sort((a,b)=>a[0].localeCompare(b[0],'de')).map(([club,minutes])=>(
+                  <div key={club} style={{display:'flex',alignItems:'center',gap:'8px',background:'rgba(255,255,255,0.03)',borderRadius:'8px',padding:'6px 10px'}}>
+                    <span style={{flex:'1 1 auto',fontSize:'12px',color:'white',fontWeight:'600'}}>{club}</span>
+                    <input type="number" min="0" defaultValue={minutes} onBlur={e=>saveAbfahrtClub(club, e.target.value?parseInt(e.target.value,10):null)}
+                      style={{width:'60px',padding:'5px',background:'#1a0a14',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'6px',color:'white',fontSize:'12px',textAlign:'center'}}/>
+                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>Min.</span>
+                    <button onClick={()=>saveAbfahrtClub(club,null)} style={{padding:'4px 7px',background:'rgba(220,38,38,0.12)',border:'none',borderRadius:'6px',color:'#fca5a5',cursor:'pointer',fontSize:'11px'}}>✕</button>
+                  </div>
+                ))}
+                {Object.keys(abfahrtClubs).length===0&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.3)'}}>Noch keine Vereine hinterlegt.</p>}
+              </div>
+              <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                <input type="text" placeholder="Vereinsname (genau wie im Spielplan)" value={newAbfahrtClub} onChange={e=>setNewAbfahrtClub(e.target.value)}
+                  style={{flex:'1 1 200px',padding:'8px 10px',background:'#1a0a14',border:`1px solid ${accentBorder}`,borderRadius:'7px',color:'white',fontSize:'12px'}}/>
+                <input type="number" min="0" placeholder="Minuten" value={newAbfahrtMinutes} onChange={e=>setNewAbfahrtMinutes(e.target.value)}
+                  style={{width:'90px',padding:'8px 10px',background:'#1a0a14',border:`1px solid ${accentBorder}`,borderRadius:'7px',color:'white',fontSize:'12px'}}/>
+                <button onClick={addAbfahrtClub} style={{padding:'8px 14px',background:'linear-gradient(135deg,#0891b2,#0e7490)',color:'white',border:'none',borderRadius:'7px',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>+ Hinzufügen</button>
+              </div>
+            </div>
+          )}
+
           {myAssignments.length>0&&(
             <div style={{marginBottom:'16px',padding:'12px 14px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'12px'}}>
               <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'800',color:'#fbbf24',textTransform:'uppercase',letterSpacing:'0.5px'}}>🚗 Deine Betreuungen</p>

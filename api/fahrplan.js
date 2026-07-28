@@ -45,6 +45,15 @@ export default async function handler(req, res) {
       overrides = snap.exists ? (snap.data() || {}) : {};
     } catch { /* Overrides optional */ }
 
+    // Abfahrtszeiten-Manager: pro Gegner-Verein hinterlegte Vorlaufzeit (Minuten vor
+    // Anpfiff) für Auswärtsspiele. Überschreibt die Treffpunkt-Angabe aus dem Sheet,
+    // falls für den Gegner ein Eintrag existiert.
+    let abfahrtsClubs = {};
+    try {
+      const snap = await adminDb().collection('ttc').doc('abfahrtszeiten').get();
+      abfahrtsClubs = snap.exists ? (snap.data()?.clubs || {}) : {};
+    } catch { /* Abfahrtszeiten optional */ }
+
     const items = [];
     Object.values(byDate).forEach(dayGames => {
       (dayGames || []).forEach(g => {
@@ -63,6 +72,21 @@ export default async function handler(req, res) {
         const match = byLiga.get(`${datum}|${ligaCode}`) || byTeams.get(`${datum}|${heim}|${gast}`);
         const meetingId = g.meeting_id || '';
         const override = meetingId ? overrides[meetingId] : null;
+
+        // Abfahrtszeit berechnen: bei Auswärtsspielen anhand der im Manager hinterlegten
+        // Vorlaufzeit des Gegner-Vereins (Anpfiff minus Minuten), sonst Sheet-Wert.
+        let treffpunkt = match?.treffpunkt || '';
+        if (!isHeimspiel && g.formattedTime) {
+          const leadMinutes = abfahrtsClubs[heim];
+          if (leadMinutes != null) {
+            const [hh, mm] = g.formattedTime.split(':').map(Number);
+            const total = hh * 60 + mm - leadMinutes;
+            const dh = Math.floor(((total % 1440) + 1440) % 1440 / 60);
+            const dm = ((total % 60) + 60) % 60;
+            treffpunkt = `${String(dh).padStart(2,'0')}:${String(dm).padStart(2,'0')}`;
+          }
+        }
+
         items.push({
           meetingId,
           datum,
@@ -76,7 +100,7 @@ export default async function handler(req, res) {
           ourTeam,
           ourTeamId,
           fahrer: override != null ? override : (match?.fahrer || ''),
-          treffpunkt: match?.treffpunkt || '',
+          treffpunkt,
         });
       });
     });
