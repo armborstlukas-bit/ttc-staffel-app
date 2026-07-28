@@ -12166,7 +12166,7 @@ export default function TrainingsApp() {
           {showAbfahrtManager&&canEditFahrer&&(
             <div style={{marginBottom:'16px',padding:'14px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'12px'}}>
               <p style={{margin:'0 0 4px',fontSize:'12px',fontWeight:'800',color:'#fbbf24',textTransform:'uppercase',letterSpacing:'0.5px'}}>🕐 Abfahrtszeitenmanager</p>
-              <p style={{margin:'0 0 12px',fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>Vorlaufzeit je gegnerischem Verein (Minuten vor Anpfiff). Die Abfahrtszeit bei Auswärtsspielen wird daraus automatisch berechnet: Anpfiff − Minuten.</p>
+              <p style={{margin:'0 0 12px',fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>Vorlaufzeit je Ort (Minuten vor Anpfiff) — reicht der reine Ortsname (z.B. "Niederzeuzheim"), erkennt die App das automatisch bei allen Mannschaften dieses Vereins. Die Abfahrtszeit bei Auswärtsspielen wird daraus berechnet: Anpfiff − Minuten.</p>
               <div style={{display:'grid',gap:'6px',marginBottom:'14px',maxHeight:'320px',overflowY:'auto'}}>
                 {Object.entries(abfahrtClubs).sort((a,b)=>a[0].localeCompare(b[0],'de')).map(([club,minutes])=>(
                   <div key={club} style={{display:'flex',alignItems:'center',gap:'8px',background:'rgba(255,255,255,0.03)',borderRadius:'8px',padding:'6px 10px'}}>
@@ -12180,7 +12180,7 @@ export default function TrainingsApp() {
                 {Object.keys(abfahrtClubs).length===0&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.3)'}}>Noch keine Vereine hinterlegt.</p>}
               </div>
               <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-                <input type="text" placeholder="Vereinsname (genau wie im Spielplan)" value={newAbfahrtClub} onChange={e=>setNewAbfahrtClub(e.target.value)}
+                <input type="text" placeholder="Ortsname (z.B. Niederzeuzheim)" value={newAbfahrtClub} onChange={e=>setNewAbfahrtClub(e.target.value)}
                   style={{flex:'1 1 200px',padding:'8px 10px',background:'#1a0a14',border:`1px solid ${accentBorder}`,borderRadius:'7px',color:'white',fontSize:'12px'}}/>
                 <input type="number" min="0" placeholder="Minuten" value={newAbfahrtMinutes} onChange={e=>setNewAbfahrtMinutes(e.target.value)}
                   style={{width:'90px',padding:'8px 10px',background:'#1a0a14',border:`1px solid ${accentBorder}`,borderRadius:'7px',color:'white',fontSize:'12px'}}/>

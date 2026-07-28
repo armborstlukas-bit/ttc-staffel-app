@@ -77,7 +77,14 @@ export default async function handler(req, res) {
         // Vorlaufzeit des Gegner-Vereins (Anpfiff minus Minuten), sonst Sheet-Wert.
         let treffpunkt = match?.treffpunkt || '';
         if (!isHeimspiel && g.formattedTime) {
-          const leadMinutes = abfahrtsClubs[heim];
+          // Der Manager speichert nur den Ortsnamen (z.B. "Niederzeuzheim") statt des
+          // vollen Vereinsnamens. Wir suchen den längsten (spezifischsten) Ortsnamen,
+          // der im gegnerischen Team-Namen vorkommt.
+          const heimLower = heim.toLowerCase();
+          const matchingKey = Object.keys(abfahrtsClubs)
+            .filter(k => heimLower.includes(k.toLowerCase()))
+            .sort((a, b) => b.length - a.length)[0];
+          const leadMinutes = matchingKey != null ? abfahrtsClubs[matchingKey] : null;
           if (leadMinutes != null) {
             const [hh, mm] = g.formattedTime.split(':').map(Number);
             const total = hh * 60 + mm - leadMinutes;
