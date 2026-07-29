@@ -709,6 +709,9 @@ export default function TrainingsApp() {
   const [newSession, setNewSession]             = useState(emptySession);
   const [recurringTemplates, setRecurringTemplates] = useState({});
   const [rangliste, setRangliste] = useState([]); // ordered array of childIds
+  const [ranglisteHistory, setRanglisteHistory] = useState([]); // [{date:'YYYY-MM-DD', order:[childId,...]}]
+  const [showRangStats, setShowRangStats] = useState(false);
+  const [rangStatsH2H, setRangStatsH2H] = useState(['', '']);
   const [ranglistenspiele, setRanglistenspiele] = useState({ active: [], archived: [] });
   const [newSpielForm, setNewSpielForm] = useState({ open: false, challengerId: '', defenderId: '' });
   const [rangSelectionMode, setRangSelectionMode] = useState(false);
@@ -1034,6 +1037,7 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','aktiveSpieler'),      s => setAktiveSpieler(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','leagueData'),         s => setLeagueData(s.exists()?s.data():{ table: null, schedule: null, fetchedAt: null })),
       onSnapshot(doc(db,'ttc','rangliste'), s => setRangliste(s.exists()&&s.data().entries ? s.data().entries : [])),
+      onSnapshot(doc(db,'ttc','ranglisteHistory'), s => setRanglisteHistory(s.exists()&&Array.isArray(s.data().snapshots) ? s.data().snapshots : [])),
       onSnapshot(doc(db,'ttc','ranglistenspiele'), s => setRanglistenspiele(s.exists() ? { active: s.data().active||[], archived: s.data().archived||[] } : { active:[], archived:[] })),
       onSnapshot(doc(db,'ttc','ranglisteAchievements'), s => setRanglisteAch(s.exists() ? s.data() : {})),
       onSnapshot(doc(db,'ttc','practiceTournaments'),          s => setPracticeTournaments(s.exists()?s.data():{})),
@@ -1618,7 +1622,17 @@ export default function TrainingsApp() {
       setLeagueFetching(false);
     }
   };
-  const saveRangliste = (entries) => { setRangliste(entries); setDoc(doc(db,'ttc','rangliste'),{entries}); };
+  const saveRangliste = (entries) => {
+    setRangliste(entries);
+    setDoc(doc(db,'ttc','rangliste'),{entries});
+    // Für die Platzverbesserungs-Statistik: einmal pro Tag einen Schnappschuss der Reihenfolge sichern.
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (!ranglisteHistory.some(snap => snap.date === todayStr)) {
+      const nextHistory = [...ranglisteHistory, { date: todayStr, order: entries }];
+      setRanglisteHistory(nextHistory);
+      setDoc(doc(db,'ttc','ranglisteHistory'), { snapshots: nextHistory });
+    }
+  };
   const saveRanglistenspiele = (data) => { setRanglistenspiele(data); setDoc(doc(db,'ttc','ranglistenspiele'), data); };
   const saveRanglisteAch = (data) => { setRanglisteAch(data); setDoc(doc(db,'ttc','ranglisteAchievements'), data); };
 
@@ -7255,7 +7269,226 @@ export default function TrainingsApp() {
               style={{padding:'14px 16px',borderRadius:'14px',border:'2px solid rgba(252,211,77,0.4)',background:'rgba(255,255,255,0.08)',color:'rgba(255,255,255,0.8)',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',gap:'6px',transition:'all 0.15s'}}>
               {rangAddOpen ? '✕' : '+ Spieler'}
             </button>
+            <button
+              onClick={()=>setShowRangStats(v=>!v)}
+              style={{padding:'14px 16px',borderRadius:'14px',border:`2px solid ${showRangStats?'#38bdf8':'rgba(56,189,248,0.4)'}`,background:showRangStats?'rgba(56,189,248,0.15)':'rgba(255,255,255,0.08)',color:showRangStats?'#38bdf8':'rgba(255,255,255,0.8)',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',gap:'6px',transition:'all 0.15s'}}>
+              📊 Statistiken
+            </button>
           </div>
+
+          {showRangStats&&(()=>{
+            const childName = id => children[id]?.name || '?';
+            const archived = ranglistenspiele.archived || [];
+
+            // ── 1. Siegquote pro Spieler (gesamt, als Herausforderer, als Verteidiger) ──
+            const statsByChild = {};
+            const ensure = id => { if (!statsByChild[id]) statsByChild[id] = { id, wins:0, losses:0, chalWins:0, chalLosses:0, defWins:0, defLosses:0, challenges:0, timesChallenged:0 }; return statsByChild[id]; };
+            archived.forEach(sp => {
+              const chal = ensure(sp.challengerId); const def = ensure(sp.defenderId);
+              chal.challenges++; def.timesChallenged++;
+              const chalWon = sp.result === 'challenger';
+              if (chalWon) { chal.wins++; chal.chalWins++; def.losses++; def.defLosses++; }
+              else { def.wins++; def.defWins++; chal.losses++; chal.chalLosses++; }
+            });
+            const winrateList = Object.values(statsByChild)
+              .map(s => ({ ...s, total: s.wins+s.losses, rate: (s.wins+s.losses)>0 ? Math.round(s.wins/(s.wins+s.losses)*100) : 0 }))
+              .filter(s => s.total > 0)
+              .sort((a,b) => b.rate-a.rate || b.total-a.total);
+
+            // ── 2. Längste Siegesserie (aktuell + aller Zeiten) je Spieler ──
+            const sortedByTime = [...archived].sort((a,b) => (a.closedAt||'').localeCompare(b.closedAt||''));
+            const streakInfo = {};
+            sortedByTime.forEach(sp => {
+              [sp.challengerId, sp.defenderId].forEach(id => { if (!streakInfo[id]) streakInfo[id] = { current:0, best:0 }; });
+              const winnerId = sp.result==='challenger' ? sp.challengerId : sp.defenderId;
+              const loserId  = sp.result==='challenger' ? sp.defenderId  : sp.challengerId;
+              streakInfo[winnerId].current++;
+              streakInfo[winnerId].best = Math.max(streakInfo[winnerId].best, streakInfo[winnerId].current);
+              streakInfo[loserId].current = 0;
+            });
+            const streakList = Object.entries(streakInfo)
+              .map(([id,v]) => ({ id, ...v }))
+              .filter(v => v.best > 0)
+              .sort((a,b) => b.best-a.best);
+
+            // ── 3. Platzverbesserung über verschiedene Zeiträume ──
+            const periods = [
+              { key:'1m', label:'1 Monat', days:30 },
+              { key:'6m', label:'6 Monate', days:182 },
+              { key:'1y', label:'1 Jahr', days:365 },
+              { key:'2y', label:'2 Jahre', days:730 },
+            ];
+            const sortedHistory = [...ranglisteHistory].sort((a,b) => a.date.localeCompare(b.date));
+            const findSnapshotBefore = (targetDate) => {
+              let best = null;
+              for (const snap of sortedHistory) { if (snap.date <= targetDate) best = snap; else break; }
+              return best;
+            };
+            const movementByPeriod = periods.map(p => {
+              const targetDate = new Date(); targetDate.setDate(targetDate.getDate()-p.days);
+              const targetStr = targetDate.toISOString().split('T')[0];
+              const snap = findSnapshotBefore(targetStr);
+              if (!snap) return { ...p, rows: null };
+              const rows = rangliste.map((id,idx) => {
+                const oldIdx = snap.order.indexOf(id);
+                if (oldIdx === -1) return null;
+                return { id, delta: oldIdx - idx }; // positiv = aufgestiegen (kleinere Nummer = besser)
+              }).filter(Boolean).sort((a,b)=>b.delta-a.delta);
+              return { ...p, rows };
+            });
+
+            // ── 4. Aktivitäts-Ranking ──
+            const mostChallenging = Object.values(statsByChild).filter(s=>s.challenges>0).sort((a,b)=>b.challenges-a.challenges).slice(0,5);
+            const mostChallenged  = Object.values(statsByChild).filter(s=>s.timesChallenged>0).sort((a,b)=>b.timesChallenged-a.timesChallenged).slice(0,5);
+
+            // ── 6. Durchschnittliche Verweildauer auf dem aktuellen Platz ──
+            const daysSinceLastMove = rangliste.map((id,idx) => {
+              let lastChangeDate = null;
+              for (let i=sortedHistory.length-1; i>=0; i--) {
+                const snap = sortedHistory[i];
+                const posInSnap = snap.order.indexOf(id);
+                if (posInSnap !== idx) break;
+                lastChangeDate = snap.date;
+              }
+              if (!lastChangeDate) return null;
+              const days = Math.floor((Date.now() - new Date(lastChangeDate+'T00:00:00').getTime()) / 86400000);
+              return { id, days };
+            }).filter(Boolean);
+            const avgDwellDays = daysSinceLastMove.length ? Math.round(daysSinceLastMove.reduce((s,x)=>s+x.days,0)/daysSinceLastMove.length) : null;
+
+            const statCardStyle = {...s.card, marginBottom:'14px'};
+            const rowStyle = {display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 10px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'8px',fontSize:'13px'};
+
+            return (
+              <div style={{marginBottom:'20px'}}>
+                <div style={statCardStyle}>
+                  <h3 style={{margin:'0 0 10px',fontSize:'15px',fontWeight:'800',color:'#0369a1'}}>🏆 Siegquote</h3>
+                  {winrateList.length===0?<p style={{margin:0,fontSize:'13px',color:'#9ca3af'}}>Noch keine abgeschlossenen Ranglistenspiele.</p>:(
+                    <div style={{display:'grid',gap:'5px'}}>
+                      {winrateList.map(s=>(
+                        <div key={s.id} style={rowStyle}>
+                          <span style={{fontWeight:'700',color:'#1f2937'}}>{childName(s.id)}</span>
+                          <span style={{color:'#6b7280'}}>{s.wins}S {s.losses}N <b style={{color:'#0369a1'}}>({s.rate}%)</b> · als Herausforderer {s.chalWins}/{s.chalWins+s.chalLosses} · als Verteidiger {s.defWins}/{s.defWins+s.defLosses}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div style={statCardStyle}>
+                  <h3 style={{margin:'0 0 10px',fontSize:'15px',fontWeight:'800',color:'#0369a1'}}>🔥 Siegesserien</h3>
+                  {streakList.length===0?<p style={{margin:0,fontSize:'13px',color:'#9ca3af'}}>Noch keine Daten.</p>:(
+                    <div style={{display:'grid',gap:'5px'}}>
+                      {streakList.map(st=>(
+                        <div key={st.id} style={rowStyle}>
+                          <span style={{fontWeight:'700',color:'#1f2937'}}>{childName(st.id)}</span>
+                          <span style={{color:'#6b7280'}}>aktuell <b style={{color: st.current>0?'#16a34a':'#9ca3af'}}>{st.current}</b> · Rekord <b style={{color:'#d97706'}}>{st.best}</b></span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div style={statCardStyle}>
+                  <h3 style={{margin:'0 0 10px',fontSize:'15px',fontWeight:'800',color:'#0369a1'}}>📈 Platzverbesserung</h3>
+                  <div style={{display:'grid',gap:'12px'}}>
+                    {movementByPeriod.map(p=>(
+                      <div key={p.key}>
+                        <p style={{margin:'0 0 6px',fontSize:'12px',fontWeight:'800',color:'#92400e',textTransform:'uppercase',letterSpacing:'0.5px'}}>{p.label}</p>
+                        {p.rows===null?(
+                          <p style={{margin:0,fontSize:'12px',color:'#9ca3af'}}>Noch keine Vergleichsdaten (App-Historie noch nicht alt genug).</p>
+                        ):p.rows.filter(r=>r.delta!==0).length===0?(
+                          <p style={{margin:0,fontSize:'12px',color:'#9ca3af'}}>Keine Veränderungen.</p>
+                        ):(
+                          <div style={{display:'grid',gap:'4px'}}>
+                            {p.rows.filter(r=>r.delta!==0).slice(0,5).map(r=>(
+                              <div key={r.id} style={rowStyle}>
+                                <span style={{fontWeight:'700',color:'#1f2937'}}>{childName(r.id)}</span>
+                                <span style={{fontWeight:'800',color:r.delta>0?'#16a34a':'#dc2626'}}>{r.delta>0?`↑ +${r.delta}`:`↓ ${r.delta}`}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={statCardStyle}>
+                  <h3 style={{margin:'0 0 10px',fontSize:'15px',fontWeight:'800',color:'#0369a1'}}>⚡ Aktivität</h3>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'14px'}}>
+                    <div>
+                      <p style={{margin:'0 0 6px',fontSize:'12px',fontWeight:'800',color:'#92400e'}}>Fordert am häufigsten heraus</p>
+                      <div style={{display:'grid',gap:'4px'}}>
+                        {mostChallenging.length===0?<p style={{margin:0,fontSize:'12px',color:'#9ca3af'}}>Keine Daten.</p>:mostChallenging.map(s=>(
+                          <div key={s.id} style={rowStyle}><span style={{fontWeight:'700',color:'#1f2937'}}>{childName(s.id)}</span><span style={{color:'#6b7280'}}>{s.challenges}×</span></div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p style={{margin:'0 0 6px',fontSize:'12px',fontWeight:'800',color:'#92400e'}}>Wird am häufigsten herausgefordert</p>
+                      <div style={{display:'grid',gap:'4px'}}>
+                        {mostChallenged.length===0?<p style={{margin:0,fontSize:'12px',color:'#9ca3af'}}>Keine Daten.</p>:mostChallenged.map(s=>(
+                          <div key={s.id} style={rowStyle}><span style={{fontWeight:'700',color:'#1f2937'}}>{childName(s.id)}</span><span style={{color:'#6b7280'}}>{s.timesChallenged}×</span></div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={statCardStyle}>
+                  <h3 style={{margin:'0 0 10px',fontSize:'15px',fontWeight:'800',color:'#0369a1'}}>⚔️ Kopf-an-Kopf-Bilanz</h3>
+                  <div style={{display:'flex',gap:'8px',marginBottom:'10px',flexWrap:'wrap'}}>
+                    <select value={rangStatsH2H[0]} onChange={e=>setRangStatsH2H([e.target.value,rangStatsH2H[1]])} style={{...s.input,flex:'1 1 160px'}}>
+                      <option value="">Spieler 1 wählen…</option>
+                      {rangliste.map(id=><option key={id} value={id}>{childName(id)}</option>)}
+                    </select>
+                    <select value={rangStatsH2H[1]} onChange={e=>setRangStatsH2H([rangStatsH2H[0],e.target.value])} style={{...s.input,flex:'1 1 160px'}}>
+                      <option value="">Spieler 2 wählen…</option>
+                      {rangliste.map(id=><option key={id} value={id}>{childName(id)}</option>)}
+                    </select>
+                  </div>
+                  {(() => {
+                    const [p1,p2] = rangStatsH2H;
+                    if (!p1 || !p2 || p1===p2) return <p style={{margin:0,fontSize:'13px',color:'#9ca3af'}}>Bitte zwei unterschiedliche Spieler wählen.</p>;
+                    const matches = archived.filter(sp => (sp.challengerId===p1&&sp.defenderId===p2)||(sp.challengerId===p2&&sp.defenderId===p1));
+                    if (matches.length===0) return <p style={{margin:0,fontSize:'13px',color:'#9ca3af'}}>Diese beiden haben noch nie gegeneinander gespielt.</p>;
+                    const p1Wins = matches.filter(sp => (sp.result==='challenger'&&sp.challengerId===p1)||(sp.result==='defender'&&sp.defenderId===p1)).length;
+                    const p2Wins = matches.length - p1Wins;
+                    return (
+                      <div>
+                        <p style={{margin:'0 0 10px',fontSize:'16px',fontWeight:'800',color:'#1f2937',textAlign:'center'}}>{childName(p1)} <span style={{color:'#0369a1'}}>{p1Wins} : {p2Wins}</span> {childName(p2)}</p>
+                        <div style={{display:'grid',gap:'4px'}}>
+                          {matches.slice(0,10).map(sp=>(
+                            <div key={sp.id} style={rowStyle}>
+                              <span style={{color:'#6b7280'}}>{sp.date||sp.closedAt?.slice(0,10)}</span>
+                              <span style={{fontWeight:'700',color:'#1f2937'}}>{childName(sp.challengerId)} {sp.sets1??sp.challengerScore}:{sp.sets2??sp.defenderScore} {childName(sp.defenderId)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                <div style={statCardStyle}>
+                  <h3 style={{margin:'0 0 10px',fontSize:'15px',fontWeight:'800',color:'#0369a1'}}>⏱️ Verweildauer auf dem aktuellen Platz</h3>
+                  {avgDwellDays===null?(
+                    <p style={{margin:0,fontSize:'13px',color:'#9ca3af'}}>Noch keine Historie vorhanden.</p>
+                  ):(
+                    <>
+                      <p style={{margin:'0 0 10px',fontSize:'13px',color:'#6b7280'}}>Im Schnitt sitzen Spieler seit <b style={{color:'#0369a1'}}>{avgDwellDays} Tagen</b> auf ihrem aktuellen Platz.</p>
+                      <div style={{display:'grid',gap:'4px'}}>
+                        {daysSinceLastMove.sort((a,b)=>b.days-a.days).slice(0,5).map(x=>(
+                          <div key={x.id} style={rowStyle}><span style={{fontWeight:'700',color:'#1f2937'}}>{childName(x.id)}</span><span style={{color:'#6b7280'}}>{x.days} Tage</span></div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ── Spieler hinzufügen (collapsible) ─────────────── */}
           {rangAddOpen && (
