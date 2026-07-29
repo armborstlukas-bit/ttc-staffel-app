@@ -813,6 +813,8 @@ export default function TrainingsApp() {
   const [fahrplanFahrerFilter, setFahrplanFahrerFilter] = useState('');
   const [showAbfahrtManager, setShowAbfahrtManager] = useState(false);
   const [sendingIntroMail, setSendingIntroMail] = useState(false);
+  const [showIntroMailPicker, setShowIntroMailPicker] = useState(false);
+  const [introMailSelected, setIntroMailSelected] = useState([]);
   const [abfahrtClubs, setAbfahrtClubs] = useState({});
   const [newAbfahrtClub, setNewAbfahrtClub] = useState('');
   const [newAbfahrtMinutes, setNewAbfahrtMinutes] = useState('');
@@ -2031,19 +2033,25 @@ export default function TrainingsApp() {
     await fetchTippspiel();
   };
 
-  const sendFahrplanIntroMail = async () => {
+  const sendFahrplanIntroMail = async (emails = null) => {
     if (sendingIntroMail) return;
-    if (!window.confirm('Wirklich an ALLE im Fahrplan hinterlegten E-Mail-Adressen eine Sammel-Mail mit ihren zugeteilten Spielen verschicken? Das kann nicht rückgängig gemacht werden.')) return;
+    const confirmMsg = emails
+      ? `Sammel-Mail an ${emails.length} ausgewählte Adresse${emails.length===1?'':'n'} verschicken?`
+      : 'Wirklich an ALLE im Fahrplan hinterlegten E-Mail-Adressen eine Sammel-Mail mit ihren zugeteilten Spielen verschicken? Das kann nicht rückgängig gemacht werden.';
+    if (!window.confirm(confirmMsg)) return;
     setSendingIntroMail(true);
     try {
       const idToken = await user.getIdToken();
       const r = await fetch('/api/fahrplan-send-intro', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${idToken}` },
+        headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(emails ? { emails } : {}),
       });
       const d = await r.json();
       if (d.error) throw new Error(d.error);
       alert(`Fertig! ${d.sent} von ${d.recipients} Mails erfolgreich verschickt.`);
+      setShowIntroMailPicker(false);
+      setIntroMailSelected([]);
     } catch (e) {
       alert('Fehler beim Versand: ' + (e?.message || e));
     } finally {
@@ -12183,12 +12191,39 @@ export default function TrainingsApp() {
               </button>
             )}
             {userRole==='admin'&&(
-              <button onClick={sendFahrplanIntroMail} disabled={sendingIntroMail}
-                style={{padding:isMobile?'10px 10px':'7px 12px',background:'rgba(96,165,250,0.1)',border:'1px solid rgba(96,165,250,0.3)',borderRadius:'9px',color:'#93c5fd',fontSize:isMobile?'13px':'12px',fontWeight:'700',cursor:sendingIntroMail?'not-allowed':'pointer',flex:isMobile?'1 1 100%':'0 0 auto',opacity:sendingIntroMail?0.6:1}}>
+              <button onClick={()=>setShowIntroMailPicker(v=>!v)} disabled={sendingIntroMail}
+                style={{padding:isMobile?'10px 10px':'7px 12px',background:showIntroMailPicker?'rgba(96,165,250,0.18)':'rgba(96,165,250,0.1)',border:'1px solid rgba(96,165,250,0.3)',borderRadius:'9px',color:'#93c5fd',fontSize:isMobile?'13px':'12px',fontWeight:'700',cursor:sendingIntroMail?'not-allowed':'pointer',flex:isMobile?'1 1 100%':'0 0 auto',opacity:sendingIntroMail?0.6:1}}>
                 {sendingIntroMail?'Sende…':'📧 Info an alle schicken'}
               </button>
             )}
           </div>
+
+          {showIntroMailPicker&&userRole==='admin'&&(
+            <div style={{marginBottom:'16px',padding:'14px',background:'rgba(96,165,250,0.06)',border:'1px solid rgba(96,165,250,0.25)',borderRadius:'12px'}}>
+              <p style={{margin:'0 0 10px',fontSize:'12px',fontWeight:'800',color:'#93c5fd',textTransform:'uppercase',letterSpacing:'0.5px'}}>📧 Info-Mail verschicken</p>
+              <div style={{display:'flex',gap:'8px',marginBottom:'12px',flexWrap:'wrap'}}>
+                <button onClick={()=>sendFahrplanIntroMail(null)} disabled={sendingIntroMail}
+                  style={{padding:'9px 14px',background:'linear-gradient(135deg,#2563eb,#1d4ed8)',color:'white',border:'none',borderRadius:'9px',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>
+                  An alle ({fahrerOptions.length})
+                </button>
+                <span style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',alignSelf:'center'}}>oder unten einzeln auswählen:</span>
+              </div>
+              <div style={{display:'grid',gap:'5px',maxHeight:'260px',overflowY:'auto',marginBottom:'12px'}}>
+                {fahrerOptions.map(f=>(
+                  <label key={f} style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'12px',color:'white',padding:'5px 8px',background:'rgba(255,255,255,0.03)',borderRadius:'7px',cursor:'pointer'}}>
+                    <input type="checkbox" checked={introMailSelected.includes(f)}
+                      onChange={e=>setIntroMailSelected(sel => e.target.checked ? [...sel,f] : sel.filter(x=>x!==f))}/>
+                    {f}
+                  </label>
+                ))}
+                {fahrerOptions.length===0&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.3)'}}>Keine E-Mail-Adressen im Plan gefunden.</p>}
+              </div>
+              <button onClick={()=>sendFahrplanIntroMail(introMailSelected)} disabled={sendingIntroMail || introMailSelected.length===0}
+                style={{padding:'9px 14px',background:introMailSelected.length?'linear-gradient(135deg,#2563eb,#1d4ed8)':'rgba(255,255,255,0.06)',color:introMailSelected.length?'white':'rgba(255,255,255,0.35)',border:'none',borderRadius:'9px',cursor:introMailSelected.length?'pointer':'not-allowed',fontWeight:'700',fontSize:'13px'}}>
+                An Auswahl senden ({introMailSelected.length})
+              </button>
+            </div>
+          )}
 
           {showAbfahrtManager&&canEditFahrer&&(
             <div style={{marginBottom:'16px',padding:'14px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'12px'}}>

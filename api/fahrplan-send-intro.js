@@ -19,11 +19,18 @@ export default async function handler(req, res) {
 
     const items = await getFahrplanItems();
 
+    // Optional: nur an eine bestimmte Auswahl von E-Mail-Adressen verschicken
+    // (aus dem "Einzelauswahl"-Modus in der App). Ohne Angabe: alle.
+    const onlyEmails = Array.isArray(req.body?.emails) && req.body.emails.length > 0
+      ? new Set(req.body.emails.map(e => String(e).trim().toLowerCase()))
+      : null;
+
     const byEmail = new Map();
     items.forEach(it => {
       const fahrer = (it.fahrer || '').trim();
       if (!EMAIL_REGEX.test(fahrer)) return;
       const key = fahrer.toLowerCase();
+      if (onlyEmails && !onlyEmails.has(key)) return;
       if (!byEmail.has(key)) byEmail.set(key, { email: fahrer, games: [] });
       byEmail.get(key).games.push(it);
     });
