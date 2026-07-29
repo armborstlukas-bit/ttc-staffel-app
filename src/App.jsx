@@ -865,7 +865,8 @@ export default function TrainingsApp() {
   const [wettenZitate, setWettenZitate] = useState([]);
   const [wzAdding, setWzAdding] = useState(false);
   const [wzEditId, setWzEditId] = useState(null);
-  const [wzForm, setWzForm] = useState({type:'zitat',text:'',date:'',dueDate:'',options:['','']});
+  const [wzForm, setWzForm] = useState({type:'zitat',text:'',date:'',dueDate:'',options:['',''],visibility:{mode:'all',roles:[],userIds:[]}});
+  const [wzEditVisibility, setWzEditVisibility] = useState({mode:'all',roles:[],userIds:[]});
   const [wzEditText, setWzEditText] = useState('');
   const [wzSearch, setWzSearch] = useState('');
   const [wzFilter, setWzFilter] = useState('alle');
@@ -1316,7 +1317,7 @@ export default function TrainingsApp() {
   const saveAktiveSpieler                = d => { setAktiveSpieler(d);               setDoc(doc(db,'ttc','aktiveSpieler'),                  d); };
   const canAccessRompel    = () => userRole === 'admin' || (appSettings.rompelTrainers  || []).includes(user?.uid);
   const canAccessPfand     = () => userRole === 'admin' || (appSettings.pfandTrainers   || []).includes(user?.uid);
-  const canAccessPinnwand  = () => userRole === 'admin' || (appSettings.pinnwandUsers   || []).includes(user?.uid);
+  const canAccessPinnwand  = () => !!user; // Pinnwand ist fuer alle eingeloggten Nutzer sichtbar; Sichtbarkeit einzelner Beitraege wird pro Beitrag geregelt
   const enablePushNotifications = async () => {
     if (notifBusy) return;
     setNotifBusy(true);
@@ -13145,6 +13146,52 @@ export default function TrainingsApp() {
     const authorName = userProfile?.name || user?.email || 'Unbekannt';
     const canEditEntry = (entry) => userRole==='admin' || entry.createdBy===authorName;
 
+    // Sichtbarkeit: ohne Einschränkung (mode:'all' oder kein Feld = Altbestand) sieht jeder den Beitrag.
+    // Sonst nur wer eine passende Rolle hat, explizit als Person ausgewählt wurde, der Ersteller ist, oder Admin.
+    const canSeeEntry = (entry) => {
+      if (!entry.visibility || entry.visibility.mode !== 'restricted') return true;
+      if (userRole === 'admin') return true;
+      if (entry.createdBy === authorName) return true;
+      if ((entry.visibility.roles||[]).includes(userRole)) return true;
+      if ((entry.visibility.userIds||[]).includes(user?.uid)) return true;
+      return false;
+    };
+
+    const VISIBILITY_ROLES = [
+      {key:'admin', label:'Admin'}, {key:'trainer', label:'Trainer'}, {key:'aktiver', label:'Aktive'},
+      {key:'eltern', label:'Eltern'}, {key:'jugendlich', label:'Jugendliche'},
+    ];
+
+    const VisibilityPicker = (vis, setVis) => (
+      <div style={{marginTop:'10px',padding:'12px',background:'rgba(0,0,0,0.2)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'10px'}}>
+        <span style={{fontSize:'12px',fontWeight:'700',color:'rgba(255,255,255,0.6)',display:'block',marginBottom:'8px'}}>👁️ Sichtbarkeit</span>
+        <div style={{display:'flex',gap:'8px',marginBottom:vis.mode==='restricted'?'10px':0}}>
+          <button type="button" onClick={()=>setVis(v=>({...v,mode:'all'}))}
+            style={{flex:1,padding:'7px',borderRadius:'8px',border:`1px solid ${vis.mode==='all'?ac:'rgba(255,255,255,0.15)'}`,background:vis.mode==='all'?'rgba(251,191,36,0.15)':'rgba(255,255,255,0.03)',color:vis.mode==='all'?ac:'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>Alle</button>
+          <button type="button" onClick={()=>setVis(v=>({...v,mode:'restricted'}))}
+            style={{flex:1,padding:'7px',borderRadius:'8px',border:`1px solid ${vis.mode==='restricted'?ac:'rgba(255,255,255,0.15)'}`,background:vis.mode==='restricted'?'rgba(251,191,36,0.15)':'rgba(255,255,255,0.03)',color:vis.mode==='restricted'?ac:'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>Eingeschränkt</button>
+        </div>
+        {vis.mode==='restricted'&&(
+          <div style={{display:'grid',gap:'8px'}}>
+            <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+              {VISIBILITY_ROLES.map(r=>{
+                const on=(vis.roles||[]).includes(r.key);
+                return <button key={r.key} type="button" onClick={()=>setVis(v=>({...v,roles:on?(v.roles||[]).filter(x=>x!==r.key):[...(v.roles||[]),r.key]}))}
+                  style={{padding:'4px 10px',borderRadius:'20px',border:`1px solid ${on?ac:'rgba(255,255,255,0.15)'}`,background:on?'rgba(251,191,36,0.15)':'rgba(255,255,255,0.03)',color:on?ac:'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>{r.label}</button>;
+              })}
+            </div>
+            <select multiple value={vis.userIds||[]} onChange={e=>setVis(v=>({...v,userIds:Array.from(e.target.selectedOptions,o=>o.value)}))}
+              style={{padding:'6px',background:'rgba(0,0,0,0.3)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'8px',color:'white',fontSize:'12px',minHeight:'70px'}}>
+              {Object.values(allUsers).filter(u=>u.name||u.email).sort((a,b)=>(a.name||a.email).localeCompare(b.name||b.email,'de')).map(u=>(
+                <option key={u.uid} value={u.uid}>{u.name||u.email}</option>
+              ))}
+            </select>
+            <span style={{fontSize:'10px',color:'rgba(255,255,255,0.3)'}}>Strg/Cmd gedrückt halten für Mehrfachauswahl einzelner Personen.</span>
+          </div>
+        )}
+      </div>
+    );
+
     const submitWZ = () => {
       if (!wzForm.text.trim()) return;
       const validOptions = wzForm.type==='wette' ? wzForm.options.map(o=>o.trim()).filter(Boolean) : [];
@@ -13156,12 +13203,13 @@ export default function TrainingsApp() {
         createdBy: authorName,
         date: wzForm.date || TODAY,
         createdAt: new Date().toISOString(),
+        visibility: wzForm.visibility || {mode:'all',roles:[],userIds:[]},
         ...(wzForm.dueDate ? {dueDate: wzForm.dueDate} : {}),
         ...(validOptions.length ? {options: validOptions, bets: {}} : {}),
       };
       saveWZ([entry, ...wettenZitate]);
       setWzAdding(false);
-      setWzForm({type:'zitat',text:'',date:'',dueDate:'',options:['','']});
+      setWzForm({type:'zitat',text:'',date:'',dueDate:'',options:['',''],visibility:{mode:'all',roles:[],userIds:[]}});
     };
 
     const daysDiff = (a, b) => Math.floor((new Date(b) - new Date(a)) / 86400000);
@@ -13204,7 +13252,7 @@ export default function TrainingsApp() {
 
     const saveEdit = (id) => {
       if (!wzEditText.trim()) return;
-      saveWZ(wettenZitate.map(e=>e.id===id?{...e,text:wzEditText.trim(),edited:true}:e));
+      saveWZ(wettenZitate.map(e=>e.id===id?{...e,text:wzEditText.trim(),visibility:wzEditVisibility,edited:true}:e));
       setWzEditId(null);
     };
 
@@ -13302,8 +13350,9 @@ export default function TrainingsApp() {
                   style={{padding:'5px 10px',borderRadius:'8px',border:'1px solid rgba(239,68,68,0.4)',background:'rgba(0,0,0,0.3)',color:wzForm.dueDate?'#fca5a5':'rgba(255,255,255,0.3)',fontSize:'12px',outline:'none',fontFamily:'inherit'}}/>
                 {!wzForm.dueDate&&<span style={{fontSize:'11px',color:'rgba(255,255,255,0.2)'}}>Fälligkeitsdatum (optional)</span>}
               </div>
+              {VisibilityPicker(wzForm.visibility||{mode:'all',roles:[],userIds:[]}, updater=>setWzForm(f=>({...f,visibility:typeof updater==='function'?updater(f.visibility||{mode:'all',roles:[],userIds:[]}):updater})))}
               <div style={{display:'flex',gap:'8px',justifyContent:'flex-end',marginTop:'10px'}}>
-                <button onClick={()=>{setWzAdding(false);setWzForm({type:'zitat',text:'',date:'',dueDate:'',options:['','']});}}
+                <button onClick={()=>{setWzAdding(false);setWzForm({type:'zitat',text:'',date:'',dueDate:'',options:['',''],visibility:{mode:'all',roles:[],userIds:[]}});}}
                   style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
                 {(() => { const ok = wzForm.text.trim() && (wzForm.type!=='wette'||wzForm.options.filter(o=>o.trim()).length>=2); return (
                 <button onClick={submitWZ} disabled={!ok}
@@ -13321,6 +13370,7 @@ export default function TrainingsApp() {
           ) : (
             <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
               {wettenZitate.filter(entry=>{
+                if (!canSeeEntry(entry)) return false;
                 if (wzFilter !== 'alle' && entry.type !== wzFilter) return false;
                 if (wzSearch.trim()) {
                   const q = wzSearch.trim().toLowerCase();
@@ -13354,7 +13404,7 @@ export default function TrainingsApp() {
                             <button onClick={()=>{setWzAddOptionsId(entry.id);setWzAddOptions(['','']);}}
                               style={{padding:'3px 8px',borderRadius:'7px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.2)',color:ac,cursor:'pointer',fontSize:'11px',fontWeight:'700',flexShrink:0}}>+ Optionen</button>
                           )}
-                          <button onClick={()=>{setWzEditId(entry.id);setWzEditText(entry.text);}}
+                          <button onClick={()=>{setWzEditId(entry.id);setWzEditText(entry.text);setWzEditVisibility(entry.visibility||{mode:'all',roles:[],userIds:[]});}}
                             style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.2)',color:ac,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Pencil size={12}/></button>
                           <button onClick={()=>{if(!window.confirm('Eintrag löschen?'))return;saveWZ(wettenZitate.filter(e=>e.id!==entry.id));}}
                             style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Trash2 size={12}/></button>
@@ -13366,6 +13416,7 @@ export default function TrainingsApp() {
                       <div style={{padding:'12px 14px'}}>
                         <textarea value={wzEditText} onChange={e=>setWzEditText(e.target.value)} rows={4}
                           style={{width:'100%',padding:'10px',background:'rgba(0,0,0,0.3)',border:`1px solid ${acBorder}`,borderRadius:'8px',color:'white',fontSize:'14px',outline:'none',resize:'vertical',boxSizing:'border-box',fontFamily:'inherit',lineHeight:'1.5'}}/>
+                        {VisibilityPicker(wzEditVisibility, updater=>setWzEditVisibility(v=>typeof updater==='function'?updater(v):updater))}
                         <div style={{display:'flex',gap:'8px',marginTop:'8px',justifyContent:'flex-end'}}>
                           <button onClick={()=>setWzEditId(null)} style={{padding:'7px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
                           <button onClick={()=>saveEdit(entry.id)} style={{padding:'7px 16px',background:`linear-gradient(135deg,${ac},#d97706)`,border:'none',borderRadius:'8px',color:'white',fontWeight:'700',fontSize:'13px',cursor:'pointer'}}>Speichern</button>
@@ -13476,6 +13527,7 @@ export default function TrainingsApp() {
                 );
               })}
               {wettenZitate.filter(entry=>{
+                if (!canSeeEntry(entry)) return false;
                 if (wzFilter!=='alle'&&entry.type!==wzFilter) return false;
                 if (wzSearch.trim()){const q=wzSearch.trim().toLowerCase();return entry.text?.toLowerCase().includes(q)||entry.createdBy?.toLowerCase().includes(q);}
                 return true;
