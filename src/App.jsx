@@ -12085,25 +12085,43 @@ export default function TrainingsApp() {
             </div>
           ):(
             <div style={{display:'grid',gap:'8px'}}>
-              {upcomingEvents.map((e,i)=>(
-                <div key={e.uid||e.id||i} style={{background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'12px',padding:'12px 14px'}}>
-                  <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'8px'}}>
-                    <div style={{flex:1,minWidth:0}}>
-                      <p style={{margin:'0 0 3px',fontSize:'14px',fontWeight:'700',color:'white'}}>{e.source==='google'?'🔗 ':''}{e.title}</p>
-                      <p style={{margin:'0 0 3px',fontSize:'12px',color:accentColor,fontWeight:'600'}}>{fmtEventDate(e)}</p>
-                      {e.location&&<p style={{margin:'0 0 3px',fontSize:'12px',color:'rgba(255,255,255,0.5)'}}>📍 {e.location}</p>}
-                      {e.description&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>{e.description}</p>}
-                    </div>
-                    {canEditKalender&&e.source==='manual'&&(
-                      <div style={{display:'flex',gap:'4px',flexShrink:0}}>
-                        <button onClick={()=>{setKalenderEditId(e.id);setKalenderForm({title:e.title||'',date:e.date||'',endDate:e.endDate||'',time:e.time||'',location:e.location||'',description:e.description||''});setKalenderAdding(true);}}
-                          style={{padding:'5px 8px',background:'rgba(255,255,255,0.06)',border:'none',borderRadius:'7px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'12px'}}>✏️</button>
-                        <button onClick={()=>deleteKalenderEvent(e.id)} style={{padding:'5px 8px',background:'rgba(220,38,38,0.12)',border:'none',borderRadius:'7px',color:'#fca5a5',cursor:'pointer',fontSize:'12px'}}><Trash2 size={13}/></button>
+              {(()=>{
+                let lastMonth = null;
+                const out = [];
+                upcomingEvents.forEach((e,i)=>{
+                  const dateStr = (e.start || e.date || '').split('T')[0];
+                  const dt = dateStr ? new Date(dateStr+'T12:00:00') : null;
+                  const monthKey = dt ? `${dt.getFullYear()}-${dt.getMonth()}` : null;
+                  if (monthKey && monthKey !== lastMonth) {
+                    lastMonth = monthKey;
+                    out.push(
+                      <p key={'m'+monthKey} style={{margin:i===0?'0 0 2px':'12px 0 2px',fontSize:'11px',fontWeight:'800',color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px'}}>
+                        {dt.toLocaleDateString('de-DE',{month:'long',year:'numeric'})}
+                      </p>
+                    );
+                  }
+                  out.push(
+                    <div key={e.uid||e.id||i} style={{background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'12px',padding:'12px 14px'}}>
+                      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'8px'}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <p style={{margin:'0 0 3px',fontSize:'14px',fontWeight:'700',color:'white'}}>{e.source==='google'?'🔗 ':''}{e.title}</p>
+                          <p style={{margin:'0 0 3px',fontSize:'12px',color:accentColor,fontWeight:'600'}}>{fmtEventDate(e)}</p>
+                          {e.location&&<p style={{margin:'0 0 3px',fontSize:'12px',color:'rgba(255,255,255,0.5)'}}>📍 {e.location}</p>}
+                          {e.description&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>{e.description}</p>}
+                        </div>
+                        {canEditKalender&&e.source==='manual'&&(
+                          <div style={{display:'flex',gap:'4px',flexShrink:0}}>
+                            <button onClick={()=>{setKalenderEditId(e.id);setKalenderForm({title:e.title||'',date:e.date||'',endDate:e.endDate||'',time:e.time||'',location:e.location||'',description:e.description||''});setKalenderAdding(true);}}
+                              style={{padding:'5px 8px',background:'rgba(255,255,255,0.06)',border:'none',borderRadius:'7px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'12px'}}>✏️</button>
+                            <button onClick={()=>deleteKalenderEvent(e.id)} style={{padding:'5px 8px',background:'rgba(220,38,38,0.12)',border:'none',borderRadius:'7px',color:'#fca5a5',cursor:'pointer',fontSize:'12px'}}><Trash2 size={13}/></button>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                    </div>
+                  );
+                });
+                return out;
+              })()}
             </div>
           )}
         </div>
