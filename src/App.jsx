@@ -819,6 +819,7 @@ export default function TrainingsApp() {
   const [fahrplanTeamFilter, setFahrplanTeamFilter] = useState('');
   const [fahrplanFahrerFilter, setFahrplanFahrerFilter] = useState('');
   const [showAbfahrtManager, setShowAbfahrtManager] = useState(false);
+  const [editingFahrerRows, setEditingFahrerRows] = useState([]);
   const [sendingIntroMail, setSendingIntroMail] = useState(false);
   const [showIntroMailPicker, setShowIntroMailPicker] = useState(false);
   const [introMailSelected, setIntroMailSelected] = useState([]);
@@ -12332,13 +12333,27 @@ export default function TrainingsApp() {
                     lastMonth = monthKey;
                     out.push(<p key={'m'+monthKey} style={{margin:i===0?'0 0 2px':'10px 0 2px',fontSize:'11px',fontWeight:'800',color:'rgba(255,255,255,0.35)',textTransform:'uppercase',letterSpacing:'0.5px'}}>{dt.toLocaleDateString('de-DE',{month:'long',year:'numeric'})}</p>);
                   }
+                  const isEditingFahrer = editingFahrerRows.includes(it.meetingId);
                   const fahrerNode = canEditFahrer ? (
-                    <>
-                      <input list="fahrer-vorschlaege" defaultValue={it.fahrer||''} placeholder="Fahrer eintragen…"
-                        onBlur={e=>{ if(e.target.value!==(it.fahrer||'')) setFahrplanFahrer(it.meetingId, e.target.value.trim()); }}
-                        onKeyDown={e=>{ if(e.key==='Enter') e.target.blur(); }}
-                        style={isMobile?{...rowFahrerSelectStyle,marginLeft:0,maxWidth:'none',width:'100%'}:rowFahrerSelectStyle}/>
-                    </>
+                    <div style={{display:'flex',alignItems:'center',gap:'4px',marginLeft:isMobile?0:'auto',width:isMobile?'100%':'auto'}}>
+                      {isEditingFahrer ? (
+                        <input autoFocus list="fahrer-vorschlaege" defaultValue={it.fahrer||''} placeholder="Fahrer eintragen…"
+                          onBlur={e=>{ const v=e.target.value.trim(); if(v!==(it.fahrer||'')) setFahrplanFahrer(it.meetingId, v); setEditingFahrerRows(r=>r.filter(x=>x!==it.meetingId)); }}
+                          onKeyDown={e=>{ if(e.key==='Enter'||e.key==='Escape') e.target.blur(); }}
+                          style={{...rowFahrerSelectStyle,marginLeft:0,maxWidth:isMobile?'none':'160px',width:isMobile?'100%':'160px'}}/>
+                      ) : (
+                        <select value={it.fahrer||''} onChange={e=>setFahrplanFahrer(it.meetingId, e.target.value)}
+                          style={{...rowFahrerSelectStyle,marginLeft:0,maxWidth:isMobile?'none':'160px',width:isMobile?'100%':'160px'}}>
+                          <option value="" style={{background:'#0a1f13',color:accentColor}}>– kein Fahrer –</option>
+                          {it.fahrer&&!fahrerOptions.includes(it.fahrer)&&<option value={it.fahrer} style={{background:'#0a1f13',color:accentColor}}>{it.fahrer}</option>}
+                          {fahrerOptions.map(f=><option key={f} value={f} style={{background:'#0a1f13',color:accentColor}}>{f}</option>)}
+                        </select>
+                      )}
+                      <button type="button" title="Namen/Adresse bearbeiten" onClick={()=>setEditingFahrerRows(r=>isEditingFahrer?r.filter(x=>x!==it.meetingId):[...r,it.meetingId])}
+                        style={{flexShrink:0,padding:'4px 6px',background:isEditingFahrer?'rgba(74,222,128,0.15)':'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'6px',color:isEditingFahrer?'#4ade80':'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'12px'}}>
+                        {isEditingFahrer?'✓':'✏️'}
+                      </button>
+                    </div>
                   ) : (
                     <span style={{color:accentColor,fontWeight:'700',flexShrink:0,marginLeft:isMobile?0:'auto'}}>👤 {it.fahrer || '–'}</span>
                   );
