@@ -867,6 +867,7 @@ export default function TrainingsApp() {
   const [wzEditId, setWzEditId] = useState(null);
   const [wzForm, setWzForm] = useState({type:'zitat',text:'',date:'',dueDate:'',options:['',''],visibility:{mode:'all',roles:[],userIds:[]}});
   const [wzEditVisibility, setWzEditVisibility] = useState({mode:'all',roles:[],userIds:[]});
+  const [wzVisibilitySearch, setWzVisibilitySearch] = useState('');
   const [wzEditText, setWzEditText] = useState('');
   const [wzSearch, setWzSearch] = useState('');
   const [wzFilter, setWzFilter] = useState('alle');
@@ -13180,13 +13181,26 @@ export default function TrainingsApp() {
                   style={{padding:'4px 10px',borderRadius:'20px',border:`1px solid ${on?ac:'rgba(255,255,255,0.15)'}`,background:on?'rgba(251,191,36,0.15)':'rgba(255,255,255,0.03)',color:on?ac:'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>{r.label}</button>;
               })}
             </div>
-            <select multiple value={vis.userIds||[]} onChange={e=>setVis(v=>({...v,userIds:Array.from(e.target.selectedOptions,o=>o.value)}))}
-              style={{padding:'6px',background:'rgba(0,0,0,0.3)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'8px',color:'white',fontSize:'12px',minHeight:'70px'}}>
-              {Object.values(allUsers).filter(u=>u.name||u.email).sort((a,b)=>(a.name||a.email).localeCompare(b.name||b.email,'de')).map(u=>(
-                <option key={u.uid} value={u.uid}>{u.name||u.email}</option>
-              ))}
-            </select>
-            <span style={{fontSize:'10px',color:'rgba(255,255,255,0.3)'}}>Strg/Cmd gedrückt halten für Mehrfachauswahl einzelner Personen.</span>
+            <input type="text" value={wzVisibilitySearch} onChange={e=>setWzVisibilitySearch(e.target.value)} placeholder="Person suchen…"
+              style={{padding:'7px 10px',background:'rgba(0,0,0,0.3)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'8px',color:'white',fontSize:'12px',outline:'none'}}/>
+            <div style={{display:'grid',gap:'2px',maxHeight:'160px',overflowY:'auto',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'8px',padding:'4px'}}>
+              {Object.values(allUsers)
+                .filter(u=>u.name||u.email)
+                .filter(u=>!wzVisibilitySearch.trim()||((u.name||u.email)).toLowerCase().includes(wzVisibilitySearch.trim().toLowerCase()))
+                .sort((a,b)=>(a.name||a.email).localeCompare(b.name||b.email,'de'))
+                .map(u=>{
+                  const on=(vis.userIds||[]).includes(u.uid);
+                  return (
+                    <label key={u.uid} style={{display:'flex',alignItems:'center',gap:'8px',padding:'5px 6px',borderRadius:'6px',cursor:'pointer',background:on?'rgba(251,191,36,0.1)':'transparent',fontSize:'12px',color:on?ac:'rgba(255,255,255,0.7)'}}>
+                      <input type="checkbox" checked={on} onChange={()=>setVis(v=>({...v,userIds:on?(v.userIds||[]).filter(x=>x!==u.uid):[...(v.userIds||[]),u.uid]}))}/>
+                      {u.name||u.email}
+                    </label>
+                  );
+                })}
+              {Object.values(allUsers).filter(u=>u.name||u.email).filter(u=>!wzVisibilitySearch.trim()||((u.name||u.email)).toLowerCase().includes(wzVisibilitySearch.trim().toLowerCase())).length===0&&
+                <p style={{margin:'4px',fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>Keine Person gefunden.</p>}
+            </div>
+            {(vis.userIds||[]).length>0&&<span style={{fontSize:'11px',color:ac,fontWeight:'600'}}>{vis.userIds.length} Person{vis.userIds.length===1?'':'en'} ausgewählt</span>}
           </div>
         )}
       </div>
