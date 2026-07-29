@@ -12217,6 +12217,9 @@ export default function TrainingsApp() {
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🚗 Wer fährt wann</h1>
         </div>
         <div style={{padding:'16px 14px',maxWidth:'820px',margin:'0 auto'}}>
+          <datalist id="fahrer-vorschlaege">
+            {fahrerOptions.map(f=><option key={f} value={f}/>)}
+          </datalist>
           <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
             <select value={fahrplanTeamFilter} onChange={e=>setFahrplanTeamFilter(e.target.value)} style={selectStyle}>
               <option value="" style={{background:'#132a1c',color:'white'}}>Alle Mannschaften</option>
@@ -12330,10 +12333,12 @@ export default function TrainingsApp() {
                     out.push(<p key={'m'+monthKey} style={{margin:i===0?'0 0 2px':'10px 0 2px',fontSize:'11px',fontWeight:'800',color:'rgba(255,255,255,0.35)',textTransform:'uppercase',letterSpacing:'0.5px'}}>{dt.toLocaleDateString('de-DE',{month:'long',year:'numeric'})}</p>);
                   }
                   const fahrerNode = canEditFahrer ? (
-                    <select value={it.fahrer||''} onChange={e=>setFahrplanFahrer(it.meetingId, e.target.value)} style={isMobile?{...rowFahrerSelectStyle,marginLeft:0,maxWidth:'none',width:'100%'}:rowFahrerSelectStyle}>
-                      <option value="" style={{background:'#0a1f13',color:accentColor}}>– kein Fahrer –</option>
-                      {fahrerOptions.map(f=><option key={f} value={f} style={{background:'#0a1f13',color:accentColor}}>{f}</option>)}
-                    </select>
+                    <>
+                      <input list="fahrer-vorschlaege" defaultValue={it.fahrer||''} placeholder="Fahrer eintragen…"
+                        onBlur={e=>{ if(e.target.value!==(it.fahrer||'')) setFahrplanFahrer(it.meetingId, e.target.value.trim()); }}
+                        onKeyDown={e=>{ if(e.key==='Enter') e.target.blur(); }}
+                        style={isMobile?{...rowFahrerSelectStyle,marginLeft:0,maxWidth:'none',width:'100%'}:rowFahrerSelectStyle}/>
+                    </>
                   ) : (
                     <span style={{color:accentColor,fontWeight:'700',flexShrink:0,marginLeft:isMobile?0:'auto'}}>👤 {it.fahrer || '–'}</span>
                   );
