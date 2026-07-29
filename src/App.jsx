@@ -812,6 +812,7 @@ export default function TrainingsApp() {
   const [fahrplanTeamFilter, setFahrplanTeamFilter] = useState('');
   const [fahrplanFahrerFilter, setFahrplanFahrerFilter] = useState('');
   const [showAbfahrtManager, setShowAbfahrtManager] = useState(false);
+  const [sendingIntroMail, setSendingIntroMail] = useState(false);
   const [abfahrtClubs, setAbfahrtClubs] = useState({});
   const [newAbfahrtClub, setNewAbfahrtClub] = useState('');
   const [newAbfahrtMinutes, setNewAbfahrtMinutes] = useState('');
@@ -2028,6 +2029,26 @@ export default function TrainingsApp() {
     await setDoc(doc(db,'ttc','tippspiel'), { revealed: next }, { merge: true });
     setTippspielConfig(c => ({ ...(c||{}), revealed: next }));
     await fetchTippspiel();
+  };
+
+  const sendFahrplanIntroMail = async () => {
+    if (sendingIntroMail) return;
+    if (!window.confirm('Wirklich an ALLE im Fahrplan hinterlegten E-Mail-Adressen eine Sammel-Mail mit ihren zugeteilten Spielen verschicken? Das kann nicht rückgängig gemacht werden.')) return;
+    setSendingIntroMail(true);
+    try {
+      const idToken = await user.getIdToken();
+      const r = await fetch('/api/fahrplan-send-intro', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const d = await r.json();
+      if (d.error) throw new Error(d.error);
+      alert(`Fertig! ${d.sent} von ${d.recipients} Mails erfolgreich verschickt.`);
+    } catch (e) {
+      alert('Fehler beim Versand: ' + (e?.message || e));
+    } finally {
+      setSendingIntroMail(false);
+    }
   };
 
   const fetchAbfahrtClubs = async () => {
@@ -12159,6 +12180,12 @@ export default function TrainingsApp() {
               <button onClick={()=>{ setShowAbfahrtManager(v=>!v); if (!showAbfahrtManager) fetchAbfahrtClubs(); }}
                 style={{padding:isMobile?'10px 10px':'7px 12px',background:showAbfahrtManager?'rgba(251,191,36,0.15)':'rgba(255,255,255,0.06)',border:`1px solid ${showAbfahrtManager?'rgba(251,191,36,0.4)':accentBorder}`,borderRadius:'9px',color:showAbfahrtManager?'#fbbf24':'white',fontSize:isMobile?'13px':'12px',fontWeight:'700',cursor:'pointer',flex:isMobile?'1 1 100%':'0 0 auto'}}>
                 🕐 Abfahrtszeitenmanager
+              </button>
+            )}
+            {userRole==='admin'&&(
+              <button onClick={sendFahrplanIntroMail} disabled={sendingIntroMail}
+                style={{padding:isMobile?'10px 10px':'7px 12px',background:'rgba(96,165,250,0.1)',border:'1px solid rgba(96,165,250,0.3)',borderRadius:'9px',color:'#93c5fd',fontSize:isMobile?'13px':'12px',fontWeight:'700',cursor:sendingIntroMail?'not-allowed':'pointer',flex:isMobile?'1 1 100%':'0 0 auto',opacity:sendingIntroMail?0.6:1}}>
+                {sendingIntroMail?'Sende…':'📧 Info an alle schicken'}
               </button>
             )}
           </div>
