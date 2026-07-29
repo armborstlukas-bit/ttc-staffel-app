@@ -30,6 +30,13 @@ if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styl
       from { opacity: 0; transform: scale(0.97); }
       to   { opacity: 1; transform: scale(1); }
     }
+    @keyframes ttcBlink {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(244,114,182,0.55); }
+      50%      { box-shadow: 0 0 0 6px rgba(244,114,182,0); }
+    }
+    .ttc-blink {
+      animation: ttcBlink 1.4s ease-in-out infinite;
+    }
     .ttc-view-enter {
       animation: ttcFadeSlide 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
@@ -824,6 +831,8 @@ export default function TrainingsApp() {
   const [myBonus, setMyBonus] = useState({});
   const [allTipps, setAllTipps] = useState(null);
   const [tippspielImporting, setTippspielImporting] = useState(false);
+  const [tippspielSubmitted, setTippspielSubmitted] = useState(null); // null = noch unbekannt
+  const [tippspielSeenAt, setTippspielSeenAt] = useState(null);
   const [tippspielJustSaved, setTippspielJustSaved] = useState(false);
   const [expandedTipper, setExpandedTipper] = useState(null);
   const [gegnerForm, setGegnerForm] = useState({date:'', verein:'', gegner:'', taktik:'', spielweise:''});
@@ -1931,6 +1940,38 @@ export default function TrainingsApp() {
       }).catch(()=>{}).finally(()=>setFahrplanLoading(false));
   };
 
+  // Lädt beim Login einmalig den Abgabe-Status fürs Tippspiel (unabhängig davon, ob
+  // die View gerade offen ist), damit der Menü-Button ggf. blinken kann.
+  useEffect(() => {
+    if (!user?.uid) return;
+    const seenRaw = localStorage.getItem('tippspielSeenAt_' + user.uid);
+    setTippspielSeenAt(seenRaw ? parseInt(seenRaw, 10) : null);
+    (async () => {
+      try {
+        const cfgSnap = await getDoc(doc(db,'ttc','tippspiel'));
+        const cfg = cfgSnap.exists() ? cfgSnap.data() : null;
+        setTippspielConfig(cfg);
+        const teams = cfg?.teams || [];
+        if (teams.length === 0) { setTippspielSubmitted(true); return; }
+        const tippSnap = await getDoc(doc(db,'ttc','tippspiel','tipps',user.uid));
+        const ranks = tippSnap.exists() ? (tippSnap.data().ranks || {}) : {};
+        setTippspielSubmitted(teams.every(t => ranks[t.teamId]));
+      } catch { setTippspielSubmitted(null); }
+    })();
+  }, [user?.uid]);
+
+  // Aufruf beim Klick auf den Tippspiel-Menüpunkt: merkt sich "gesehen am", damit der
+  // Button nicht mehr blinkt — bis 5 Tage später, falls dann immer noch nicht alles abgegeben ist.
+  const markTippspielSeen = () => {
+    if (!user?.uid) return;
+    const now = Date.now();
+    localStorage.setItem('tippspielSeenAt_' + user.uid, String(now));
+    setTippspielSeenAt(now);
+  };
+
+  const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
+  const tippspielNeedsAttention = tippspielSubmitted === false && (!tippspielSeenAt || (Date.now() - tippspielSeenAt) > FIVE_DAYS_MS);
+
   const fetchTippspiel = async () => {
     setTippspielLoading(true);
     try {
@@ -1976,6 +2017,7 @@ export default function TrainingsApp() {
       updatedAt: new Date().toISOString(),
     }, { merge: true });
     setTippspielJustSaved(true);
+    setTippspielSubmitted(true);
   };
 
   const saveBonus = async (key, value) => {
@@ -4545,7 +4587,7 @@ export default function TrainingsApp() {
           {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>navTo('notifications'), badge: unreadCount},
           {label:'TTC News',         icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',   action:()=>{navTo('ttcnews');fetchTtcNews();}},
           {label:'Wer fährt wann',   icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
-          {label:'TTC Tippspiel',   icon:'🎱', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.25)', action:()=>{navTo('tippspiel');fetchTippspiel();}},
+          {label: tippspielNeedsAttention&&tippspielConfig?.deadline ? `Tippspiel bis ${new Date(tippspielConfig.deadline+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}` : 'TTC Tippspiel', icon:'🎱', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.25)', blink: tippspielNeedsAttention, action:()=>{markTippspielSeen();navTo('tippspiel');fetchTippspiel();}},
           {label:'Materialverwaltung',icon:'🏓', color:'#fb923c', bg:'rgba(251,146,60,0.08)', border:'rgba(251,146,60,0.25)',  action:()=>navTo('materialverwaltung')},
           ...(canAccessPinnwand()?[{label:'Pinnwand',  icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.2)',  action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
           ...(canEdit()?[
@@ -4715,7 +4757,7 @@ export default function TrainingsApp() {
               <p style={{color:cat.color,fontSize:'10px',fontWeight:'800',textTransform:'uppercase',letterSpacing:'2px',margin:'0 0 10px'}}>⬡ {cat.label}</p>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(110px,1fr))',gap:'8px'}}>
                 {cat.links.map((ql,i)=>(
-                  <button key={i} onClick={ql.action} style={QL_STYLE(ql.bg,ql.border)}
+                  <button key={i} onClick={ql.action} className={ql.blink?'ttc-blink':''} style={QL_STYLE(ql.bg,ql.border)}
                     onMouseEnter={e=>e.currentTarget.style.transform='translateY(-2px)'}
                     onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
                     {ql.icon&&typeof ql.icon==='object'&&ql.icon.type==='img'
@@ -4872,12 +4914,12 @@ export default function TrainingsApp() {
               {label:'Gegnerlogbuch', icon:'🎯', desc:`${gegnerLogbuch.length} ${gegnerLogbuch.length===1?'Eintrag':'Einträge'} · Taktiken & Hinweise`, color:'#67e8f9', bg:'rgba(8,145,178,0.08)', border:'rgba(8,145,178,0.2)', action:()=>navTo('gegnerlogbuch')},
               {label:'TTC News',        icon:'📰', desc:'Aktuelle Vereinsnachrichten',             color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',  action:()=>{navTo('ttcnews');fetchTtcNews();}},
               {label:'Wer fährt wann',  icon:'🚗', desc:'Spielplan mit Fahrer je Spiel',            color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.2)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
-              {label:'TTC Tippspiel',  icon:'🎱', desc:'Endplatzierungen tippen',                    color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>{navTo('tippspiel');fetchTippspiel();}},
+              {label:'TTC Tippspiel',  icon:'🎱', desc: tippspielNeedsAttention&&tippspielConfig?.deadline ? `Noch nicht abgegeben — Frist ${new Date(tippspielConfig.deadline+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}` : 'Endplatzierungen tippen', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', blink: tippspielNeedsAttention, action:()=>{markTippspielSeen();navTo('tippspiel');fetchTippspiel();}},
               {label:'Trainingsmatches',icon:'⚔️', desc:'Duelle & Allzeittabelle',                  color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>navTo('trainingsmatches')},
               ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', desc:'Wetten, Zitate & Lessons Learned', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
               {label:'MyTischtennis', icon:'🏓', desc:'Vereinsübersicht auf MyTischtennis',                                                                  color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)',  action:()=>(()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);})()},
             ].map(t=>(
-              <button key={t.label} onClick={t.action}
+              <button key={t.label} onClick={t.action} className={t.blink?'ttc-blink':''}
                 style={{position:'relative',background:t.bg,border:`1px solid ${t.border}`,borderRadius:'18px',padding:'22px 20px',cursor:'pointer',textAlign:'left',display:'flex',flexDirection:'column',gap:'8px',transition:'transform 0.15s'}}
                 onMouseEnter={e=>e.currentTarget.style.transform='translateY(-2px)'}
                 onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
@@ -5450,7 +5492,7 @@ export default function TrainingsApp() {
                 links:[
                   {label:'TTC News', icon:'📰', color:'#86efac', bg:'rgba(134,239,172,0.1)', border:'rgba(134,239,172,0.25)', action:()=>{navTo('ttcnews');fetchTtcNews();}},
                   {label:'Wer fährt wann', icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.1)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
-                  {label:'TTC Tippspiel', icon:'🎱', color:'#f9a8d4', bg:'rgba(244,114,182,0.1)', border:'rgba(244,114,182,0.25)', action:()=>{navTo('tippspiel');fetchTippspiel();}},
+                  {label: tippspielNeedsAttention&&tippspielConfig?.deadline ? `Tipps bis ${new Date(tippspielConfig.deadline+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}!` : 'TTC Tippspiel', icon:'🎱', color:'#f9a8d4', bg:'rgba(244,114,182,0.1)', border:'rgba(244,114,182,0.25)', blink: tippspielNeedsAttention, action:()=>{markTippspielSeen();navTo('tippspiel');fetchTippspiel();}},
                   ...(isJugend ? [{label:'Gegnerlogbuch', icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.1)', border:'rgba(8,145,178,0.25)', action:()=>navTo('gegnerlogbuch')}] : []),
                 ],
               },
@@ -5462,7 +5504,7 @@ export default function TrainingsApp() {
                     <p style={{color:cat.color,fontSize:'10px',fontWeight:'800',textTransform:'uppercase',letterSpacing:'2px',margin:'0 0 10px'}}>⬡ {cat.label}</p>
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(110px,1fr))',gap:'8px'}}>
                       {cat.links.map((ql,i)=>(
-                        <button key={i} onClick={ql.action} style={QL(ql.bg,ql.border)}
+                        <button key={i} onClick={ql.action} className={ql.blink?'ttc-blink':''} style={QL(ql.bg,ql.border)}
                           onMouseEnter={e=>e.currentTarget.style.transform='translateY(-2px)'}
                           onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
                           <span style={{fontSize:'24px',lineHeight:1}}>{ql.icon}</span>
