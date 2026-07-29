@@ -13402,6 +13402,15 @@ export default function TrainingsApp() {
                     {/* Kopfzeile */}
                     <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 14px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
                       <span style={{fontSize:'11px',fontWeight:'800',color:cfg.color,background:cfg.bg,border:`1px solid ${cfg.border}`,borderRadius:'6px',padding:'2px 8px',flexShrink:0}}>{cfg.icon} {cfg.label}</span>
+                      {entry.visibility?.mode==='restricted'&&(
+                        <span title={[
+                            ...(entry.visibility.roles||[]).map(r=>VISIBILITY_ROLES.find(x=>x.key===r)?.label||r),
+                            ...(entry.visibility.userIds||[]).map(uid=>allUsers[uid]?.name||allUsers[uid]?.email).filter(Boolean),
+                          ].join(', ') || 'Eingeschränkt sichtbar'}
+                          style={{fontSize:'11px',fontWeight:'800',color:'#fca5a5',background:'rgba(239,68,68,0.12)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:'6px',padding:'2px 8px',flexShrink:0,cursor:'help'}}>
+                          🔒 Eingeschränkt sichtbar
+                        </span>
+                      )}
                       <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)',flex:1}}>{entry.createdBy}</span>
                       {entry.dueDate && (
                         <span
