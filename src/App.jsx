@@ -820,6 +820,12 @@ export default function TrainingsApp() {
   const [fahrplanFahrerFilter, setFahrplanFahrerFilter] = useState('');
   const [showAbfahrtManager, setShowAbfahrtManager] = useState(false);
   const [editingFahrerRows, setEditingFahrerRows] = useState([]);
+  const [kalenderManual, setKalenderManual] = useState({});
+  const [kalenderGoogle, setKalenderGoogle] = useState([]);
+  const [kalenderLoading, setKalenderLoading] = useState(false);
+  const [kalenderAdding, setKalenderAdding] = useState(false);
+  const [kalenderForm, setKalenderForm] = useState({ title:'', date:'', endDate:'', time:'', location:'', description:'' });
+  const [kalenderEditId, setKalenderEditId] = useState(null);
   const [sendingIntroMail, setSendingIntroMail] = useState(false);
   const [showIntroMailPicker, setShowIntroMailPicker] = useState(false);
   const [introMailSelected, setIntroMailSelected] = useState([]);
@@ -2100,6 +2106,39 @@ export default function TrainingsApp() {
     } finally {
       setSendingIntroMail(false);
     }
+  };
+
+  const fetchKalender = async () => {
+    setKalenderLoading(true);
+    try {
+      const [manualSnap, googleRes] = await Promise.all([
+        getDoc(doc(db,'ttc','kalenderEvents')),
+        fetch('/api/kalender-google?_='+Date.now()).then(r=>r.json()).catch(()=>({items:[]})),
+      ]);
+      setKalenderManual(manualSnap.exists() ? (manualSnap.data() || {}) : {});
+      setKalenderGoogle(Array.isArray(googleRes.items) ? googleRes.items : []);
+    } finally {
+      setKalenderLoading(false);
+    }
+  };
+
+  const saveKalenderEvent = async () => {
+    if (!kalenderForm.title.trim() || !kalenderForm.date) { alert('Bitte Titel und Datum ausfüllen.'); return; }
+    const id = kalenderEditId || ('kev_' + Date.now());
+    const updated = { ...kalenderManual, [id]: { ...kalenderForm, id, createdBy: userProfile?.name || user?.email || '' } };
+    setKalenderManual(updated);
+    await setDoc(doc(db,'ttc','kalenderEvents'), updated);
+    setKalenderAdding(false);
+    setKalenderEditId(null);
+    setKalenderForm({ title:'', date:'', endDate:'', time:'', location:'', description:'' });
+  };
+
+  const deleteKalenderEvent = async (id) => {
+    if (!window.confirm('Diesen Termin wirklich löschen?')) return;
+    const updated = { ...kalenderManual };
+    delete updated[id];
+    setKalenderManual(updated);
+    await setDoc(doc(db,'ttc','kalenderEvents'), updated);
   };
 
   const fetchAbfahrtClubs = async () => {
@@ -4588,6 +4627,7 @@ export default function TrainingsApp() {
           {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>navTo('notifications'), badge: unreadCount},
           {label:'TTC News',         icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',   action:()=>{navTo('ttcnews');fetchTtcNews();}},
           {label:'Wer fährt wann',   icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
+          {label:'Vereinskalender',  icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)', action:()=>{navTo('kalender');fetchKalender();}},
           {label: tippspielNeedsAttention&&tippspielConfig?.deadline ? `Tippspiel bis ${new Date(tippspielConfig.deadline+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}` : 'TTC Tippspiel', icon:'🎱', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.25)', blink: tippspielNeedsAttention, action:()=>{markTippspielSeen();navTo('tippspiel');fetchTippspiel();}},
           {label:'Materialverwaltung',icon:'🏓', color:'#fb923c', bg:'rgba(251,146,60,0.08)', border:'rgba(251,146,60,0.25)',  action:()=>navTo('materialverwaltung')},
           ...(canAccessPinnwand()?[{label:'Pinnwand',  icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.2)',  action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
@@ -4782,7 +4822,7 @@ export default function TrainingsApp() {
 
 
   // ── AKTIVER DASHBOARD ────────────────────────────────────────────────────
-  if (userRole === 'aktiver' && !['gegnerlogbuch','ttcnews','trainingsmatches','wettenZitate','fahrplan','tippspiel'].includes(view)) {
+  if (userRole === 'aktiver' && !['gegnerlogbuch','ttcnews','trainingsmatches','wettenZitate','fahrplan','tippspiel','kalender'].includes(view)) {
     const dateLabel = new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
     const greeting = new Date().getHours()<12?'Guten Morgen':new Date().getHours()<18?'Hallo':'Guten Abend';
 
@@ -4915,6 +4955,7 @@ export default function TrainingsApp() {
               {label:'Gegnerlogbuch', icon:'🎯', desc:`${gegnerLogbuch.length} ${gegnerLogbuch.length===1?'Eintrag':'Einträge'} · Taktiken & Hinweise`, color:'#67e8f9', bg:'rgba(8,145,178,0.08)', border:'rgba(8,145,178,0.2)', action:()=>navTo('gegnerlogbuch')},
               {label:'TTC News',        icon:'📰', desc:'Aktuelle Vereinsnachrichten',             color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',  action:()=>{navTo('ttcnews');fetchTtcNews();}},
               {label:'Wer fährt wann',  icon:'🚗', desc:'Spielplan mit Fahrer je Spiel',            color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.2)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
+              {label:'Vereinskalender', icon:'📅', desc:'Termine & Hallenbelegungen',               color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.2)', action:()=>{navTo('kalender');fetchKalender();}},
               {label:'TTC Tippspiel',  icon:'🎱', desc: tippspielNeedsAttention&&tippspielConfig?.deadline ? `Noch nicht abgegeben — Frist ${new Date(tippspielConfig.deadline+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}` : 'Endplatzierungen tippen', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', blink: tippspielNeedsAttention, action:()=>{markTippspielSeen();navTo('tippspiel');fetchTippspiel();}},
               {label:'Trainingsmatches',icon:'⚔️', desc:'Duelle & Allzeittabelle',                  color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>navTo('trainingsmatches')},
               ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', desc:'Wetten, Zitate & Lessons Learned', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
@@ -5493,6 +5534,7 @@ export default function TrainingsApp() {
                 links:[
                   {label:'TTC News', icon:'📰', color:'#86efac', bg:'rgba(134,239,172,0.1)', border:'rgba(134,239,172,0.25)', action:()=>{navTo('ttcnews');fetchTtcNews();}},
                   {label:'Wer fährt wann', icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.1)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
+                  {label:'Vereinskalender', icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.1)', border:'rgba(251,191,36,0.25)', action:()=>{navTo('kalender');fetchKalender();}},
                   {label: tippspielNeedsAttention&&tippspielConfig?.deadline ? `Tipps bis ${new Date(tippspielConfig.deadline+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}!` : 'TTC Tippspiel', icon:'🎱', color:'#f9a8d4', bg:'rgba(244,114,182,0.1)', border:'rgba(244,114,182,0.25)', blink: tippspielNeedsAttention, action:()=>{markTippspielSeen();navTo('tippspiel');fetchTippspiel();}},
                   ...(isJugend ? [{label:'Gegnerlogbuch', icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.1)', border:'rgba(8,145,178,0.25)', action:()=>navTo('gegnerlogbuch')}] : []),
                 ],
@@ -11953,6 +11995,115 @@ export default function TrainingsApp() {
                   </a>
                 );
               })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── VEREINSKALENDER VIEW ──────────────────────────────────────────────────
+  if (view === 'kalender') {
+    const isAktiver = userRole === 'aktiver';
+    const accentColor = isAktiver ? '#0891b2' : '#fbbf24';
+    const accentBorder = isAktiver ? 'rgba(8,145,178,0.2)' : 'rgba(251,191,36,0.2)';
+    const bgGrad = isAktiver ? 'linear-gradient(135deg,#0c1a2e 0%,#0e2a3a 100%)' : 'linear-gradient(135deg,#1a1408 0%,#0d0a1f 100%)';
+    const canEditKalender = ['admin','trainer'].includes(userRole);
+
+    const allEvents = [
+      ...Object.values(kalenderManual).map(e => ({ ...e, source: 'manual' })),
+      ...kalenderGoogle,
+    ];
+    const todayIso = new Date().toISOString().split('T')[0];
+    const upcomingEvents = allEvents
+      .filter(e => (e.start || e.date) >= todayIso)
+      .sort((a,b) => (a.start || a.date).localeCompare(b.start || b.date));
+
+    const fmtEventDate = (e) => {
+      const dateStr = (e.start || e.date || '').split('T')[0];
+      if (!dateStr) return '';
+      const dt = new Date(dateStr + 'T12:00:00');
+      const dateLabel = dt.toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'2-digit', year:'numeric' });
+      const endDateStr = (e.end || e.endDate || '').split('T')[0];
+      let range = dateLabel;
+      if (endDateStr && endDateStr !== dateStr) {
+        const endDt = new Date(endDateStr + 'T12:00:00');
+        // Google-Kalender-Enddatum bei Ganztagesterminen ist exklusiv (Tag danach) — für Anzeige einen Tag zurückrechnen
+        if (e.allDay) endDt.setDate(endDt.getDate() - 1);
+        range += ' – ' + endDt.toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
+      }
+      const timeStr = e.time || (!e.allDay && e.start?.includes('T') ? e.start.split('T')[1]?.slice(0,5) : '');
+      return range + (timeStr ? `, ${timeStr} Uhr` : '');
+    };
+
+    const inputStyleK = {width:'100%',boxSizing:'border-box',padding:'9px 12px',background:'#1a1408',border:`1px solid ${accentBorder}`,borderRadius:'8px',color:'white',fontSize:'13px'};
+
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:bgGrad,fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
+          <button onClick={()=>navTo('home')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'9px',color:'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:'600'}}><Home size={15}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>📅 Vereinskalender</h1>
+        </div>
+        <div style={{padding:'16px 14px',maxWidth:'820px',margin:'0 auto'}}>
+          <p style={{margin:'0 0 16px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>Wichtige Termine & Hallenbelegungen. 🔗 = automatisch aus dem TTC-Google-Kalender.</p>
+
+          {canEditKalender&&(
+            <div style={{marginBottom:'16px'}}>
+              {!kalenderAdding ? (
+                <button onClick={()=>{setKalenderAdding(true);setKalenderEditId(null);setKalenderForm({title:'',date:'',endDate:'',time:'',location:'',description:''});}}
+                  style={{padding:'9px 14px',background:'linear-gradient(135deg,#d97706,#b45309)',color:'white',border:'none',borderRadius:'9px',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>
+                  ➕ Termin hinzufügen
+                </button>
+              ) : (
+                <div style={{padding:'14px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'12px',display:'grid',gap:'8px'}}>
+                  <input placeholder="Titel" value={kalenderForm.title} onChange={e=>setKalenderForm(f=>({...f,title:e.target.value}))} style={inputStyleK}/>
+                  <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                    <input type="date" value={kalenderForm.date} onChange={e=>setKalenderForm(f=>({...f,date:e.target.value}))} style={{...inputStyleK,flex:'1 1 140px',colorScheme:'dark'}}/>
+                    <input type="date" placeholder="Enddatum (optional)" value={kalenderForm.endDate} onChange={e=>setKalenderForm(f=>({...f,endDate:e.target.value}))} style={{...inputStyleK,flex:'1 1 140px',colorScheme:'dark'}}/>
+                    <input type="time" value={kalenderForm.time} onChange={e=>setKalenderForm(f=>({...f,time:e.target.value}))} style={{...inputStyleK,flex:'1 1 100px',colorScheme:'dark'}}/>
+                  </div>
+                  <input placeholder="Ort / Halle" value={kalenderForm.location} onChange={e=>setKalenderForm(f=>({...f,location:e.target.value}))} style={inputStyleK}/>
+                  <textarea placeholder="Beschreibung (optional)" rows={2} value={kalenderForm.description} onChange={e=>setKalenderForm(f=>({...f,description:e.target.value}))} style={{...inputStyleK,resize:'vertical'}}/>
+                  <div style={{display:'flex',gap:'8px'}}>
+                    <button onClick={saveKalenderEvent} style={{flex:1,padding:'10px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'9px',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>Speichern</button>
+                    <button onClick={()=>{setKalenderAdding(false);setKalenderEditId(null);}} style={{flex:1,padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.5)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'9px',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {kalenderLoading?(
+            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.3)'}}>
+              <div style={{fontSize:'36px',marginBottom:'12px'}}>⏳</div>
+              <p style={{margin:0}}>Termine werden geladen…</p>
+            </div>
+          ):upcomingEvents.length===0?(
+            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.2)'}}>
+              <div style={{fontSize:'36px',marginBottom:'12px'}}>📭</div>
+              <p style={{margin:0,fontWeight:'600'}}>Keine anstehenden Termine</p>
+            </div>
+          ):(
+            <div style={{display:'grid',gap:'8px'}}>
+              {upcomingEvents.map((e,i)=>(
+                <div key={e.uid||e.id||i} style={{background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'12px',padding:'12px 14px'}}>
+                  <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'8px'}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <p style={{margin:'0 0 3px',fontSize:'14px',fontWeight:'700',color:'white'}}>{e.source==='google'?'🔗 ':''}{e.title}</p>
+                      <p style={{margin:'0 0 3px',fontSize:'12px',color:accentColor,fontWeight:'600'}}>{fmtEventDate(e)}</p>
+                      {e.location&&<p style={{margin:'0 0 3px',fontSize:'12px',color:'rgba(255,255,255,0.5)'}}>📍 {e.location}</p>}
+                      {e.description&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>{e.description}</p>}
+                    </div>
+                    {canEditKalender&&e.source==='manual'&&(
+                      <div style={{display:'flex',gap:'4px',flexShrink:0}}>
+                        <button onClick={()=>{setKalenderEditId(e.id);setKalenderForm({title:e.title||'',date:e.date||'',endDate:e.endDate||'',time:e.time||'',location:e.location||'',description:e.description||''});setKalenderAdding(true);}}
+                          style={{padding:'5px 8px',background:'rgba(255,255,255,0.06)',border:'none',borderRadius:'7px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'12px'}}>✏️</button>
+                        <button onClick={()=>deleteKalenderEvent(e.id)} style={{padding:'5px 8px',background:'rgba(220,38,38,0.12)',border:'none',borderRadius:'7px',color:'#fca5a5',cursor:'pointer',fontSize:'12px'}}><Trash2 size={13}/></button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
