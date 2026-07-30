@@ -12212,6 +12212,21 @@ export default function TrainingsApp() {
       passiv:     {color:'#9ca3af', bg:'rgba(156,163,175,0.1)',  border:'rgba(156,163,175,0.3)'},  // Grau
     };
     const highestRole = roles => ROLE_RANK.find(r=>roles.includes(r)) || null;
+    // TTR-Exportlisten liefern Namen teils als "Nachname, Vorname" statt "Vorname Nachname" —
+    // daher wortweise (reihenfolge-unabhängig) statt als reinen String vergleichen.
+    const wordSet = s => (s||'').replace(/,/g,' ').trim().toLowerCase().replace(/\s+/g,' ').split(' ').filter(Boolean).sort().join(' ');
+    const getAktiverMatch = m => {
+      const fullNameWords = wordSet(`${m.vorname} ${m.nachname}`);
+      const spielerList = Object.values(aktiveSpieler);
+      const exact = spielerList.find(sp => wordSet(sp.name) === fullNameWords);
+      if (exact) return {status:'exact', sp:exact};
+      const similar = spielerList
+        .map(sp => ({sp, dist: levenshtein(wordSet(sp.name), fullNameWords)}))
+        .filter(({sp,dist}) => dist>0 && dist<=3 && Math.abs(wordSet(sp.name).length-fullNameWords.length)<=4)
+        .sort((a,b)=>a.dist-b.dist)[0]?.sp;
+      if (similar) return {status:'similar', sp:similar};
+      return {status:'none', sp:null};
+    };
 
     const entries = Object.entries(mitgliederListe);
     const knownEmails = new Set(entries.map(([,m])=>(m.email||'').trim().toLowerCase()).filter(Boolean));
@@ -12381,16 +12396,23 @@ export default function TrainingsApp() {
               const isExpanded = mitgliedExpandedId === id;
               const childQ = mitgliedChildSearch.trim().toLowerCase();
               const elternOhneKind = roles.includes('eltern') && linkedIds.length===0;
+              const aktiverMatch = roles.includes('aktiver') ? getAktiverMatch(m) : null;
+              const aktiverKeinTTR = aktiverMatch?.status === 'none';
+              const aktiverAehnlich = aktiverMatch?.status === 'similar';
               const topRole = highestRole(roles);
-              const cardColors = elternOhneKind ? {border:'rgba(239,68,68,0.6)', bg:'rgba(239,68,68,0.06)'} : (topRole ? {border:ROLE_COLORS[topRole].border, bg:ROLE_COLORS[topRole].bg} : {border:'rgba(196,181,253,0.2)', bg:'rgba(255,255,255,0.04)'});
+              const cardColors = elternOhneKind || aktiverKeinTTR ? {border:'rgba(239,68,68,0.6)', bg:'rgba(239,68,68,0.06)'}
+                : aktiverAehnlich ? {border:'rgba(251,191,36,0.6)', bg:'rgba(251,191,36,0.07)'}
+                : (topRole ? {border:ROLE_COLORS[topRole].border, bg:ROLE_COLORS[topRole].bg} : {border:'rgba(196,181,253,0.2)', bg:'rgba(255,255,255,0.04)'});
               const matchedUser = Object.values(allUsers).find(u => (u.email||'').trim().toLowerCase() === (m.email||'').trim().toLowerCase());
               return (
-                <div key={id} style={{background:cardColors.bg,border:`1px solid ${cardColors.border}`,borderRadius:'10px',overflow:'hidden',...(elternOhneKind?{boxShadow:'0 0 0 1px rgba(239,68,68,0.4)'}:{})}}>
+                <div key={id} style={{background:cardColors.bg,border:`1px solid ${cardColors.border}`,borderRadius:'10px',overflow:'hidden',...((elternOhneKind||aktiverKeinTTR)?{boxShadow:'0 0 0 1px rgba(239,68,68,0.4)'}:aktiverAehnlich?{boxShadow:'0 0 0 1px rgba(251,191,36,0.4)'}:{})}}>
                   <button onClick={()=>{setMitgliedExpandedId(isExpanded?null:id);setMitgliedChildSearch('');}}
                     style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',background:'transparent',border:'none',cursor:'pointer',textAlign:'left'}}>
                     <div style={{flex:'1 1 200px',minWidth:0}}>
                       <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'white'}}>{m.vorname} {m.nachname}</p>
                       {elternOhneKind&&<p style={{margin:0,fontSize:'10px',color:'#fca5a5',fontWeight:'700'}}>⚠️ Kein Kind zugeordnet</p>}
+                      {aktiverKeinTTR&&<p style={{margin:0,fontSize:'10px',color:'#fca5a5',fontWeight:'700'}}>⚠️ Kein TTR-Wert auffindbar</p>}
+                      {aktiverAehnlich&&<p style={{margin:0,fontSize:'10px',color:'#fbbf24',fontWeight:'700'}}>⚠️ TTR: nur ähnlicher Name gefunden</p>}
                       <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>{fmtGeb(m.geburtsdatum)}{m.email?` · ${m.email}`:' · keine E-Mail'}</p>
                     </div>
                     <div style={{display:'flex',gap:'4px',flexWrap:'wrap',justifyContent:'flex-end',flex:'0 1 auto'}}>
@@ -12453,28 +12475,19 @@ export default function TrainingsApp() {
                         )
                       )}
                       {roles.includes('aktiver') && (()=>{
-                        // TTR-Exportlisten liefern Namen teils als "Nachname, Vorname" statt "Vorname Nachname" —
-                        // daher wortweise (reihenfolge-unabhängig) statt als reinen String vergleichen.
-                        const wordSet = s => (s||'').replace(/,/g,' ').trim().toLowerCase().replace(/\s+/g,' ').split(' ').filter(Boolean).sort().join(' ');
-                        const fullName = `${m.vorname} ${m.nachname}`.trim().toLowerCase();
-                        const fullNameWords = wordSet(fullName);
+                        const {status, sp: match} = aktiverMatch;
                         const spielerList = Object.values(aktiveSpieler);
-                        const exact = spielerList.find(sp => wordSet(sp.name) === fullNameWords);
-                        const similar = !exact ? spielerList
-                          .map(sp => ({sp, dist: levenshtein(wordSet(sp.name), fullNameWords)}))
-                          .filter(({sp,dist}) => dist>0 && dist<=3 && Math.abs(wordSet(sp.name).length-fullNameWords.length)<=4)
-                          .sort((a,b)=>a.dist-b.dist)[0]?.sp : null;
                         return (
                           <div>
                             <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'6px'}}>⚡ TTR-Wert / Spieler-Zuordnung</span>
-                            {exact ? (
-                              <p style={{margin:0,fontSize:'12px',color:'#86efac'}}>✅ {exact.name}{exact.ttr?` — TTR ${exact.ttr}`:' — kein TTR-Wert hinterlegt'}</p>
-                            ) : similar ? (
-                              <p style={{margin:0,fontSize:'12px',color:'#fbbf24'}}>⚠️ Ähnlicher Name gefunden: {similar.name}{similar.ttr?` (TTR ${similar.ttr})`:''} — bitte prüfen{matchedUser?'':' (noch kein App-Account)'}</p>
+                            {status==='exact' ? (
+                              <p style={{margin:0,fontSize:'12px',color:'#86efac'}}>✅ {match.name}{match.ttr?` — TTR ${match.ttr}`:' — kein TTR-Wert hinterlegt'}</p>
+                            ) : status==='similar' ? (
+                              <p style={{margin:0,fontSize:'12px',color:'#fbbf24'}}>⚠️ Ähnlicher Name gefunden: {match.name}{match.ttr?` (TTR ${match.ttr})`:''} — bitte prüfen{matchedUser?'':' (noch kein App-Account)'}</p>
                             ) : (
-                              <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>❌ Kein TTR-Wert auffindbar</p>
+                              <p style={{margin:0,fontSize:'12px',color:'#fca5a5'}}>❌ Kein TTR-Wert auffindbar</p>
                             )}
-                            {matchedUser && (exact || similar) && (
+                            {matchedUser && status!=='none' && (
                               <select value={matchedUser.linkedPlayerId||''} onChange={e=>linkPlayerToUser(matchedUser.uid, e.target.value||null)}
                                 style={{marginTop:'6px',padding:'6px 10px',border:'1px solid rgba(8,145,178,0.4)',borderRadius:'8px',fontSize:'12px',cursor:'pointer',color:'#67e8f9',background:'#0a2210',width:'100%'}}>
                                 <option value="" style={{background:'#0a2210'}}>– kein Spieler –</option>
