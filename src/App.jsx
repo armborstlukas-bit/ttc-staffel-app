@@ -2134,6 +2134,17 @@ export default function TrainingsApp() {
   const saveMitgliedField = async (id, field, value) => {
     setMitgliederListe(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
     await updateDoc(doc(db,'ttc','mitgliederListe'), { [`list.${id}.${field}`]: value });
+
+    // Falls diese Person bereits einen echten Account hat (E-Mail stimmt überein),
+    // die Rollenänderung auch dort sofort live übernehmen — sonst wirkt die
+    // Mitgliederverwaltung nur bei künftigen Neu-Registrierungen.
+    if (field === 'roles') {
+      const email = (mitgliederListe[id]?.email || '').trim().toLowerCase();
+      if (email) {
+        const matchedUser = Object.values(allUsers).find(u => (u.email||'').trim().toLowerCase() === email);
+        if (matchedUser?.uid) saveUserRoles(matchedUser.uid, value.length ? value : ['pending']);
+      }
+    }
   };
 
   const fetchKalender = async () => {
@@ -3415,6 +3426,7 @@ export default function TrainingsApp() {
       eltern:     {icon:'👨‍👩‍👧', accent:'rgba(253,230,138,0.9)', accentBg:'rgba(253,230,138,0.08)', accentBorder:'rgba(253,230,138,0.25)', desc:'Übersicht & An-/Abmeldung für dein Kind'},
       jugendlich: {icon:'🧒', accent:'rgba(110,231,183,0.9)', accentBg:'rgba(110,231,183,0.08)', accentBorder:'rgba(110,231,183,0.25)', desc:'Eigene Übersicht, Turniere & Errungenschaften'},
       aktiver:    {icon:'🏓', accent:'rgba(103,232,249,0.9)', accentBg:'rgba(8,145,178,0.08)',   accentBorder:'rgba(8,145,178,0.3)',   desc:'Aktiven-Portal & Gegnerlogbuch'},
+      passiv:     {icon:'📰', accent:'rgba(209,213,219,0.9)', accentBg:'rgba(107,114,128,0.1)',  accentBorder:'rgba(107,114,128,0.3)', desc:'News, Kalender, Tippspiel & MyTischtennis'},
     };
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
