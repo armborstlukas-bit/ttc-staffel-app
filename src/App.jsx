@@ -12453,12 +12453,16 @@ export default function TrainingsApp() {
                         )
                       )}
                       {roles.includes('aktiver') && (()=>{
+                        // TTR-Exportlisten liefern Namen teils als "Nachname, Vorname" statt "Vorname Nachname" —
+                        // daher wortweise (reihenfolge-unabhängig) statt als reinen String vergleichen.
+                        const wordSet = s => (s||'').replace(/,/g,' ').trim().toLowerCase().replace(/\s+/g,' ').split(' ').filter(Boolean).sort().join(' ');
                         const fullName = `${m.vorname} ${m.nachname}`.trim().toLowerCase();
+                        const fullNameWords = wordSet(fullName);
                         const spielerList = Object.values(aktiveSpieler);
-                        const exact = spielerList.find(sp => (sp.name||'').trim().toLowerCase() === fullName);
+                        const exact = spielerList.find(sp => wordSet(sp.name) === fullNameWords);
                         const similar = !exact ? spielerList
-                          .map(sp => ({sp, dist: levenshtein((sp.name||'').trim().toLowerCase(), fullName)}))
-                          .filter(({sp,dist}) => dist>0 && dist<=3 && Math.abs((sp.name||'').length-fullName.length)<=4)
+                          .map(sp => ({sp, dist: levenshtein(wordSet(sp.name), fullNameWords)}))
+                          .filter(({sp,dist}) => dist>0 && dist<=3 && Math.abs(wordSet(sp.name).length-fullNameWords.length)<=4)
                           .sort((a,b)=>a.dist-b.dist)[0]?.sp : null;
                         return (
                           <div>
