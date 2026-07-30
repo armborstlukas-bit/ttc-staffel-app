@@ -715,6 +715,8 @@ export default function TrainingsApp() {
   const [mitgliedExpandedId, setMitgliedExpandedId] = useState(null);
   const [mitgliedChildSearch, setMitgliedChildSearch] = useState('');
   const [mitgliederRoleFilter, setMitgliederRoleFilter] = useState('');
+  const [mitgliedLinkUid, setMitgliedLinkUid] = useState(null);
+  const [mitgliedLinkSearch, setMitgliedLinkSearch] = useState('');
   const [usageStats, setUsageStats] = useState({ dailyActive:{}, viewCounts:{} });
   const [ranglisteHistory, setRanglisteHistory] = useState([]); // [{date:'YYYY-MM-DD', order:[childId,...]}]
   const [showRangStats, setShowRangStats] = useState(false);
@@ -2184,6 +2186,31 @@ export default function TrainingsApp() {
         if (matchedUser?.uid) saveUserRoles(matchedUser.uid, value.length ? value : ['pending']);
       }
     }
+    // Falls einer bestehenden Person eine (neue) E-Mail zugeordnet wird und sie bereits
+    // Rollen hat, direkt den nun passenden Account live freischalten.
+    if (field === 'email') {
+      const roles = mitgliederListe[id]?.roles?.length ? mitgliederListe[id].roles : (mitgliederListe[id]?.role ? [mitgliederListe[id].role] : []);
+      const email = (value || '').trim().toLowerCase();
+      if (email && roles.length) {
+        const matchedUser = Object.values(allUsers).find(u => (u.email||'').trim().toLowerCase() === email);
+        if (matchedUser?.uid) saveUserRoles(matchedUser.uid, roles);
+      }
+    }
+  };
+
+  // Legt aus einem nicht zugeordneten Pending-Account einen neuen Mitgliederlisten-Eintrag an
+  // (Name best-effort in Vor-/Nachname gesplittet), zum sofortigen Rollen-Zuweisen.
+  const addMitgliedFromPending = async (u) => {
+    const parts = (u.name || '').trim().split(/\s+/);
+    const nachname = parts.length > 1 ? parts.pop() : '';
+    const vorname = parts.join(' ');
+    const id = 'm_' + Date.now();
+    const entry = { vorname, nachname, geburtsdatum: '', email: u.email || '', roles: [] };
+    await updateDoc(doc(db,'ttc','mitgliederListe'), { [`list.${id}`]: entry });
+    setMitgliederListe(prev => ({ ...prev, [id]: entry }));
+    setMitgliedExpandedId(id);
+    setMitgliederSearch('');
+    setMitgliederRoleFilter('');
   };
 
   const fetchKalender = async () => {
@@ -12464,6 +12491,13 @@ export default function TrainingsApp() {
     const highestRole = roles => ROLE_RANK.find(r=>roles.includes(r)) || null;
 
     const entries = Object.entries(mitgliederListe);
+    const knownEmails = new Set(entries.map(([,m])=>(m.email||'').trim().toLowerCase()).filter(Boolean));
+    const unmatchedPending = Object.values(allUsers).filter(u => {
+      const roles = u.roles?.length ? u.roles : (u.role ? [u.role] : []);
+      if (roles.length===0 || !roles.every(r=>r==='pending')) return false;
+      const email = (u.email||'').trim().toLowerCase();
+      return email && !knownEmails.has(email);
+    });
     const jugendOptions = entries.filter(([,m])=>getRoles(m).includes('jugendlich')).sort((a,b)=>`${a[1].nachname}${a[1].vorname}`.localeCompare(`${b[1].nachname}${b[1].vorname}`,'de'));
     const q = mitgliederSearch.trim().toLowerCase();
     const filtered = entries
@@ -12497,6 +12531,43 @@ export default function TrainingsApp() {
           <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
             Importierte Mitgliederliste. Klicke auf eine Person, um Rollen (Mehrfachauswahl möglich) und bei "Eltern" die zugehörigen Kinder/Jugendlichen zuzuordnen (auch mehrere möglich). Meldet sich jemand mit einer hier hinterlegten E-Mail-Adresse und zugewiesener Rolle an, wird der Account automatisch freigeschaltet.
           </p>
+          {unmatchedPending.length > 0 && (
+            <div style={{marginBottom:'16px',padding:'12px 14px',background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.35)',borderRadius:'12px'}}>
+              <p style={{margin:'0 0 10px',fontSize:'13px',fontWeight:'800',color:'#fbbf24'}}>⚠️ {unmatchedPending.length} Anmeldung{unmatchedPending.length===1?'':'en'} ohne Zuordnung in der Mitgliederliste</p>
+              <div style={{display:'grid',gap:'8px'}}>
+                {unmatchedPending.map(u => (
+                  <div key={u.uid} style={{padding:'10px 12px',background:'rgba(255,255,255,0.05)',borderRadius:'8px'}}>
+                    <p style={{margin:'0 0 8px',fontSize:'13px'}}><b>{u.name||'(ohne Name)'}</b> · <span style={{color:'rgba(255,255,255,0.6)'}}>{u.email}</span></p>
+                    {mitgliedLinkUid === u.uid ? (
+                      <div>
+                        <input value={mitgliedLinkSearch} onChange={e=>setMitgliedLinkSearch(e.target.value)} placeholder="Mitglied suchen…" autoFocus
+                          style={{width:'100%',boxSizing:'border-box',padding:'7px 10px',background:'#0a2210',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'8px',color:'white',fontSize:'12px',outline:'none',marginBottom:'6px'}}/>
+                        <div style={{display:'grid',gap:'2px',maxHeight:'160px',overflowY:'auto',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'8px',padding:'4px'}}>
+                          {entries
+                            .filter(([,m])=>{const s=mitgliedLinkSearch.trim().toLowerCase();return !s||`${m.vorname} ${m.nachname} ${m.email||''}`.toLowerCase().includes(s);})
+                            .sort((a,b)=>`${a[1].nachname}${a[1].vorname}`.localeCompare(`${b[1].nachname}${b[1].vorname}`,'de'))
+                            .map(([mid,m])=>(
+                              <button key={mid} onClick={()=>{ saveMitgliedField(mid,'email',u.email); setMitgliedLinkUid(null); setMitgliedLinkSearch(''); }}
+                                style={{textAlign:'left',padding:'6px 8px',borderRadius:'6px',background:'transparent',border:'none',cursor:'pointer',color:'white',fontSize:'12px'}}>
+                                {m.vorname} {m.nachname} {m.email && <span style={{color:'rgba(255,255,255,0.4)'}}>({m.email})</span>}
+                              </button>
+                          ))}
+                        </div>
+                        <button onClick={()=>{setMitgliedLinkUid(null);setMitgliedLinkSearch('');}} style={{marginTop:'6px',padding:'4px 10px',background:'transparent',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'8px',color:'rgba(255,255,255,0.6)',cursor:'pointer',fontSize:'11px'}}>Abbrechen</button>
+                      </div>
+                    ) : (
+                      <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                        <button onClick={()=>addMitgliedFromPending(u)}
+                          style={{padding:'6px 12px',background:'#16a34a',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>+ Neues Mitglied anlegen</button>
+                        <button onClick={()=>{setMitgliedLinkUid(u.uid);setMitgliedLinkSearch('');}}
+                          style={{padding:'6px 12px',background:'rgba(251,191,36,0.15)',color:'#fbbf24',border:'1px solid rgba(251,191,36,0.4)',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>Bestehendem Mitglied zuordnen</button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
             <input value={mitgliederSearch} onChange={e=>setMitgliederSearch(e.target.value)} placeholder="Suche nach Name oder E-Mail…"
               style={{flex:'1 1 220px',boxSizing:'border-box',padding:'10px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(196,181,253,0.25)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none'}}/>
