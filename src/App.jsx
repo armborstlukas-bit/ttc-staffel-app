@@ -729,9 +729,6 @@ export default function TrainingsApp() {
   const [mitgliederRoleFilter, setMitgliederRoleFilter] = useState('');
   const [mitgliedLinkUid, setMitgliedLinkUid] = useState(null);
   const [mitgliedLinkSearch, setMitgliedLinkSearch] = useState('');
-  const [spielerverwaltungSearch, setSpielerverwaltungSearch] = useState('');
-  const [spielerverwaltungNewName, setSpielerverwaltungNewName] = useState('');
-  const [spielerverwaltungNewTtr, setSpielerverwaltungNewTtr] = useState('');
   const [usageStats, setUsageStats] = useState({ dailyActive:{}, viewCounts:{} });
   const [ranglisteHistory, setRanglisteHistory] = useState([]); // [{date:'YYYY-MM-DD', order:[childId,...]}]
   const [showRangStats, setShowRangStats] = useState(false);
@@ -1347,24 +1344,6 @@ export default function TrainingsApp() {
   const saveRompelData                   = u => { setRompelData(u);                   setDoc(doc(db,'ttc','rompel'),                        u); };
   const savePfandDaten                   = u => { setPfandDaten(u);                   setDoc(doc(db,'ttc','pfandkasse'),                    u); };
   const saveAktiveSpieler                = d => { setAktiveSpieler(d);               setDoc(doc(db,'ttc','aktiveSpieler'),                  d); };
-  // Manuelle Korrektur eines Feldes — markiert es als "manuell", damit der naechste TTR-Excel-Import es nicht ueberschreibt.
-  const updateAktiverField = (id, field, value) => {
-    const manualFlag = field==='name' ? 'manualName' : 'manualTtr';
-    saveAktiveSpieler({...aktiveSpieler, [id]: {...aktiveSpieler[id], [field]: value, [manualFlag]: true}});
-  };
-  const resetAktiverField = (id, field) => {
-    const manualFlag = field==='name' ? 'manualName' : 'manualTtr';
-    saveAktiveSpieler({...aktiveSpieler, [id]: {...aktiveSpieler[id], [manualFlag]: false}});
-  };
-  const deleteAktiverEntry = id => {
-    const updated = {...aktiveSpieler};
-    delete updated[id];
-    saveAktiveSpieler(updated);
-  };
-  const addAktiverEntry = (name, ttr) => {
-    const id = 'aktiv_manual_' + Date.now();
-    saveAktiveSpieler({...aktiveSpieler, [id]: {id, name: name.trim(), ttr: ttr?Number(ttr):null, spielernr:null, manualName:true, manualTtr:true}});
-  };
   const canAccessRompel    = () => userRole === 'admin' || (appSettings.rompelTrainers  || []).includes(user?.uid);
   const canAccessPfand     = () => userRole === 'admin' || (appSettings.pfandTrainers   || []).includes(user?.uid);
   const canAccessPinnwand  = () => !!user; // Pinnwand ist fuer alle eingeloggten Nutzer sichtbar; Sichtbarkeit einzelner Beitraege wird pro Beitrag geregelt
@@ -2223,6 +2202,13 @@ export default function TrainingsApp() {
         const matchedUser = Object.values(allUsers).find(u => (u.email||'').trim().toLowerCase() === email);
         if (matchedUser?.uid) saveUserRoles(matchedUser.uid, roles);
       }
+    }
+    // Manuelle TTR-Zuordnung (Aktiver → aktiveSpieler) auch am bestehenden Account spiegeln,
+    // damit die schon vorhandene Spieler-Verknüpfung (z.B. fürs Trainingsmatch-System) mitzieht.
+    if (field === 'ttrRefId' && (value||'').startsWith('aktiv:')) {
+      const email = (mitgliederListe[id]?.email || '').trim().toLowerCase();
+      const matchedUser = email ? Object.values(allUsers).find(u => (u.email||'').trim().toLowerCase() === email) : null;
+      if (matchedUser?.uid) linkPlayerToUser(matchedUser.uid, value.slice('aktiv:'.length));
     }
   };
 
@@ -11356,66 +11342,6 @@ export default function TrainingsApp() {
     );
   }
 
-  // ── TTR WERTE VIEW ──────────────────────────────────────────────────────
-  // ── SPIELERVERWALTUNG (Aktive: Namen/TTR manuell pflegen) ────────────────
-  if (view === 'spielerverwaltung' && canEdit()) {
-    const accent = '#67e8f9';
-    const q = spielerverwaltungSearch.trim().toLowerCase();
-    const list = Object.values(aktiveSpieler)
-      .filter(sp => !q || (sp.name||'').toLowerCase().includes(q))
-      .sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
-
-    return (
-      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#00151a 0%,#012129 45%,#000e11 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
-        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-          <button onClick={()=>navTo('ttrWerte')} style={s.btn(accent)}><Home size={16}/></button>
-          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>🛠️ Spielerverwaltung</h1>
-          <span style={{fontSize:'12px',color:'rgba(103,232,249,0.7)',fontWeight:'600'}}>{list.length} Spieler</span>
-        </div>
-        <div style={{maxWidth:'820px',margin:'0 auto',padding:'16px'}}>
-          <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
-            Name und TTR-Wert der Aktiven kommen normalerweise aus dem TTR-Excel-Import. Hier kannst du beides manuell korrigieren — manuell geänderte Felder werden beim nächsten Import nicht mehr überschrieben (erkennbar am 🔒-Symbol), bis du sie wieder auf "automatisch" zurücksetzt.
-          </p>
-
-          <input value={spielerverwaltungSearch} onChange={e=>setSpielerverwaltungSearch(e.target.value)} placeholder="Spieler suchen…"
-            style={{width:'100%',boxSizing:'border-box',padding:'10px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(103,232,249,0.25)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',marginBottom:'14px'}}/>
-
-          {/* Neuer Spieler manuell anlegen */}
-          <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'18px',padding:'12px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(103,232,249,0.15)',borderRadius:'10px'}}>
-            <input value={spielerverwaltungNewName} onChange={e=>setSpielerverwaltungNewName(e.target.value)} placeholder="Name…"
-              style={{flex:'2 1 160px',padding:'8px 10px',background:'#001f24',border:'1px solid rgba(103,232,249,0.3)',borderRadius:'8px',color:'white',fontSize:'13px',outline:'none'}}/>
-            <input value={spielerverwaltungNewTtr} onChange={e=>setSpielerverwaltungNewTtr(e.target.value)} placeholder="TTR" type="number"
-              style={{flex:'1 1 80px',padding:'8px 10px',background:'#001f24',border:'1px solid rgba(103,232,249,0.3)',borderRadius:'8px',color:'white',fontSize:'13px',outline:'none'}}/>
-            <button onClick={()=>{
-              if(!spielerverwaltungNewName.trim()) return;
-              addAktiverEntry(spielerverwaltungNewName, spielerverwaltungNewTtr);
-              setSpielerverwaltungNewName(''); setSpielerverwaltungNewTtr('');
-            }} style={{padding:'8px 16px',background:accent,color:'#00151a',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'800',fontSize:'13px',whiteSpace:'nowrap'}}>+ Spieler anlegen</button>
-          </div>
-
-          <div style={{display:'grid',gap:'6px'}}>
-            {list.map(sp=>(
-              <div key={sp.id} style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',padding:'10px 12px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'10px'}}>
-                <div style={{flex:'2 1 160px',display:'flex',alignItems:'center',gap:'6px'}}>
-                  <input value={sp.name||''} onChange={e=>updateAktiverField(sp.id,'name',e.target.value)}
-                    style={{width:'100%',padding:'6px 9px',background:'#001f24',border:`1px solid ${sp.manualName?'rgba(251,191,36,0.5)':'rgba(255,255,255,0.15)'}`,borderRadius:'7px',color:'white',fontSize:'13px',outline:'none'}}/>
-                  {sp.manualName&&<button onClick={()=>resetAktiverField(sp.id,'name')} title="Zurück auf automatisch (Excel-Import)" style={{background:'none',border:'none',cursor:'pointer',fontSize:'13px',padding:'2px'}}>🔒</button>}
-                </div>
-                <div style={{flex:'1 1 100px',display:'flex',alignItems:'center',gap:'6px'}}>
-                  <input value={sp.ttr??''} onChange={e=>updateAktiverField(sp.id,'ttr',e.target.value===''?null:Number(e.target.value))} type="number" placeholder="TTR"
-                    style={{width:'100%',padding:'6px 9px',background:'#001f24',border:`1px solid ${sp.manualTtr?'rgba(251,191,36,0.5)':'rgba(255,255,255,0.15)'}`,borderRadius:'7px',color:'white',fontSize:'13px',outline:'none'}}/>
-                  {sp.manualTtr&&<button onClick={()=>resetAktiverField(sp.id,'ttr')} title="Zurück auf automatisch (Excel-Import)" style={{background:'none',border:'none',cursor:'pointer',fontSize:'13px',padding:'2px'}}>🔒</button>}
-                </div>
-                <button onClick={()=>{if(window.confirm(`"${sp.name}" wirklich löschen?`))deleteAktiverEntry(sp.id);}}
-                  style={{padding:'6px 10px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.3)',borderRadius:'7px',cursor:'pointer',color:'#fca5a5',fontSize:'12px',fontWeight:'700'}}>🗑️</button>
-              </div>
-            ))}
-            {list.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.3)',fontSize:'13px'}}>Keine Treffer.</p>}
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (view === 'ttrWerte' && canEdit()) {
     const accent = '#fbbf24';
@@ -11484,12 +11410,6 @@ export default function TrainingsApp() {
               onMouseEnter={e=>{e.currentTarget.style.background='rgba(252,211,77,0.13)';e.currentTarget.style.borderColor='rgba(252,211,77,0.4)';}}
               onMouseLeave={e=>{e.currentTarget.style.background='rgba(252,211,77,0.07)';e.currentTarget.style.borderColor='rgba(252,211,77,0.2)';}}>
               <span style={{fontSize:'16px'}}>🥇</span> Spieler des Monats
-            </button>
-            <button onClick={()=>navTo('spielerverwaltung')}
-              style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',padding:'12px',background:'rgba(103,232,249,0.07)',border:'1px solid rgba(103,232,249,0.2)',borderRadius:'14px',color:'#67e8f9',cursor:'pointer',fontWeight:'700',fontSize:'14px',transition:'all 0.12s'}}
-              onMouseEnter={e=>{e.currentTarget.style.background='rgba(103,232,249,0.13)';e.currentTarget.style.borderColor='rgba(103,232,249,0.4)';}}
-              onMouseLeave={e=>{e.currentTarget.style.background='rgba(103,232,249,0.07)';e.currentTarget.style.borderColor='rgba(103,232,249,0.2)';}}>
-              <span style={{fontSize:'16px'}}>🛠️</span> Spielerverwaltung
             </button>
           </div>
 
@@ -11710,17 +11630,7 @@ export default function TrainingsApp() {
           updated[id] = {entries: merged};
         }
         const latestEntry = [...entries].sort((a,b)=>b.month.localeCompare(a.month))[0];
-        // Manuell korrigierte Felder (Name/TTR) bleiben beim Re-Import erhalten, bis sie in der
-        // Spielerverwaltung wieder auf "automatisch" zurückgesetzt werden.
-        const existing = newAktiveSpieler[id];
-        newAktiveSpieler[id] = {
-          id,
-          name: existing?.manualName ? existing.name : name,
-          ttr: existing?.manualTtr ? existing.ttr : (latestEntry?.ttr||null),
-          spielernr: existing?.spielernr||null,
-          manualName: existing?.manualName||false,
-          manualTtr: existing?.manualTtr||false,
-        };
+        newAktiveSpieler[id] = {id, name, ttr: latestEntry?.ttr||null, spielernr: newAktiveSpieler[id]?.spielernr||null};
       });
       saveTtrHistory(updated);
       saveAktiveSpieler(newAktiveSpieler);
@@ -12311,17 +12221,44 @@ export default function TrainingsApp() {
     // TTR-Exportlisten liefern Namen teils als "Nachname, Vorname" statt "Vorname Nachname" —
     // daher wortweise (reihenfolge-unabhängig) statt als reinen String vergleichen.
     const wordSet = s => (s||'').replace(/,/g,' ').trim().toLowerCase().replace(/\s+/g,' ').split(' ').filter(Boolean).sort().join(' ');
-    const getAktiverMatch = m => {
+    // TTR-Kandidatenpool je Rolle: Aktive kommen aus aktiveSpieler, Jugendliche aus der echten
+    // children-Sammlung (dort landet der TTR-Verlauf beim Import, gematcht per Name).
+    const getTtrPool = role => {
+      if (role==='aktiver') return Object.values(aktiveSpieler).map(sp=>({refId:'aktiv:'+sp.id, label:sp.name, ttr:sp.ttr}));
+      if (role==='jugendlich') return Object.values(children).map(c=>{
+        const hist=(ttrHistory[c.id]?.entries||[]).slice().sort((a,b)=>a.month.localeCompare(b.month));
+        const last=hist[hist.length-1];
+        return last ? {refId:'jugend:'+c.id, label:c.name, ttr:last.ttr} : null;
+      }).filter(Boolean);
+      return [];
+    };
+    const resolveTtrRef = refId => {
+      if (!refId) return null;
+      const [kind, rid] = refId.split(':');
+      if (kind==='aktiv') { const sp = aktiveSpieler[rid]; return sp ? {label:sp.name, ttr:sp.ttr} : null; }
+      if (kind==='jugend') {
+        const c = children[rid]; if (!c) return null;
+        const hist=(ttrHistory[rid]?.entries||[]).slice().sort((a,b)=>a.month.localeCompare(b.month));
+        return {label:c.name, ttr:hist[hist.length-1]?.ttr ?? null};
+      }
+      return null;
+    };
+    // Manuell verlinkte Person (m.ttrRefId) hat Vorrang und bleibt über künftige TTR-Importe hinweg bestehen.
+    const getTtrStatus = (m, role) => {
+      if (m.ttrRefId) {
+        const resolved = resolveTtrRef(m.ttrRefId);
+        if (resolved) return {status:'linked', label:resolved.label, ttr:resolved.ttr, refId:m.ttrRefId};
+      }
+      const pool = getTtrPool(role);
       const fullNameWords = wordSet(`${m.vorname} ${m.nachname}`);
-      const spielerList = Object.values(aktiveSpieler);
-      const exact = spielerList.find(sp => wordSet(sp.name) === fullNameWords);
-      if (exact) return {status:'exact', sp:exact};
-      const similar = spielerList
-        .map(sp => ({sp, dist: levenshtein(wordSet(sp.name), fullNameWords)}))
-        .filter(({sp,dist}) => dist>0 && dist<=3 && Math.abs(wordSet(sp.name).length-fullNameWords.length)<=4)
-        .sort((a,b)=>a.dist-b.dist)[0]?.sp;
-      if (similar) return {status:'similar', sp:similar};
-      return {status:'none', sp:null};
+      const exact = pool.find(p => wordSet(p.label) === fullNameWords);
+      if (exact) return {status:'exact', label:exact.label, ttr:exact.ttr, refId:exact.refId};
+      const similar = pool
+        .map(p => ({p, dist: levenshtein(wordSet(p.label), fullNameWords)}))
+        .filter(({p,dist}) => dist>0 && dist<=3 && Math.abs(wordSet(p.label).length-fullNameWords.length)<=4)
+        .sort((a,b)=>a.dist-b.dist)[0]?.p;
+      if (similar) return {status:'similar', label:similar.label, ttr:similar.ttr, refId:similar.refId};
+      return {status:'none'};
     };
 
     const entries = Object.entries(mitgliederListe);
@@ -12492,23 +12429,24 @@ export default function TrainingsApp() {
               const isExpanded = mitgliedExpandedId === id;
               const childQ = mitgliedChildSearch.trim().toLowerCase();
               const elternOhneKind = roles.includes('eltern') && linkedIds.length===0;
-              const aktiverMatch = roles.includes('aktiver') ? getAktiverMatch(m) : null;
-              const aktiverKeinTTR = aktiverMatch?.status === 'none';
-              const aktiverAehnlich = aktiverMatch?.status === 'similar';
+              const ttrRole = roles.includes('aktiver') ? 'aktiver' : roles.includes('jugendlich') ? 'jugendlich' : null;
+              const ttrStatus = ttrRole ? getTtrStatus(m, ttrRole) : null;
+              const ttrKein = ttrStatus?.status === 'none';
+              const ttrAehnlich = ttrStatus?.status === 'similar';
               const topRole = highestRole(roles);
-              const cardColors = elternOhneKind || aktiverKeinTTR ? {border:'rgba(239,68,68,0.6)', bg:'rgba(239,68,68,0.06)'}
-                : aktiverAehnlich ? {border:'rgba(251,191,36,0.6)', bg:'rgba(251,191,36,0.07)'}
+              const cardColors = elternOhneKind || ttrKein ? {border:'rgba(239,68,68,0.6)', bg:'rgba(239,68,68,0.06)'}
+                : ttrAehnlich ? {border:'rgba(251,191,36,0.6)', bg:'rgba(251,191,36,0.07)'}
                 : (topRole ? {border:ROLE_COLORS[topRole].border, bg:ROLE_COLORS[topRole].bg} : {border:'rgba(196,181,253,0.2)', bg:'rgba(255,255,255,0.04)'});
               const matchedUser = Object.values(allUsers).find(u => (u.email||'').trim().toLowerCase() === (m.email||'').trim().toLowerCase());
               return (
-                <div key={id} style={{background:cardColors.bg,border:`1px solid ${cardColors.border}`,borderRadius:'10px',overflow:'hidden',...((elternOhneKind||aktiverKeinTTR)?{boxShadow:'0 0 0 1px rgba(239,68,68,0.4)'}:aktiverAehnlich?{boxShadow:'0 0 0 1px rgba(251,191,36,0.4)'}:{})}}>
+                <div key={id} style={{background:cardColors.bg,border:`1px solid ${cardColors.border}`,borderRadius:'10px',overflow:'hidden',...((elternOhneKind||ttrKein)?{boxShadow:'0 0 0 1px rgba(239,68,68,0.4)'}:ttrAehnlich?{boxShadow:'0 0 0 1px rgba(251,191,36,0.4)'}:{})}}>
                   <button onClick={()=>{setMitgliedExpandedId(isExpanded?null:id);setMitgliedChildSearch('');}}
                     style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',background:'transparent',border:'none',cursor:'pointer',textAlign:'left'}}>
                     <div style={{flex:'1 1 200px',minWidth:0}}>
                       <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'white'}}>{m.vorname} {m.nachname}</p>
                       {elternOhneKind&&<p style={{margin:0,fontSize:'10px',color:'#fca5a5',fontWeight:'700'}}>⚠️ Kein Kind zugeordnet</p>}
-                      {aktiverKeinTTR&&<p style={{margin:0,fontSize:'10px',color:'#fca5a5',fontWeight:'700'}}>⚠️ Kein TTR-Wert auffindbar</p>}
-                      {aktiverAehnlich&&<p style={{margin:0,fontSize:'10px',color:'#fbbf24',fontWeight:'700'}}>⚠️ TTR: nur ähnlicher Name gefunden</p>}
+                      {ttrKein&&<p style={{margin:0,fontSize:'10px',color:'#fca5a5',fontWeight:'700'}}>⚠️ Kein TTR-Wert auffindbar</p>}
+                      {ttrAehnlich&&<p style={{margin:0,fontSize:'10px',color:'#fbbf24',fontWeight:'700'}}>⚠️ TTR: nur ähnlicher Name gefunden</p>}
                       <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>{fmtGeb(m.geburtsdatum)}{m.email?` · ${m.email}`:' · keine E-Mail'}</p>
                     </div>
                     <div style={{display:'flex',gap:'4px',flexWrap:'wrap',justifyContent:'flex-end',flex:'0 1 auto'}}>
@@ -12570,24 +12508,28 @@ export default function TrainingsApp() {
                           </div>
                         )
                       )}
-                      {roles.includes('aktiver') && (()=>{
-                        const {status, sp: match} = aktiverMatch;
-                        const spielerList = Object.values(aktiveSpieler);
+                      {ttrRole && (()=>{
+                        const {status, label, ttr, refId} = ttrStatus;
+                        const pool = getTtrPool(ttrRole).sort((a,b)=>a.label.localeCompare(b.label,'de'));
+                        const onPick = e => {
+                          const val = e.target.value || null;
+                          saveMitgliedField(id, 'ttrRefId', val);
+                        };
                         return (
                           <div>
-                            <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'6px'}}>⚡ TTR-Wert / Spieler-Zuordnung</span>
-                            {status==='exact' ? (
-                              <p style={{margin:0,fontSize:'12px',color:'#86efac'}}>✅ {match.name}{match.ttr?` — TTR ${match.ttr}`:' — kein TTR-Wert hinterlegt'}</p>
+                            <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'6px'}}>⚡ TTR-Wert</span>
+                            {status==='exact' || status==='linked' ? (
+                              <p style={{margin:0,fontSize:'12px',color:'#86efac'}}>✅ {label}{ttr?` — TTR ${ttr}`:' — kein TTR-Wert hinterlegt'}{status==='linked'?' (manuell zugeordnet)':''}</p>
                             ) : status==='similar' ? (
-                              <p style={{margin:0,fontSize:'12px',color:'#fbbf24'}}>⚠️ Ähnlicher Name gefunden: {match.name}{match.ttr?` (TTR ${match.ttr})`:''} — bitte prüfen{matchedUser?'':' (noch kein App-Account)'}</p>
+                              <p style={{margin:0,fontSize:'12px',color:'#fbbf24'}}>⚠️ Ähnlicher Name gefunden: {label}{ttr?` (TTR ${ttr})`:''} — bitte prüfen</p>
                             ) : (
                               <p style={{margin:0,fontSize:'12px',color:'#fca5a5'}}>❌ Kein TTR-Wert auffindbar</p>
                             )}
-                            {matchedUser && status!=='none' && (
-                              <select value={matchedUser.linkedPlayerId||''} onChange={e=>linkPlayerToUser(matchedUser.uid, e.target.value||null)}
+                            {status!=='exact' && (
+                              <select value={refId||''} onChange={onPick}
                                 style={{marginTop:'6px',padding:'6px 10px',border:'1px solid rgba(8,145,178,0.4)',borderRadius:'8px',fontSize:'12px',cursor:'pointer',color:'#67e8f9',background:'#0a2210',width:'100%'}}>
-                                <option value="" style={{background:'#0a2210'}}>– kein Spieler –</option>
-                                {spielerList.sort((a,b)=>a.name.localeCompare(b.name,'de')).map(sp=><option key={sp.id} value={sp.id} style={{background:'#0a2210'}}>{sp.name}{sp.ttr?` (TTR ${sp.ttr})`:''}</option>)}
+                                <option value="" style={{background:'#0a2210'}}>– manuell auswählen –</option>
+                                {pool.map(p=><option key={p.refId} value={p.refId} style={{background:'#0a2210'}}>{p.label}{p.ttr?` (TTR ${p.ttr})`:''}</option>)}
                               </select>
                             )}
                           </div>
