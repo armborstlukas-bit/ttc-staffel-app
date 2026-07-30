@@ -709,8 +709,10 @@ export default function TrainingsApp() {
   const [newSession, setNewSession]             = useState(emptySession);
   const [recurringTemplates, setRecurringTemplates] = useState({});
   const [rangliste, setRangliste] = useState([]); // ordered array of childIds
-  const [mitgliederListe, setMitgliederListe] = useState({}); // { [id]: {vorname,nachname,geburtsdatum,email,role,linkedMemberId} }
+  const [mitgliederListe, setMitgliederListe] = useState({}); // { [id]: {vorname,nachname,geburtsdatum,email,roles:[],linkedMemberIds:[]} }
   const [mitgliederSearch, setMitgliederSearch] = useState('');
+  const [mitgliedExpandedId, setMitgliedExpandedId] = useState(null);
+  const [mitgliedChildSearch, setMitgliedChildSearch] = useState('');
   const [ranglisteHistory, setRanglisteHistory] = useState([]); // [{date:'YYYY-MM-DD', order:[childId,...]}]
   const [showRangStats, setShowRangStats] = useState(false);
   const [rangStatsH2H, setRangStatsH2H] = useState(['', '']);
@@ -2435,28 +2437,33 @@ export default function TrainingsApp() {
       const mitgliederSnap = await getDoc(doc(db,'ttc','mitgliederListe'));
       const mitgliederList = mitgliederSnap.exists() ? (mitgliederSnap.data().list || {}) : {};
       const emailLower = loginEmail.trim().toLowerCase();
-      const matches = Object.values(mitgliederList).filter(m => (m.email||'').trim().toLowerCase() === emailLower && m.role);
-      const rolePriority = ['admin','trainer','aktiver','eltern','jugendlich'];
-      const matchedEntry = matches.sort((a,b)=>rolePriority.indexOf(a.role)-rolePriority.indexOf(b.role))[0];
+      const getMemberRoles = m => m.roles?.length ? m.roles : (m.role ? [m.role] : []);
+      const getMemberLinkedIds = m => m.linkedMemberIds?.length ? m.linkedMemberIds : (m.linkedMemberId ? [m.linkedMemberId] : []);
+      const matches = Object.values(mitgliederList).filter(m => (m.email||'').trim().toLowerCase() === emailLower && getMemberRoles(m).length>0);
 
-      let autoRole = null, autoLinkedChildIds = [];
-      if (matchedEntry) {
-        autoRole = matchedEntry.role;
-        if (autoRole === 'eltern') {
-          // Bestes-Möglich-Zuordnung: verknüpftes Mitglied per Namensabgleich mit der
-          // echten Kinder-Liste der App verbinden (Trainings-/Anwesenheitsdaten).
-          const linkedMember = matchedEntry.linkedMemberId ? mitgliederList[matchedEntry.linkedMemberId] : null;
-          if (linkedMember) {
-            const fullName = `${linkedMember.vorname} ${linkedMember.nachname}`.trim().toLowerCase();
-            const foundChild = Object.values(children).find(c => (c.name||'').trim().toLowerCase() === fullName);
-            if (foundChild) autoLinkedChildIds = [foundChild.id];
-          }
-        }
+      // Alle Rollen aus allen passenden Einträgen zusammenführen (z.B. wenn eine Person
+      // mehrfach in der Liste steht, oder mehrere Familienmitglieder dieselbe E-Mail teilen).
+      const autoRoles = [...new Set(matches.flatMap(getMemberRoles))];
+      let autoLinkedChildIds = [];
+      if (autoRoles.includes('eltern')) {
+        // Bestes-Möglich-Zuordnung: verknüpfte Mitglieder per Namensabgleich mit der
+        // echten Kinder-Liste der App verbinden (Trainings-/Anwesenheitsdaten).
+        const linkedMemberIds = [...new Set(matches.flatMap(getMemberLinkedIds))];
+        linkedMemberIds.forEach(lid => {
+          const linkedMember = mitgliederList[lid];
+          if (!linkedMember) return;
+          const fullName = `${linkedMember.vorname} ${linkedMember.nachname}`.trim().toLowerCase();
+          const foundChild = Object.values(children).find(c => (c.name||'').trim().toLowerCase() === fullName);
+          if (foundChild) autoLinkedChildIds.push(foundChild.id);
+        });
+        autoLinkedChildIds = [...new Set(autoLinkedChildIds)];
       }
+      const rolePriority = ['admin','trainer','aktiver','eltern','jugendlich'];
+      const autoRole = autoRoles.length>0 ? [...autoRoles].sort((a,b)=>rolePriority.indexOf(a)-rolePriority.indexOf(b))[0] : null;
 
       const profile = {
         uid:cred.user.uid, email:loginEmail, name:loginName,
-        role: autoRole || 'pending', roles: autoRole ? [autoRole] : ['pending'],
+        role: autoRole || 'pending', roles: autoRoles.length>0 ? autoRoles : ['pending'],
         linkedChildId: autoLinkedChildIds[0] || null, linkedChildIds: autoLinkedChildIds,
         isParent: registerIsParent,
       };
@@ -12283,21 +12290,36 @@ export default function TrainingsApp() {
   // ── MITGLIEDERVERWALTUNG VIEW (nur Admin) ─────────────────────────────────
   if (view === 'mitglieder' && userRole === 'admin') {
     const ROLE_OPTIONS = [
-      {key:'', label:'– keine Rolle –'},
       {key:'admin', label:'Admin'},
       {key:'trainer', label:'Trainer'},
       {key:'aktiver', label:'Aktiver'},
       {key:'eltern', label:'Eltern'},
       {key:'jugendlich', label:'Jugendlicher'},
     ];
+    const getRoles = m => m.roles?.length ? m.roles : (m.role ? [m.role] : []);
+    const getLinkedIds = m => m.linkedMemberIds?.length ? m.linkedMemberIds : (m.linkedMemberId ? [m.linkedMemberId] : []);
+
     const entries = Object.entries(mitgliederListe);
-    const jugendOptions = entries.filter(([,m])=>m.role==='jugendlich').sort((a,b)=>`${a[1].nachname}${a[1].vorname}`.localeCompare(`${b[1].nachname}${b[1].vorname}`,'de'));
+    const jugendOptions = entries.filter(([,m])=>getRoles(m).includes('jugendlich')).sort((a,b)=>`${a[1].nachname}${a[1].vorname}`.localeCompare(`${b[1].nachname}${b[1].vorname}`,'de'));
     const q = mitgliederSearch.trim().toLowerCase();
     const filtered = entries
       .filter(([,m]) => !q || `${m.vorname} ${m.nachname} ${m.email}`.toLowerCase().includes(q))
       .sort((a,b)=>`${a[1].nachname}${a[1].vorname}`.localeCompare(`${b[1].nachname}${b[1].vorname}`,'de'));
     const fmtGeb = g => { if (!g) return ''; const [y,mo,d] = g.split('-'); return d&&mo&&y ? `${d}.${mo}.${y}` : g; };
-    const assignedCount = entries.filter(([,m])=>m.role).length;
+    const assignedCount = entries.filter(([,m])=>getRoles(m).length>0).length;
+
+    const toggleRole = (id, m, roleKey) => {
+      const cur = getRoles(m);
+      const next = cur.includes(roleKey) ? cur.filter(r=>r!==roleKey) : [...cur, roleKey];
+      saveMitgliedField(id, 'roles', next);
+      // Falls "eltern" entfernt wird, verknüpfte Kinder gleich mit aufräumen
+      if (roleKey==='eltern' && cur.includes('eltern')) saveMitgliedField(id, 'linkedMemberIds', []);
+    };
+    const toggleChild = (id, m, childId) => {
+      const cur = getLinkedIds(m);
+      const next = cur.includes(childId) ? cur.filter(x=>x!==childId) : [...cur, childId];
+      saveMitgliedField(id, 'linkedMemberIds', next);
+    };
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
@@ -12308,31 +12330,67 @@ export default function TrainingsApp() {
         </div>
         <div style={{padding:'16px 14px',maxWidth:'900px',margin:'0 auto'}}>
           <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
-            Importierte Mitgliederliste. Weist jeder Person eine Rolle zu – bei "Eltern" zusätzlich das zugehörige Kind/den Jugendlichen aus dieser Liste. Meldet sich jemand mit einer hier hinterlegten E-Mail-Adresse und zugewiesener Rolle an, wird der Account automatisch freigeschaltet.
+            Importierte Mitgliederliste. Klicke auf eine Person, um Rollen (Mehrfachauswahl möglich) und bei "Eltern" die zugehörigen Kinder/Jugendlichen zuzuordnen (auch mehrere möglich). Meldet sich jemand mit einer hier hinterlegten E-Mail-Adresse und zugewiesener Rolle an, wird der Account automatisch freigeschaltet.
           </p>
           <input value={mitgliederSearch} onChange={e=>setMitgliederSearch(e.target.value)} placeholder="Suche nach Name oder E-Mail…"
             style={{width:'100%',boxSizing:'border-box',padding:'10px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(196,181,253,0.25)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',marginBottom:'14px'}}/>
 
           <div style={{display:'grid',gap:'6px'}}>
-            {filtered.map(([id,m])=>(
-              <div key={id} style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(196,181,253,0.2)',borderRadius:'10px',padding:'10px 12px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-                <div style={{flex:'1 1 200px',minWidth:0}}>
-                  <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'white'}}>{m.vorname} {m.nachname}</p>
-                  <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>{fmtGeb(m.geburtsdatum)}{m.email?` · ${m.email}`:' · keine E-Mail'}</p>
+            {filtered.map(([id,m])=>{
+              const roles = getRoles(m);
+              const linkedIds = getLinkedIds(m);
+              const isExpanded = mitgliedExpandedId === id;
+              const childQ = mitgliedChildSearch.trim().toLowerCase();
+              return (
+                <div key={id} style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(196,181,253,0.2)',borderRadius:'10px',overflow:'hidden'}}>
+                  <button onClick={()=>{setMitgliedExpandedId(isExpanded?null:id);setMitgliedChildSearch('');}}
+                    style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',background:'transparent',border:'none',cursor:'pointer',textAlign:'left'}}>
+                    <div style={{flex:'1 1 200px',minWidth:0}}>
+                      <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'white'}}>{m.vorname} {m.nachname}</p>
+                      <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>{fmtGeb(m.geburtsdatum)}{m.email?` · ${m.email}`:' · keine E-Mail'}</p>
+                    </div>
+                    <div style={{display:'flex',gap:'4px',flexWrap:'wrap',justifyContent:'flex-end',flex:'0 1 auto'}}>
+                      {roles.length===0?<span style={{fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>keine Rolle</span>:
+                        roles.map(r=><span key={r} style={{fontSize:'10px',fontWeight:'700',padding:'2px 7px',borderRadius:'20px',background:'rgba(196,181,253,0.15)',color:'#c4b5fd'}}>{ROLE_OPTIONS.find(o=>o.key===r)?.label||r}</span>)}
+                    </div>
+                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',flexShrink:0}}>{isExpanded?'▲':'▼'}</span>
+                  </button>
+                  {isExpanded&&(
+                    <div style={{padding:'0 12px 14px',display:'grid',gap:'10px'}}>
+                      <div>
+                        <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'6px'}}>Rollen</span>
+                        <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                          {ROLE_OPTIONS.map(o=>{
+                            const on = roles.includes(o.key);
+                            return <button key={o.key} onClick={()=>toggleRole(id,m,o.key)}
+                              style={{padding:'5px 12px',borderRadius:'20px',border:`1px solid ${on?'#c4b5fd':'rgba(255,255,255,0.15)'}`,background:on?'rgba(196,181,253,0.15)':'rgba(255,255,255,0.03)',color:on?'#c4b5fd':'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>{o.label}</button>;
+                          })}
+                        </div>
+                      </div>
+                      {roles.includes('eltern')&&(
+                        <div>
+                          <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'6px'}}>Kinder/Jugendliche ({linkedIds.length} ausgewählt)</span>
+                          <input value={mitgliedChildSearch} onChange={e=>setMitgliedChildSearch(e.target.value)} placeholder="Kind suchen…"
+                            style={{width:'100%',boxSizing:'border-box',padding:'7px 10px',background:'#0a2210',border:'1px solid rgba(74,222,128,0.3)',borderRadius:'8px',color:'white',fontSize:'12px',outline:'none',marginBottom:'6px'}}/>
+                          <div style={{display:'grid',gap:'2px',maxHeight:'160px',overflowY:'auto',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'8px',padding:'4px'}}>
+                            {jugendOptions.filter(([,jm])=>!childQ||`${jm.vorname} ${jm.nachname}`.toLowerCase().includes(childQ)).map(([jid,jm])=>{
+                              const on = linkedIds.includes(jid);
+                              return (
+                                <label key={jid} style={{display:'flex',alignItems:'center',gap:'8px',padding:'5px 6px',borderRadius:'6px',cursor:'pointer',background:on?'rgba(74,222,128,0.1)':'transparent',fontSize:'12px',color:on?'#86efac':'rgba(255,255,255,0.7)'}}>
+                                  <input type="checkbox" checked={on} onChange={()=>toggleChild(id,m,jid)}/>
+                                  {jm.vorname} {jm.nachname}
+                                </label>
+                              );
+                            })}
+                            {jugendOptions.length===0&&<p style={{margin:'4px',fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>Noch niemand als "Jugendlicher" markiert.</p>}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <select value={m.role||''} onChange={e=>saveMitgliedField(id,'role',e.target.value)}
-                  style={{padding:'7px 10px',background:'#0a2210',border:'1px solid rgba(196,181,253,0.3)',borderRadius:'8px',color:'#c4b5fd',fontSize:'12px',fontWeight:'700',flexShrink:0}}>
-                  {ROLE_OPTIONS.map(o=><option key={o.key} value={o.key} style={{background:'#0a2210',color:'#c4b5fd'}}>{o.label}</option>)}
-                </select>
-                {m.role==='eltern'&&(
-                  <select value={m.linkedMemberId||''} onChange={e=>saveMitgliedField(id,'linkedMemberId',e.target.value||null)}
-                    style={{padding:'7px 10px',background:'#0a2210',border:'1px solid rgba(74,222,128,0.3)',borderRadius:'8px',color:'#86efac',fontSize:'12px',fontWeight:'700',flexShrink:0}}>
-                    <option value="" style={{background:'#0a2210'}}>– Kind wählen –</option>
-                    {jugendOptions.map(([jid,jm])=><option key={jid} value={jid} style={{background:'#0a2210'}}>{jm.vorname} {jm.nachname}</option>)}
-                  </select>
-                )}
-              </div>
-            ))}
+              );
+            })}
             {filtered.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.3)',fontSize:'13px'}}>Keine Treffer.</p>}
           </div>
         </div>
