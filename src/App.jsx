@@ -83,7 +83,7 @@ if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styl
 }
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
-import { getFirestore, doc, setDoc, updateDoc, deleteDoc, deleteField, arrayUnion, arrayRemove, onSnapshot, getDoc, collection, getDocs } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, updateDoc, deleteDoc, deleteField, arrayUnion, arrayRemove, increment, onSnapshot, getDoc, collection, getDocs } from 'firebase/firestore';
 import { getMessaging, getToken as getFcmToken, onMessage, isSupported as isFcmSupported } from 'firebase/messaging';
 import { Check, X, Plus, Trash2, Download, LogOut, ArrowLeft, Clock, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save, Trophy, Home, Archive, MessageSquare, Bell, Send, Pencil } from 'lucide-react';
 
@@ -715,6 +715,7 @@ export default function TrainingsApp() {
   const [mitgliedExpandedId, setMitgliedExpandedId] = useState(null);
   const [mitgliedChildSearch, setMitgliedChildSearch] = useState('');
   const [mitgliederRoleFilter, setMitgliederRoleFilter] = useState('');
+  const [usageStats, setUsageStats] = useState({ dailyActive:{}, viewCounts:{} });
   const [ranglisteHistory, setRanglisteHistory] = useState([]); // [{date:'YYYY-MM-DD', order:[childId,...]}]
   const [showRangStats, setShowRangStats] = useState(false);
   const [rangStatsH2H, setRangStatsH2H] = useState(['', '']);
@@ -949,6 +950,12 @@ export default function TrainingsApp() {
           }
         }
         setUser(u);
+        // Leichtgewichtiges Nutzungs-Tracking: merkt sich, dass dieser Account heute aktiv war
+        // (fire-and-forget, einmal pro Login/App-Start).
+        const todayKey = new Date().toISOString().split('T')[0];
+        updateDoc(doc(db,'ttc','usageStats'), { [`dailyActive.${todayKey}`]: arrayUnion(u.uid) }).catch(()=>{
+          setDoc(doc(db,'ttc','usageStats'), { dailyActive: { [todayKey]: [u.uid] } }, { merge: true }).catch(()=>{});
+        });
         const snap = await getDoc(doc(db, 'users', u.uid));
         if (snap.exists()) {
           const data = snap.data();
@@ -1045,6 +1052,7 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','rangliste'), s => setRangliste(s.exists()&&s.data().entries ? s.data().entries : [])),
       onSnapshot(doc(db,'ttc','ranglisteHistory'), s => setRanglisteHistory(s.exists()&&Array.isArray(s.data().snapshots) ? s.data().snapshots : [])),
       onSnapshot(doc(db,'ttc','mitgliederListe'), s => setMitgliederListe(s.exists()&&s.data().list ? s.data().list : {})),
+      onSnapshot(doc(db,'ttc','usageStats'), s => setUsageStats(s.exists() ? { dailyActive: s.data().dailyActive||{}, viewCounts: s.data().viewCounts||{} } : { dailyActive:{}, viewCounts:{} })),
       onSnapshot(doc(db,'ttc','ranglistenspiele'), s => setRanglistenspiele(s.exists() ? { active: s.data().active||[], archived: s.data().archived||[] } : { active:[], archived:[] })),
       onSnapshot(doc(db,'ttc','ranglisteAchievements'), s => setRanglisteAch(s.exists() ? s.data() : {})),
       onSnapshot(doc(db,'ttc','practiceTournaments'),          s => setPracticeTournaments(s.exists()?s.data():{})),
@@ -2215,7 +2223,14 @@ export default function TrainingsApp() {
       });
     } catch (e) { console.error('Fahrer speichern fehlgeschlagen', e); }
   };
-  const navTo = (v) => { setView(v); setViewKey(k => k + 1); setGegnerAdding(false); setGegnerEditId(null); setGegnerForm({date:'',verein:'',gegner:'',taktik:''}); setElternSubView(null); };
+  const navTo = (v) => {
+    setView(v); setViewKey(k => k + 1); setGegnerAdding(false); setGegnerEditId(null); setGegnerForm({date:'',verein:'',gegner:'',taktik:''}); setElternSubView(null);
+    // Leichtgewichtiges Nutzungs-Tracking: zaehlt, wie oft welcher Bereich aufgerufen wird
+    // (fire-and-forget, blockiert die Navigation nicht).
+    updateDoc(doc(db,'ttc','usageStats'), { [`viewCounts.${v}`]: increment(1) }).catch(()=>{
+      setDoc(doc(db,'ttc','usageStats'), { viewCounts: { [v]: 1 } }, { merge: true }).catch(()=>{});
+    });
+  };
 
   // ── Deep-Link beim Klick auf eine Push-Benachrichtigung ───────
   // Liest ?notif=...&childId=... aus der URL und springt direkt zur passenden Stelle.
@@ -4797,6 +4812,7 @@ export default function TrainingsApp() {
           ...(userRole==='admin'?[
             {label:'Trainingsmatches',icon:'⚔️', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.25)', action:()=>navTo('trainingsmatches')},
             {label:'Admin',          icon:'🛡️', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('admin')},
+            {label:'App-Statistik',  icon:'📈', color:'#7dd3fc', bg:'rgba(125,211,252,0.1)', border:'rgba(125,211,252,0.25)', action:()=>navTo('usageStats')},
           ]:[]),
         ],
       },
@@ -12376,6 +12392,68 @@ export default function TrainingsApp() {
   }
 
   // ── MITGLIEDERVERWALTUNG VIEW (nur Admin) ─────────────────────────────────
+  if (view === 'usageStats' && userRole === 'admin') {
+    const dailyActive = usageStats.dailyActive || {};
+    const viewCounts = usageStats.viewCounts || {};
+    const todayKey = new Date().toISOString().split('T')[0];
+    const dateKeyMinus = n => { const d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().split('T')[0]; };
+    const uniqueUnion = keys => new Set(keys.flatMap(k => dailyActive[k] || [])).size;
+    const activeToday = uniqueUnion([todayKey]);
+    const last7 = Array.from({length:7},(_,i)=>dateKeyMinus(i));
+    const last30 = Array.from({length:30},(_,i)=>dateKeyMinus(i));
+    const activeWeek = uniqueUnion(last7);
+    const activeMonth = uniqueUnion(last30);
+    const sortedDays = Object.keys(dailyActive).sort().reverse().slice(0,14);
+    const sortedViews = Object.entries(viewCounts).sort((a,b)=>b[1]-a[1]);
+    const maxCount = sortedViews.length ? sortedViews[0][1] : 1;
+    const statCard = (label, value) => (
+      <div style={{flex:'1 1 120px',padding:'16px',background:'rgba(125,211,252,0.08)',border:'1px solid rgba(125,211,252,0.25)',borderRadius:'12px',textAlign:'center'}}>
+        <div style={{fontSize:'26px',fontWeight:'800',color:'#7dd3fc'}}>{value}</div>
+        <div style={{fontSize:'12px',color:'rgba(255,255,255,0.6)',marginTop:'4px'}}>{label}</div>
+      </div>
+    );
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
+          <button onClick={()=>navTo('home')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'9px',color:'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:'600'}}><Home size={15}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>📈 App-Statistik</h1>
+        </div>
+        <div style={{padding:'16px 14px',maxWidth:'900px',margin:'0 auto'}}>
+          <div style={{display:'flex',gap:'10px',flexWrap:'wrap',marginBottom:'22px'}}>
+            {statCard('Aktiv heute', activeToday)}
+            {statCard('Aktiv 7 Tage', activeWeek)}
+            {statCard('Aktiv 30 Tage', activeMonth)}
+          </div>
+
+          <h2 style={{fontSize:'15px',fontWeight:'800',margin:'0 0 10px',color:'rgba(255,255,255,0.85)'}}>Meistgenutzte Bereiche</h2>
+          <div style={{display:'flex',flexDirection:'column',gap:'6px',marginBottom:'26px'}}>
+            {sortedViews.length === 0 && <div style={{fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>Noch keine Daten.</div>}
+            {sortedViews.map(([key,count]) => (
+              <div key={key} style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                <div style={{width:'110px',fontSize:'12px',color:'rgba(255,255,255,0.7)',flexShrink:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{key}</div>
+                <div style={{flex:1,height:'16px',background:'rgba(255,255,255,0.06)',borderRadius:'8px',overflow:'hidden'}}>
+                  <div style={{width:`${Math.max(4,(count/maxCount)*100)}%`,height:'100%',background:'linear-gradient(90deg,#38bdf8,#7dd3fc)'}}/>
+                </div>
+                <div style={{width:'32px',textAlign:'right',fontSize:'12px',fontWeight:'700',color:'#7dd3fc'}}>{count}</div>
+              </div>
+            ))}
+          </div>
+
+          <h2 style={{fontSize:'15px',fontWeight:'800',margin:'0 0 10px',color:'rgba(255,255,255,0.85)'}}>Aktive Nutzer pro Tag</h2>
+          <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+            {sortedDays.length === 0 && <div style={{fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>Noch keine Daten.</div>}
+            {sortedDays.map(day => (
+              <div key={day} style={{display:'flex',justifyContent:'space-between',padding:'8px 12px',background:'rgba(255,255,255,0.04)',borderRadius:'8px',fontSize:'13px'}}>
+                <span style={{color:'rgba(255,255,255,0.7)'}}>{day.split('-').reverse().join('.')}</span>
+                <span style={{fontWeight:'700',color:'#7dd3fc'}}>{(dailyActive[day]||[]).length}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (view === 'mitglieder' && userRole === 'admin') {
     const ROLE_OPTIONS = [
       {key:'admin', label:'Admin'},
