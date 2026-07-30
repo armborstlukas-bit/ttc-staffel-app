@@ -123,6 +123,7 @@ const ROLE_CONFIG = {
   eltern:     { label: 'Eltern',       color: '#2563eb', bg: '#dbeafe' },
   jugendlich: { label: 'Jugendliche',  color: '#d97706', bg: '#fef3c7' },
   aktiver:    { label: 'Aktiver',      color: '#0891b2', bg: '#cffafe' },
+  passiv:     { label: 'Passives Mitglied', color: '#6b7280', bg: '#f3f4f6' },
 };
 
 const WEEKDAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
@@ -3452,6 +3453,64 @@ export default function TrainingsApp() {
             </div>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // ── PASSIVES MITGLIED: stark eingeschränkter Bereich ──────────────────────
+  if (userRole === 'passiv' && !['ttcnews','kalender','tippspiel'].includes(view)) {
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr" style={{padding:'16px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
+          <div style={{flex:1,minWidth:0}}>
+            <h2 style={{margin:0,color:'white',fontWeight:'800',fontSize:'18px'}}>Hallo, {(userProfile?.name||'').split(' ')[0]||'Mitglied'} 👋</h2>
+            <p style={{margin:0,color:'rgba(255,255,255,0.35)',fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>Passives Mitglied</p>
+          </div>
+          <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{padding:'8px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.6)',fontSize:isMobile?'16px':'12px',fontWeight:'600',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'⚙️':'⚙️ Profil'}</button>
+          <button onClick={handleLogout} style={{padding:'8px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',color:'#fca5a5',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'🚪':'Abmelden'}</button>
+        </div>
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'20px 14px 40px':'24px 24px 60px'}}>
+          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'12px'}}>
+            {[
+              {label:'TTC News', icon:'📰', desc:'Aktuelle Vereinsnachrichten', color:'#86efac', bg:'rgba(74,222,128,0.08)', border:'rgba(74,222,128,0.2)', action:()=>{navTo('ttcnews');fetchTtcNews();}},
+              {label:'Vereinskalender', icon:'📅', desc:'Termine & Hallenbelegungen', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.2)', action:()=>{navTo('kalender');fetchKalender();}},
+              {label:'TTC Tippspiel', icon:'🎱', desc:'Endplatzierungen tippen', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>{navTo('tippspiel');fetchTippspiel();}},
+              {label:'MyTischtennis', icon:'🏓', desc:'Vereinsübersicht auf MyTischtennis', color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)', action:()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);}},
+            ].map(t=>(
+              <button key={t.label} onClick={t.action}
+                style={{background:t.bg,border:`1px solid ${t.border}`,borderRadius:'18px',padding:'22px 20px',cursor:'pointer',textAlign:'left',display:'flex',flexDirection:'column',gap:'8px',transition:'transform 0.15s'}}
+                onMouseEnter={e=>e.currentTarget.style.transform='translateY(-2px)'}
+                onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
+                <span style={{fontSize:'32px'}}>{t.icon}</span>
+                <p style={{margin:0,fontWeight:'800',fontSize:'17px',color:t.color}}>{t.label}</p>
+                <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)',lineHeight:'1.5'}}>{t.desc}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+        {/* Profil-Modal */}
+        {showProfile&&(
+          <Modal>
+          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
+            <div style={{background:'#0a2210',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'20px',padding:'28px',maxWidth:'400px',width:'100%',boxShadow:'0 32px 80px rgba(0,0,0,0.7)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
+              <h3 style={{margin:'0 0 2px',color:'white',fontSize:'20px',fontWeight:'800'}}>Mein Profil</h3>
+              <p style={{margin:'0 0 22px',color:'rgba(255,255,255,0.35)',fontSize:'13px'}}>{user?.email}</p>
+              <h4 style={{margin:'0 0 10px',color:'#4ade80',fontSize:'13px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.5px'}}>Passwort ändern</h4>
+              {pwSuccess&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(74,222,128,0.12)',border:'1px solid rgba(74,222,128,0.25)',borderRadius:'10px',fontSize:'13px',color:'#4ade80',fontWeight:'600'}}>✅ Passwort erfolgreich geändert!</div>}
+              {pwError&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',fontSize:'13px',color:'#fca5a5'}}>{pwError}</div>}
+              <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'18px'}}>
+                <input type="password" placeholder="Aktuelles Passwort" value={pwCurrent} onChange={e=>setPwCurrent(e.target.value)} style={{padding:'10px 14px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(134,239,172,0.2)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',width:'100%',boxSizing:'border-box'}}/>
+                <input type="password" placeholder="Neues Passwort (min. 6 Zeichen)" value={pwNew} onChange={e=>setPwNew(e.target.value)} style={{padding:'10px 14px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(134,239,172,0.2)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',width:'100%',boxSizing:'border-box'}}/>
+                <input type="password" placeholder="Neues Passwort bestätigen" value={pwConfirm} onChange={e=>setPwConfirm(e.target.value)} onKeyPress={e=>e.key==='Enter'&&handleChangePassword()} style={{padding:'10px 14px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(134,239,172,0.2)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',width:'100%',boxSizing:'border-box'}}/>
+                <button onClick={handleChangePassword} style={{padding:'11px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>Passwort ändern</button>
+              </div>
+              {renderNotifSettings()}
+              <button onClick={()=>{setShowProfile(false);setPwError('');setPwSuccess(false);setPwCurrent('');setPwNew('');setPwConfirm('');}}
+                style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.5)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button>
+            </div>
+          </div>
+          </Modal>
+        )}
       </div>
     );
   }
@@ -12295,6 +12354,7 @@ export default function TrainingsApp() {
       {key:'aktiver', label:'Aktiver'},
       {key:'eltern', label:'Eltern'},
       {key:'jugendlich', label:'Jugendlicher'},
+      {key:'passiv', label:'Passives Mitglied'},
     ];
     const getRoles = m => m.roles?.length ? m.roles : (m.role ? [m.role] : []);
     const getLinkedIds = m => m.linkedMemberIds?.length ? m.linkedMemberIds : (m.linkedMemberId ? [m.linkedMemberId] : []);
@@ -12332,8 +12392,19 @@ export default function TrainingsApp() {
           <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
             Importierte Mitgliederliste. Klicke auf eine Person, um Rollen (Mehrfachauswahl möglich) und bei "Eltern" die zugehörigen Kinder/Jugendlichen zuzuordnen (auch mehrere möglich). Meldet sich jemand mit einer hier hinterlegten E-Mail-Adresse und zugewiesener Rolle an, wird der Account automatisch freigeschaltet.
           </p>
-          <input value={mitgliederSearch} onChange={e=>setMitgliederSearch(e.target.value)} placeholder="Suche nach Name oder E-Mail…"
-            style={{width:'100%',boxSizing:'border-box',padding:'10px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(196,181,253,0.25)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',marginBottom:'14px'}}/>
+          <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
+            <input value={mitgliederSearch} onChange={e=>setMitgliederSearch(e.target.value)} placeholder="Suche nach Name oder E-Mail…"
+              style={{flex:'1 1 220px',boxSizing:'border-box',padding:'10px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(196,181,253,0.25)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none'}}/>
+            <button onClick={()=>{
+                const withoutRole = entries.filter(([,m])=>getRoles(m).length===0);
+                if (withoutRole.length===0) { alert('Alle Mitglieder haben bereits eine Rolle.'); return; }
+                if (!window.confirm(`${withoutRole.length} Mitglieder ohne Rolle als "Passives Mitglied" markieren?`)) return;
+                withoutRole.forEach(([id])=>saveMitgliedField(id,'roles',['passiv']));
+              }}
+              style={{padding:'10px 14px',background:'rgba(107,114,128,0.15)',border:'1px solid rgba(107,114,128,0.35)',borderRadius:'10px',color:'#9ca3af',fontSize:'12px',fontWeight:'700',cursor:'pointer',flexShrink:0}}>
+              Alle ohne Rolle → Passiv
+            </button>
+          </div>
 
           <div style={{display:'grid',gap:'6px'}}>
             {filtered.map(([id,m])=>{
