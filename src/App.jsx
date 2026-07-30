@@ -714,6 +714,7 @@ export default function TrainingsApp() {
   const [mitgliederSearch, setMitgliederSearch] = useState('');
   const [mitgliedExpandedId, setMitgliedExpandedId] = useState(null);
   const [mitgliedChildSearch, setMitgliedChildSearch] = useState('');
+  const [mitgliederRoleFilter, setMitgliederRoleFilter] = useState('');
   const [ranglisteHistory, setRanglisteHistory] = useState([]); // [{date:'YYYY-MM-DD', order:[childId,...]}]
   const [showRangStats, setShowRangStats] = useState(false);
   const [rangStatsH2H, setRangStatsH2H] = useState(['', '']);
@@ -12364,6 +12365,7 @@ export default function TrainingsApp() {
     const q = mitgliederSearch.trim().toLowerCase();
     const filtered = entries
       .filter(([,m]) => !q || `${m.vorname} ${m.nachname} ${m.email}`.toLowerCase().includes(q))
+      .filter(([,m]) => !mitgliederRoleFilter || (mitgliederRoleFilter==='__none__' ? getRoles(m).length===0 : getRoles(m).includes(mitgliederRoleFilter)))
       .sort((a,b)=>`${a[1].nachname}${a[1].vorname}`.localeCompare(`${b[1].nachname}${b[1].vorname}`,'de'));
     const fmtGeb = g => { if (!g) return ''; const [y,mo,d] = g.split('-'); return d&&mo&&y ? `${d}.${mo}.${y}` : g; };
     const assignedCount = entries.filter(([,m])=>getRoles(m).length>0).length;
@@ -12395,15 +12397,12 @@ export default function TrainingsApp() {
           <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
             <input value={mitgliederSearch} onChange={e=>setMitgliederSearch(e.target.value)} placeholder="Suche nach Name oder E-Mail…"
               style={{flex:'1 1 220px',boxSizing:'border-box',padding:'10px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(196,181,253,0.25)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none'}}/>
-            <button onClick={()=>{
-                const withoutRole = entries.filter(([,m])=>getRoles(m).length===0);
-                if (withoutRole.length===0) { alert('Alle Mitglieder haben bereits eine Rolle.'); return; }
-                if (!window.confirm(`${withoutRole.length} Mitglieder ohne Rolle als "Passives Mitglied" markieren?`)) return;
-                withoutRole.forEach(([id])=>saveMitgliedField(id,'roles',['passiv']));
-              }}
-              style={{padding:'10px 14px',background:'rgba(107,114,128,0.15)',border:'1px solid rgba(107,114,128,0.35)',borderRadius:'10px',color:'#9ca3af',fontSize:'12px',fontWeight:'700',cursor:'pointer',flexShrink:0}}>
-              Alle ohne Rolle → Passiv
-            </button>
+            <select value={mitgliederRoleFilter} onChange={e=>setMitgliederRoleFilter(e.target.value)}
+              style={{padding:'10px 14px',background:'#0a2210',border:'1px solid rgba(196,181,253,0.25)',borderRadius:'10px',color:'#c4b5fd',fontSize:'13px',fontWeight:'700',flexShrink:0}}>
+              <option value="" style={{background:'#0a2210'}}>Alle Rollen</option>
+              <option value="__none__" style={{background:'#0a2210'}}>– keine Rolle –</option>
+              {ROLE_OPTIONS.map(o=><option key={o.key} value={o.key} style={{background:'#0a2210'}}>{o.label}</option>)}
+            </select>
           </div>
 
           <div style={{display:'grid',gap:'6px'}}>
