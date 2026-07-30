@@ -2110,7 +2110,7 @@ export default function TrainingsApp() {
     setSendingIntroMail(true);
     try {
       const idToken = await user.getIdToken();
-      const r = await fetch('/api/fahrplan-send-intro', {
+      const r = await fetch('/api/fahrplan?action=send-intro', {
         method: 'POST',
         headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(emails ? { emails } : {}),
@@ -2193,7 +2193,7 @@ export default function TrainingsApp() {
     setFahrplan(prev => prev.map(it => it.meetingId===meetingId ? {...it, fahrer} : it));
     try {
       const idToken = await user.getIdToken();
-      await fetch('/api/fahrplan-set-fahrer', {
+      await fetch('/api/fahrplan?action=set-fahrer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ meetingId, fahrer }),
