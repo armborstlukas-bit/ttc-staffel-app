@@ -145,6 +145,17 @@ const TIPPSPIEL_BONUS_QUESTIONS = [
   { key: 'q5', type: 'select', label: 'Wie viele unterschiedliche Doppelpaarungen gibt es mannschaftsübergreifend in der Saison 26/27?', options: rangeOptions(250) },
 ];
 
+// Einfache Levenshtein-Distanz für Tippfehler-tolerante Namensabgleiche (z.B. Mitgliederliste ↔ TTR-Spielerliste).
+const levenshtein = (a, b) => {
+  const m = a.length, n = b.length;
+  const d = Array.from({length: m+1}, (_, i) => [i, ...Array(n).fill(0)]);
+  for (let j = 0; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) {
+    d[i][j] = a[i-1] === b[j-1] ? d[i-1][j-1] : 1 + Math.min(d[i-1][j], d[i][j-1], d[i-1][j-1]);
+  }
+  return d[m][n];
+};
+
 const TODAY = new Date().toISOString().split('T')[0];
 const emptyTournament = { name: '', location: '', dateFrom: TODAY, dateTo: TODAY, konkurrenzen: [] };
 const emptyKonkurrenz = () => ({ id: 'konk_' + Date.now() + '_' + Math.random().toString(36).slice(2,6), name: '', date: '', time: '10:00', participantIds: [], departureTimes: {} });
@@ -468,7 +479,7 @@ function MobileBottomNav({ view, navTo, userRole, canEdit, appSettings, unreadCo
         { icon:'📅', label:'Training',   v:'trainingsplan' },
         { icon:'🏆', label:'Turniere',   v:'turniere' },
         { icon:'💬', label:'Nachrichten', v:'notifications', badge: unreadCount },
-        ...(userRole==='admin' ? [{ icon:'🛡️', label:'Admin', v:'admin' }] : []),
+        ...(userRole==='admin' ? [{ icon:'🗂️', label:'Mitglieder', v:'mitglieder' }] : []),
       ]
     : [
         { icon:'🏠', label:'Home',       v:'home' },
@@ -742,7 +753,6 @@ export default function TrainingsApp() {
   const [resetDialog, setResetDialog]           = useState(false);
   const [resetPassword, setResetPassword]       = useState('');
   const [resetError, setResetError]             = useState('');
-  const [expandedUser, setExpandedUser]                 = useState(null);
   const [dangerSelected, setDangerSelected]             = useState('');
   const [showProfile, setShowProfile]           = useState(false);
   const [pwCurrent, setPwCurrent]               = useState('');
@@ -750,8 +760,7 @@ export default function TrainingsApp() {
   const [pwConfirm, setPwConfirm]               = useState('');
   const [pwError, setPwError]                   = useState('');
   const [pwSuccess, setPwSuccess]               = useState(false); // {sessionId, repeatId, blockSize}
-  const [adminRoleDialog, setAdminRoleDialog]   = useState(null); // { uid, newRoles } | null
-  const [adminUsersListOpen, setAdminUsersListOpen] = useState(false); // { [uid]: {rompel,pfand,pinnwand}[] }
+  const [adminRoleDialog, setAdminRoleDialog]   = useState(null); // { id, next } | null
   const [adminRolePw, setAdminRolePw]           = useState('');
   const [adminRoleError, setAdminRoleError]     = useState('');
 
@@ -3702,7 +3711,7 @@ export default function TrainingsApp() {
                 </button>
               );
             })()}
-            {userRole==='admin'&&<button onClick={()=>navTo('admin')} style={s.btn('#7c3aed')}><Shield size={16}/> Admin</button>}
+            {userRole==='admin'&&<button onClick={()=>navTo('mitglieder')} style={s.btn('#7c3aed')}><Shield size={16}/> Mitglieder</button>}
             {canEdit()&&<button onClick={()=>navTo('trainingsplan')} style={s.btn('#0369a1')}><Calendar size={16}/> Trainingsplan</button>}
             {canEdit()&&<button onClick={()=>navTo('turniere')} style={s.btn('#b45309')}><Trophy size={16}/> Turniere</button>}
             {canEdit()&&<button onClick={()=>navTo('archiv')} style={s.btn('#374151')}><Archive size={16}/> Archiv</button>}
@@ -4316,77 +4325,25 @@ export default function TrainingsApp() {
   }
 
   // ── ADMIN ────────────────────────────────────────────────────
-  if (view==='admin' && userRole!=='admin') {
+  // ── DATENLÖSCHEN (Admin) ────────────────────────────────────────────────
+  if (view==='datenloeschen' && userRole!=='admin') {
     return (
       <div style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'16px',color:'white',padding:'20px',textAlign:'center'}}>
         <span style={{fontSize:'48px'}}>🔒</span>
-        <p style={{fontSize:'16px',color:'rgba(255,255,255,0.6)',fontWeight:'700',margin:0}}>Nur Admins haben Zugriff auf die Nutzerverwaltung.</p>
+        <p style={{fontSize:'16px',color:'rgba(255,255,255,0.6)',fontWeight:'700',margin:0}}>Nur Admins haben Zugriff.</p>
         <button onClick={()=>navTo('home')} style={{padding:'10px 20px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.25)',borderRadius:'10px',color:'#4ade80',cursor:'pointer',fontWeight:'700'}}>← Zurück</button>
       </div>
     );
   }
-  if (view==='admin' && userRole==='admin') {
-    const allChildrenList=Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
-    const pendingCount=Object.values(allUsers).filter(u=>u.role==='pending').length;
-
-    const confirmAdminRole = async () => {
-      if (!adminRolePw.trim()) { setAdminRoleError('Bitte Passwort eingeben.'); return; }
-      try {
-        const credential = EmailAuthProvider.credential(user.email, adminRolePw);
-        await reauthenticateWithCredential(user, credential);
-        await saveUserRoles(adminRoleDialog.uid, adminRoleDialog.newRoles);
-        setAdminRoleDialog(null);
-        setAdminRolePw('');
-        setAdminRoleError('');
-      } catch {
-        setAdminRoleError('Falsches Passwort. Bitte erneut versuchen.');
-      }
-    };
-
+  if (view==='datenloeschen' && userRole==='admin') {
     return (
       <div style={{minHeight:'100vh',background:"linear-gradient(135deg,#1e0a3c 0%,#7c3aed 100%)",fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
         {/* Header */}
         <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
           <button onClick={()=>navTo('home')} style={s.btn('#7c3aed')}><Home size={16}/></button>
-          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}><Shield size={20} style={{display:'inline',verticalAlign:'middle',marginRight:'6px'}}/>Administration</h1>
-          {pendingCount>0&&<button onClick={()=>navTo('mitglieder')} style={{background:'#dc2626',color:'white',border:'none',borderRadius:'20px',padding:'4px 12px',fontWeight:'700',fontSize:'13px',cursor:'pointer'}}>⚠️ {pendingCount} wartend</button>}
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}><Shield size={20} style={{display:'inline',verticalAlign:'middle',marginRight:'6px'}}/>Datenlöschen</h1>
         </div>
         <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
-
-        {/* Admin-Rollen-Bestätigung */}
-        {adminRoleDialog&&(
-          <Modal>
-          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
-            <div style={{background:'white',borderRadius:'16px',padding:'28px',maxWidth:'380px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
-              <div style={{fontSize:'36px',textAlign:'center',marginBottom:'12px'}}>🛡️</div>
-              <h3 style={{margin:'0 0 8px',color:'#7c3aed',fontSize:'18px',textAlign:'center'}}>Admin-Rolle vergeben</h3>
-              <p style={{margin:'0 0 16px',color:'#666',fontSize:'14px',textAlign:'center'}}>
-                Bitte bestätige mit deinem eigenen Admin-Passwort, um die Admin-Rolle zu vergeben.
-              </p>
-              {adminRoleError&&<p style={{color:'#dc2626',fontSize:'13px',marginBottom:'12px',padding:'8px',background:'#fee2e2',borderRadius:'6px'}}>{adminRoleError}</p>}
-              <input
-                type="password"
-                placeholder="Dein Admin-Passwort"
-                value={adminRolePw}
-                onChange={e=>{setAdminRolePw(e.target.value);setAdminRoleError('');}}
-                onKeyDown={e=>e.key==='Enter'&&confirmAdminRole()}
-                autoFocus
-                style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box',marginBottom:'14px',borderColor:'#7c3aed',borderWidth:'2px'}}
-              />
-              <div style={{display:'grid',gap:'8px'}}>
-                <button onClick={confirmAdminRole}
-                  style={{padding:'12px',background:'#7c3aed',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
-                  🛡️ Bestätigen & Admin-Rolle vergeben
-                </button>
-                <button onClick={()=>{setAdminRoleDialog(null);setAdminRolePw('');setAdminRoleError('');}}
-                  style={{padding:'12px',background:'#f3f4f6',color:'#333',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
-                  Abbrechen
-                </button>
-              </div>
-            </div>
-          </div>
-          </Modal>
-        )}
 
         {/* Passwort-Bestätigungs-Dialog */}
         {resetDialog&&(
@@ -4421,199 +4378,6 @@ export default function TrainingsApp() {
           </div>
           </Modal>
         )}
-
-        {/* ── Nutzerverwaltung ── */}
-        <div style={s.card}>
-          <h2 style={{margin:'0 0 16px',color:'#7c3aed',display:'flex',alignItems:'center',gap:'8px'}}><Users size={20}/> Nutzerverwaltung</h2>
-
-          {/* Neue Registrierungen werden jetzt oben in der Mitgliederverwaltung angezeigt (Zuordnung per E-Mail) */}
-          {Object.values(allUsers).some(u=>u.role==='pending') && (
-            <div style={{padding:'10px 14px',background:'#f5f3ff',border:'1px solid #c4b5fd',borderRadius:'10px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-              <span style={{fontSize:'13px',color:'#5b21b6',flex:1,minWidth:'200px'}}>🗂️ Es gibt neue, noch nicht zugeordnete Registrierungen.</span>
-              <button onClick={()=>navTo('mitglieder')} style={{padding:'7px 14px',background:'#7c3aed',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>Zur Mitgliederverwaltung →</button>
-            </div>
-          )}
-
-          {/* Bestehende Nutzer — klappbare Liste */}
-          {(()=>{
-            // Eigenen Account einmischen falls nicht in ttc/users
-            const usersMap = user && !allUsers[user.uid] && userProfile
-              ? {...allUsers, [user.uid]: {...userProfile, uid: user.uid}}
-              : allUsers;
-            const active = Object.values(usersMap).filter(u=>u.role!=='pending').sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-            if(active.length===0) return null;
-            return (
-              <div>
-                <button onClick={()=>setAdminUsersListOpen(o=>!o)}
-                  style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'#f8f9fa',border:'1px solid #e5e7eb',borderRadius:'10px',cursor:'pointer',marginBottom: adminUsersListOpen?'10px':'0'}}>
-                  <span style={{fontSize:'11px',fontWeight:'800',color:'#6b7280',textTransform:'uppercase',letterSpacing:'0.5px'}}>Nutzer ({active.length})</span>
-                  <span style={{fontSize:'13px',color:'#9ca3af'}}>{adminUsersListOpen ? '▲' : '▼'}</span>
-                </button>
-                {adminUsersListOpen && <div style={{display:'grid',gap:'6px'}}>
-                  {active.map(u=>{
-                    const isOpen = expandedUser===u.uid;
-                    const rc=ROLE_CONFIG[u.role]||{};
-                    const userRoles=u.roles&&u.roles.length>0?u.roles:[u.role];
-                    const linkedChildIds=(u.linkedChildIds?.length>0?u.linkedChildIds:(u.linkedChildId?[u.linkedChildId]:[]));
-                    const linkedChild=linkedChildIds.length>0?children[linkedChildIds[0]]:null;
-                    const roleLabels=userRoles.filter(r=>r!=='pending').map(r=>ROLE_CONFIG[r]?.label||r).join(', ');
-                    return (
-                      <div key={u.uid} style={{borderRadius:'10px',border:'1px solid #e5e7eb',overflow:'hidden'}}>
-                        {/* Kompakte Zeile */}
-                        <button onClick={()=>setExpandedUser(isOpen?null:u.uid)}
-                          style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'#f8f9fa',border:'none',cursor:'pointer',gap:'10px',textAlign:'left'}}>
-                          <div style={{flex:1,minWidth:0}}>
-                            <span style={{fontWeight:'700',color:'#333',fontSize:'14px'}}>{u.name||u.email}</span>
-                            <span style={{marginLeft:'8px',fontSize:'12px',color:'#9ca3af'}}>{roleLabels}</span>
-                            {linkedChildIds.length>0&&<span style={{marginLeft:'8px',fontSize:'12px',color:'#16a34a',fontWeight:'600'}}>· {linkedChildIds.map(id=>children[id]?.name).filter(Boolean).join(', ')}</span>}
-                            {u.linkedPlayerId&&aktiveSpieler[u.linkedPlayerId]&&<span style={{marginLeft:'8px',fontSize:'12px',color:'#0891b2',fontWeight:'600'}}>⚡ {aktiveSpieler[u.linkedPlayerId].name}</span>}
-                          </div>
-                          <span style={{fontSize:'14px',color:'#9ca3af',transform:isOpen?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.15s',flexShrink:0}}>▾</span>
-                        </button>
-
-                        {/* Aufgeklappte Bearbeitung */}
-                        {isOpen&&(()=>{
-                          const inMitgliederListe = Object.values(mitgliederListe).some(m => (m.email||'').trim().toLowerCase() === (u.email||'').trim().toLowerCase());
-                          if (inMitgliederListe) return (
-                          <div style={{padding:'14px 16px',borderTop:'1px solid #e5e7eb',background:'white'}}>
-                            <p style={{margin:'0 0 2px',fontWeight:'700',color:'#333'}}>{u.name||u.email}</p>
-                            <p style={{margin:'0 0 14px',fontSize:'12px',color:'#999'}}>{u.email}</p>
-                            <div style={{padding:'12px 14px',background:'#f5f3ff',border:'1px solid #c4b5fd',borderRadius:'10px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-                              <span style={{fontSize:'13px',color:'#5b21b6',flex:1,minWidth:'200px'}}>🗂️ Diese Person steht in der Mitgliederliste – Rollen &amp; Kind-Zuordnung werden dort verwaltet.</span>
-                              <button onClick={()=>{navTo('mitglieder');setMitgliederSearch(u.email||u.name||'');}} style={{padding:'7px 14px',background:'#7c3aed',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>Zur Mitgliederverwaltung →</button>
-                            </div>
-                          </div>
-                          );
-                          return (
-                          <div style={{padding:'14px 16px',borderTop:'1px solid #e5e7eb',background:'white'}}>
-                            <p style={{margin:'0 0 2px',fontWeight:'700',color:'#333'}}>{u.name||u.email}</p>
-                            <p style={{margin:'0 0 12px',fontSize:'12px',color:'#999'}}>{u.email}</p>
-
-                            {/* Rollen */}
-                            <div style={{marginBottom:'10px'}}>
-                              <span style={{fontSize:'12px',color:'#555',fontWeight:'600',display:'block',marginBottom:'6px'}}>Rollen:</span>
-                              <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
-                                {Object.entries(ROLE_CONFIG).filter(([k])=>k!=='pending').map(([key,cfg])=>{
-                                  const cur=userRoles.filter(r=>r!=='pending');
-                                  const active=cur.includes(key);
-                                  return <button key={key} onClick={()=>{
-                                    let next;
-                                    if(active){next=cur.filter(r=>r!==key);if(next.length===0)return;}
-                                    else next=[...cur,key];
-                                    if(key==='admin'&&!active){setAdminRoleDialog({uid:u.uid,newRoles:next});setAdminRolePw('');setAdminRoleError('');}
-                                    else saveUserRoles(u.uid,next);
-                                  }} style={{padding:'4px 10px',borderRadius:'20px',border:`2px solid ${cfg.color}`,background:active?cfg.color:cfg.bg,color:active?'white':cfg.color,cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>
-                                    {key==='admin'&&!active?'🔒 ':''}{cfg.label}
-                                  </button>;
-                                })}
-                              </div>
-                            </div>
-
-                            {/* Oberrolle (bestimmt Standard-Rolle beim Login & Push-Ziel) */}
-                            {userRoles.filter(r=>r!=='pending').length>1&&(()=>{
-                              const cur=userRoles.filter(r=>r!=='pending');
-                              const primary=cur.includes(u.primaryRole)?u.primaryRole:cur[0];
-                              return (
-                                <div style={{marginBottom:'10px'}}>
-                                  <span style={{fontSize:'12px',color:'#555',fontWeight:'600',display:'block',marginBottom:'6px'}}>Oberrolle:</span>
-                                  <select value={primary} onChange={e=>saveUserPrimaryRole(u.uid,e.target.value)} style={{padding:'6px 10px',border:'1px solid #d1d5db',borderRadius:'8px',fontSize:'13px',cursor:'pointer',color:'#333',background:'white',width:'100%'}}>
-                                    {cur.map(r=><option key={r} value={r}>{ROLE_CONFIG[r]?.label||r}</option>)}
-                                  </select>
-                                </div>
-                              );
-                            })()}
-
-                            {/* Kinder zuordnen (Dropdown + Chips) */}
-                            {userRoles.some(r=>['eltern','jugendlich'].includes(r))&&(()=>{
-                              const latestProfile=allUsers[u.uid]||u;
-                              const curIds=(latestProfile.linkedChildIds?.length>0?latestProfile.linkedChildIds:(latestProfile.linkedChildId?[latestProfile.linkedChildId]:[]));
-                              const unassigned=allChildrenList.filter(c=>!curIds.includes(c.id));
-                              return (
-                                <div style={{marginBottom:'10px'}}>
-                                  <span style={{fontSize:'12px',color:'#555',fontWeight:'600',display:'block',marginBottom:'6px'}}>Kinder zuordnen:</span>
-                                  {curIds.length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:'4px',marginBottom:'6px'}}>
-                                    {curIds.map(id=>children[id]&&(
-                                      <span key={id} style={{display:'inline-flex',alignItems:'center',gap:'4px',padding:'3px 8px',background:'#dcfce7',border:'1px solid #16a34a',borderRadius:'20px',fontSize:'12px',fontWeight:'600',color:'#15803d'}}>
-                                        {children[id].name}
-                                        <button onClick={()=>{const fresh=allUsersRef.current[u.uid]||u;const freshIds=fresh.linkedChildIds?.length>0?fresh.linkedChildIds:(fresh.linkedChildId?[fresh.linkedChildId]:[]);linkChildrenToUser(u.uid,freshIds.filter(x=>x!==id));}} style={{background:'none',border:'none',cursor:'pointer',color:'#15803d',padding:'0 0 0 2px',lineHeight:1,fontSize:'15px',fontWeight:'700'}}>×</button>
-                                      </span>
-                                    ))}
-                                  </div>}
-                                  {unassigned.length>0&&<select defaultValue="" onChange={e=>{if(!e.target.value)return;const fresh=allUsersRef.current[u.uid]||u;const freshIds=fresh.linkedChildIds?.length>0?fresh.linkedChildIds:(fresh.linkedChildId?[fresh.linkedChildId]:[]);if(!freshIds.includes(e.target.value))linkChildrenToUser(u.uid,[...freshIds,e.target.value]);e.target.value='';}} style={{padding:'6px 10px',border:'1px solid #16a34a',borderRadius:'8px',fontSize:'13px',cursor:'pointer',color:'#15803d',background:'white',width:'100%'}}>
-                                    <option value="">+ Kind hinzufügen…</option>
-                                    {unassigned.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-                                  </select>}
-                                  {curIds.length===0&&unassigned.length===0&&<p style={{fontSize:'12px',color:'#9ca3af',margin:0}}>Keine Kinder vorhanden.</p>}
-                                </div>
-                              );
-                            })()}
-
-                            {/* Spieler zuordnen (Aktiver / Admin) */}
-                            {userRoles.some(r=>['aktiver','admin'].includes(r))&&(()=>{
-                              const aktivList=Object.values(aktiveSpieler).sort((a,b)=>a.name.localeCompare(b.name,'de'));
-                              const jugendList=Object.values(children).filter(c=>subgroups[c.subgroupId]?.groupId==='jugend').sort((a,b)=>a.name.localeCompare(b.name,'de'));
-                              const curPlayer=allUsers[u.uid]?.linkedPlayerId||'';
-                              return (
-                                <div style={{marginBottom:'10px'}}>
-                                  <span style={{fontSize:'12px',color:'#555',fontWeight:'600',display:'block',marginBottom:'6px'}}>⚡ Spieler zuordnen:</span>
-                                  <select value={curPlayer} onChange={e=>linkPlayerToUser(u.uid,e.target.value||null)} style={{padding:'6px 10px',border:'1px solid #0891b2',borderRadius:'8px',fontSize:'13px',cursor:'pointer',color:'#0c4a6e',background:'white',width:'100%'}}>
-                                    <option value="">– kein Spieler –</option>
-                                    {aktivList.length>0&&<optgroup label="Aktive">
-                                      {aktivList.map(sp=><option key={sp.id} value={sp.id}>{sp.name}{sp.ttr?` (TTR ${sp.ttr})`:''}</option>)}
-                                    </optgroup>}
-                                    {jugendList.length>0&&<optgroup label="Nachwuchs">
-                                      {jugendList.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-                                    </optgroup>}
-                                  </select>
-                                </div>
-                              );
-                            })()}
-
-                            {/* Gruppen (Trainer) */}
-                            {userRoles.includes('trainer')&&(
-                              <div style={{marginBottom:'10px'}}>
-                                <span style={{fontSize:'12px',color:'#555',fontWeight:'600',display:'block',marginBottom:'6px'}}>Gruppen:</span>
-                                <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
-                                  {FIXED_GROUPS.map(g=>{
-                                    const assigned=(u.groupIds||[]).includes(g.id);
-                                    return <button key={g.id} onClick={()=>{
-                                      const cur=u.groupIds||[];
-                                      saveUserGroupIds(u.uid,assigned?cur.filter(x=>x!==g.id):[...cur,g.id]);
-                                    }} style={{padding:'3px 10px',borderRadius:'20px',border:`2px solid ${g.color}`,background:assigned?g.color:'white',color:assigned?'white':g.color,cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>
-                                      {g.emoji} {g.name}
-                                    </button>;
-                                  })}
-                                  {(u.groupIds||[]).length===0&&<span style={{fontSize:'11px',color:'#dc2626',fontStyle:'italic'}}>⚠️ Keine Gruppe</span>}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Aktionen */}
-                            <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginTop:'4px'}}>
-                              <button onClick={()=>{if(window.confirm(`"${u.name||u.email}" zurück auf Wartend setzen?`))saveUserRoles(u.uid,['pending']);}}
-                                style={{padding:'4px 10px',background:'#fef3c7',border:'1px solid #d97706',borderRadius:'6px',cursor:'pointer',color:'#92400e',fontSize:'11px',fontWeight:'600'}}>
-                                ⏳ Auf Wartend setzen
-                              </button>
-                              <button onClick={async()=>{
-                                if(!window.confirm(`Account von "${u.name||u.email}" wirklich löschen?`))return;
-                                const updated={...allUsers};delete updated[u.uid];
-                                await setDoc(doc(db,'ttc','users'),updated);setAllUsers(updated);setExpandedUser(null);
-                              }} style={{padding:'4px 10px',background:'#fee2e2',border:'1px solid #fca5a5',borderRadius:'6px',cursor:'pointer',color:'#dc2626',fontSize:'11px',fontWeight:'600'}}>
-                                🗑️ Löschen
-                              </button>
-                            </div>
-                          </div>
-                          );
-                        })()}
-                      </div>
-                    );
-                  })}
-                </div>}
-              </div>
-            );
-          })()}
-          {Object.keys(allUsers).length===0&&<p style={{color:'#999',textAlign:'center',padding:'20px'}}>Noch keine Nutzer.</p>}
-        </div>
 
         {/* ── Datenlöschen ── */}
         {(()=>{
@@ -4783,7 +4547,7 @@ export default function TrainingsApp() {
           ]:[]),
           ...(userRole==='admin'?[
             {label:'Trainingsmatches',icon:'⚔️', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.25)', action:()=>navTo('trainingsmatches')},
-            {label:'Admin',          icon:'🛡️', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('admin')},
+            {label:'Datenlöschen',   icon:'🗑️', color:'#fca5a5', bg:'rgba(220,38,38,0.08)', border:'rgba(220,38,38,0.25)', action:()=>navTo('datenloeschen')},
             {label:'App-Statistik',  icon:'📈', color:'#7dd3fc', bg:'rgba(125,211,252,0.1)', border:'rgba(125,211,252,0.25)', action:()=>navTo('usageStats')},
           ]:[]),
         ],
@@ -12470,6 +12234,13 @@ export default function TrainingsApp() {
     const toggleRole = (id, m, roleKey) => {
       const cur = getRoles(m);
       const next = cur.includes(roleKey) ? cur.filter(r=>r!==roleKey) : [...cur, roleKey];
+      // Admin-Rolle vergeben ist sicherheitskritisch — verlangt eigenes Passwort zur Bestätigung
+      if (roleKey==='admin' && !cur.includes('admin')) {
+        setAdminRoleDialog({id, next});
+        setAdminRolePw('');
+        setAdminRoleError('');
+        return;
+      }
       saveMitgliedField(id, 'roles', next);
       // Falls "eltern" entfernt wird, verknüpfte Kinder gleich mit aufräumen
       if (roleKey==='eltern' && cur.includes('eltern')) saveMitgliedField(id, 'linkedMemberIds', []);
@@ -12480,8 +12251,55 @@ export default function TrainingsApp() {
       saveMitgliedField(id, 'linkedMemberIds', next);
     };
 
+    const confirmAdminRole = async () => {
+      if (!adminRolePw.trim()) { setAdminRoleError('Bitte Passwort eingeben.'); return; }
+      try {
+        const credential = EmailAuthProvider.credential(user.email, adminRolePw);
+        await reauthenticateWithCredential(user, credential);
+        saveMitgliedField(adminRoleDialog.id, 'roles', adminRoleDialog.next);
+        setAdminRoleDialog(null);
+        setAdminRolePw('');
+        setAdminRoleError('');
+      } catch {
+        setAdminRoleError('Falsches Passwort. Bitte erneut versuchen.');
+      }
+    };
+
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        {adminRoleDialog&&(
+          <Modal>
+          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
+            <div style={{background:'white',borderRadius:'16px',padding:'28px',maxWidth:'380px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
+              <div style={{fontSize:'36px',textAlign:'center',marginBottom:'12px'}}>🛡️</div>
+              <h3 style={{margin:'0 0 8px',color:'#7c3aed',fontSize:'18px',textAlign:'center'}}>Admin-Rolle vergeben</h3>
+              <p style={{margin:'0 0 16px',color:'#666',fontSize:'14px',textAlign:'center'}}>
+                Bitte bestätige mit deinem eigenen Admin-Passwort, um die Admin-Rolle zu vergeben.
+              </p>
+              {adminRoleError&&<p style={{color:'#dc2626',fontSize:'13px',marginBottom:'12px',padding:'8px',background:'#fee2e2',borderRadius:'6px'}}>{adminRoleError}</p>}
+              <input
+                type="password"
+                placeholder="Dein Admin-Passwort"
+                value={adminRolePw}
+                onChange={e=>{setAdminRolePw(e.target.value);setAdminRoleError('');}}
+                onKeyDown={e=>e.key==='Enter'&&confirmAdminRole()}
+                autoFocus
+                style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box',marginBottom:'14px',borderColor:'#7c3aed',borderWidth:'2px'}}
+              />
+              <div style={{display:'grid',gap:'8px'}}>
+                <button onClick={confirmAdminRole}
+                  style={{padding:'12px',background:'#7c3aed',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
+                  🛡️ Bestätigen & Admin-Rolle vergeben
+                </button>
+                <button onClick={()=>{setAdminRoleDialog(null);setAdminRolePw('');setAdminRoleError('');}}
+                  style={{padding:'12px',background:'#f3f4f6',color:'#333',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          </div>
+          </Modal>
+        )}
         <div className="ttc-sticky-hdr" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
           <button onClick={()=>navTo('home')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'9px',color:'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:'600'}}><Home size={15}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🗂️ Mitgliederverwaltung</h1>
@@ -12565,6 +12383,7 @@ export default function TrainingsApp() {
               const elternOhneKind = roles.includes('eltern') && linkedIds.length===0;
               const topRole = highestRole(roles);
               const cardColors = elternOhneKind ? {border:'rgba(239,68,68,0.6)', bg:'rgba(239,68,68,0.06)'} : (topRole ? {border:ROLE_COLORS[topRole].border, bg:ROLE_COLORS[topRole].bg} : {border:'rgba(196,181,253,0.2)', bg:'rgba(255,255,255,0.04)'});
+              const matchedUser = Object.values(allUsers).find(u => (u.email||'').trim().toLowerCase() === (m.email||'').trim().toLowerCase());
               return (
                 <div key={id} style={{background:cardColors.bg,border:`1px solid ${cardColors.border}`,borderRadius:'10px',overflow:'hidden',...(elternOhneKind?{boxShadow:'0 0 0 1px rgba(239,68,68,0.4)'}:{})}}>
                   <button onClick={()=>{setMitgliedExpandedId(isExpanded?null:id);setMitgliedChildSearch('');}}
@@ -12610,6 +12429,75 @@ export default function TrainingsApp() {
                             })}
                             {jugendOptions.length===0&&<p style={{margin:'4px',fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>Noch niemand als "Jugendlicher" markiert.</p>}
                           </div>
+                        </div>
+                      )}
+                      {roles.includes('trainer') && (
+                        !matchedUser ? (
+                          <div><span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'6px'}}>Gruppen</span>
+                            <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>Noch kein App-Account vorhanden — Gruppen können erst nach der ersten Anmeldung zugeordnet werden.</p>
+                          </div>
+                        ) : (
+                          <div>
+                            <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'6px'}}>Gruppen (als Trainer)</span>
+                            <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                              {FIXED_GROUPS.map(g=>{
+                                const assigned = (matchedUser.groupIds||[]).includes(g.id);
+                                return <button key={g.id} onClick={()=>{
+                                  const cur = matchedUser.groupIds||[];
+                                  saveUserGroupIds(matchedUser.uid, assigned?cur.filter(x=>x!==g.id):[...cur,g.id]);
+                                }} style={{padding:'4px 10px',borderRadius:'20px',border:`2px solid ${g.color}`,background:assigned?g.color:'transparent',color:assigned?'white':g.color,cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>{g.emoji} {g.name}</button>;
+                              })}
+                              {(matchedUser.groupIds||[]).length===0&&<span style={{fontSize:'11px',color:'#fca5a5',fontStyle:'italic'}}>⚠️ Keine Gruppe</span>}
+                            </div>
+                          </div>
+                        )
+                      )}
+                      {roles.includes('aktiver') && (()=>{
+                        const fullName = `${m.vorname} ${m.nachname}`.trim().toLowerCase();
+                        const spielerList = Object.values(aktiveSpieler);
+                        const exact = spielerList.find(sp => (sp.name||'').trim().toLowerCase() === fullName);
+                        const similar = !exact ? spielerList
+                          .map(sp => ({sp, dist: levenshtein((sp.name||'').trim().toLowerCase(), fullName)}))
+                          .filter(({sp,dist}) => dist>0 && dist<=3 && Math.abs((sp.name||'').length-fullName.length)<=4)
+                          .sort((a,b)=>a.dist-b.dist)[0]?.sp : null;
+                        return (
+                          <div>
+                            <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'6px'}}>⚡ TTR-Wert / Spieler-Zuordnung</span>
+                            {exact ? (
+                              <p style={{margin:0,fontSize:'12px',color:'#86efac'}}>✅ {exact.name}{exact.ttr?` — TTR ${exact.ttr}`:' — kein TTR-Wert hinterlegt'}</p>
+                            ) : similar ? (
+                              <p style={{margin:0,fontSize:'12px',color:'#fbbf24'}}>⚠️ Ähnlicher Name gefunden: {similar.name}{similar.ttr?` (TTR ${similar.ttr})`:''} — bitte prüfen{matchedUser?'':' (noch kein App-Account)'}</p>
+                            ) : (
+                              <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>❌ Kein TTR-Wert auffindbar</p>
+                            )}
+                            {matchedUser && (exact || similar) && (
+                              <select value={matchedUser.linkedPlayerId||''} onChange={e=>linkPlayerToUser(matchedUser.uid, e.target.value||null)}
+                                style={{marginTop:'6px',padding:'6px 10px',border:'1px solid rgba(8,145,178,0.4)',borderRadius:'8px',fontSize:'12px',cursor:'pointer',color:'#67e8f9',background:'#0a2210',width:'100%'}}>
+                                <option value="" style={{background:'#0a2210'}}>– kein Spieler –</option>
+                                {spielerList.sort((a,b)=>a.name.localeCompare(b.name,'de')).map(sp=><option key={sp.id} value={sp.id} style={{background:'#0a2210'}}>{sp.name}{sp.ttr?` (TTR ${sp.ttr})`:''}</option>)}
+                              </select>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      {matchedUser && roles.length>1 && (()=>{
+                        const primary = roles.includes(matchedUser.primaryRole) ? matchedUser.primaryRole : roles[0];
+                        return (
+                          <div>
+                            <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'6px'}}>Oberrolle (Standard-Rolle beim Login)</span>
+                            <select value={primary} onChange={e=>saveUserPrimaryRole(matchedUser.uid,e.target.value)}
+                              style={{padding:'6px 10px',border:'1px solid rgba(196,181,253,0.4)',borderRadius:'8px',fontSize:'12px',cursor:'pointer',color:'#c4b5fd',background:'#0a2210',width:'100%'}}>
+                              {roles.map(r=><option key={r} value={r} style={{background:'#0a2210'}}>{ROLE_OPTIONS.find(o=>o.key===r)?.label||r}</option>)}
+                            </select>
+                          </div>
+                        );
+                      })()}
+                      {matchedUser && (
+                        <div style={{display:'flex',gap:'6px',flexWrap:'wrap',paddingTop:'4px',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
+                          <button onClick={()=>{if(window.confirm(`"${m.vorname} ${m.nachname}" Account zurück auf Wartend setzen? Die Rollen hier in der Mitgliederliste bleiben erhalten, der App-Zugriff wird aber vorerst pausiert.`))saveUserRoles(matchedUser.uid,['pending']);}}
+                            style={{padding:'5px 10px',background:'rgba(217,119,6,0.15)',border:'1px solid rgba(217,119,6,0.4)',borderRadius:'6px',cursor:'pointer',color:'#fbbf24',fontSize:'11px',fontWeight:'700'}}>⏳ Auf Wartend setzen</button>
+                          <button onClick={()=>{if(window.confirm(`Account von "${m.vorname} ${m.nachname}" wirklich löschen? Der Mitgliederlisten-Eintrag bleibt erhalten.`)){const updated={...allUsers};delete updated[matchedUser.uid];setDoc(doc(db,'ttc','users'),updated);setAllUsers(updated);}}}
+                            style={{padding:'5px 10px',background:'rgba(220,38,38,0.15)',border:'1px solid rgba(220,38,38,0.4)',borderRadius:'6px',cursor:'pointer',color:'#fca5a5',fontSize:'11px',fontWeight:'700'}}>🗑️ Account löschen</button>
                         </div>
                       )}
                     </div>
