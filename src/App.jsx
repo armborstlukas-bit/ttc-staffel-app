@@ -118,6 +118,7 @@ const STATUS_CONFIG = {
 
 const ROLE_CONFIG = {
   pending:    { label: 'Wartend',      color: '#dc2626', bg: '#fee2e2' },
+  blocked:    { label: 'Blockiert',    color: '#991b1b', bg: '#fecaca' },
   admin:      { label: 'Admin',        color: '#7c3aed', bg: '#ede9fe' },
   trainer:    { label: 'Trainer',      color: '#358941', bg: '#dcfce7' },
   eltern:     { label: 'Eltern',       color: '#2563eb', bg: '#dbeafe' },
@@ -3624,6 +3625,22 @@ export default function TrainingsApp() {
             <LogOut size={16}/> Abmelden
           </button>
         </div>
+      </div>
+    </div>
+  );
+
+  if (userRole==='blocked') return (
+    <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#1a0505 0%,#2d0a0a 45%,#150303 100%)',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
+      <div style={{width:'100%',maxWidth:'400px',textAlign:'center'}}>
+        <div style={{width:'80px',height:'80px',borderRadius:'22px',background:'linear-gradient(135deg,#991b1b,#dc2626)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'38px',margin:'0 auto 20px',boxShadow:'0 8px 32px rgba(220,38,38,0.35)'}}>🚫</div>
+        <h2 style={{margin:'0 0 10px',color:'white',fontSize:'24px',fontWeight:'800',letterSpacing:'-0.3px'}}>Kein Zugriff</h2>
+        <p style={{margin:'0 0 32px',color:'rgba(255,255,255,0.5)',fontSize:'15px',lineHeight:'1.6'}}>
+          Hallo <strong style={{color:'#fca5a5'}}>{userProfile?.name}</strong>, diese App steht nur Vereinsmitgliedern des TTC Grün-Weiß zur Verfügung. Falls das ein Irrtum ist, wende dich bitte an den Verein.
+        </p>
+        <button onClick={handleLogout}
+          style={{padding:'12px 22px',background:'rgba(220,38,38,0.15)',color:'#fca5a5',border:'1px solid rgba(220,38,38,0.3)',borderRadius:'12px',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'inline-flex',alignItems:'center',gap:'6px'}}>
+          <LogOut size={16}/> Abmelden
+        </button>
       </div>
     </div>
   );
@@ -12440,6 +12457,7 @@ export default function TrainingsApp() {
       const email = (u.email||'').trim().toLowerCase();
       return email && !knownEmails.has(email);
     });
+    const blockedUsers = Object.values(allUsers).filter(u => (u.role==='blocked' || (u.roles||[]).includes('blocked')));
     const jugendOptions = entries.filter(([,m])=>getRoles(m).includes('jugendlich')).sort((a,b)=>`${a[1].nachname}${a[1].vorname}`.localeCompare(`${b[1].nachname}${b[1].vorname}`,'de'));
     const q = mitgliederSearch.trim().toLowerCase();
     const filtered = entries
@@ -12474,12 +12492,13 @@ export default function TrainingsApp() {
             Importierte Mitgliederliste. Klicke auf eine Person, um Rollen (Mehrfachauswahl möglich) und bei "Eltern" die zugehörigen Kinder/Jugendlichen zuzuordnen (auch mehrere möglich). Meldet sich jemand mit einer hier hinterlegten E-Mail-Adresse und zugewiesener Rolle an, wird der Account automatisch freigeschaltet.
           </p>
           {unmatchedPending.length > 0 && (
-            <div style={{marginBottom:'16px',padding:'12px 14px',background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.35)',borderRadius:'12px'}}>
-              <p style={{margin:'0 0 10px',fontSize:'13px',fontWeight:'800',color:'#fbbf24'}}>⚠️ {unmatchedPending.length} Anmeldung{unmatchedPending.length===1?'':'en'} ohne Zuordnung in der Mitgliederliste</p>
+            <div style={{marginBottom:'16px',padding:'14px 16px',background:'rgba(220,38,38,0.12)',border:'2px solid #dc2626',borderRadius:'12px',boxShadow:'0 0 0 1px rgba(220,38,38,0.3)'}}>
+              <p style={{margin:'0 0 10px',fontSize:'14px',fontWeight:'800',color:'#fca5a5'}}>🚫 {unmatchedPending.length} Anmeldung{unmatchedPending.length===1?'':'en'} — Nicht Mitglied</p>
+              <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.5)'}}>Diese Accounts haben aktuell <b>keinen Zugriff</b>. Ordne sie einem Mitglied zu, oder blockiere sie dauerhaft.</p>
               <div style={{display:'grid',gap:'8px'}}>
                 {unmatchedPending.map(u => (
-                  <div key={u.uid} style={{padding:'10px 12px',background:'rgba(255,255,255,0.05)',borderRadius:'8px'}}>
-                    <p style={{margin:'0 0 8px',fontSize:'13px'}}><b>{u.name||'(ohne Name)'}</b> · <span style={{color:'rgba(255,255,255,0.6)'}}>{u.email}</span></p>
+                  <div key={u.uid} style={{padding:'10px 12px',background:'rgba(0,0,0,0.2)',border:'1px solid rgba(220,38,38,0.4)',borderRadius:'8px'}}>
+                    <p style={{margin:'0 0 8px',fontSize:'13px'}}><b style={{color:'#fca5a5'}}>{u.name||'(ohne Name)'}</b> · <span style={{color:'rgba(255,255,255,0.6)'}}>{u.email}</span></p>
                     {mitgliedLinkUid === u.uid ? (
                       <div>
                         <input value={mitgliedLinkSearch} onChange={e=>setMitgliedLinkSearch(e.target.value)} placeholder="Mitglied suchen…" autoFocus
@@ -12503,8 +12522,24 @@ export default function TrainingsApp() {
                           style={{padding:'6px 12px',background:'#16a34a',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>+ Neues Mitglied anlegen</button>
                         <button onClick={()=>{setMitgliedLinkUid(u.uid);setMitgliedLinkSearch('');}}
                           style={{padding:'6px 12px',background:'rgba(251,191,36,0.15)',color:'#fbbf24',border:'1px solid rgba(251,191,36,0.4)',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>Bestehendem Mitglied zuordnen</button>
+                        <button onClick={()=>{ if(window.confirm(`"${u.name||u.email}" dauerhaft blockieren? Die Person bekommt dann explizit "Kein Zugriff" angezeigt.`)) saveUserRoles(u.uid,['blocked']); }}
+                          style={{padding:'6px 12px',background:'rgba(153,27,27,0.25)',color:'#fca5a5',border:'1px solid #991b1b',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>🚫 Blockieren</button>
                       </div>
                     )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {blockedUsers.length > 0 && (
+            <div style={{marginBottom:'16px',padding:'12px 14px',background:'rgba(153,27,27,0.1)',border:'1px solid rgba(153,27,27,0.4)',borderRadius:'12px'}}>
+              <p style={{margin:'0 0 10px',fontSize:'13px',fontWeight:'800',color:'#fca5a5'}}>⛔ {blockedUsers.length} blockierte Person{blockedUsers.length===1?'':'en'}</p>
+              <div style={{display:'grid',gap:'6px'}}>
+                {blockedUsers.map(u => (
+                  <div key={u.uid} style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',padding:'8px 10px',background:'rgba(0,0,0,0.15)',borderRadius:'8px'}}>
+                    <span style={{flex:1,minWidth:'150px',fontSize:'12px'}}><b>{u.name||'(ohne Name)'}</b> · <span style={{color:'rgba(255,255,255,0.5)'}}>{u.email}</span></span>
+                    <button onClick={()=>saveUserRoles(u.uid,['pending'])}
+                      style={{padding:'5px 10px',background:'rgba(74,222,128,0.15)',color:'#86efac',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>Entsperren</button>
                   </div>
                 ))}
               </div>
