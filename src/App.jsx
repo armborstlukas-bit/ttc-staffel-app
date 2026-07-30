@@ -4437,7 +4437,19 @@ export default function TrainingsApp() {
                         </button>
 
                         {/* Aufgeklappte Bearbeitung */}
-                        {isOpen&&(
+                        {isOpen&&(()=>{
+                          const inMitgliederListe = Object.values(mitgliederListe).some(m => (m.email||'').trim().toLowerCase() === (u.email||'').trim().toLowerCase());
+                          if (inMitgliederListe) return (
+                          <div style={{padding:'14px 16px',borderTop:'1px solid #e5e7eb',background:'white'}}>
+                            <p style={{margin:'0 0 2px',fontWeight:'700',color:'#333'}}>{u.name||u.email}</p>
+                            <p style={{margin:'0 0 14px',fontSize:'12px',color:'#999'}}>{u.email}</p>
+                            <div style={{padding:'12px 14px',background:'#f5f3ff',border:'1px solid #c4b5fd',borderRadius:'10px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+                              <span style={{fontSize:'13px',color:'#5b21b6',flex:1,minWidth:'200px'}}>🗂️ Diese Person steht in der Mitgliederliste – Rollen &amp; Kind-Zuordnung werden dort verwaltet.</span>
+                              <button onClick={()=>{navTo('mitglieder');setMitgliederSearch(u.email||u.name||'');}} style={{padding:'7px 14px',background:'#7c3aed',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>Zur Mitgliederverwaltung →</button>
+                            </div>
+                          </div>
+                          );
+                          return (
                           <div style={{padding:'14px 16px',borderTop:'1px solid #e5e7eb',background:'white'}}>
                             <p style={{margin:'0 0 2px',fontWeight:'700',color:'#333'}}>{u.name||u.email}</p>
                             <p style={{margin:'0 0 12px',fontSize:'12px',color:'#999'}}>{u.email}</p>
@@ -4556,7 +4568,8 @@ export default function TrainingsApp() {
                               </button>
                             </div>
                           </div>
-                        )}
+                          );
+                        })()}
                       </div>
                     );
                   })}
@@ -12371,6 +12384,17 @@ export default function TrainingsApp() {
     ];
     const getRoles = m => m.roles?.length ? m.roles : (m.role ? [m.role] : []);
     const getLinkedIds = m => m.linkedMemberIds?.length ? m.linkedMemberIds : (m.linkedMemberId ? [m.linkedMemberId] : []);
+    // Rollen-Rangfolge (edelstes Farbschema zuerst, Passiv = grau/schlicht)
+    const ROLE_RANK = ['admin','trainer','aktiver','eltern','jugendlich','passiv'];
+    const ROLE_COLORS = {
+      admin:      {color:'#fbbf24', bg:'rgba(251,191,36,0.15)',  border:'rgba(251,191,36,0.45)'},  // Gold
+      trainer:    {color:'#c4b5fd', bg:'rgba(196,181,253,0.15)', border:'rgba(196,181,253,0.45)'}, // Amethyst
+      aktiver:    {color:'#67e8f9', bg:'rgba(103,232,249,0.15)', border:'rgba(103,232,249,0.45)'}, // Türkis
+      eltern:     {color:'#93c5fd', bg:'rgba(147,197,253,0.15)', border:'rgba(147,197,253,0.45)'}, // Blau
+      jugendlich: {color:'#86efac', bg:'rgba(134,239,172,0.15)', border:'rgba(134,239,172,0.45)'}, // Grün
+      passiv:     {color:'#9ca3af', bg:'rgba(156,163,175,0.1)',  border:'rgba(156,163,175,0.3)'},  // Grau
+    };
+    const highestRole = roles => ROLE_RANK.find(r=>roles.includes(r)) || null;
 
     const entries = Object.entries(mitgliederListe);
     const jugendOptions = entries.filter(([,m])=>getRoles(m).includes('jugendlich')).sort((a,b)=>`${a[1].nachname}${a[1].vorname}`.localeCompare(`${b[1].nachname}${b[1].vorname}`,'de'));
@@ -12423,17 +12447,21 @@ export default function TrainingsApp() {
               const linkedIds = getLinkedIds(m);
               const isExpanded = mitgliedExpandedId === id;
               const childQ = mitgliedChildSearch.trim().toLowerCase();
+              const elternOhneKind = roles.includes('eltern') && linkedIds.length===0;
+              const topRole = highestRole(roles);
+              const cardColors = elternOhneKind ? {border:'rgba(239,68,68,0.6)', bg:'rgba(239,68,68,0.06)'} : (topRole ? {border:ROLE_COLORS[topRole].border, bg:ROLE_COLORS[topRole].bg} : {border:'rgba(196,181,253,0.2)', bg:'rgba(255,255,255,0.04)'});
               return (
-                <div key={id} style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(196,181,253,0.2)',borderRadius:'10px',overflow:'hidden'}}>
+                <div key={id} style={{background:cardColors.bg,border:`1px solid ${cardColors.border}`,borderRadius:'10px',overflow:'hidden',...(elternOhneKind?{boxShadow:'0 0 0 1px rgba(239,68,68,0.4)'}:{})}}>
                   <button onClick={()=>{setMitgliedExpandedId(isExpanded?null:id);setMitgliedChildSearch('');}}
                     style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',background:'transparent',border:'none',cursor:'pointer',textAlign:'left'}}>
                     <div style={{flex:'1 1 200px',minWidth:0}}>
                       <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'white'}}>{m.vorname} {m.nachname}</p>
+                      {elternOhneKind&&<p style={{margin:0,fontSize:'10px',color:'#fca5a5',fontWeight:'700'}}>⚠️ Kein Kind zugeordnet</p>}
                       <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>{fmtGeb(m.geburtsdatum)}{m.email?` · ${m.email}`:' · keine E-Mail'}</p>
                     </div>
                     <div style={{display:'flex',gap:'4px',flexWrap:'wrap',justifyContent:'flex-end',flex:'0 1 auto'}}>
                       {roles.length===0?<span style={{fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>keine Rolle</span>:
-                        roles.map(r=><span key={r} style={{fontSize:'10px',fontWeight:'700',padding:'2px 7px',borderRadius:'20px',background:'rgba(196,181,253,0.15)',color:'#c4b5fd'}}>{ROLE_OPTIONS.find(o=>o.key===r)?.label||r}</span>)}
+                        roles.map(r=><span key={r} style={{fontSize:'10px',fontWeight:'700',padding:'2px 7px',borderRadius:'20px',background:ROLE_COLORS[r]?.bg||'rgba(196,181,253,0.15)',color:ROLE_COLORS[r]?.color||'#c4b5fd',border:`1px solid ${ROLE_COLORS[r]?.border||'transparent'}`}}>{ROLE_OPTIONS.find(o=>o.key===r)?.label||r}</span>)}
                     </div>
                     <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',flexShrink:0}}>{isExpanded?'▲':'▼'}</span>
                   </button>
@@ -12444,8 +12472,9 @@ export default function TrainingsApp() {
                         <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
                           {ROLE_OPTIONS.map(o=>{
                             const on = roles.includes(o.key);
+                            const rc = ROLE_COLORS[o.key];
                             return <button key={o.key} onClick={()=>toggleRole(id,m,o.key)}
-                              style={{padding:'5px 12px',borderRadius:'20px',border:`1px solid ${on?'#c4b5fd':'rgba(255,255,255,0.15)'}`,background:on?'rgba(196,181,253,0.15)':'rgba(255,255,255,0.03)',color:on?'#c4b5fd':'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>{o.label}</button>;
+                              style={{padding:'5px 12px',borderRadius:'20px',border:`1px solid ${on?rc.border:'rgba(255,255,255,0.15)'}`,background:on?rc.bg:'rgba(255,255,255,0.03)',color:on?rc.color:'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>{o.label}</button>;
                           })}
                         </div>
                       </div>
