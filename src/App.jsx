@@ -1449,6 +1449,12 @@ export default function TrainingsApp() {
             <p style={{margin:'0 0 10px',fontSize:'11px',color:dark?'rgba(255,255,255,0.4)':'#6b7280',lineHeight:'1.5'}}>
               Stoppt alle Push-Nachrichten an dieses Gerät für diesen Account. Die grundsätzliche Browser-Erlaubnis für diese Website bleibt dabei bestehen — komplett zurücksetzen geht nur direkt in den Website-Einstellungen deines Browsers.
             </p>
+            {['admin','trainer'].includes(userRole)&&(
+              <button onClick={()=>triggerPushNotification({userIds:[user.uid],title:'🔔 Test-Benachrichtigung',body:'Wenn du das siehst, funktioniert Push auf diesem Gerät!',url:'/',category:'other'})}
+                style={{width:'100%',padding:'10px',marginBottom:'10px',background:'rgba(96,165,250,0.12)',border:'1px solid rgba(96,165,250,0.3)',borderRadius:'10px',color:'#93c5fd',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>
+                🔔 Test-Push an mich senden
+              </button>
+            )}
           </>
         ) : notifPermission==='denied' ? (
           <p style={{margin:'0 0 10px',fontSize:'12px',color:'#dc2626'}}>Blockiert – bitte in den Browser-Einstellungen für diese Seite erlauben.</p>
