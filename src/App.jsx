@@ -12253,7 +12253,10 @@ export default function TrainingsApp() {
       const pool = getTtrPool();
       const fullNameWords = wordSet(`${m.vorname} ${m.nachname}`);
       const exact = pool.find(p => wordSet(p.label) === fullNameWords);
+      // Ein echter Namenstreffer (z.B. durch einen neuen Import) sticht eine frühere
+      // "kein TTR-Wert"-Bestätigung immer aus.
       if (exact) return {status:'exact', label:exact.label, ttr:exact.ttr, refId:exact.refId};
+      if (m.ttrNoValue) return {status:'confirmed-none'};
       const similar = pool
         .map(p => ({p, dist: levenshtein(wordSet(p.label), fullNameWords)}))
         .filter(({p,dist}) => dist>0 && dist<=3 && Math.abs(wordSet(p.label).length-fullNameWords.length)<=4)
@@ -12522,16 +12525,30 @@ export default function TrainingsApp() {
                             {status==='exact' || status==='linked' ? (
                               <p style={{margin:0,fontSize:'12px',color:'#86efac'}}>✅ {label}{ttr?` — TTR ${ttr}`:' — kein TTR-Wert hinterlegt'}{status==='linked'?' (manuell zugeordnet)':''}</p>
                             ) : status==='similar' ? (
-                              <p style={{margin:0,fontSize:'12px',color:'#fbbf24'}}>⚠️ Ähnlicher Name gefunden: {label}{ttr?` (TTR ${ttr})`:''} — bitte prüfen</p>
+                              <p style={{margin:0,fontSize:'12px',color:'#fbbf24'}}>⚠️ Ähnlicher Name gefunden: {label}{ttr?` (TTR ${ttr})`:''} — bitte prüfen (ggf. nicht dieselbe Person)</p>
+                            ) : status==='confirmed-none' ? (
+                              <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.5)'}}>➖ Aktuell kein TTR-Wert (bestätigt)</p>
                             ) : (
                               <p style={{margin:0,fontSize:'12px',color:'#fca5a5'}}>❌ Kein TTR-Wert auffindbar</p>
                             )}
-                            {status!=='exact' && (
+                            {status!=='exact' && status!=='confirmed-none' && (
                               <select value={refId||''} onChange={onPick}
                                 style={{marginTop:'6px',padding:'6px 10px',border:'1px solid rgba(8,145,178,0.4)',borderRadius:'8px',fontSize:'12px',cursor:'pointer',color:'#67e8f9',background:'#0a2210',width:'100%'}}>
                                 <option value="" style={{background:'#0a2210'}}>– manuell auswählen –</option>
                                 {pool.map(p=><option key={p.refId} value={p.refId} style={{background:'#0a2210'}}>{p.label}{p.ttr?` (TTR ${p.ttr})`:''}</option>)}
                               </select>
+                            )}
+                            {(status==='none' || status==='similar') && (
+                              <button onClick={()=>saveMitgliedField(id,'ttrNoValue',true)}
+                                style={{marginTop:'6px',padding:'5px 10px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'8px',cursor:'pointer',color:'rgba(255,255,255,0.6)',fontSize:'11px',fontWeight:'700'}}>
+                                ➖ Aktuell kein TTR-Wert
+                              </button>
+                            )}
+                            {status==='confirmed-none' && (
+                              <button onClick={()=>saveMitgliedField(id,'ttrNoValue',false)}
+                                style={{marginTop:'6px',padding:'5px 10px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'8px',cursor:'pointer',color:'rgba(255,255,255,0.6)',fontSize:'11px',fontWeight:'700'}}>
+                                🔄 Erneut prüfen
+                              </button>
                             )}
                           </div>
                         );
