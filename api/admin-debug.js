@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   try {
     if (req.query.action === 'set-passiv-defaults') {
       const snap = await db.collection('ttc').doc('mitgliederListe').get();
-      const list = snap.exists() ? (snap.data().list || {}) : {};
+      const list = snap.exists ? (snap.data().list || {}) : {};
       let changed = 0;
       Object.entries(list).forEach(([id, m]) => {
         const roles = m.roles?.length ? m.roles : (m.role ? [m.role] : []);
