@@ -1338,6 +1338,37 @@ export default function TrainingsApp() {
   const canAccessRompel    = () => userRole === 'admin' || (appSettings.rompelTrainers  || []).includes(user?.uid);
   const canAccessPfand     = () => userRole === 'admin' || (appSettings.pfandTrainers   || []).includes(user?.uid);
   const canAccessPinnwand  = () => !!user; // Pinnwand ist fuer alle eingeloggten Nutzer sichtbar; Sichtbarkeit einzelner Beitraege wird pro Beitrag geregelt
+  // Schmale Admin-Zeile zur Zugangsverwaltung, direkt im jeweiligen Spezialbereich (statt zentral im Adminbereich).
+  const renderAccessManagerRow = (settingsKey, label, accent) => {
+    if (userRole !== 'admin') return null;
+    const allRegistered = Object.values(allUsers).filter(u=>u.role!=='pending').sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    const currentList = appSettings[settingsKey] || [];
+    const add = uid => { if(!currentList.includes(uid)) saveAppSettings({...appSettings,[settingsKey]:[...currentList,uid]}); };
+    const remove = uid => saveAppSettings({...appSettings,[settingsKey]:currentList.filter(x=>x!==uid)});
+    const available = allRegistered.filter(u=>!currentList.includes(u.uid));
+    return (
+      <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',padding:'8px 12px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accent}33`,borderRadius:'10px',marginBottom:'16px',fontSize:'12px'}}>
+        <span style={{fontWeight:'700',color:accent,whiteSpace:'nowrap'}}>🔑 Zugang ({label}):</span>
+        <select defaultValue="" onChange={e=>{if(e.target.value){add(e.target.value);e.target.value='';}}}
+          style={{padding:'4px 8px',border:`1px solid ${accent}55`,borderRadius:'6px',fontSize:'12px',background:'rgba(255,255,255,0.06)',color:'white',cursor:'pointer'}}>
+          <option value="" style={{color:'#111'}}>+ hinzufügen…</option>
+          {available.map(u=><option key={u.uid} value={u.uid} style={{color:'#111'}}>{u.name||u.email}</option>)}
+        </select>
+        {currentList.length===0
+          ? <span style={{color:'rgba(255,255,255,0.4)',fontStyle:'italic'}}>niemand zusätzlich freigeschaltet</span>
+          : currentList.map(uid=>{
+            const u=allUsers[uid];
+            return (
+              <span key={uid} style={{display:'inline-flex',alignItems:'center',gap:'4px',padding:'2px 8px 2px 10px',borderRadius:'16px',background:`${accent}22`,border:`1px solid ${accent}`,fontWeight:'600',color:accent}}>
+                {u?.name||u?.email||uid}
+                <button onClick={()=>remove(uid)} style={{background:'none',border:'none',cursor:'pointer',color:accent,padding:'0',lineHeight:1,fontSize:'13px',fontWeight:'700'}}>×</button>
+              </span>
+            );
+          })
+        }
+      </div>
+    );
+  };
   const enablePushNotifications = async () => {
     if (notifBusy) return;
     setNotifBusy(true);
@@ -4381,7 +4412,7 @@ export default function TrainingsApp() {
                           // Spezialbereiche anwenden
                           const sa=pendingSpecialAccess[u.uid]||{};
                           const newSettings={...appSettings};
-                          ['pfandTrainers','rompelTrainers','pinnwandUsers'].forEach(k=>{
+                          ['pfandTrainers','rompelTrainers'].forEach(k=>{
                             if(sa[k]){const cur=newSettings[k]||[];if(!cur.includes(u.uid))newSettings[k]=[...cur,u.uid];}
                           });
                           saveAppSettings(newSettings);
@@ -4404,7 +4435,7 @@ export default function TrainingsApp() {
                       </div>
                       <div style={{display:'flex',gap:'5px',flexWrap:'wrap',alignItems:'center',marginTop:'6px'}}>
                         <span style={{fontSize:'12px',color:'#555',fontWeight:'600'}}>Spezialbereiche:</span>
-                        {[{k:'pfandTrainers',l:'♻️ Pfandkasse'},{k:'rompelTrainers',l:'🖼️ Rompel'},{k:'pinnwandUsers',l:'📋 Pinnwand'}].map(({k,l})=>{
+                        {[{k:'pfandTrainers',l:'♻️ Pfandkasse'},{k:'rompelTrainers',l:'🖼️ Rompel'}].map(({k,l})=>{
                           const on=(pendingSpecialAccess[u.uid]||{})[k];
                           return <button key={k} onClick={()=>setPendingSpecialAccess(p=>({...p,[u.uid]:{...(p[u.uid]||{}),[k]:!on}}))}
                             style={{padding:'3px 9px',borderRadius:'20px',border:`2px solid ${on?'#16a34a':'#d1d5db'}`,background:on?'#dcfce7':'#f9fafb',color:on?'#16a34a':'#6b7280',cursor:'pointer',fontWeight:'600',fontSize:'11px'}}>{l}</button>;
@@ -4653,51 +4684,6 @@ export default function TrainingsApp() {
             </div>
           );
         })()}
-
-          {/* Spezialbereiche Zugang */}
-          {[
-            {key:'pfandTrainers',   icon:'♻️',  label:'Pfandkasse',    color:'#16a34a', accent:'#86efac'},
-            {key:'rompelTrainers',  icon:null,  label:'Rompel Bereich',color:'#be185d', accent:'#fda4af'},
-            {key:'pinnwandUsers',   icon:'📋',  label:'Pinnwand',      color:'#b45309', accent:'#fde68a'},
-          ].map(({key,icon,label,color,accent})=>{
-            const allRegistered = Object.values(allUsers).filter(u=>u.role!=='pending').sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-            const currentList = appSettings[key] || [];
-            const add = uid => { if(!currentList.includes(uid)) saveAppSettings({...appSettings,[key]:[...currentList,uid]}); };
-            const remove = uid => saveAppSettings({...appSettings,[key]:currentList.filter(x=>x!==uid)});
-            const available = allRegistered.filter(u=>!currentList.includes(u.uid));
-            return (
-              <div key={key} style={{...s.card,marginTop:'16px'}}>
-                <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'10px'}}>
-                  {key==='rompelTrainers'
-                    ? <img src="/rompel.jpg" alt="" style={{width:'28px',height:'28px',borderRadius:'50%',objectFit:'cover',objectPosition:'center top',border:`2px solid ${accent}`}}/>
-                    : <span style={{fontSize:'22px'}}>{icon}</span>}
-                  <span style={{fontWeight:'800',color,fontSize:'14px'}}>{label} — Zugang</span>
-                </div>
-                <p style={{margin:'0 0 10px',fontSize:'12px',color:'#6b7280'}}>Admins haben immer Zugang. Wähle Nutzer aus:</p>
-                {/* Dropdown */}
-                <select defaultValue="" onChange={e=>{if(e.target.value){add(e.target.value);e.target.value='';}}}
-                  style={{width:'100%',padding:'8px 10px',border:`1px solid ${accent}`,borderRadius:'8px',fontSize:'13px',background:'white',color:'#374151',cursor:'pointer',marginBottom:'10px'}}>
-                  <option value="">+ Nutzer hinzufügen…</option>
-                  {available.map(u=><option key={u.uid} value={u.uid}>{u.name||u.email}</option>)}
-                </select>
-                {/* Tag-Liste der freigeschalteten Nutzer */}
-                {currentList.length===0
-                  ? <p style={{margin:0,fontSize:'12px',color:'#9ca3af',fontStyle:'italic'}}>Noch niemand freigeschaltet.</p>
-                  : <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
-                    {currentList.map(uid=>{
-                      const u=allUsers[uid];
-                      return (
-                        <span key={uid} style={{display:'inline-flex',alignItems:'center',gap:'5px',padding:'3px 10px 3px 12px',borderRadius:'20px',background:`rgba(${key==='pfandTrainers'?'134,239,172':key==='rompelTrainers'?'253,164,175':'253,230,138'},0.15)`,border:`1px solid ${accent}`,fontSize:'12px',fontWeight:'700',color}}>
-                          {u?.name||u?.email||uid}
-                          <button onClick={()=>remove(uid)} style={{background:'none',border:'none',cursor:'pointer',color,padding:'0',lineHeight:1,fontSize:'14px',fontWeight:'700'}}>×</button>
-                        </span>
-                      );
-                    })}
-                  </div>
-                }
-              </div>
-            );
-          })}
 
         </div>
       </div>
@@ -14407,6 +14393,7 @@ export default function TrainingsApp() {
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>Rompel Bereich</h1>
         </div>
         <div style={{padding:'20px',maxWidth:'700px',margin:'0 auto'}}>
+          {renderAccessManagerRow('rompelTrainers','Rompel Bereich',accent)}
 
           {/* Saldo-Übersicht */}
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'12px',marginBottom:'24px'}}>
@@ -14529,6 +14516,7 @@ export default function TrainingsApp() {
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>Pfandkasse</h1>
         </div>
         <div style={{padding:'20px',maxWidth:'700px',margin:'0 auto'}}>
+          {renderAccessManagerRow('pfandTrainers','Pfandkasse',accent)}
 
           {/* Kassenstand-Übersicht */}
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'12px',marginBottom:'24px'}}>
