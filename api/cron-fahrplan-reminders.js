@@ -9,6 +9,7 @@ import { sendPushToUsers } from './_lib/sendPush.js';
 // Erinnerungsmail. Jede Erinnerung wird pro Spiel+Frist nur einmal verschickt
 // (gemerkt in ttc/fahrplanReminderLog), auch wenn der Cron mehrfach am Tag laeuft.
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const TEST_EMAIL = 'armborst.lukas@gmail.com';
 
 function berlinDateStr(offsetDays = 0) {
   const now = new Date();
@@ -49,8 +50,8 @@ export default async function handler(req, res) {
       for (const id of ids) {
         const game = items.find(it => it.meetingId === id);
         if (!game) continue;
-        const fahrer = (game.fahrer || '').trim();
-        if (!EMAIL_REGEX.test(fahrer)) continue;
+        // Testmails/-pushes gehen unabhaengig vom echten Fahrer immer nur an TEST_EMAIL,
+        // damit beim Ausprobieren keine echten Vereinsmitglieder benachrichtigt werden.
         const artLabel = game.isHeimspiel ? 'Treffpunkt' : 'Abfahrt';
         const html = `
           <p>Hallo,</p>
@@ -64,8 +65,8 @@ export default async function handler(req, res) {
           </table>
           <p>Sportliche Grüße<br/>TTC Grün-Weiß Staffel</p>
         `;
-        await sendEmail({ to: fahrer, subject: `[TEST] Erinnerung: ${game.heim} – ${game.gast}`, html });
-        const uid = uidByEmail.get(fahrer.toLowerCase());
+        await sendEmail({ to: TEST_EMAIL, subject: `[TEST] Erinnerung: ${game.heim} – ${game.gast}`, html });
+        const uid = uidByEmail.get(TEST_EMAIL.toLowerCase());
         if (uid) {
           await sendPushToUsers(db, adminMessaging(), {
             userIds: [uid],
