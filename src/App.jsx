@@ -709,6 +709,8 @@ export default function TrainingsApp() {
   const [newSession, setNewSession]             = useState(emptySession);
   const [recurringTemplates, setRecurringTemplates] = useState({});
   const [rangliste, setRangliste] = useState([]); // ordered array of childIds
+  const [mitgliederListe, setMitgliederListe] = useState({}); // { [id]: {vorname,nachname,geburtsdatum,email,role,linkedMemberId} }
+  const [mitgliederSearch, setMitgliederSearch] = useState('');
   const [ranglisteHistory, setRanglisteHistory] = useState([]); // [{date:'YYYY-MM-DD', order:[childId,...]}]
   const [showRangStats, setShowRangStats] = useState(false);
   const [rangStatsH2H, setRangStatsH2H] = useState(['', '']);
@@ -1038,6 +1040,7 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','leagueData'),         s => setLeagueData(s.exists()?s.data():{ table: null, schedule: null, fetchedAt: null })),
       onSnapshot(doc(db,'ttc','rangliste'), s => setRangliste(s.exists()&&s.data().entries ? s.data().entries : [])),
       onSnapshot(doc(db,'ttc','ranglisteHistory'), s => setRanglisteHistory(s.exists()&&Array.isArray(s.data().snapshots) ? s.data().snapshots : [])),
+      onSnapshot(doc(db,'ttc','mitgliederListe'), s => setMitgliederListe(s.exists()&&s.data().list ? s.data().list : {})),
       onSnapshot(doc(db,'ttc','ranglistenspiele'), s => setRanglistenspiele(s.exists() ? { active: s.data().active||[], archived: s.data().archived||[] } : { active:[], archived:[] })),
       onSnapshot(doc(db,'ttc','ranglisteAchievements'), s => setRanglisteAch(s.exists() ? s.data() : {})),
       onSnapshot(doc(db,'ttc','practiceTournaments'),          s => setPracticeTournaments(s.exists()?s.data():{})),
@@ -2124,6 +2127,11 @@ export default function TrainingsApp() {
     }
   };
 
+  const saveMitgliedField = async (id, field, value) => {
+    setMitgliederListe(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
+    await updateDoc(doc(db,'ttc','mitgliederListe'), { [`list.${id}.${field}`]: value });
+  };
+
   const fetchKalender = async () => {
     setKalenderLoading(true);
     try {
@@ -2421,11 +2429,43 @@ export default function TrainingsApp() {
     if (!loginName.trim()) { setError('Bitte Name eingeben!'); return; }
     try {
       const cred = await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
-      const profile = { uid:cred.user.uid, email:loginEmail, name:loginName, role:'pending', linkedChildId:null, isParent: registerIsParent };
+
+      // ── Automatische Freischaltung, falls die E-Mail in der Mitgliederliste
+      // hinterlegt ist und dort bereits eine Rolle zugewiesen wurde ──────────
+      const mitgliederSnap = await getDoc(doc(db,'ttc','mitgliederListe'));
+      const mitgliederList = mitgliederSnap.exists() ? (mitgliederSnap.data().list || {}) : {};
+      const emailLower = loginEmail.trim().toLowerCase();
+      const matches = Object.values(mitgliederList).filter(m => (m.email||'').trim().toLowerCase() === emailLower && m.role);
+      const rolePriority = ['admin','trainer','aktiver','eltern','jugendlich'];
+      const matchedEntry = matches.sort((a,b)=>rolePriority.indexOf(a.role)-rolePriority.indexOf(b.role))[0];
+
+      let autoRole = null, autoLinkedChildIds = [];
+      if (matchedEntry) {
+        autoRole = matchedEntry.role;
+        if (autoRole === 'eltern') {
+          // Bestes-Möglich-Zuordnung: verknüpftes Mitglied per Namensabgleich mit der
+          // echten Kinder-Liste der App verbinden (Trainings-/Anwesenheitsdaten).
+          const linkedMember = matchedEntry.linkedMemberId ? mitgliederList[matchedEntry.linkedMemberId] : null;
+          if (linkedMember) {
+            const fullName = `${linkedMember.vorname} ${linkedMember.nachname}`.trim().toLowerCase();
+            const foundChild = Object.values(children).find(c => (c.name||'').trim().toLowerCase() === fullName);
+            if (foundChild) autoLinkedChildIds = [foundChild.id];
+          }
+        }
+      }
+
+      const profile = {
+        uid:cred.user.uid, email:loginEmail, name:loginName,
+        role: autoRole || 'pending', roles: autoRole ? [autoRole] : ['pending'],
+        linkedChildId: autoLinkedChildIds[0] || null, linkedChildIds: autoLinkedChildIds,
+        isParent: registerIsParent,
+      };
       await setDoc(doc(db,'users',cred.user.uid), profile);
       const snap = await getDoc(doc(db,'ttc','users'));
       await setDoc(doc(db,'ttc','users'), { ...(snap.exists()?snap.data():{}), [cred.user.uid]:profile });
-      setUserRole('pending'); setUserProfile(profile);
+      setUserRole(profile.role); setUserProfile(profile);
+
+      if (autoRole) return; // automatisch freigeschaltet — keine Admin-Benachrichtigung/Wartezeit nötig
 
       // ── Admin-Benachrichtigung im App-Nachrichten-Modul ──────────
       try {
@@ -4649,6 +4689,9 @@ export default function TrainingsApp() {
           ...(canAccessPinnwand()?[{label:'Pinnwand',  icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.2)',  action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
           ...(canEdit()?[
             {label:'Trikotgrößen', icon:'👕', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.2)', action:()=>navTo('trikotgroessen')},
+          ]:[]),
+          ...(userRole==='admin'?[
+            {label:'Mitgliederverwaltung', icon:'🗂️', color:'#c4b5fd', bg:'rgba(196,181,253,0.08)', border:'rgba(196,181,253,0.2)', action:()=>navTo('mitglieder')},
           ]:[]),
           ...(canAccessRompel()?[
             {label:'Rompel Bereich', icon:{type:'img',src:'/rompel.jpg'}, color:'#fda4af', bg:'rgba(253,164,175,0.08)', border:'rgba(253,164,175,0.25)', action:()=>navTo('rompel')},
@@ -12232,6 +12275,66 @@ export default function TrainingsApp() {
               })}
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── MITGLIEDERVERWALTUNG VIEW (nur Admin) ─────────────────────────────────
+  if (view === 'mitglieder' && userRole === 'admin') {
+    const ROLE_OPTIONS = [
+      {key:'', label:'– keine Rolle –'},
+      {key:'admin', label:'Admin'},
+      {key:'trainer', label:'Trainer'},
+      {key:'aktiver', label:'Aktiver'},
+      {key:'eltern', label:'Eltern'},
+      {key:'jugendlich', label:'Jugendlicher'},
+    ];
+    const entries = Object.entries(mitgliederListe);
+    const jugendOptions = entries.filter(([,m])=>m.role==='jugendlich').sort((a,b)=>`${a[1].nachname}${a[1].vorname}`.localeCompare(`${b[1].nachname}${b[1].vorname}`,'de'));
+    const q = mitgliederSearch.trim().toLowerCase();
+    const filtered = entries
+      .filter(([,m]) => !q || `${m.vorname} ${m.nachname} ${m.email}`.toLowerCase().includes(q))
+      .sort((a,b)=>`${a[1].nachname}${a[1].vorname}`.localeCompare(`${b[1].nachname}${b[1].vorname}`,'de'));
+    const fmtGeb = g => { if (!g) return ''; const [y,mo,d] = g.split('-'); return d&&mo&&y ? `${d}.${mo}.${y}` : g; };
+    const assignedCount = entries.filter(([,m])=>m.role).length;
+
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
+          <button onClick={()=>navTo('home')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'9px',color:'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:'600'}}><Home size={15}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🗂️ Mitgliederverwaltung</h1>
+          <span style={{fontSize:'12px',color:'rgba(196,181,253,0.7)',fontWeight:'600'}}>{assignedCount}/{entries.length} zugeordnet</span>
+        </div>
+        <div style={{padding:'16px 14px',maxWidth:'900px',margin:'0 auto'}}>
+          <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
+            Importierte Mitgliederliste. Weist jeder Person eine Rolle zu – bei "Eltern" zusätzlich das zugehörige Kind/den Jugendlichen aus dieser Liste. Meldet sich jemand mit einer hier hinterlegten E-Mail-Adresse und zugewiesener Rolle an, wird der Account automatisch freigeschaltet.
+          </p>
+          <input value={mitgliederSearch} onChange={e=>setMitgliederSearch(e.target.value)} placeholder="Suche nach Name oder E-Mail…"
+            style={{width:'100%',boxSizing:'border-box',padding:'10px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(196,181,253,0.25)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',marginBottom:'14px'}}/>
+
+          <div style={{display:'grid',gap:'6px'}}>
+            {filtered.map(([id,m])=>(
+              <div key={id} style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(196,181,253,0.2)',borderRadius:'10px',padding:'10px 12px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+                <div style={{flex:'1 1 200px',minWidth:0}}>
+                  <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'white'}}>{m.vorname} {m.nachname}</p>
+                  <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>{fmtGeb(m.geburtsdatum)}{m.email?` · ${m.email}`:' · keine E-Mail'}</p>
+                </div>
+                <select value={m.role||''} onChange={e=>saveMitgliedField(id,'role',e.target.value)}
+                  style={{padding:'7px 10px',background:'#0a2210',border:'1px solid rgba(196,181,253,0.3)',borderRadius:'8px',color:'#c4b5fd',fontSize:'12px',fontWeight:'700',flexShrink:0}}>
+                  {ROLE_OPTIONS.map(o=><option key={o.key} value={o.key} style={{background:'#0a2210',color:'#c4b5fd'}}>{o.label}</option>)}
+                </select>
+                {m.role==='eltern'&&(
+                  <select value={m.linkedMemberId||''} onChange={e=>saveMitgliedField(id,'linkedMemberId',e.target.value||null)}
+                    style={{padding:'7px 10px',background:'#0a2210',border:'1px solid rgba(74,222,128,0.3)',borderRadius:'8px',color:'#86efac',fontSize:'12px',fontWeight:'700',flexShrink:0}}>
+                    <option value="" style={{background:'#0a2210'}}>– Kind wählen –</option>
+                    {jugendOptions.map(([jid,jm])=><option key={jid} value={jid} style={{background:'#0a2210'}}>{jm.vorname} {jm.nachname}</option>)}
+                  </select>
+                )}
+              </div>
+            ))}
+            {filtered.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.3)',fontSize:'13px'}}>Keine Treffer.</p>}
+          </div>
         </div>
       </div>
     );
