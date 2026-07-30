@@ -12221,17 +12221,18 @@ export default function TrainingsApp() {
     // TTR-Exportlisten liefern Namen teils als "Nachname, Vorname" statt "Vorname Nachname" —
     // daher wortweise (reihenfolge-unabhängig) statt als reinen String vergleichen.
     const wordSet = s => (s||'').replace(/,/g,' ').trim().toLowerCase().replace(/\s+/g,' ').split(' ').filter(Boolean).sort().join(' ');
-    // TTR-Kandidatenpool je Rolle: Aktive kommen aus aktiveSpieler, Jugendliche aus der echten
-    // children-Sammlung (dort landet der TTR-Verlauf beim Import, gematcht per Name).
-    const getTtrPool = role => {
-      if (role==='aktiver') return Object.values(aktiveSpieler).map(sp=>({refId:'aktiv:'+sp.id, label:sp.name, ttr:sp.ttr}));
-      if (role==='jugendlich') return Object.values(children).map(c=>{
+    // TTR-Kandidatenpool: Aktive kommen aus aktiveSpieler, Jugendliche aus der echten children-Sammlung
+    // (dort landet der TTR-Verlauf beim Import, gematcht per Name). Beide Töpfe werden IMMER zusammen
+    // durchsucht — der TTR-Import ordnet manchen Jugendlichen (noch ohne eigenen children-Datensatz)
+    // fälschlich dem "Aktive"-Topf zu, und umgekehrt.
+    const getTtrPool = () => [
+      ...Object.values(aktiveSpieler).map(sp=>({refId:'aktiv:'+sp.id, label:sp.name, ttr:sp.ttr})),
+      ...Object.values(children).map(c=>{
         const hist=(ttrHistory[c.id]?.entries||[]).slice().sort((a,b)=>a.month.localeCompare(b.month));
         const last=hist[hist.length-1];
         return last ? {refId:'jugend:'+c.id, label:c.name, ttr:last.ttr} : null;
-      }).filter(Boolean);
-      return [];
-    };
+      }).filter(Boolean),
+    ];
     const resolveTtrRef = refId => {
       if (!refId) return null;
       const [kind, rid] = refId.split(':');
@@ -12244,12 +12245,12 @@ export default function TrainingsApp() {
       return null;
     };
     // Manuell verlinkte Person (m.ttrRefId) hat Vorrang und bleibt über künftige TTR-Importe hinweg bestehen.
-    const getTtrStatus = (m, role) => {
+    const getTtrStatus = m => {
       if (m.ttrRefId) {
         const resolved = resolveTtrRef(m.ttrRefId);
         if (resolved) return {status:'linked', label:resolved.label, ttr:resolved.ttr, refId:m.ttrRefId};
       }
-      const pool = getTtrPool(role);
+      const pool = getTtrPool();
       const fullNameWords = wordSet(`${m.vorname} ${m.nachname}`);
       const exact = pool.find(p => wordSet(p.label) === fullNameWords);
       if (exact) return {status:'exact', label:exact.label, ttr:exact.ttr, refId:exact.refId};
@@ -12430,7 +12431,7 @@ export default function TrainingsApp() {
               const childQ = mitgliedChildSearch.trim().toLowerCase();
               const elternOhneKind = roles.includes('eltern') && linkedIds.length===0;
               const ttrRole = roles.includes('aktiver') ? 'aktiver' : roles.includes('jugendlich') ? 'jugendlich' : null;
-              const ttrStatus = ttrRole ? getTtrStatus(m, ttrRole) : null;
+              const ttrStatus = ttrRole ? getTtrStatus(m) : null;
               const ttrKein = ttrStatus?.status === 'none';
               const ttrAehnlich = ttrStatus?.status === 'similar';
               const topRole = highestRole(roles);
@@ -12510,7 +12511,7 @@ export default function TrainingsApp() {
                       )}
                       {ttrRole && (()=>{
                         const {status, label, ttr, refId} = ttrStatus;
-                        const pool = getTtrPool(ttrRole).sort((a,b)=>a.label.localeCompare(b.label,'de'));
+                        const pool = getTtrPool().sort((a,b)=>a.label.localeCompare(b.label,'de'));
                         const onPick = e => {
                           const val = e.target.value || null;
                           saveMitgliedField(id, 'ttrRefId', val);
