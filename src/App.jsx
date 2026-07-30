@@ -729,6 +729,9 @@ export default function TrainingsApp() {
   const [mitgliederRoleFilter, setMitgliederRoleFilter] = useState('');
   const [mitgliedLinkUid, setMitgliedLinkUid] = useState(null);
   const [mitgliedLinkSearch, setMitgliedLinkSearch] = useState('');
+  const [spielerverwaltungSearch, setSpielerverwaltungSearch] = useState('');
+  const [spielerverwaltungNewName, setSpielerverwaltungNewName] = useState('');
+  const [spielerverwaltungNewTtr, setSpielerverwaltungNewTtr] = useState('');
   const [usageStats, setUsageStats] = useState({ dailyActive:{}, viewCounts:{} });
   const [ranglisteHistory, setRanglisteHistory] = useState([]); // [{date:'YYYY-MM-DD', order:[childId,...]}]
   const [showRangStats, setShowRangStats] = useState(false);
@@ -825,7 +828,6 @@ export default function TrainingsApp() {
   const [ttrFilter, setTtrFilter] = useState('all');
   const [rompelData, setRompelData] = useState({hours:[], expenses:[]});
   const [aktiveSpieler, setAktiveSpieler] = useState({});
-  const [aktiverForm, setAktiverForm] = useState({name:'', ttr:'', spielernr:''});
   const [rompelHoursForm, setRompelHoursForm] = useState({date:new Date().toISOString().split('T')[0], hours:'', desc:''});
   const [rompelExpForm, setRompelExpForm] = useState({date:new Date().toISOString().split('T')[0], amount:'', desc:''});
   const [pfandDaten, setPfandDaten] = useState({entries:[]});
@@ -1345,6 +1347,24 @@ export default function TrainingsApp() {
   const saveRompelData                   = u => { setRompelData(u);                   setDoc(doc(db,'ttc','rompel'),                        u); };
   const savePfandDaten                   = u => { setPfandDaten(u);                   setDoc(doc(db,'ttc','pfandkasse'),                    u); };
   const saveAktiveSpieler                = d => { setAktiveSpieler(d);               setDoc(doc(db,'ttc','aktiveSpieler'),                  d); };
+  // Manuelle Korrektur eines Feldes — markiert es als "manuell", damit der naechste TTR-Excel-Import es nicht ueberschreibt.
+  const updateAktiverField = (id, field, value) => {
+    const manualFlag = field==='name' ? 'manualName' : 'manualTtr';
+    saveAktiveSpieler({...aktiveSpieler, [id]: {...aktiveSpieler[id], [field]: value, [manualFlag]: true}});
+  };
+  const resetAktiverField = (id, field) => {
+    const manualFlag = field==='name' ? 'manualName' : 'manualTtr';
+    saveAktiveSpieler({...aktiveSpieler, [id]: {...aktiveSpieler[id], [manualFlag]: false}});
+  };
+  const deleteAktiverEntry = id => {
+    const updated = {...aktiveSpieler};
+    delete updated[id];
+    saveAktiveSpieler(updated);
+  };
+  const addAktiverEntry = (name, ttr) => {
+    const id = 'aktiv_manual_' + Date.now();
+    saveAktiveSpieler({...aktiveSpieler, [id]: {id, name: name.trim(), ttr: ttr?Number(ttr):null, spielernr:null, manualName:true, manualTtr:true}});
+  };
   const canAccessRompel    = () => userRole === 'admin' || (appSettings.rompelTrainers  || []).includes(user?.uid);
   const canAccessPfand     = () => userRole === 'admin' || (appSettings.pfandTrainers   || []).includes(user?.uid);
   const canAccessPinnwand  = () => !!user; // Pinnwand ist fuer alle eingeloggten Nutzer sichtbar; Sichtbarkeit einzelner Beitraege wird pro Beitrag geregelt
@@ -11337,6 +11357,66 @@ export default function TrainingsApp() {
   }
 
   // ── TTR WERTE VIEW ──────────────────────────────────────────────────────
+  // ── SPIELERVERWALTUNG (Aktive: Namen/TTR manuell pflegen) ────────────────
+  if (view === 'spielerverwaltung' && canEdit()) {
+    const accent = '#67e8f9';
+    const q = spielerverwaltungSearch.trim().toLowerCase();
+    const list = Object.values(aktiveSpieler)
+      .filter(sp => !q || (sp.name||'').toLowerCase().includes(q))
+      .sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
+
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#00151a 0%,#012129 45%,#000e11 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+          <button onClick={()=>navTo('ttrWerte')} style={s.btn(accent)}><Home size={16}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>🛠️ Spielerverwaltung</h1>
+          <span style={{fontSize:'12px',color:'rgba(103,232,249,0.7)',fontWeight:'600'}}>{list.length} Spieler</span>
+        </div>
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:'16px'}}>
+          <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
+            Name und TTR-Wert der Aktiven kommen normalerweise aus dem TTR-Excel-Import. Hier kannst du beides manuell korrigieren — manuell geänderte Felder werden beim nächsten Import nicht mehr überschrieben (erkennbar am 🔒-Symbol), bis du sie wieder auf "automatisch" zurücksetzt.
+          </p>
+
+          <input value={spielerverwaltungSearch} onChange={e=>setSpielerverwaltungSearch(e.target.value)} placeholder="Spieler suchen…"
+            style={{width:'100%',boxSizing:'border-box',padding:'10px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(103,232,249,0.25)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',marginBottom:'14px'}}/>
+
+          {/* Neuer Spieler manuell anlegen */}
+          <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'18px',padding:'12px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(103,232,249,0.15)',borderRadius:'10px'}}>
+            <input value={spielerverwaltungNewName} onChange={e=>setSpielerverwaltungNewName(e.target.value)} placeholder="Name…"
+              style={{flex:'2 1 160px',padding:'8px 10px',background:'#001f24',border:'1px solid rgba(103,232,249,0.3)',borderRadius:'8px',color:'white',fontSize:'13px',outline:'none'}}/>
+            <input value={spielerverwaltungNewTtr} onChange={e=>setSpielerverwaltungNewTtr(e.target.value)} placeholder="TTR" type="number"
+              style={{flex:'1 1 80px',padding:'8px 10px',background:'#001f24',border:'1px solid rgba(103,232,249,0.3)',borderRadius:'8px',color:'white',fontSize:'13px',outline:'none'}}/>
+            <button onClick={()=>{
+              if(!spielerverwaltungNewName.trim()) return;
+              addAktiverEntry(spielerverwaltungNewName, spielerverwaltungNewTtr);
+              setSpielerverwaltungNewName(''); setSpielerverwaltungNewTtr('');
+            }} style={{padding:'8px 16px',background:accent,color:'#00151a',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'800',fontSize:'13px',whiteSpace:'nowrap'}}>+ Spieler anlegen</button>
+          </div>
+
+          <div style={{display:'grid',gap:'6px'}}>
+            {list.map(sp=>(
+              <div key={sp.id} style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',padding:'10px 12px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'10px'}}>
+                <div style={{flex:'2 1 160px',display:'flex',alignItems:'center',gap:'6px'}}>
+                  <input value={sp.name||''} onChange={e=>updateAktiverField(sp.id,'name',e.target.value)}
+                    style={{width:'100%',padding:'6px 9px',background:'#001f24',border:`1px solid ${sp.manualName?'rgba(251,191,36,0.5)':'rgba(255,255,255,0.15)'}`,borderRadius:'7px',color:'white',fontSize:'13px',outline:'none'}}/>
+                  {sp.manualName&&<button onClick={()=>resetAktiverField(sp.id,'name')} title="Zurück auf automatisch (Excel-Import)" style={{background:'none',border:'none',cursor:'pointer',fontSize:'13px',padding:'2px'}}>🔒</button>}
+                </div>
+                <div style={{flex:'1 1 100px',display:'flex',alignItems:'center',gap:'6px'}}>
+                  <input value={sp.ttr??''} onChange={e=>updateAktiverField(sp.id,'ttr',e.target.value===''?null:Number(e.target.value))} type="number" placeholder="TTR"
+                    style={{width:'100%',padding:'6px 9px',background:'#001f24',border:`1px solid ${sp.manualTtr?'rgba(251,191,36,0.5)':'rgba(255,255,255,0.15)'}`,borderRadius:'7px',color:'white',fontSize:'13px',outline:'none'}}/>
+                  {sp.manualTtr&&<button onClick={()=>resetAktiverField(sp.id,'ttr')} title="Zurück auf automatisch (Excel-Import)" style={{background:'none',border:'none',cursor:'pointer',fontSize:'13px',padding:'2px'}}>🔒</button>}
+                </div>
+                <button onClick={()=>{if(window.confirm(`"${sp.name}" wirklich löschen?`))deleteAktiverEntry(sp.id);}}
+                  style={{padding:'6px 10px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.3)',borderRadius:'7px',cursor:'pointer',color:'#fca5a5',fontSize:'12px',fontWeight:'700'}}>🗑️</button>
+              </div>
+            ))}
+            {list.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.3)',fontSize:'13px'}}>Keine Treffer.</p>}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (view === 'ttrWerte' && canEdit()) {
     const accent = '#fbbf24';
 
@@ -11404,6 +11484,12 @@ export default function TrainingsApp() {
               onMouseEnter={e=>{e.currentTarget.style.background='rgba(252,211,77,0.13)';e.currentTarget.style.borderColor='rgba(252,211,77,0.4)';}}
               onMouseLeave={e=>{e.currentTarget.style.background='rgba(252,211,77,0.07)';e.currentTarget.style.borderColor='rgba(252,211,77,0.2)';}}>
               <span style={{fontSize:'16px'}}>🥇</span> Spieler des Monats
+            </button>
+            <button onClick={()=>navTo('spielerverwaltung')}
+              style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',padding:'12px',background:'rgba(103,232,249,0.07)',border:'1px solid rgba(103,232,249,0.2)',borderRadius:'14px',color:'#67e8f9',cursor:'pointer',fontWeight:'700',fontSize:'14px',transition:'all 0.12s'}}
+              onMouseEnter={e=>{e.currentTarget.style.background='rgba(103,232,249,0.13)';e.currentTarget.style.borderColor='rgba(103,232,249,0.4)';}}
+              onMouseLeave={e=>{e.currentTarget.style.background='rgba(103,232,249,0.07)';e.currentTarget.style.borderColor='rgba(103,232,249,0.2)';}}>
+              <span style={{fontSize:'16px'}}>🛠️</span> Spielerverwaltung
             </button>
           </div>
 
@@ -11624,7 +11710,17 @@ export default function TrainingsApp() {
           updated[id] = {entries: merged};
         }
         const latestEntry = [...entries].sort((a,b)=>b.month.localeCompare(a.month))[0];
-        newAktiveSpieler[id] = {id, name, ttr: latestEntry?.ttr||null, spielernr: newAktiveSpieler[id]?.spielernr||null};
+        // Manuell korrigierte Felder (Name/TTR) bleiben beim Re-Import erhalten, bis sie in der
+        // Spielerverwaltung wieder auf "automatisch" zurückgesetzt werden.
+        const existing = newAktiveSpieler[id];
+        newAktiveSpieler[id] = {
+          id,
+          name: existing?.manualName ? existing.name : name,
+          ttr: existing?.manualTtr ? existing.ttr : (latestEntry?.ttr||null),
+          spielernr: existing?.spielernr||null,
+          manualName: existing?.manualName||false,
+          manualTtr: existing?.manualTtr||false,
+        };
       });
       saveTtrHistory(updated);
       saveAktiveSpieler(newAktiveSpieler);
