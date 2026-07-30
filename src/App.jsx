@@ -750,8 +750,6 @@ export default function TrainingsApp() {
   const [pwError, setPwError]                   = useState('');
   const [pwSuccess, setPwSuccess]               = useState(false); // {sessionId, repeatId, blockSize}
   const [adminRoleDialog, setAdminRoleDialog]   = useState(null); // { uid, newRoles } | null
-  const [pendingRoleSelections, setPendingRoleSelections] = useState({}); // { [uid]: roles[] } — local only until Freischalten
-  const [pendingSpecialAccess, setPendingSpecialAccess] = useState({});
   const [adminUsersListOpen, setAdminUsersListOpen] = useState(false); // { [uid]: {rompel,pfand,pinnwand}[] }
   const [adminRolePw, setAdminRolePw]           = useState('');
   const [adminRoleError, setAdminRoleError]     = useState('');
@@ -2334,7 +2332,7 @@ export default function TrainingsApp() {
       else if (hasStaffRole) { switchToStaffRole(); navTo('notifications'); }
     } else if (notif === 'registration' && myRoles.includes('admin')) {
       if (userRole !== 'admin') setUserRole('admin');
-      navTo('admin');
+      navTo('mitglieder');
     } else if (notif === 'news') {
       navTo('ttcnews');
       fetchTtcNews();
@@ -4334,7 +4332,7 @@ export default function TrainingsApp() {
         <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
           <button onClick={()=>navTo('home')} style={s.btn('#7c3aed')}><Home size={16}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}><Shield size={20} style={{display:'inline',verticalAlign:'middle',marginRight:'6px'}}/>Administration</h1>
-          {pendingCount>0&&<span style={{background:'#dc2626',color:'white',borderRadius:'20px',padding:'4px 12px',fontWeight:'700',fontSize:'13px'}}>⚠️ {pendingCount} wartend</span>}
+          {pendingCount>0&&<button onClick={()=>navTo('mitglieder')} style={{background:'#dc2626',color:'white',border:'none',borderRadius:'20px',padding:'4px 12px',fontWeight:'700',fontSize:'13px',cursor:'pointer'}}>⚠️ {pendingCount} wartend</button>}
         </div>
         <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
 
@@ -4411,69 +4409,13 @@ export default function TrainingsApp() {
         <div style={s.card}>
           <h2 style={{margin:'0 0 16px',color:'#7c3aed',display:'flex',alignItems:'center',gap:'8px'}}><Users size={20}/> Nutzerverwaltung</h2>
 
-          {/* Neue Registrierungen */}
-          {(()=>{
-            const pending = Object.values(allUsers).filter(u=>u.role==='pending');
-            if(pending.length===0) return (
-              <div style={{padding:'10px 14px',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:'10px',marginBottom:'16px'}}>
-                <p style={{margin:0,fontSize:'13px',color:'#16a34a',fontWeight:'600'}}>✅ Keine ausstehenden Registrierungen</p>
-              </div>
-            );
-            return (
-              <div style={{marginBottom:'20px'}}>
-                <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'#dc2626',textTransform:'uppercase',letterSpacing:'0.5px'}}>⏳ Neue Registrierungen ({pending.length})</p>
-                <div style={{display:'grid',gap:'8px'}}>
-                  {pending.map(u=>(
-                    <div key={u.uid} style={{padding:'14px 16px',background:'#fff5f5',borderRadius:'10px',border:'2px solid #fca5a5'}}>
-                      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'10px',flexWrap:'wrap',marginBottom:'10px'}}>
-                        <div>
-                          <p style={{margin:'0 0 2px',fontWeight:'700',color:'#333',fontSize:'15px'}}>{u.name||u.email}</p>
-                          <p style={{margin:0,fontSize:'12px',color:'#999'}}>{u.email}</p>
-                          {u.isParent&&<span style={{fontSize:'11px',background:'#dbeafe',color:'#1d4ed8',padding:'2px 8px',borderRadius:'10px',fontWeight:'700',display:'inline-block',marginTop:'4px'}}>👨‍👧 Elternteil</span>}
-                          {u.isParent===false&&<span style={{fontSize:'11px',background:'#fef9c3',color:'#92400e',padding:'2px 8px',borderRadius:'10px',fontWeight:'700',display:'inline-block',marginTop:'4px'}}>🧒 Kein Elternteil</span>}
-                        </div>
-                        <button onClick={()=>{
-                          const sel=pendingRoleSelections[u.uid];
-                          const assigned=sel&&sel.length>0?sel:(u.roles||[u.role]).filter(r=>r!=='pending');
-                          saveUserRoles(u.uid,assigned.length>0?assigned:['eltern']);
-                          // Spezialbereiche anwenden
-                          const sa=pendingSpecialAccess[u.uid]||{};
-                          const newSettings={...appSettings};
-                          ['pfandTrainers','rompelTrainers'].forEach(k=>{
-                            if(sa[k]){const cur=newSettings[k]||[];if(!cur.includes(u.uid))newSettings[k]=[...cur,u.uid];}
-                          });
-                          saveAppSettings(newSettings);
-                          setPendingRoleSelections(prev=>{const n={...prev};delete n[u.uid];return n;});
-                          setPendingSpecialAccess(prev=>{const n={...prev};delete n[u.uid];return n;});
-                        }} style={{padding:'10px 20px',background:'#16a34a',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px',whiteSpace:'nowrap',boxShadow:'0 2px 8px rgba(22,163,74,0.3)'}}>
-                          ✓ Freischalten
-                        </button>
-                      </div>
-                      <div style={{display:'flex',gap:'5px',flexWrap:'wrap',alignItems:'center'}}>
-                        <span style={{fontSize:'12px',color:'#555',fontWeight:'600'}}>Rolle:</span>
-                        {Object.entries(ROLE_CONFIG).filter(([k])=>k!=='pending').map(([key,cfg])=>{
-                          const base=pendingRoleSelections[u.uid]??(u.roles||[u.role]).filter(r=>r!=='pending');
-                          const active=base.includes(key);
-                          return <button key={key} onClick={()=>{
-                            const next=active?base.filter(r=>r!==key):[...base,key];
-                            setPendingRoleSelections(p=>({...p,[u.uid]:next.length>0?next:base}));
-                          }} style={{padding:'3px 9px',borderRadius:'20px',border:`2px solid ${cfg.color}`,background:active?cfg.color:cfg.bg,color:active?'white':cfg.color,cursor:'pointer',fontWeight:'600',fontSize:'11px'}}>{cfg.label}</button>;
-                        })}
-                      </div>
-                      <div style={{display:'flex',gap:'5px',flexWrap:'wrap',alignItems:'center',marginTop:'6px'}}>
-                        <span style={{fontSize:'12px',color:'#555',fontWeight:'600'}}>Spezialbereiche:</span>
-                        {[{k:'pfandTrainers',l:'♻️ Pfandkasse'},{k:'rompelTrainers',l:'🖼️ Rompel'}].map(({k,l})=>{
-                          const on=(pendingSpecialAccess[u.uid]||{})[k];
-                          return <button key={k} onClick={()=>setPendingSpecialAccess(p=>({...p,[u.uid]:{...(p[u.uid]||{}),[k]:!on}}))}
-                            style={{padding:'3px 9px',borderRadius:'20px',border:`2px solid ${on?'#16a34a':'#d1d5db'}`,background:on?'#dcfce7':'#f9fafb',color:on?'#16a34a':'#6b7280',cursor:'pointer',fontWeight:'600',fontSize:'11px'}}>{l}</button>;
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
+          {/* Neue Registrierungen werden jetzt oben in der Mitgliederverwaltung angezeigt (Zuordnung per E-Mail) */}
+          {Object.values(allUsers).some(u=>u.role==='pending') && (
+            <div style={{padding:'10px 14px',background:'#f5f3ff',border:'1px solid #c4b5fd',borderRadius:'10px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+              <span style={{fontSize:'13px',color:'#5b21b6',flex:1,minWidth:'200px'}}>🗂️ Es gibt neue, noch nicht zugeordnete Registrierungen.</span>
+              <button onClick={()=>navTo('mitglieder')} style={{padding:'7px 14px',background:'#7c3aed',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>Zur Mitgliederverwaltung →</button>
+            </div>
+          )}
 
           {/* Bestehende Nutzer — klappbare Liste */}
           {(()=>{
@@ -8350,7 +8292,7 @@ export default function TrainingsApp() {
                             <p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>{dateStr} Uhr</p>
                           </div>
                           <div style={{display:'flex',gap:'4px',flexShrink:0}}>
-                            {userRole==='admin'&&<button onClick={()=>navTo('admin')} title="Zur Nutzerverwaltung" style={{padding:'5px 10px',background:'#dc2626',border:'none',borderRadius:'8px',cursor:'pointer',color:'white',fontSize:'12px',fontWeight:'700'}}>Freischalten →</button>}
+                            {userRole==='admin'&&<button onClick={()=>navTo('mitglieder')} title="Zur Mitgliederverwaltung" style={{padding:'5px 10px',background:'#dc2626',border:'none',borderRadius:'8px',cursor:'pointer',color:'white',fontSize:'12px',fontWeight:'700'}}>Freischalten →</button>}
                             <button onClick={()=>{
                               const tdb = typeof n.trainerDeletedBy==='object'&&n.trainerDeletedBy?{...n.trainerDeletedBy}:{};
                               saveNotifications({...notifications,[n.id]:{...n,trainerDeletedBy:{...tdb,[uid]:true}}});
