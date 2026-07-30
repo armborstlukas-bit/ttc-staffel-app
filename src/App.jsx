@@ -2265,6 +2265,9 @@ export default function TrainingsApp() {
     } else if (notif === 'news') {
       navTo('ttcnews');
       fetchTtcNews();
+    } else if (notif === 'fahrplan') {
+      navTo('fahrplan');
+      fetchFahrplan();
     }
 
     deepLinkHandled.current = true;

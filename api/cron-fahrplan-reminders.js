@@ -1,6 +1,7 @@
 import { getFahrplanItems } from './_lib/getFahrplanItems.js';
 import { sendEmail } from './_lib/sendEmail.js';
-import { adminDb } from './_lib/firebaseAdmin.js';
+import { adminDb, adminMessaging } from './_lib/firebaseAdmin.js';
+import { sendPushToUsers } from './_lib/sendPush.js';
 
 // Wird taeglich per externem Cron (z.B. cron-job.org) aufgerufen. Prueft, welche
 // Auswaerts-/Heimspiele in genau 5 oder 1 Tagen stattfinden, und schickt dem/der im
@@ -30,6 +31,15 @@ export default async function handler(req, res) {
     const items = await getFahrplanItems();
     const db = adminDb();
 
+    // E-Mail -> Nutzer-UID Zuordnung, um neben der Mail auch eine Push-Nachricht an einen
+    // ggf. existierenden App-Account mit derselben Adresse zu schicken.
+    const usersSnap = await db.collection('users').get();
+    const uidByEmail = new Map();
+    usersSnap.forEach(d => {
+      const email = (d.data()?.email || '').trim().toLowerCase();
+      if (email) uidByEmail.set(email, d.id);
+    });
+
     // Manueller Testmodus: ?testMeetingIds=id1,id2 verschickt sofort fuer diese
     // konkreten Spiele (ignoriert Datum-Check und Verlauf), nutzt aber die echten
     // Fahrer-Adressen dieser Spiele. Nur zum manuellen Ausprobieren, kein Cron-Pfad.
@@ -55,6 +65,16 @@ export default async function handler(req, res) {
           <p>Sportliche Grüße<br/>TTC Grün-Weiß Staffel</p>
         `;
         await sendEmail({ to: fahrer, subject: `[TEST] Erinnerung: ${game.heim} – ${game.gast}`, html });
+        const uid = uidByEmail.get(fahrer.toLowerCase());
+        if (uid) {
+          await sendPushToUsers(db, adminMessaging(), {
+            userIds: [uid],
+            title: '⚠️ [TEST] Bitte ans Abmelden denken',
+            body: `${game.heim} – ${game.gast} (${game.datum})`,
+            url: `/?notif=fahrplan`,
+            category: 'training',
+          });
+        }
         testSent++;
       }
       res.status(200).json({ testSent });
@@ -103,6 +123,20 @@ export default async function handler(req, res) {
             subject: `Erinnerung (${target.label}): ${game.heim} – ${game.gast}`,
             html,
           });
+          const uid = uidByEmail.get(fahrer.toLowerCase());
+          if (uid) {
+            try {
+              await sendPushToUsers(db, adminMessaging(), {
+                userIds: [uid],
+                title: '⚠️ Bitte ans Abmelden denken',
+                body: `In ${target.label}: ${game.heim} – ${game.gast}${game.treffpunkt ? ` (${artLabel}: ${game.treffpunkt} Uhr)` : ''}`,
+                url: `/?notif=fahrplan`,
+                category: 'training',
+              });
+            } catch (pushErr) {
+              console.error('[cron-fahrplan-reminders] Push-Fehler bei', fahrer, pushErr?.message);
+            }
+          }
           updatedLog[logKey] = new Date().toISOString();
           sent++;
         } catch (e) {
