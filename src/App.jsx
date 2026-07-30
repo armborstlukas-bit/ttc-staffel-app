@@ -12532,11 +12532,19 @@ export default function TrainingsApp() {
                               <p style={{margin:0,fontSize:'12px',color:'#fca5a5'}}>❌ Kein TTR-Wert auffindbar</p>
                             )}
                             {status!=='exact' && status!=='confirmed-none' && (
-                              <select value={refId||''} onChange={onPick}
-                                style={{marginTop:'6px',padding:'6px 10px',border:'1px solid rgba(8,145,178,0.4)',borderRadius:'8px',fontSize:'12px',cursor:'pointer',color:'#67e8f9',background:'#0a2210',width:'100%'}}>
-                                <option value="" style={{background:'#0a2210'}}>– manuell auswählen –</option>
-                                {pool.map(p=><option key={p.refId} value={p.refId} style={{background:'#0a2210'}}>{p.label}{p.ttr?` (TTR ${p.ttr})`:''}</option>)}
-                              </select>
+                              <div style={{display:'flex',gap:'6px',marginTop:'6px'}}>
+                                <select value={refId||''} onChange={onPick}
+                                  style={{flex:1,padding:'6px 10px',border:'1px solid rgba(8,145,178,0.4)',borderRadius:'8px',fontSize:'12px',cursor:'pointer',color:'#67e8f9',background:'#0a2210'}}>
+                                  <option value="" style={{background:'#0a2210'}}>– manuell auswählen –</option>
+                                  {pool.map(p=><option key={p.refId} value={p.refId} style={{background:'#0a2210'}}>{p.label}{p.ttr?` (TTR ${p.ttr})`:''}</option>)}
+                                </select>
+                                {status==='similar' && (
+                                  <button onClick={()=>saveMitgliedField(id,'ttrRefId',refId)}
+                                    style={{padding:'6px 12px',background:'rgba(74,222,128,0.15)',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'8px',cursor:'pointer',color:'#86efac',fontSize:'12px',fontWeight:'700',whiteSpace:'nowrap'}}>
+                                    ✅ Übernehmen
+                                  </button>
+                                )}
+                              </div>
                             )}
                             {(status==='none' || status==='similar') && (
                               <button onClick={()=>saveMitgliedField(id,'ttrNoValue',true)}
