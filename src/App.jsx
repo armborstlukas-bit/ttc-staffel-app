@@ -142,6 +142,31 @@ const BEITRAGSARTEN = [
   { key: 'beitragsfrei',     label: 'Beitragsfrei',          amount: 0 },
 ];
 
+// Verfügbare Spalten für den Mitglieder-Excel-Export, gruppiert wie in der Mitgliedsdaten-Karte.
+const MITGLIED_EXPORT_FIELDS = [
+  { group: 'Basis',              key: 'vorname',          label: 'Vorname' },
+  { group: 'Basis',              key: 'nachname',         label: 'Nachname' },
+  { group: 'Basis',              key: 'rollen',           label: 'Rollen' },
+  { group: 'Persönliche Daten',  key: 'geburtsdatum',     label: 'Geburtsdatum' },
+  { group: 'Persönliche Daten',  key: 'email',            label: 'E-Mail' },
+  { group: 'Persönliche Daten',  key: 'strasse',          label: 'Straße' },
+  { group: 'Persönliche Daten',  key: 'plz',              label: 'PLZ' },
+  { group: 'Persönliche Daten',  key: 'ort',              label: 'Ort' },
+  { group: 'Persönliche Daten',  key: 'telefon',          label: 'Telefon' },
+  { group: 'Persönliche Daten',  key: 'handy',            label: 'Handy' },
+  { group: 'Zahlungsdaten',      key: 'iban',             label: 'IBAN' },
+  { group: 'Zahlungsdaten',      key: 'bic',              label: 'BIC' },
+  { group: 'Zahlungsdaten',      key: 'sepaMandatsRef',   label: 'SEPA-Mandatsreferenz' },
+  { group: 'Zahlungsdaten',      key: 'sepaMandatsDatum', label: 'SEPA-Mandatsdatum' },
+  { group: 'Zahlungsdaten',      key: 'zahlart',          label: 'Zahlart' },
+  { group: 'Zahlungsdaten',      key: 'zahler',           label: 'Zahler' },
+  { group: 'Zahlungsdaten',      key: 'zahlweise',        label: 'Zahlweise' },
+  { group: 'Zahlungsdaten',      key: 'beitragsart',      label: 'Beitragsart' },
+  { group: 'Zahlungsdaten',      key: 'beitrag',          label: 'Beitrag (€)' },
+  { group: 'Zahlungsdaten',      key: 'kontosaldo',       label: 'Kontosaldo (€)' },
+  { group: 'Zahlungsdaten',      key: 'eintrittsdatum',   label: 'Eintrittsdatum' },
+];
+
 const emptySession = { subgroupIds: [], extraPlayerIds: [], date: new Date().toISOString().split('T')[0], time: '17:00', endTime: '', trainer: '', trainerUids: [], info: '', repeat: false, repeatWeeks: 8, isRecurring: false };
 
 // Erzeugt Bereichsoptionen in Zehnerschritten für Dropdown-Bonusfragen, z.B. "0-10","11-20",...
@@ -743,6 +768,8 @@ export default function TrainingsApp() {
   const [mitgliederRoleFilter, setMitgliederRoleFilter] = useState('');
   const [mitgliedLinkUid, setMitgliedLinkUid] = useState(null);
   const [mitgliedLinkSearch, setMitgliedLinkSearch] = useState('');
+  const [showMitgliedExport, setShowMitgliedExport] = useState(false);
+  const [mitgliedExportFields, setMitgliedExportFields] = useState(() => Object.fromEntries(MITGLIED_EXPORT_FIELDS.map(f=>[f.key,true])));
   const [usageStats, setUsageStats] = useState({ dailyActive:{}, viewCounts:{} });
   const [ranglisteHistory, setRanglisteHistory] = useState([]); // [{date:'YYYY-MM-DD', order:[childId,...]}]
   const [showRangStats, setShowRangStats] = useState(false);
@@ -12379,9 +12406,76 @@ export default function TrainingsApp() {
           </div>
           </Modal>
         )}
-        <div className="ttc-sticky-hdr" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
+        {showMitgliedExport && (()=>{
+          const groups = [...new Set(MITGLIED_EXPORT_FIELDS.map(f=>f.group))];
+          const allOn = MITGLIED_EXPORT_FIELDS.every(f=>mitgliedExportFields[f.key]);
+          const toggleAll = on => setMitgliedExportFields(Object.fromEntries(MITGLIED_EXPORT_FIELDS.map(f=>[f.key,on])));
+          const runExport = () => {
+            const XLSX = window._XLSX;
+            if (!XLSX) { alert('Export-Werkzeug lädt noch — bitte kurz warten und nochmal versuchen.'); return; }
+            const rows = filtered.map(([id,m])=>{
+              const fin = mitgliederFinanzen[id] || {};
+              const row = {};
+              MITGLIED_EXPORT_FIELDS.forEach(f=>{
+                if (!mitgliedExportFields[f.key]) return;
+                if (f.key==='vorname') row[f.label]=m.vorname||'';
+                else if (f.key==='nachname') row[f.label]=m.nachname||'';
+                else if (f.key==='rollen') row[f.label]=getRoles(m).map(r=>ROLE_OPTIONS.find(o=>o.key===r)?.label||r).join(', ');
+                else if (f.key==='geburtsdatum') row[f.label]=m.geburtsdatum||'';
+                else if (f.key==='email') row[f.label]=m.email||'';
+                else if (f.key==='beitragsart') row[f.label]=BEITRAGSARTEN.find(a=>a.key===fin.beitragsart)?.label||'';
+                else row[f.label]=fin[f.key]??'';
+              });
+              return row;
+            });
+            const ws = XLSX.utils.json_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Mitglieder');
+            XLSX.writeFile(wb, `Mitgliederexport_${TODAY}.xlsx`);
+            setShowMitgliedExport(false);
+          };
+          return (
+            <Modal>
+            <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
+              <div style={{background:'#0a2210',border:'1px solid rgba(196,181,253,0.3)',borderRadius:'16px',padding:'22px',maxWidth:'440px',width:'100%',maxHeight:'85vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.4)'}}>
+                <h3 style={{margin:'0 0 4px',color:'white',fontSize:'17px',fontWeight:'800'}}>📤 Excel-Export</h3>
+                <p style={{margin:'0 0 14px',color:'rgba(255,255,255,0.4)',fontSize:'12px'}}>Wähle aus, welche Spalten exportiert werden sollen ({filtered.length} Person{filtered.length===1?'':'en'} gemäß aktueller Suche/Filter).</p>
+                <button onClick={()=>toggleAll(!allOn)} style={{marginBottom:'14px',padding:'6px 12px',background:'rgba(196,181,253,0.1)',border:'1px solid rgba(196,181,253,0.3)',borderRadius:'8px',color:'#c4b5fd',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>{allOn?'Alle abwählen':'Alle auswählen'}</button>
+                {groups.map(g=>(
+                  <div key={g} style={{marginBottom:'14px'}}>
+                    <p style={{margin:'0 0 6px',fontSize:'11px',fontWeight:'800',color:'rgba(196,181,253,0.6)',textTransform:'uppercase',letterSpacing:'0.5px'}}>{g}</p>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px'}}>
+                      {MITGLIED_EXPORT_FIELDS.filter(f=>f.group===g).map(f=>(
+                        <label key={f.key} style={{display:'flex',alignItems:'center',gap:'7px',padding:'4px 2px',cursor:'pointer',fontSize:'12px',color:mitgliedExportFields[f.key]?'white':'rgba(255,255,255,0.5)'}}>
+                          <input type="checkbox" checked={!!mitgliedExportFields[f.key]} onChange={e=>setMitgliedExportFields(p=>({...p,[f.key]:e.target.checked}))}/>
+                          {f.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <div style={{display:'grid',gap:'8px',marginTop:'8px'}}>
+                  <button onClick={runExport} style={{padding:'12px',background:'#7c3aed',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>📤 Export erstellen</button>
+                  <button onClick={()=>setShowMitgliedExport(false)} style={{padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.6)',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>Abbrechen</button>
+                </div>
+              </div>
+            </div>
+            </Modal>
+          );
+        })()}
+        <div className="ttc-sticky-hdr" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
           <button onClick={()=>navTo('home')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'9px',color:'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:'600'}}><Home size={15}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🗂️ Mitgliederverwaltung</h1>
+          <button onClick={()=>{
+              if (typeof window !== 'undefined' && !window._XLSX) {
+                const s = document.createElement('script');
+                s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+                s.onload = () => { window._XLSX = window.XLSX; };
+                document.head.appendChild(s);
+              }
+              setShowMitgliedExport(true);
+            }}
+            style={{padding:'7px 12px',background:'rgba(196,181,253,0.12)',border:'1px solid rgba(196,181,253,0.35)',borderRadius:'9px',color:'#c4b5fd',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:'700'}}>📤 Excel Export</button>
           <span style={{fontSize:'12px',color:'rgba(196,181,253,0.7)',fontWeight:'600'}}>{assignedCount}/{entries.length} zugeordnet</span>
         </div>
         <div style={{padding:'16px 14px',maxWidth:'900px',margin:'0 auto'}}>
