@@ -2272,6 +2272,28 @@ export default function TrainingsApp() {
     }
   };
 
+  // Erzeugt aus einer Liste gleichförmiger Zeilenobjekte (jede Zeile MUSS dieselben Keys
+  // haben, sonst verteilt SheetJS sie über unterschiedliche Spalten) eine schön formatierte
+  // .xlsx-Datei: Arial-Schrift, fette Kopfzeile, automatische Spaltenbreite.
+  const exportRowsToXlsx = (rows, sheetName, filename) => {
+    const XLSX = window._XLSX;
+    if (!XLSX) { alert('Export-Werkzeug lädt noch — bitte kurz warten und nochmal versuchen.'); return; }
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const headers = rows.length ? Object.keys(rows[0]) : [];
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
+    for (let R = range.s.r; R <= range.e.r; R++) {
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+        if (!cell) continue;
+        cell.s = { font: { name: 'Arial', sz: 11, bold: R === 0 } };
+      }
+    }
+    ws['!cols'] = headers.map(h => ({ wch: Math.max(12, h.length + 2) }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    XLSX.writeFile(wb, filename, { cellStyles: true });
+  };
+
   // Adresse/Bankdaten liegen in der separaten, admin-only abgesicherten mitgliederFinanzen-Collection.
   const saveFinanzField = async (id, field, value) => {
     setMitgliederFinanzen(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
@@ -12424,8 +12446,6 @@ export default function TrainingsApp() {
           const allOn = MITGLIED_EXPORT_FIELDS.every(f=>mitgliedExportFields[f.key]);
           const toggleAll = on => setMitgliedExportFields(Object.fromEntries(MITGLIED_EXPORT_FIELDS.map(f=>[f.key,on])));
           const runExport = () => {
-            const XLSX = window._XLSX;
-            if (!XLSX) { alert('Export-Werkzeug lädt noch — bitte kurz warten und nochmal versuchen.'); return; }
             const rows = filtered.map(([id,m])=>{
               const fin = mitgliederFinanzen[id] || {};
               const row = {};
@@ -12441,10 +12461,7 @@ export default function TrainingsApp() {
               });
               return row;
             });
-            const ws = XLSX.utils.json_to_sheet(rows);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Mitglieder');
-            XLSX.writeFile(wb, `Mitgliederexport_${TODAY}.xlsx`);
+            exportRowsToXlsx(rows, 'Mitglieder', `Mitgliederexport_${TODAY}.xlsx`);
             setShowMitgliedExport(false);
           };
           return (
@@ -12478,8 +12495,6 @@ export default function TrainingsApp() {
         })()}
         {showGeburtstagExport && (()=>{
           const runExport = () => {
-            const XLSX = window._XLSX;
-            if (!XLSX) { alert('Export-Werkzeug lädt noch — bitte kurz warten und nochmal versuchen.'); return; }
             const jahr = Number(geburtstagJahr);
             if (!jahr) return;
             const rows = [];
@@ -12493,10 +12508,7 @@ export default function TrainingsApp() {
               }
             });
             rows.sort((a,b)=>a.Nachname.localeCompare(b.Nachname,'de'));
-            const ws = XLSX.utils.json_to_sheet(rows);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Geburtstage');
-            XLSX.writeFile(wb, `Geburtstagsliste_${jahr}.xlsx`);
+            exportRowsToXlsx(rows, 'Geburtstage', `Geburtstagsliste_${jahr}.xlsx`);
             setShowGeburtstagExport(false);
           };
           return (
@@ -12519,8 +12531,6 @@ export default function TrainingsApp() {
         })()}
         {showJubilaeumExport && (()=>{
           const runExport = () => {
-            const XLSX = window._XLSX;
-            if (!XLSX) { alert('Export-Werkzeug lädt noch — bitte kurz warten und nochmal versuchen.'); return; }
             const jahr = Number(jubilaeumJahr);
             if (!jahr) return;
             const rows = [];
@@ -12531,14 +12541,13 @@ export default function TrainingsApp() {
               if (!ey) return;
               const jahre = jahr - ey;
               if (jahre > 0 && jahre % 5 === 0) {
-                rows.push({ Vorname: m.vorname||'', Nachname: m.nachname||'', Eintrittsdatum: eintritt, [`Mitglied seit ${jahre} Jahren`]: jahre, 'E-Mail': m.email||'' });
+                // Fester Spaltenname (nicht mit der Jahreszahl im Key mischen!) — sonst
+                // landet jede unterschiedliche Jahreszahl in einer eigenen Spalte.
+                rows.push({ Vorname: m.vorname||'', Nachname: m.nachname||'', Eintrittsdatum: eintritt, 'Mitgliedsjahre': jahre, 'E-Mail': m.email||'' });
               }
             });
             rows.sort((a,b)=>a.Nachname.localeCompare(b.Nachname,'de'));
-            const ws = XLSX.utils.json_to_sheet(rows);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Jubiläen');
-            XLSX.writeFile(wb, `Jubilaeumsliste_${jahr}.xlsx`);
+            exportRowsToXlsx(rows, 'Jubiläen', `Jubilaeumsliste_${jahr}.xlsx`);
             setShowJubilaeumExport(false);
           };
           return (
