@@ -730,6 +730,7 @@ export default function TrainingsApp() {
   const [mitgliederRoleFilter, setMitgliederRoleFilter] = useState('');
   const [mitgliedLinkUid, setMitgliedLinkUid] = useState(null);
   const [mitgliedLinkSearch, setMitgliedLinkSearch] = useState('');
+  const [mitgliedFinanzOpenId, setMitgliedFinanzOpenId] = useState(null);
   const [usageStats, setUsageStats] = useState({ dailyActive:{}, viewCounts:{} });
   const [ranglisteHistory, setRanglisteHistory] = useState([]); // [{date:'YYYY-MM-DD', order:[childId,...]}]
   const [showRangStats, setShowRangStats] = useState(false);
@@ -2217,6 +2218,12 @@ export default function TrainingsApp() {
       const matchedUser = email ? Object.values(allUsers).find(u => (u.email||'').trim().toLowerCase() === email) : null;
       if (matchedUser?.uid) linkPlayerToUser(matchedUser.uid, value.slice('aktiv:'.length));
     }
+  };
+
+  // Adresse/Bankdaten liegen in der separaten, admin-only abgesicherten mitgliederFinanzen-Collection.
+  const saveFinanzField = async (id, field, value) => {
+    setMitgliederFinanzen(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
+    await updateDoc(doc(db,'ttc','mitgliederFinanzen'), { [`list.${id}.${field}`]: value });
   };
 
   // Legt aus einem nicht zugeordneten Pending-Account einen neuen Mitgliederlisten-Eintrag an
@@ -12590,6 +12597,48 @@ export default function TrainingsApp() {
                             style={{padding:'5px 10px',background:'rgba(220,38,38,0.15)',border:'1px solid rgba(220,38,38,0.4)',borderRadius:'6px',cursor:'pointer',color:'#fca5a5',fontSize:'11px',fontWeight:'700'}}>🗑️ Account löschen</button>
                         </div>
                       )}
+                      {(()=>{
+                        const fin = mitgliederFinanzen[id] || {};
+                        const finOpen = mitgliedFinanzOpenId === id;
+                        const fld = (key, label, opts={}) => (
+                          <div key={key} style={{minWidth:0}}>
+                            <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>{label}</span>
+                            <input value={fin[key]??''} type={opts.type||'text'} onChange={e=>saveFinanzField(id,key,e.target.value)}
+                              style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#0a2210',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',fontFamily:opts.mono?'monospace':'inherit'}}/>
+                          </div>
+                        );
+                        return (
+                          <div style={{paddingTop:'4px',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
+                            <button onClick={()=>setMitgliedFinanzOpenId(finOpen?null:id)}
+                              style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 2px',background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.5)',fontSize:'11px',fontWeight:'700'}}>
+                              <span>📇 Adresse &amp; Bankdaten</span>
+                              <span>{finOpen?'▲':'▼'}</span>
+                            </button>
+                            {finOpen && (
+                              <div style={{display:'grid',gap:'8px'}}>
+                                <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1.5fr',gap:'6px'}}>
+                                  {fld('strasse','Straße')}{fld('plz','PLZ')}{fld('ort','Ort')}
+                                </div>
+                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
+                                  {fld('telefon','Telefon')}{fld('handy','Handy')}
+                                </div>
+                                <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:'6px'}}>
+                                  {fld('iban','IBAN',{mono:true})}{fld('bic','BIC',{mono:true})}
+                                </div>
+                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
+                                  {fld('sepaMandatsRef','SEPA-Mandatsreferenz')}{fld('sepaMandatsDatum','SEPA-Mandatsdatum')}
+                                </div>
+                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'6px'}}>
+                                  {fld('zahlart','Zahlart')}{fld('zahler','Zahler')}{fld('zahlweise','Zahlweise')}
+                                </div>
+                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'6px'}}>
+                                  {fld('beitrag','Beitrag (€)')}{fld('kontosaldo','Kontosaldo (€)')}{fld('eintrittsdatum','Eintrittsdatum')}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
