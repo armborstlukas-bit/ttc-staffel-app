@@ -18,6 +18,9 @@ if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styl
   const st = document.createElement('style');
   st.id = 'ttc-global-styles';
   st.textContent = `
+    body, input, select, textarea, button {
+      font-family: 'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
+    }
     @keyframes ttcFadeSlide {
       from { opacity: 0; }
       to   { opacity: 1; }
