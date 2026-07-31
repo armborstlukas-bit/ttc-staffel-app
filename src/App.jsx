@@ -129,6 +129,17 @@ const ROLE_CONFIG = {
 
 const WEEKDAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
 
+// Feste Beitragsarten des Vereins — Auswahl bestimmt automatisch den Beitrag.
+const BEITRAGSARTEN = [
+  { key: 'passiv',           label: 'Passives Mitglied',     amount: 36 },
+  { key: 'kind_unter10',     label: 'Kind unter 10 Jahre',   amount: 72 },
+  { key: 'kind_ab10',        label: 'Kinder ab 10 Jahre',    amount: 96 },
+  { key: 'aktive',           label: 'Aktive',                amount: 144 },
+  { key: 'familienbeitrag',  label: 'Familienbeitrag',       amount: 240 },
+  { key: 'ehrenmitglied',    label: 'Ehrenmitglied',         amount: 0 },
+  { key: 'familienmitglied', label: 'Familienmitglied',      amount: 0 },
+];
+
 const emptySession = { subgroupIds: [], extraPlayerIds: [], date: new Date().toISOString().split('T')[0], time: '17:00', endTime: '', trainer: '', trainerUids: [], info: '', repeat: false, repeatWeeks: 8, isRecurring: false };
 
 // Erzeugt Bereichsoptionen in Zehnerschritten für Dropdown-Bonusfragen, z.B. "0-10","11-20",...
@@ -12631,8 +12642,24 @@ export default function TrainingsApp() {
                                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'6px'}}>
                                   {fld('zahlart','Zahlart')}{fld('zahler','Zahler')}{fld('zahlweise','Zahlweise')}
                                 </div>
-                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'6px'}}>
-                                  {fld('beitrag','Beitrag (€)')}{fld('kontosaldo','Kontosaldo (€)')}{fld('eintrittsdatum','Eintrittsdatum')}
+                                <div style={{display:'grid',gridTemplateColumns:'1.4fr 1fr 1fr',gap:'6px'}}>
+                                  <div style={{minWidth:0}}>
+                                    <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Beitragsart</span>
+                                    <select value={fin.beitragsart||''} onChange={e=>{
+                                        const key = e.target.value;
+                                        const art = BEITRAGSARTEN.find(a=>a.key===key);
+                                        saveFinanzField(id,'beitragsart',key);
+                                        if (art) saveFinanzField(id,'beitrag',art.amount);
+                                      }}
+                                      style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#0a2210',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',cursor:'pointer'}}>
+                                      <option value="" style={{background:'#0a2210'}}>– auswählen –</option>
+                                      {BEITRAGSARTEN.map(a=><option key={a.key} value={a.key} style={{background:'#0a2210'}}>{a.label} ({a.amount}€)</option>)}
+                                    </select>
+                                  </div>
+                                  {fld('beitrag','Beitrag (€)')}{fld('kontosaldo','Kontosaldo (€)')}
+                                </div>
+                                <div style={{display:'grid',gridTemplateColumns:'1fr',gap:'6px'}}>
+                                  {fld('eintrittsdatum','Eintrittsdatum')}
                                 </div>
                               </div>
                             )}
