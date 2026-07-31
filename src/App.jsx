@@ -770,6 +770,10 @@ export default function TrainingsApp() {
   const [mitgliedLinkSearch, setMitgliedLinkSearch] = useState('');
   const [showMitgliedExport, setShowMitgliedExport] = useState(false);
   const [mitgliedExportFields, setMitgliedExportFields] = useState(() => Object.fromEntries(MITGLIED_EXPORT_FIELDS.map(f=>[f.key,true])));
+  const [showGeburtstagExport, setShowGeburtstagExport] = useState(false);
+  const [geburtstagJahr, setGeburtstagJahr] = useState(String(new Date().getFullYear()));
+  const [showJubilaeumExport, setShowJubilaeumExport] = useState(false);
+  const [jubilaeumJahr, setJubilaeumJahr] = useState(String(new Date().getFullYear()));
   const [usageStats, setUsageStats] = useState({ dailyActive:{}, viewCounts:{} });
   const [ranglisteHistory, setRanglisteHistory] = useState([]); // [{date:'YYYY-MM-DD', order:[childId,...]}]
   const [showRangStats, setShowRangStats] = useState(false);
@@ -2256,6 +2260,15 @@ export default function TrainingsApp() {
       const email = (mitgliederListe[id]?.email || '').trim().toLowerCase();
       const matchedUser = email ? Object.values(allUsers).find(u => (u.email||'').trim().toLowerCase() === email) : null;
       if (matchedUser?.uid) linkPlayerToUser(matchedUser.uid, value.slice('aktiv:'.length));
+    }
+  };
+
+  const ensureXlsxLoaded = () => {
+    if (typeof window !== 'undefined' && !window._XLSX) {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+      s.onload = () => { window._XLSX = window.XLSX; };
+      document.head.appendChild(s);
     }
   };
 
@@ -12463,19 +12476,92 @@ export default function TrainingsApp() {
             </Modal>
           );
         })()}
-        <div className="ttc-sticky-hdr" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+        {showGeburtstagExport && (()=>{
+          const runExport = () => {
+            const XLSX = window._XLSX;
+            if (!XLSX) { alert('Export-Werkzeug lädt noch — bitte kurz warten und nochmal versuchen.'); return; }
+            const jahr = Number(geburtstagJahr);
+            if (!jahr) return;
+            const rows = [];
+            Object.values(mitgliederListe).forEach(m=>{
+              if (!m.geburtsdatum) return;
+              const [gy] = m.geburtsdatum.split('-').map(Number);
+              if (!gy) return;
+              const alter = jahr - gy;
+              if (alter > 0 && alter % 5 === 0) {
+                rows.push({ Vorname: m.vorname||'', Nachname: m.nachname||'', Geburtsdatum: m.geburtsdatum, [`Wird ${jahr} Jahre alt`]: alter, 'E-Mail': m.email||'' });
+              }
+            });
+            rows.sort((a,b)=>a.Nachname.localeCompare(b.Nachname,'de'));
+            const ws = XLSX.utils.json_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Geburtstage');
+            XLSX.writeFile(wb, `Geburtstagsliste_${jahr}.xlsx`);
+            setShowGeburtstagExport(false);
+          };
+          return (
+            <Modal>
+            <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
+              <div style={{background:'#0a2210',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'16px',padding:'22px',maxWidth:'360px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.4)'}}>
+                <h3 style={{margin:'0 0 4px',color:'white',fontSize:'17px',fontWeight:'800'}}>🎂 Geburtstagsliste</h3>
+                <p style={{margin:'0 0 14px',color:'rgba(255,255,255,0.4)',fontSize:'12px'}}>Exportiert alle Mitglieder, die im gewählten Jahr einen runden Geburtstag (5er-Schritte: 10, 15, 20, 25 …) haben.</p>
+                <span style={{fontSize:'11px',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'4px'}}>Bezugsjahr</span>
+                <input value={geburtstagJahr} onChange={e=>setGeburtstagJahr(e.target.value)} type="number"
+                  style={{width:'100%',boxSizing:'border-box',padding:'10px 12px',background:'#1a1206',border:'1px solid rgba(251,191,36,0.4)',borderRadius:'9px',color:'white',fontSize:'14px',outline:'none',marginBottom:'16px'}}/>
+                <div style={{display:'grid',gap:'8px'}}>
+                  <button onClick={runExport} style={{padding:'12px',background:'#b45309',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>📤 Export erstellen</button>
+                  <button onClick={()=>setShowGeburtstagExport(false)} style={{padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.6)',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>Abbrechen</button>
+                </div>
+              </div>
+            </div>
+            </Modal>
+          );
+        })()}
+        {showJubilaeumExport && (()=>{
+          const runExport = () => {
+            const XLSX = window._XLSX;
+            if (!XLSX) { alert('Export-Werkzeug lädt noch — bitte kurz warten und nochmal versuchen.'); return; }
+            const jahr = Number(jubilaeumJahr);
+            if (!jahr) return;
+            const rows = [];
+            Object.entries(mitgliederListe).forEach(([id,m])=>{
+              const eintritt = mitgliederFinanzen[id]?.eintrittsdatum;
+              if (!eintritt) return;
+              const [ey] = String(eintritt).split('-').map(Number);
+              if (!ey) return;
+              const jahre = jahr - ey;
+              if (jahre > 0 && jahre % 5 === 0) {
+                rows.push({ Vorname: m.vorname||'', Nachname: m.nachname||'', Eintrittsdatum: eintritt, [`Mitglied seit ${jahre} Jahren`]: jahre, 'E-Mail': m.email||'' });
+              }
+            });
+            rows.sort((a,b)=>a.Nachname.localeCompare(b.Nachname,'de'));
+            const ws = XLSX.utils.json_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Jubiläen');
+            XLSX.writeFile(wb, `Jubilaeumsliste_${jahr}.xlsx`);
+            setShowJubilaeumExport(false);
+          };
+          return (
+            <Modal>
+            <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
+              <div style={{background:'#0a2210',border:'1px solid rgba(134,239,172,0.3)',borderRadius:'16px',padding:'22px',maxWidth:'360px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.4)'}}>
+                <h3 style={{margin:'0 0 4px',color:'white',fontSize:'17px',fontWeight:'800'}}>🏅 Jubiläumsjahre</h3>
+                <p style={{margin:'0 0 14px',color:'rgba(255,255,255,0.4)',fontSize:'12px'}}>Exportiert alle Mitglieder, die im gewählten Jahr seit 5, 10, 15, 20 … Jahren Mitglied sind (Basis: Eintrittsdatum).</p>
+                <span style={{fontSize:'11px',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'4px'}}>Bezugsjahr</span>
+                <input value={jubilaeumJahr} onChange={e=>setJubilaeumJahr(e.target.value)} type="number"
+                  style={{width:'100%',boxSizing:'border-box',padding:'10px 12px',background:'#1a1206',border:'1px solid rgba(134,239,172,0.4)',borderRadius:'9px',color:'white',fontSize:'14px',outline:'none',marginBottom:'16px'}}/>
+                <div style={{display:'grid',gap:'8px'}}>
+                  <button onClick={runExport} style={{padding:'12px',background:'#15803d',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>📤 Export erstellen</button>
+                  <button onClick={()=>setShowJubilaeumExport(false)} style={{padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.6)',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>Abbrechen</button>
+                </div>
+              </div>
+            </div>
+            </Modal>
+          );
+        })()}
+        <div className="ttc-sticky-hdr" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
           <button onClick={()=>navTo('home')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'9px',color:'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:'600'}}><Home size={15}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🗂️ Mitgliederverwaltung</h1>
-          <button onClick={()=>{
-              if (typeof window !== 'undefined' && !window._XLSX) {
-                const s = document.createElement('script');
-                s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
-                s.onload = () => { window._XLSX = window.XLSX; };
-                document.head.appendChild(s);
-              }
-              setShowMitgliedExport(true);
-            }}
-            style={{padding:'7px 12px',background:'rgba(196,181,253,0.12)',border:'1px solid rgba(196,181,253,0.35)',borderRadius:'9px',color:'#c4b5fd',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:'700'}}>📤 Excel Export</button>
           <span style={{fontSize:'12px',color:'rgba(196,181,253,0.7)',fontWeight:'600'}}>{assignedCount}/{entries.length} zugeordnet</span>
         </div>
         <div style={{padding:'16px 14px',maxWidth:'900px',margin:'0 auto'}}>
@@ -12536,6 +12622,14 @@ export default function TrainingsApp() {
               </div>
             </div>
           )}
+          <div style={{display:'flex',gap:'8px',marginBottom:'10px',flexWrap:'wrap'}}>
+            <button onClick={()=>{ensureXlsxLoaded();setShowMitgliedExport(true);}}
+              style={{padding:'8px 14px',background:'rgba(196,181,253,0.12)',border:'1px solid rgba(196,181,253,0.35)',borderRadius:'9px',color:'#c4b5fd',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:'700'}}>📤 Excel Export</button>
+            <button onClick={()=>{ensureXlsxLoaded();setShowGeburtstagExport(true);}}
+              style={{padding:'8px 14px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'9px',color:'#fbbf24',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:'700'}}>🎂 Geburtstagsliste</button>
+            <button onClick={()=>{ensureXlsxLoaded();setShowJubilaeumExport(true);}}
+              style={{padding:'8px 14px',background:'rgba(134,239,172,0.1)',border:'1px solid rgba(134,239,172,0.3)',borderRadius:'9px',color:'#86efac',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:'700'}}>🏅 Jubiläumsjahre</button>
+          </div>
           <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
             <input value={mitgliederSearch} onChange={e=>setMitgliederSearch(e.target.value)} placeholder="Suche nach Name oder E-Mail…"
               style={{flex:'1 1 220px',boxSizing:'border-box',padding:'10px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(196,181,253,0.25)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none'}}/>
