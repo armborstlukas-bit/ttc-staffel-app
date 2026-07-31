@@ -12629,7 +12629,7 @@ export default function TrainingsApp() {
                               style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#0a2210',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none'}}/>
                           </div>
                         );
-                        const familienZahlerOptions = entries.filter(([oid])=>oid!==id).sort((a,b)=>`${a[1].nachname}${a[1].vorname}`.localeCompare(`${b[1].nachname}${b[1].vorname}`,'de'));
+                        const familienZahlerOptions = entries.filter(([oid])=>oid!==id && mitgliederFinanzen[oid]?.beitragsart==='familienbeitrag').sort((a,b)=>`${a[1].nachname}${a[1].vorname}`.localeCompare(`${b[1].nachname}${b[1].vorname}`,'de'));
                         return (
                           <div style={{paddingTop:'4px',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
                             <button onClick={()=>setMitgliedFinanzOpenId(finOpen?null:id)}
