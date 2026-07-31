@@ -723,6 +723,7 @@ export default function TrainingsApp() {
   const [recurringTemplates, setRecurringTemplates] = useState({});
   const [rangliste, setRangliste] = useState([]); // ordered array of childIds
   const [mitgliederListe, setMitgliederListe] = useState({}); // { [id]: {vorname,nachname,geburtsdatum,email,roles:[],linkedMemberIds:[]} }
+  const [mitgliederFinanzen, setMitgliederFinanzen] = useState({}); // { [id]: {strasse,plz,ort,telefon,handy,iban,bic,sepaMandatsRef,sepaMandatsDatum,zahlart,zahler,beitrag,kontosaldo,eintrittsdatum} } — admin-only, siehe firestore.rules
   const [mitgliederSearch, setMitgliederSearch] = useState('');
   const [mitgliedExpandedId, setMitgliedExpandedId] = useState(null);
   const [mitgliedChildSearch, setMitgliedChildSearch] = useState('');
@@ -1060,7 +1061,13 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','leagueData'),         s => setLeagueData(s.exists()?s.data():{ table: null, schedule: null, fetchedAt: null })),
       onSnapshot(doc(db,'ttc','rangliste'), s => setRangliste(s.exists()&&s.data().entries ? s.data().entries : [])),
       onSnapshot(doc(db,'ttc','ranglisteHistory'), s => setRanglisteHistory(s.exists()&&Array.isArray(s.data().snapshots) ? s.data().snapshots : [])),
-      onSnapshot(doc(db,'ttc','mitgliederListe'), s => setMitgliederListe(s.exists()&&s.data().list ? s.data().list : {})),
+      // mitgliederListe/mitgliederFinanzen sind seit der DSGVO-Absicherung nur noch für Admins
+      // lesbar — der Listener wird für alle anderen Rollen gar nicht erst registriert, sonst
+      // gäbe es dauerhaft "permission-denied"-Fehler im Hintergrund.
+      ...(userRole === 'admin' ? [
+        onSnapshot(doc(db,'ttc','mitgliederListe'), s => setMitgliederListe(s.exists()&&s.data().list ? s.data().list : {})),
+        onSnapshot(doc(db,'ttc','mitgliederFinanzen'), s => setMitgliederFinanzen(s.exists()&&s.data().list ? s.data().list : {})),
+      ] : []),
       onSnapshot(doc(db,'ttc','usageStats'), s => setUsageStats(s.exists() ? { dailyActive: s.data().dailyActive||{}, viewCounts: s.data().viewCounts||{} } : { dailyActive:{}, viewCounts:{} })),
       onSnapshot(doc(db,'ttc','ranglistenspiele'), s => setRanglistenspiele(s.exists() ? { active: s.data().active||[], archived: s.data().archived||[] } : { active:[], archived:[] })),
       onSnapshot(doc(db,'ttc','ranglisteAchievements'), s => setRanglisteAch(s.exists() ? s.data() : {})),
@@ -2537,25 +2544,27 @@ export default function TrainingsApp() {
 
       // ── Automatische Freischaltung, falls die E-Mail in der Mitgliederliste
       // hinterlegt ist und dort bereits eine Rolle zugewiesen wurde ──────────
-      const mitgliederSnap = await getDoc(doc(db,'ttc','mitgliederListe'));
-      const mitgliederList = mitgliederSnap.exists() ? (mitgliederSnap.data().list || {}) : {};
-      const emailLower = loginEmail.trim().toLowerCase();
-      const getMemberRoles = m => m.roles?.length ? m.roles : (m.role ? [m.role] : []);
-      const getMemberLinkedIds = m => m.linkedMemberIds?.length ? m.linkedMemberIds : (m.linkedMemberId ? [m.linkedMemberId] : []);
-      const matches = Object.values(mitgliederList).filter(m => (m.email||'').trim().toLowerCase() === emailLower && getMemberRoles(m).length>0);
+      // Läuft über eine serverseitige Funktion, da mitgliederListe seit der DSGVO-
+      // Absicherung nur noch für Admins direkt lesbar ist (Firestore-Regeln).
+      let autoRoles = [], linkedMembers = [];
+      try {
+        const idToken = await cred.user.getIdToken();
+        const r = await fetch('/api/mitglieder?action=match-email', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: loginEmail }),
+        });
+        const d = await r.json();
+        autoRoles = d.roles || [];
+        linkedMembers = d.linkedMembers || [];
+      } catch { /* kein Treffer / Fehler -> bleibt pending, wie bisher ohne Match */ }
 
-      // Alle Rollen aus allen passenden Einträgen zusammenführen (z.B. wenn eine Person
-      // mehrfach in der Liste steht, oder mehrere Familienmitglieder dieselbe E-Mail teilen).
-      const autoRoles = [...new Set(matches.flatMap(getMemberRoles))];
       let autoLinkedChildIds = [];
       if (autoRoles.includes('eltern')) {
         // Bestes-Möglich-Zuordnung: verknüpfte Mitglieder per Namensabgleich mit der
         // echten Kinder-Liste der App verbinden (Trainings-/Anwesenheitsdaten).
-        const linkedMemberIds = [...new Set(matches.flatMap(getMemberLinkedIds))];
-        linkedMemberIds.forEach(lid => {
-          const linkedMember = mitgliederList[lid];
-          if (!linkedMember) return;
-          const fullName = `${linkedMember.vorname} ${linkedMember.nachname}`.trim().toLowerCase();
+        linkedMembers.forEach(lm => {
+          const fullName = `${lm.vorname} ${lm.nachname}`.trim().toLowerCase();
           const foundChild = Object.values(children).find(c => (c.name||'').trim().toLowerCase() === fullName);
           if (foundChild) autoLinkedChildIds.push(foundChild.id);
         });
