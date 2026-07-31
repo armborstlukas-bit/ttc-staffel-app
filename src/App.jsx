@@ -12640,26 +12640,6 @@ export default function TrainingsApp() {
               </div>
             </div>
           )}
-          {exitedEntries.length > 0 && (
-            <div style={{marginBottom:'16px'}}>
-              <button onClick={()=>setShowExitedMitglieder(o=>!o)}
-                style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'10px',cursor:'pointer',color:'rgba(255,255,255,0.6)'}}>
-                <span style={{fontSize:'13px',fontWeight:'800'}}>📦 {exitedEntries.length} vergangene{exitedEntries.length===1?'s':''} Mitglied{exitedEntries.length===1?'':'er'}</span>
-                <span style={{fontSize:'12px'}}>{showExitedMitglieder?'▲':'▼'}</span>
-              </button>
-              {showExitedMitglieder && (
-                <div style={{display:'grid',gap:'6px',marginTop:'8px'}}>
-                  {exitedEntries.map(([eid,em])=>(
-                    <div key={eid} style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',padding:'8px 10px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'8px'}}>
-                      <span style={{flex:1,minWidth:'150px',fontSize:'12px',color:'rgba(255,255,255,0.7)'}}><b>{em.vorname} {em.nachname}</b> · <span style={{color:'rgba(255,255,255,0.4)'}}>ausgetreten {mitgliederFinanzen[eid]?.austrittsdatum}</span></span>
-                      <button onClick={()=>saveFinanzField(eid,'austrittsdatum',null)}
-                        style={{padding:'5px 10px',background:'rgba(74,222,128,0.15)',color:'#86efac',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>↩️ Zurückholen</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
           <div style={{display:'flex',gap:'8px',marginBottom:'10px',flexWrap:'wrap'}}>
             <button onClick={()=>{ensureXlsxLoaded();setShowMitgliedExport(true);}}
               style={{padding:'8px 14px',background:'rgba(196,181,253,0.12)',border:'1px solid rgba(196,181,253,0.35)',borderRadius:'9px',color:'#c4b5fd',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:'700'}}>📤 Excel Export</button>
@@ -12667,15 +12647,6 @@ export default function TrainingsApp() {
               style={{padding:'8px 14px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'9px',color:'#fbbf24',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:'700'}}>🎂 Geburtstagsliste</button>
             <button onClick={()=>{ensureXlsxLoaded();setShowJubilaeumExport(true);}}
               style={{padding:'8px 14px',background:'rgba(134,239,172,0.1)',border:'1px solid rgba(134,239,172,0.3)',borderRadius:'9px',color:'#86efac',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:'700'}}>🏅 Jubiläumsjahre</button>
-            <button onClick={()=>{
-                ensureXlsxLoaded();
-                const rows = exitedEntries.map(([eid,em])=>({
-                  Vorname: em.vorname||'', Nachname: em.nachname||'',
-                  Austrittsdatum: mitgliederFinanzen[eid]?.austrittsdatum||'', 'E-Mail': em.email||'',
-                }));
-                exportRowsToXlsx(rows, 'Vergangene Mitglieder', `Vergangene_Mitglieder_${TODAY}.xlsx`);
-              }}
-              style={{padding:'8px 14px',background:'rgba(153,27,27,0.12)',border:'1px solid rgba(153,27,27,0.35)',borderRadius:'9px',color:'#fca5a5',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:'700'}}>📦 Vergangene Mitglieder</button>
           </div>
           <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
             <input value={mitgliederSearch} onChange={e=>setMitgliederSearch(e.target.value)} placeholder="Suche nach Name oder E-Mail…"
@@ -12960,6 +12931,26 @@ export default function TrainingsApp() {
             })}
             {filtered.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.3)',fontSize:'13px'}}>Keine Treffer.</p>}
           </div>
+          {exitedEntries.length > 0 && (
+            <div style={{marginTop:'20px'}}>
+              <button onClick={()=>setShowExitedMitglieder(o=>!o)}
+                style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'10px',cursor:'pointer',color:'rgba(255,255,255,0.6)'}}>
+                <span style={{fontSize:'13px',fontWeight:'800'}}>📦 {exitedEntries.length} vergangene{exitedEntries.length===1?'s':''} Mitglied{exitedEntries.length===1?'':'er'}</span>
+                <span style={{fontSize:'12px'}}>{showExitedMitglieder?'▲':'▼'}</span>
+              </button>
+              {showExitedMitglieder && (
+                <div style={{display:'grid',gap:'6px',marginTop:'8px'}}>
+                  {exitedEntries.map(([eid,em])=>(
+                    <div key={eid} style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',padding:'8px 10px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'8px'}}>
+                      <span style={{flex:1,minWidth:'150px',fontSize:'12px',color:'rgba(255,255,255,0.7)'}}><b>{em.vorname} {em.nachname}</b> · <span style={{color:'rgba(255,255,255,0.4)'}}>ausgetreten {mitgliederFinanzen[eid]?.austrittsdatum}</span></span>
+                      <button onClick={()=>saveFinanzField(eid,'austrittsdatum',null)}
+                        style={{padding:'5px 10px',background:'rgba(74,222,128,0.15)',color:'#86efac',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>↩️ Zurückholen</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
