@@ -138,6 +138,8 @@ const BEITRAGSARTEN = [
   { key: 'familienbeitrag',  label: 'Familienbeitrag',       amount: 240 },
   { key: 'ehrenmitglied',    label: 'Ehrenmitglied',         amount: 0 },
   { key: 'familienmitglied', label: 'Familienmitglied',      amount: 0 },
+  { key: 'arbeitslos',       label: 'Arbeitslos',            amount: 60 },
+  { key: 'beitragsfrei',     label: 'Beitragsfrei',          amount: 0 },
 ];
 
 const emptySession = { subgroupIds: [], extraPlayerIds: [], date: new Date().toISOString().split('T')[0], time: '17:00', endTime: '', trainer: '', trainerUids: [], info: '', repeat: false, repeatWeeks: 8, isRecurring: false };
@@ -12307,7 +12309,6 @@ export default function TrainingsApp() {
       .filter(([,m]) => !q || `${m.vorname} ${m.nachname} ${m.email}`.toLowerCase().includes(q))
       .filter(([,m]) => !mitgliederRoleFilter || (mitgliederRoleFilter==='__none__' ? getRoles(m).length===0 : getRoles(m).includes(mitgliederRoleFilter)))
       .sort((a,b)=>`${a[1].nachname}${a[1].vorname}`.localeCompare(`${b[1].nachname}${b[1].vorname}`,'de'));
-    const fmtGeb = g => { if (!g) return ''; const [y,mo,d] = g.split('-'); return d&&mo&&y ? `${d}.${mo}.${y}` : g; };
     const assignedCount = entries.filter(([,m])=>getRoles(m).length>0).length;
 
     const toggleRole = (id, m, roleKey) => {
@@ -12464,13 +12465,16 @@ export default function TrainingsApp() {
               const ttrStatus = ttrRole ? getTtrStatus(m) : null;
               const ttrKein = ttrStatus?.status === 'none';
               const ttrAehnlich = ttrStatus?.status === 'similar';
+              const fin = mitgliederFinanzen[id] || {};
+              const beitragOffen = roles.length>0 && !fin.beitragsart;
               const topRole = highestRole(roles);
-              const cardColors = elternOhneKind || ttrKein ? {border:'rgba(239,68,68,0.6)', bg:'rgba(239,68,68,0.06)'}
+              const rot = elternOhneKind || ttrKein || beitragOffen;
+              const cardColors = rot ? {border:'rgba(239,68,68,0.6)', bg:'rgba(239,68,68,0.06)'}
                 : ttrAehnlich ? {border:'rgba(251,191,36,0.6)', bg:'rgba(251,191,36,0.07)'}
                 : (topRole ? {border:ROLE_COLORS[topRole].border, bg:ROLE_COLORS[topRole].bg} : {border:'rgba(196,181,253,0.2)', bg:'rgba(255,255,255,0.04)'});
               const matchedUser = Object.values(allUsers).find(u => (u.email||'').trim().toLowerCase() === (m.email||'').trim().toLowerCase());
               return (
-                <div key={id} style={{background:cardColors.bg,border:`1px solid ${cardColors.border}`,borderRadius:'10px',overflow:'hidden',...((elternOhneKind||ttrKein)?{boxShadow:'0 0 0 1px rgba(239,68,68,0.4)'}:ttrAehnlich?{boxShadow:'0 0 0 1px rgba(251,191,36,0.4)'}:{})}}>
+                <div key={id} style={{background:cardColors.bg,border:`1px solid ${cardColors.border}`,borderRadius:'10px',overflow:'hidden',...(rot?{boxShadow:'0 0 0 1px rgba(239,68,68,0.4)'}:ttrAehnlich?{boxShadow:'0 0 0 1px rgba(251,191,36,0.4)'}:{})}}>
                   <button onClick={()=>{setMitgliedExpandedId(isExpanded?null:id);setMitgliedChildSearch('');}}
                     style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',background:'transparent',border:'none',cursor:'pointer',textAlign:'left'}}>
                     <div style={{flex:'1 1 200px',minWidth:0}}>
@@ -12478,7 +12482,7 @@ export default function TrainingsApp() {
                       {elternOhneKind&&<p style={{margin:0,fontSize:'10px',color:'#fca5a5',fontWeight:'700'}}>⚠️ Kein Kind zugeordnet</p>}
                       {ttrKein&&<p style={{margin:0,fontSize:'10px',color:'#fca5a5',fontWeight:'700'}}>⚠️ Kein TTR-Wert auffindbar</p>}
                       {ttrAehnlich&&<p style={{margin:0,fontSize:'10px',color:'#fbbf24',fontWeight:'700'}}>⚠️ TTR: nur ähnlicher Name gefunden</p>}
-                      <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>{fmtGeb(m.geburtsdatum)}{m.email?` · ${m.email}`:' · keine E-Mail'}</p>
+                      {beitragOffen&&<p style={{margin:0,fontSize:'10px',color:'#fca5a5',fontWeight:'700'}}>⚠️ Keine Beitragsart zugeordnet</p>}
                     </div>
                     <div style={{display:'flex',gap:'4px',flexWrap:'wrap',justifyContent:'flex-end',flex:'0 1 auto'}}>
                       {roles.length===0?<span style={{fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>keine Rolle</span>:
@@ -12618,15 +12622,26 @@ export default function TrainingsApp() {
                               style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#0a2210',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',fontFamily:opts.mono?'monospace':'inherit'}}/>
                           </div>
                         );
+                        const mfld = (key, label, opts={}) => (
+                          <div style={{minWidth:0}}>
+                            <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>{label}</span>
+                            <input value={m[key]??''} type={opts.type||'text'} onChange={e=>saveMitgliedField(id,key,e.target.value)}
+                              style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#0a2210',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none'}}/>
+                          </div>
+                        );
+                        const familienZahlerOptions = entries.filter(([oid])=>oid!==id).sort((a,b)=>`${a[1].nachname}${a[1].vorname}`.localeCompare(`${b[1].nachname}${b[1].vorname}`,'de'));
                         return (
                           <div style={{paddingTop:'4px',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
                             <button onClick={()=>setMitgliedFinanzOpenId(finOpen?null:id)}
                               style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 2px',background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.5)',fontSize:'11px',fontWeight:'700'}}>
-                              <span>📇 Adresse &amp; Bankdaten</span>
+                              <span>📇 Daten</span>
                               <span>{finOpen?'▲':'▼'}</span>
                             </button>
                             {finOpen && (
                               <div style={{display:'grid',gap:'8px'}}>
+                                <div style={{display:'grid',gridTemplateColumns:'1fr 1.4fr',gap:'6px'}}>
+                                  {mfld('geburtsdatum','Geburtsdatum',{type:'date'})}{mfld('email','E-Mail',{type:'email'})}
+                                </div>
                                 <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1.5fr',gap:'6px'}}>
                                   {fld('strasse','Straße')}{fld('plz','PLZ')}{fld('ort','Ort')}
                                 </div>
@@ -12658,6 +12673,16 @@ export default function TrainingsApp() {
                                   </div>
                                   {fld('beitrag','Beitrag (€)')}{fld('kontosaldo','Kontosaldo (€)')}
                                 </div>
+                                {fin.beitragsart==='familienmitglied' && (
+                                  <div style={{minWidth:0}}>
+                                    <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Gehört zu (Familienbeitrag-Zahler)</span>
+                                    <select value={fin.familienZahlerId||''} onChange={e=>saveFinanzField(id,'familienZahlerId',e.target.value||null)}
+                                      style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#0a2210',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',cursor:'pointer'}}>
+                                      <option value="" style={{background:'#0a2210'}}>– niemand ausgewählt –</option>
+                                      {familienZahlerOptions.map(([oid,om])=><option key={oid} value={oid} style={{background:'#0a2210'}}>{om.vorname} {om.nachname}</option>)}
+                                    </select>
+                                  </div>
+                                )}
                                 <div style={{display:'grid',gridTemplateColumns:'1fr',gap:'6px'}}>
                                   {fld('eintrittsdatum','Eintrittsdatum')}
                                 </div>
