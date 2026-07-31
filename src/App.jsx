@@ -743,7 +743,6 @@ export default function TrainingsApp() {
   const [mitgliederRoleFilter, setMitgliederRoleFilter] = useState('');
   const [mitgliedLinkUid, setMitgliedLinkUid] = useState(null);
   const [mitgliedLinkSearch, setMitgliedLinkSearch] = useState('');
-  const [mitgliedFinanzOpenId, setMitgliedFinanzOpenId] = useState(null);
   const [usageStats, setUsageStats] = useState({ dailyActive:{}, viewCounts:{} });
   const [ranglisteHistory, setRanglisteHistory] = useState([]); // [{date:'YYYY-MM-DD', order:[childId,...]}]
   const [showRangStats, setShowRangStats] = useState(false);
@@ -12491,7 +12490,9 @@ export default function TrainingsApp() {
                     <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',flexShrink:0}}>{isExpanded?'▲':'▼'}</span>
                   </button>
                   {isExpanded&&(
-                    <div style={{padding:'0 12px 14px',display:'grid',gap:'10px'}}>
+                    <div style={{padding:'0 12px 14px',display:'grid',gap:'12px'}}>
+                    <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'10px',padding:'10px',display:'grid',gap:'10px'}}>
+                      <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(196,181,253,0.6)',textTransform:'uppercase',letterSpacing:'0.5px'}}>⚙️ App-Steuerung</span>
                       <div>
                         <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'6px'}}>Rollen</span>
                         <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
@@ -12612,82 +12613,88 @@ export default function TrainingsApp() {
                             style={{padding:'5px 10px',background:'rgba(220,38,38,0.15)',border:'1px solid rgba(220,38,38,0.4)',borderRadius:'6px',cursor:'pointer',color:'#fca5a5',fontSize:'11px',fontWeight:'700'}}>🗑️ Account löschen</button>
                         </div>
                       )}
+                    </div>
                       {(()=>{
                         const fin = mitgliederFinanzen[id] || {};
-                        const finOpen = mitgliedFinanzOpenId === id;
                         const fld = (key, label, opts={}) => (
                           <div key={key} style={{minWidth:0}}>
                             <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>{label}</span>
                             <input value={fin[key]??''} type={opts.type||'text'} onChange={e=>saveFinanzField(id,key,e.target.value)}
-                              style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#0a2210',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',fontFamily:opts.mono?'monospace':'inherit'}}/>
+                              style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',fontFamily:opts.mono?'monospace':'inherit'}}/>
                           </div>
                         );
                         const mfld = (key, label, opts={}) => (
                           <div style={{minWidth:0}}>
                             <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>{label}</span>
                             <input value={m[key]??''} type={opts.type||'text'} onChange={e=>saveMitgliedField(id,key,e.target.value)}
-                              style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#0a2210',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none'}}/>
+                              style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none'}}/>
                           </div>
                         );
                         const familienZahlerOptions = entries.filter(([oid])=>oid!==id && mitgliederFinanzen[oid]?.beitragsart==='familienbeitrag').sort((a,b)=>`${a[1].nachname}${a[1].vorname}`.localeCompare(`${b[1].nachname}${b[1].vorname}`,'de'));
                         return (
-                          <div style={{paddingTop:'4px',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
-                            <button onClick={()=>setMitgliedFinanzOpenId(finOpen?null:id)}
-                              style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 2px',background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.5)',fontSize:'11px',fontWeight:'700'}}>
-                              <span>📇 Daten</span>
-                              <span>{finOpen?'▲':'▼'}</span>
-                            </button>
-                            {finOpen && (
-                              <div style={{display:'grid',gap:'8px'}}>
-                                <div style={{display:'grid',gridTemplateColumns:'1fr 1.4fr',gap:'6px'}}>
-                                  {mfld('geburtsdatum','Geburtsdatum',{type:'date'})}{mfld('email','E-Mail',{type:'email'})}
-                                </div>
-                                <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1.5fr',gap:'6px'}}>
-                                  {fld('strasse','Straße')}{fld('plz','PLZ')}{fld('ort','Ort')}
-                                </div>
-                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
-                                  {fld('telefon','Telefon')}{fld('handy','Handy')}
-                                </div>
-                                <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:'6px'}}>
-                                  {fld('iban','IBAN',{mono:true})}{fld('bic','BIC',{mono:true})}
-                                </div>
-                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
-                                  {fld('sepaMandatsRef','SEPA-Mandatsreferenz')}{fld('sepaMandatsDatum','SEPA-Mandatsdatum')}
-                                </div>
-                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'6px'}}>
-                                  {fld('zahlart','Zahlart')}{fld('zahler','Zahler')}{fld('zahlweise','Zahlweise')}
-                                </div>
-                                <div style={{display:'grid',gridTemplateColumns:'1.4fr 1fr 1fr',gap:'6px'}}>
-                                  <div style={{minWidth:0}}>
-                                    <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Beitragsart</span>
-                                    <select value={fin.beitragsart||''} onChange={e=>{
-                                        const key = e.target.value;
-                                        const art = BEITRAGSARTEN.find(a=>a.key===key);
-                                        saveFinanzField(id,'beitragsart',key);
-                                        if (art) saveFinanzField(id,'beitrag',art.amount);
-                                      }}
-                                      style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#0a2210',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',cursor:'pointer'}}>
-                                      <option value="" style={{background:'#0a2210'}}>– auswählen –</option>
-                                      {BEITRAGSARTEN.map(a=><option key={a.key} value={a.key} style={{background:'#0a2210'}}>{a.label} ({a.amount}€)</option>)}
-                                    </select>
-                                  </div>
-                                  {fld('beitrag','Beitrag (€)')}{fld('kontosaldo','Kontosaldo (€)')}
-                                </div>
-                                {fin.beitragsart==='familienmitglied' && (
-                                  <div style={{minWidth:0}}>
-                                    <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Gehört zu (Familienbeitrag-Zahler)</span>
-                                    <select value={fin.familienZahlerId||''} onChange={e=>saveFinanzField(id,'familienZahlerId',e.target.value||null)}
-                                      style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#0a2210',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',cursor:'pointer'}}>
-                                      <option value="" style={{background:'#0a2210'}}>– niemand ausgewählt –</option>
-                                      {familienZahlerOptions.map(([oid,om])=><option key={oid} value={oid} style={{background:'#0a2210'}}>{om.vorname} {om.nachname}</option>)}
-                                    </select>
-                                  </div>
-                                )}
-                                <div style={{display:'grid',gridTemplateColumns:'1fr',gap:'6px'}}>
-                                  {fld('eintrittsdatum','Eintrittsdatum')}
-                                </div>
+                          <div style={{background:'rgba(251,191,36,0.04)',border:'1px solid rgba(251,191,36,0.15)',borderRadius:'10px',padding:'10px',display:'grid',gap:'14px'}}>
+                            <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(251,191,36,0.6)',textTransform:'uppercase',letterSpacing:'0.5px'}}>🗂️ Mitgliedsdaten</span>
+
+                            {/* Persönliche Daten */}
+                            <div style={{display:'grid',gap:'8px'}}>
+                              <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.35)'}}>Persönliche Daten</span>
+                              <div style={{display:'grid',gridTemplateColumns:'1fr 1.4fr',gap:'6px'}}>
+                                {mfld('geburtsdatum','Geburtsdatum',{type:'date'})}{mfld('email','E-Mail',{type:'email'})}
                               </div>
-                            )}
+                              <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1.5fr',gap:'6px'}}>
+                                {fld('strasse','Straße')}{fld('plz','PLZ')}{fld('ort','Ort')}
+                              </div>
+                              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
+                                {fld('telefon','Telefon')}{fld('handy','Handy')}
+                              </div>
+                            </div>
+
+                            {/* Zahlungsdaten */}
+                            <div style={{display:'grid',gap:'8px',paddingTop:'12px',borderTop:'1px solid rgba(251,191,36,0.15)'}}>
+                              <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.35)'}}>Zahlungsdaten</span>
+                              <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:'6px'}}>
+                                {fld('iban','IBAN',{mono:true})}{fld('bic','BIC',{mono:true})}
+                              </div>
+                              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
+                                {fld('sepaMandatsRef','SEPA-Mandatsreferenz')}{fld('sepaMandatsDatum','SEPA-Mandatsdatum')}
+                              </div>
+                              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'6px'}}>
+                                {fld('zahlart','Zahlart')}{fld('zahler','Zahler')}{fld('zahlweise','Zahlweise')}
+                              </div>
+                              <div style={{display:'grid',gridTemplateColumns:'1.4fr 1fr 1fr',gap:'6px'}}>
+                                <div style={{minWidth:0}}>
+                                  <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Beitragsart</span>
+                                  <select value={fin.beitragsart||''} onChange={e=>{
+                                      const key = e.target.value;
+                                      const art = BEITRAGSARTEN.find(a=>a.key===key);
+                                      saveFinanzField(id,'beitragsart',key);
+                                      if (art) saveFinanzField(id,'beitrag',art.amount);
+                                    }}
+                                    style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',cursor:'pointer'}}>
+                                    <option value="" style={{background:'#1a1206'}}>– auswählen –</option>
+                                    {BEITRAGSARTEN.map(a=><option key={a.key} value={a.key} style={{background:'#1a1206'}}>{a.label} ({a.amount}€)</option>)}
+                                  </select>
+                                </div>
+                                {fld('beitrag','Beitrag (€)')}{fld('kontosaldo','Kontosaldo (€)')}
+                              </div>
+                              {fin.beitragsart==='familienmitglied' && (
+                                <div style={{minWidth:0}}>
+                                  <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Gehört zu (Familienbeitrag-Zahler)</span>
+                                  <select value={fin.familienZahlerId||''} onChange={e=>saveFinanzField(id,'familienZahlerId',e.target.value||null)}
+                                    style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',cursor:'pointer'}}>
+                                    <option value="" style={{background:'#1a1206'}}>– niemand ausgewählt –</option>
+                                    {familienZahlerOptions.map(([oid,om])=><option key={oid} value={oid} style={{background:'#1a1206'}}>{om.vorname} {om.nachname}</option>)}
+                                  </select>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Eintrittsdatum — prominent */}
+                            <div style={{padding:'10px 12px',background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'8px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+                              <span style={{fontSize:'12px',fontWeight:'800',color:'#fbbf24',whiteSpace:'nowrap'}}>📅 Eintrittsdatum</span>
+                              <input value={fin.eintrittsdatum??''} onChange={e=>saveFinanzField(id,'eintrittsdatum',e.target.value)}
+                                style={{flex:1,minWidth:'140px',padding:'7px 10px',background:'#1a1206',border:'1px solid rgba(251,191,36,0.4)',borderRadius:'7px',color:'white',fontSize:'13px',fontWeight:'700',outline:'none'}}/>
+                            </div>
                           </div>
                         );
                       })()}
