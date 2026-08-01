@@ -3057,6 +3057,8 @@ export default function TrainingsApp() {
       const isYear = w.type === 'year';
       keys.push({ key:`sdm_${w.type}_${w.period}`, icon: isYear?'👑':'⭐', title: isYear?`Spieler des Jahres ${w.period}!`:'Spieler des Monats!', desc: isYear?`Du warst Spieler des Jahres ${w.period}!`:`Du warst Spieler des Monats — starke Leistung!` });
     });
+    const teamCount = child.achievements?.team || 0;
+    for (let n = 1; n <= teamCount; n++) keys.push({ key:`team_${n}`, icon:'🏆', title:'Mannschaftsmeisterschaft!', desc: ACHIEVEMENT_DESCRIPTIONS.team });
     return keys;
   };
 
@@ -3084,19 +3086,24 @@ export default function TrainingsApp() {
     return fresh;
   };
 
-  // Prüft einmal pro App-Start (nicht bei jedem Re-Render), ob das eigene Kind seit dem
-  // letzten Öffnen neue Errungenschaften freigeschaltet hat, und reiht sie für die
-  // Feier-Animation ein. Nur für Eltern/Jugendliche relevant, läuft erst wenn Kinder- und
-  // Ranglisten-Daten geladen sind.
+  // Prüft einmal pro App-Start (nicht bei jedem Re-Render), ob eines der eigenen/verknüpften
+  // Kinder seit dem letzten Öffnen neue Errungenschaften freigeschaltet hat, und reiht sie für
+  // die Feier-Animation ein. Bei Eltern mit mehreren Kindern werden ALLE geprüft, nicht nur das
+  // gerade aktive. Läuft für Eltern/Jugendliche, erst wenn Kinder-/Ranglisten-Daten geladen sind.
   const achievementCheckDone = useRef(false);
   useEffect(() => {
     if (achievementCheckDone.current) return;
     if (!(userRole === 'eltern' || userRole === 'jugendlich')) return;
     if (Object.keys(children).length === 0) return;
-    const myChild = getMyChild();
-    if (!myChild) return;
+    const ids = getMyLinkedChildIds();
+    if (ids.length === 0) return;
     achievementCheckDone.current = true;
-    const fresh = checkNewAchievements(myChild.id);
+    const multi = ids.length > 1;
+    const fresh = ids.flatMap(id => {
+      const child = children[id];
+      if (!child) return [];
+      return checkNewAchievements(id).map(a => multi ? { ...a, title: `${child.name}: ${a.title}` } : a);
+    });
     if (fresh.length > 0) setUnlockCelebrationQueue(fresh);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userRole, children, ranglisteAch]);
