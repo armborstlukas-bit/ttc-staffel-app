@@ -12212,13 +12212,6 @@ export default function TrainingsApp() {
           <span style={{fontSize:'12px',color:'rgba(196,181,253,0.7)',fontWeight:'600'}}>{assignedCount}/{entries.length} zugeordnet</span>
         </div>
         <div style={{padding:'16px 14px',maxWidth:'900px',margin:'0 auto'}}>
-          <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
-            Importierte Mitgliederliste. Klicke auf eine Person, um Rollen (Mehrfachauswahl möglich) und bei "Eltern" die zugehörigen Kinder/Jugendlichen zuzuordnen (auch mehrere möglich). Meldet sich jemand mit einer hier hinterlegten E-Mail-Adresse und zugewiesener Rolle an, wird der Account automatisch freigeschaltet.
-          </p>
-          <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
-            <button onClick={()=>{setNewMitgliedForm(NEW_MITGLIED_DEFAULTS);setShowNewMitglied(true);}}
-              style={{padding:'9px 16px',background:'#16a34a',color:'white',border:'none',borderRadius:'9px',cursor:'pointer',fontWeight:'800',fontSize:'13px'}}>+ Neues Mitglied anlegen</button>
-          </div>
           {unmatchedPending.length > 0 && (
             <div style={{marginBottom:'16px',padding:'14px 16px',background:'rgba(220,38,38,0.12)',border:'2px solid #dc2626',borderRadius:'12px',boxShadow:'0 0 0 1px rgba(220,38,38,0.3)'}}>
               <p style={{margin:'0 0 10px',fontSize:'14px',fontWeight:'800',color:'#fca5a5'}}>🚫 {unmatchedPending.length} Anmeldung{unmatchedPending.length===1?'':'en'} — Nicht Mitglied</p>
@@ -12259,6 +12252,13 @@ export default function TrainingsApp() {
               </div>
             </div>
           )}
+          <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
+            Importierte Mitgliederliste. Klicke auf eine Person, um Rollen (Mehrfachauswahl möglich) und bei "Eltern" die zugehörigen Kinder/Jugendlichen zuzuordnen (auch mehrere möglich). Meldet sich jemand mit einer hier hinterlegten E-Mail-Adresse und zugewiesener Rolle an, wird der Account automatisch freigeschaltet.
+          </p>
+          <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
+            <button onClick={()=>{setNewMitgliedForm(NEW_MITGLIED_DEFAULTS);setShowNewMitglied(true);}}
+              style={{padding:'9px 16px',background:'#16a34a',color:'white',border:'none',borderRadius:'9px',cursor:'pointer',fontWeight:'800',fontSize:'13px'}}>+ Neues Mitglied anlegen</button>
+          </div>
           {blockedUsers.length > 0 && (
             <div style={{marginBottom:'16px',padding:'12px 14px',background:'rgba(153,27,27,0.1)',border:'1px solid rgba(153,27,27,0.4)',borderRadius:'12px'}}>
               <p style={{margin:'0 0 10px',fontSize:'13px',fontWeight:'800',color:'#fca5a5'}}>⛔ {blockedUsers.length} blockierte Person{blockedUsers.length===1?'':'en'}</p>
@@ -12411,7 +12411,10 @@ export default function TrainingsApp() {
                   <button onClick={()=>{setMitgliedExpandedId(isExpanded?null:id);setMitgliedChildSearch('');}}
                     style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',background:'transparent',border:'none',cursor:'pointer',textAlign:'left'}}>
                     <div style={{flex:'1 1 200px',minWidth:0}}>
-                      <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'white'}}>{m.vorname} {m.nachname}</p>
+                      <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'white',display:'flex',alignItems:'center',gap:'6px'}}>
+                        {m.vorname} {m.nachname}
+                        {matchedUser&&<span title="App-Account zugeordnet" style={{fontSize:'11px',fontWeight:'800',color:'#4ade80',background:'rgba(74,222,128,0.15)',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'50%',width:'16px',height:'16px',display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>✓</span>}
+                      </p>
                       {elternOhneKind&&<p style={{margin:0,fontSize:'10px',color:'#fca5a5',fontWeight:'700'}}>⚠️ Kein Kind zugeordnet</p>}
                       {ttrKein&&<p style={{margin:0,fontSize:'10px',color:'#fca5a5',fontWeight:'700'}}>⚠️ Kein TTR-Wert auffindbar</p>}
                       {ttrAehnlich&&<p style={{margin:0,fontSize:'10px',color:'#fbbf24',fontWeight:'700'}}>⚠️ TTR: nur ähnlicher Name gefunden</p>}
