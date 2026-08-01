@@ -558,9 +558,9 @@ export default function TrainingsApp() {
   const [mitgliederListe, setMitgliederListe] = useState({}); // { [id]: {vorname,nachname,geburtsdatum,email,roles:[],linkedMemberIds:[]} }
   const [mitgliederFinanzen, setMitgliederFinanzen] = useState({}); // { [id]: {strasse,plz,ort,telefon,handy,iban,bic,sepaMandatsRef,sepaMandatsDatum,zahlart,zahler,beitrag,kontosaldo,eintrittsdatum} } — admin-only, siehe firestore.rules
   const [mitgliederSearch, setMitgliederSearch] = useState('');
+  const [pageScrollPos, setPageScrollPos] = useState('top'); // 'top' | 'middle' | 'bottom' — für Scroll-Buttons in langen Listen (z.B. Mitgliederverwaltung)
   const [mitgliedExpandedId, setMitgliedExpandedId] = useState(null);
   const [mitgliedChildSearch, setMitgliedChildSearch] = useState('');
-  const [mitgliederRoleFilter, setMitgliederRoleFilter] = useState('');
   const [mitgliedLinkUid, setMitgliedLinkUid] = useState(null);
   const [mitgliedLinkSearch, setMitgliedLinkSearch] = useState('');
   const [showMitgliedExport, setShowMitgliedExport] = useState(false);
@@ -578,7 +578,6 @@ export default function TrainingsApp() {
   const [ttrProTagSearch, setTtrProTagSearch] = useState('');
   const [ttrProTagSelected, setTtrProTagSelected] = useState([]); // ausgewählte mitgliederListe-ids
   const [showNewMitglied, setShowNewMitglied] = useState(false);
-  const [mitgliedSyncing, setMitgliedSyncing] = useState(false);
   const NEW_MITGLIED_DEFAULTS = { vorname:'', nachname:'', roles:[], geburtsdatum:'', email:'', strasse:'', plz:'', ort:'', telefon:'', handy:'', iban:'', bic:'', sepaMandatsRef:'', sepaMandatsDatum:'', zahlart:'', zahler:'', zahlweise:'', beitragsart:'', beitrag:'', kontosaldo:'', eintrittsdatum:'' };
   const [newMitgliedForm, setNewMitgliedForm] = useState(NEW_MITGLIED_DEFAULTS);
   const [usageStats, setUsageStats] = useState({ dailyActive:{}, viewCounts:{} });
@@ -791,6 +790,21 @@ export default function TrainingsApp() {
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
   }, []);
+
+  useEffect(() => {
+    const checkScroll = () => {
+      const scrollY = window.scrollY;
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      if (maxScroll <= 40) { setPageScrollPos('top'); return; }
+      if (scrollY <= 40) setPageScrollPos('top');
+      else if (scrollY >= maxScroll - 40) setPageScrollPos('bottom');
+      else setPageScrollPos('middle');
+    };
+    checkScroll();
+    window.addEventListener('scroll', checkScroll, { passive: true });
+    window.addEventListener('resize', checkScroll);
+    return () => { window.removeEventListener('scroll', checkScroll); window.removeEventListener('resize', checkScroll); };
+  }, [view]);
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
@@ -1989,7 +2003,7 @@ export default function TrainingsApp() {
       const d = await r.json();
       if (d.error) throw new Error(d.error);
     } catch (e) {
-      alert('⚠️ Rollen-Abgleich mit dem App-Account ist fehlgeschlagen: ' + (e?.message || e) + '\nBitte oben in der Mitgliederverwaltung "🔄 Rollen abgleichen" klicken.');
+      alert('⚠️ Rollen-Abgleich mit dem App-Account ist fehlgeschlagen: ' + (e?.message || e) + '\nBitte die Rolle noch einmal speichern oder später erneut versuchen.');
     }
   };
 
@@ -11837,7 +11851,6 @@ export default function TrainingsApp() {
     const q = mitgliederSearch.trim().toLowerCase();
     const filtered = activeEntries
       .filter(([,m]) => !q || `${m.vorname} ${m.nachname} ${m.email}`.toLowerCase().includes(q))
-      .filter(([,m]) => !mitgliederRoleFilter || (mitgliederRoleFilter==='__none__' ? getRoles(m).length===0 : getRoles(m).includes(mitgliederRoleFilter)))
       .sort((a,b)=>`${a[1].nachname}${a[1].vorname}`.localeCompare(`${b[1].nachname}${b[1].vorname}`,'de'));
     const assignedCount = activeEntries.filter(([,m])=>getRoles(m).length>0).length;
 
@@ -12155,25 +12168,6 @@ export default function TrainingsApp() {
           <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
             <button onClick={()=>{setNewMitgliedForm(NEW_MITGLIED_DEFAULTS);setShowNewMitglied(true);}}
               style={{padding:'9px 16px',background:'#16a34a',color:'white',border:'none',borderRadius:'9px',cursor:'pointer',fontWeight:'800',fontSize:'13px'}}>+ Neues Mitglied anlegen</button>
-            <button disabled={mitgliedSyncing} onClick={async ()=>{
-                setMitgliedSyncing(true);
-                try {
-                  const idToken = await user.getIdToken();
-                  const r = await fetch('/api/mitglieder?action=sync-roles', {
-                    method:'POST', headers:{ Authorization:`Bearer ${idToken}`, 'Content-Type':'application/json' }, body: JSON.stringify({}),
-                  });
-                  const d = await r.json();
-                  if (d.error) throw new Error(d.error);
-                  alert(d.fixed>0
-                    ? `✅ ${d.fixed} Account(s) korrigiert:\n${d.fixedNames.join(', ')}`
-                    : '✅ Alles stimmt überein — keine Korrektur nötig.');
-                } catch(e) {
-                  alert('⚠️ Abgleich fehlgeschlagen: ' + (e?.message||e));
-                } finally { setMitgliedSyncing(false); }
-              }}
-              style={{padding:'9px 16px',background:'rgba(103,232,249,0.12)',border:'1px solid rgba(103,232,249,0.35)',borderRadius:'9px',color:'#67e8f9',cursor:mitgliedSyncing?'wait':'pointer',fontWeight:'800',fontSize:'13px',opacity:mitgliedSyncing?0.6:1}}>
-              {mitgliedSyncing?'⏳ Gleicht ab…':'🔄 Rollen abgleichen'}
-            </button>
           </div>
           {unmatchedPending.length > 0 && (
             <div style={{marginBottom:'16px',padding:'14px 16px',background:'rgba(220,38,38,0.12)',border:'2px solid #dc2626',borderRadius:'12px',boxShadow:'0 0 0 1px rgba(220,38,38,0.3)'}}>
@@ -12341,12 +12335,6 @@ export default function TrainingsApp() {
           <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
             <input value={mitgliederSearch} onChange={e=>setMitgliederSearch(e.target.value)} placeholder="Suche nach Name oder E-Mail…"
               style={{flex:'1 1 220px',boxSizing:'border-box',padding:'10px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(196,181,253,0.25)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none'}}/>
-            <select value={mitgliederRoleFilter} onChange={e=>setMitgliederRoleFilter(e.target.value)}
-              style={{padding:'10px 14px',background:'#0a2210',border:'1px solid rgba(196,181,253,0.25)',borderRadius:'10px',color:'#c4b5fd',fontSize:'13px',fontWeight:'700',flexShrink:0}}>
-              <option value="" style={{background:'#0a2210'}}>Alle Rollen</option>
-              <option value="__none__" style={{background:'#0a2210'}}>– keine Rolle –</option>
-              {ROLE_OPTIONS.map(o=><option key={o.key} value={o.key} style={{background:'#0a2210'}}>{o.label}</option>)}
-            </select>
           </div>
 
           <div style={{display:'grid',gap:'6px'}}>
@@ -12645,6 +12633,14 @@ export default function TrainingsApp() {
             </div>
           )}
         </div>
+        {pageScrollPos !== 'top' && (
+          <button onClick={()=>window.scrollTo({top:0,behavior:'smooth'})} title="Nach oben"
+            style={{position:'fixed',right:'16px',bottom: pageScrollPos==='middle' ? '68px' : '16px',zIndex:500,width:'44px',height:'44px',borderRadius:'50%',background:'#16a34a',color:'white',border:'none',boxShadow:'0 4px 14px rgba(0,0,0,0.4)',fontSize:'18px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>▲</button>
+        )}
+        {pageScrollPos !== 'bottom' && (
+          <button onClick={()=>window.scrollTo({top:document.documentElement.scrollHeight,behavior:'smooth'})} title="Nach unten"
+            style={{position:'fixed',right:'16px',bottom:'16px',zIndex:500,width:'44px',height:'44px',borderRadius:'50%',background:'#16a34a',color:'white',border:'none',boxShadow:'0 4px 14px rgba(0,0,0,0.4)',fontSize:'18px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>▼</button>
+        )}
       </div>
     );
   }
