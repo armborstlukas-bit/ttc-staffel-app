@@ -14301,30 +14301,47 @@ export default function TrainingsApp() {
 
         <div style={{padding:'20px',maxWidth:'820px',margin:'0 auto'}}>
 
+          {/* Fällig-Hinweis — eigene, gut sichtbare Zeile statt irgendwo in der Liste zu verschwinden */}
+          {wzDueCount > 0 && (
+            <div style={{marginBottom:'14px',padding:'12px 14px',background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.4)',borderRadius:'12px',display:'flex',alignItems:'center',gap:'10px'}}>
+              <span style={{fontSize:'18px'}}>⚠️</span>
+              <span style={{fontSize:'13px',fontWeight:'700',color:'#fca5a5',flex:1}}>{wzDueCount} fällige Wette{wzDueCount===1?'':'n'} — bitte auflösen</span>
+              <button onClick={()=>setWzFilter('wette')}
+                style={{padding:'6px 12px',background:'rgba(239,68,68,0.2)',border:'1px solid rgba(239,68,68,0.5)',borderRadius:'8px',color:'#fca5a5',cursor:'pointer',fontWeight:'700',fontSize:'12px',whiteSpace:'nowrap'}}>Ansehen</button>
+            </div>
+          )}
+
+          {/* Übersicht — große Kacheln statt kleiner Filter-Pillen, dienen gleichzeitig als Navigation */}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'8px',marginBottom:'16px'}}>
+            {[
+              ['alle','Alle','📋',wettenZitate.length,'#e5e7eb'],
+              ['zitat','Zitate','💬',wettenZitate.filter(e=>e.type==='zitat').length,'#67e8f9'],
+              ['wette','Wetten','🎰',wettenZitate.filter(e=>e.type==='wette').length,'#fbbf24'],
+              ['lessons_learned','Lessons','📚',wettenZitate.filter(e=>e.type==='lessons_learned').length,'#86efac'],
+            ].map(([key,lbl,icon,count,color])=>(
+              <button key={key} onClick={()=>setWzFilter(key)}
+                style={{padding:'10px 6px',borderRadius:'12px',border:`1.5px solid ${wzFilter===key?color:'rgba(255,255,255,0.1)'}`,background:wzFilter===key?`${color}22`:'rgba(255,255,255,0.03)',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:'2px'}}>
+                <span style={{fontSize:'18px'}}>{icon}</span>
+                <span style={{fontSize:'17px',fontWeight:'800',color:wzFilter===key?color:'white'}}>{count}</span>
+                <span style={{fontSize:'10px',fontWeight:'700',color:wzFilter===key?color:'rgba(255,255,255,0.4)'}}>{lbl}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Suche */}
+          <input
+            value={wzSearch} onChange={e=>setWzSearch(e.target.value)}
+            placeholder="🔍 Suche…"
+            style={{width:'100%',padding:'9px 14px',background:'rgba(255,255,255,0.06)',border:`1px solid ${acBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box',fontFamily:'inherit',marginBottom:'14px'}}
+          />
+
           {/* Neuer Eintrag Button */}
           {!wzAdding && (
             <button onClick={()=>setWzAdding(true)}
-              style={{width:'100%',padding:'11px',background:`linear-gradient(135deg,${ac},#d97706)`,border:'none',borderRadius:'12px',color:'white',fontWeight:'700',fontSize:'14px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',marginBottom:'12px'}}>
+              style={{width:'100%',padding:'11px',background:`linear-gradient(135deg,${ac},#d97706)`,border:'none',borderRadius:'12px',color:'white',fontWeight:'700',fontSize:'14px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',marginBottom:'16px'}}>
               <Plus size={16}/> Neuer Eintrag
             </button>
           )}
-
-          {/* Suche + Filter */}
-          <div style={{marginBottom:'16px',display:'flex',flexDirection:'column',gap:'8px'}}>
-            <input
-              value={wzSearch} onChange={e=>setWzSearch(e.target.value)}
-              placeholder="Suche…"
-              style={{width:'100%',padding:'9px 14px',background:'rgba(255,255,255,0.06)',border:`1px solid ${acBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box',fontFamily:'inherit'}}
-            />
-            <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-              {[['alle','Alle'],['zitat','💬 Zitate'],['wette','🎰 Wetten'],['lessons_learned','📚 Lessons']].map(([key,lbl])=>(
-                <button key={key} onClick={()=>setWzFilter(key)}
-                  style={{padding:'5px 12px',borderRadius:'20px',border:`1px solid ${wzFilter===key?ac:'rgba(255,255,255,0.15)'}`,background:wzFilter===key?'rgba(251,191,36,0.15)':'rgba(255,255,255,0.04)',color:wzFilter===key?ac:'rgba(255,255,255,0.45)',fontWeight:'700',fontSize:'12px',cursor:'pointer'}}>
-                  {lbl}
-                </button>
-              ))}
-            </div>
-          </div>
 
           {/* Formular */}
           {wzAdding && (
@@ -14413,38 +14430,44 @@ export default function TrainingsApp() {
                 const isEditing = wzEditId === entry.id;
                 return (
                   <div key={entry.id} style={{background: isDue ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.03)',border:`1px solid ${isDue ? 'rgba(239,68,68,0.4)' : acBorder}`,borderRadius:'14px',overflow:'hidden'}}>
-                    {/* Kopfzeile */}
-                    <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 14px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
-                      <span style={{fontSize:'11px',fontWeight:'800',color:cfg.color,background:cfg.bg,border:`1px solid ${cfg.border}`,borderRadius:'6px',padding:'2px 8px',flexShrink:0}}>{cfg.icon} {cfg.label}</span>
-                      {entry.visibility?.mode==='restricted'&&(
-                        <span title={[
-                            ...(entry.visibility.roles||[]).map(r=>VISIBILITY_ROLES.find(x=>x.key===r)?.label||r),
-                            ...(entry.visibility.userIds||[]).map(uid=>allUsers[uid]?.name||allUsers[uid]?.email).filter(Boolean),
-                          ].join(', ') || 'Eingeschränkt sichtbar'}
-                          style={{fontSize:'11px',fontWeight:'800',color:'#fca5a5',background:'rgba(239,68,68,0.12)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:'6px',padding:'2px 8px',flexShrink:0,cursor:'help'}}>
-                          🔒 Eingeschränkt sichtbar
-                        </span>
-                      )}
-                      <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)',flex:1}}>{entry.createdBy}</span>
-                      {entry.dueDate && (
-                        <span
-                          onClick={isDue ? ()=>saveWZ(wettenZitate.map(e=>e.id===entry.id?{...e,dueSeen:true}:e)) : undefined}
-                          style={{fontSize:'11px',fontWeight:'700',color:isDue?'#fca5a5':'rgba(255,255,255,0.3)',background:isDue?'rgba(239,68,68,0.15)':'rgba(255,255,255,0.05)',border:`1px solid ${isDue?'rgba(239,68,68,0.4)':'rgba(255,255,255,0.1)'}`,borderRadius:'6px',padding:'2px 8px',cursor:isDue?'pointer':'default',flexShrink:0}}>
-                          {isDue ? '⚠️ ' : '📅 '}fällig {dueDateStr}
-                        </span>
-                      )}
-                      <span style={{fontSize:'11px',color:'rgba(255,255,255,0.2)'}}>{dateStr}</span>
-                      {entry.edited&&<span style={{fontSize:'10px',color:'rgba(255,255,255,0.2)',fontStyle:'italic'}}>bearbeitet</span>}
-                      {canEditEntry(entry) && !isEditing && (
-                        <div style={{display:'flex',gap:'4px',marginLeft:'4px'}}>
-                          {entry.type==='wette' && !entry.options?.length && wzAddOptionsId!==entry.id && (
+                    {/* Kopfzeile — zwei Zeilen: oben Typ/Autor/Aktionen, unten Meta-Infos, statt alles in eine Zeile zu quetschen */}
+                    <div style={{padding:'10px 14px 6px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                        <span style={{fontSize:'11px',fontWeight:'800',color:cfg.color,background:cfg.bg,border:`1px solid ${cfg.border}`,borderRadius:'6px',padding:'2px 8px',flexShrink:0}}>{cfg.icon} {cfg.label}</span>
+                        <span style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',flex:1}}>{entry.createdBy}</span>
+                        <span style={{fontSize:'11px',color:'rgba(255,255,255,0.25)',flexShrink:0}}>{dateStr}</span>
+                        {canEditEntry(entry) && !isEditing && (
+                          <div style={{display:'flex',gap:'4px',flexShrink:0}}>
+                            <button onClick={()=>{setWzEditId(entry.id);setWzEditText(entry.text);setWzEditVisibility(entry.visibility||{mode:'all',roles:[],userIds:[]});}}
+                              style={{width:'24px',height:'24px',borderRadius:'7px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.2)',color:ac,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Pencil size={11}/></button>
+                            <button onClick={()=>{if(!window.confirm('Eintrag löschen?'))return;saveWZ(wettenZitate.filter(e=>e.id!==entry.id));}}
+                              style={{width:'24px',height:'24px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Trash2 size={11}/></button>
+                          </div>
+                        )}
+                      </div>
+                      {(entry.dueDate || entry.visibility?.mode==='restricted' || entry.edited || (entry.type==='wette' && !entry.options?.length && canEditEntry(entry))) && (
+                        <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap',marginTop:'6px'}}>
+                          {entry.dueDate && (
+                            <span
+                              onClick={isDue ? ()=>saveWZ(wettenZitate.map(e=>e.id===entry.id?{...e,dueSeen:true}:e)) : undefined}
+                              style={{fontSize:'11px',fontWeight:'700',color:isDue?'#fca5a5':'rgba(255,255,255,0.3)',background:isDue?'rgba(239,68,68,0.15)':'rgba(255,255,255,0.05)',border:`1px solid ${isDue?'rgba(239,68,68,0.4)':'rgba(255,255,255,0.1)'}`,borderRadius:'6px',padding:'2px 8px',cursor:isDue?'pointer':'default',flexShrink:0}}>
+                              {isDue ? '⚠️ ' : '📅 '}fällig {dueDateStr}
+                            </span>
+                          )}
+                          {entry.visibility?.mode==='restricted'&&(
+                            <span title={[
+                                ...(entry.visibility.roles||[]).map(r=>VISIBILITY_ROLES.find(x=>x.key===r)?.label||r),
+                                ...(entry.visibility.userIds||[]).map(uid=>allUsers[uid]?.name||allUsers[uid]?.email).filter(Boolean),
+                              ].join(', ') || 'Eingeschränkt sichtbar'}
+                              style={{fontSize:'11px',fontWeight:'800',color:'#fca5a5',background:'rgba(239,68,68,0.12)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:'6px',padding:'2px 8px',flexShrink:0,cursor:'help'}}>
+                              🔒 Eingeschränkt sichtbar
+                            </span>
+                          )}
+                          {entry.edited&&<span style={{fontSize:'10px',color:'rgba(255,255,255,0.25)',fontStyle:'italic'}}>bearbeitet</span>}
+                          {entry.type==='wette' && !entry.options?.length && wzAddOptionsId!==entry.id && canEditEntry(entry) && (
                             <button onClick={()=>{setWzAddOptionsId(entry.id);setWzAddOptions(['','']);}}
                               style={{padding:'3px 8px',borderRadius:'7px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.2)',color:ac,cursor:'pointer',fontSize:'11px',fontWeight:'700',flexShrink:0}}>+ Optionen</button>
                           )}
-                          <button onClick={()=>{setWzEditId(entry.id);setWzEditText(entry.text);setWzEditVisibility(entry.visibility||{mode:'all',roles:[],userIds:[]});}}
-                            style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.2)',color:ac,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Pencil size={12}/></button>
-                          <button onClick={()=>{if(!window.confirm('Eintrag löschen?'))return;saveWZ(wettenZitate.filter(e=>e.id!==entry.id));}}
-                            style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Trash2 size={12}/></button>
                         </div>
                       )}
                     </div>
