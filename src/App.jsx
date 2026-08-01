@@ -3069,6 +3069,7 @@ export default function TrainingsApp() {
   const checkNewAchievements = (childId) => {
     const child = children[childId];
     if (!child) return [];
+    updateDoc(doc(db,'ttc','children'), { [`${childId}.lastAchievementCheckAt`]: new Date().toISOString() }).catch(()=>{});
     const current = getAchievementKeysForChild(childId);
     const seen = child.seenAchievementKeys;
     if (!seen) {

@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     const childrenMap = childrenSnap.exists ? (childrenSnap.data() || {}) : {};
     const childMatches = Object.entries(childrenMap)
       .filter(([, c]) => (c.name || '').toLowerCase().includes(q))
-      .map(([id, c]) => ({ id, name: c.name, achievements: c.achievements, seenAchievementKeys: c.seenAchievementKeys }));
+      .map(([id, c]) => ({ id, name: c.name, achievements: c.achievements, seenAchievementKeys: c.seenAchievementKeys, lastAchievementCheckAt: c.lastAchievementCheckAt }));
 
     const usersSnap = await db.collection('users').get();
     const userMatches = [];
