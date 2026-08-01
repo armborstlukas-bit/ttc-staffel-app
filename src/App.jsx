@@ -2024,6 +2024,7 @@ export default function TrainingsApp() {
   // liegen als Array direkt am Mitgliederlisten-Eintrag, damit sie 1:1 mit der Person
   // verknüpft bleiben (auch nach einem eventuellen Austritt) und sich einfach anzeigen/exportieren lassen.
   const AEMTER_ART_LABELS = {amt:'Amt',ehrentitel:'Ehrentitel',sonstiges:'Sonstiges'};
+  const AEMTER_ART_ICONS = {amt:'💼',ehrentitel:'🏅',sonstiges:'📌'};
   const formatAemter = m => (m.aemter||[]).map(a => `[${AEMTER_ART_LABELS[a.art]||'Amt'}] ${a.titel}${a.bis ? ` (${a.von||'?'}–${a.bis})` : a.von ? ` (seit ${a.von})` : ''}`).join('; ');
 
   const saveMitgliedAemter = async (id, aemter) => {
@@ -12711,7 +12712,7 @@ export default function TrainingsApp() {
                                 <span style={{fontSize:'11px',fontWeight:'800',color:'#fbbf24',display:'block',marginBottom:'4px'}}>🎖️ Ämter & Ehrentitel</span>
                                 {m.aemter.map((a,i)=>(
                                   <p key={i} style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.75)'}}>
-                                    <span style={{color:'rgba(251,191,36,0.6)',fontWeight:'700'}}>{AEMTER_ART_LABELS[a.art]||'Amt'}:</span> {a.titel}{a.bis?` (${a.von||'?'}–${a.bis})`:a.von?` (seit ${a.von})`:''}
+                                    {AEMTER_ART_ICONS[a.art]||'💼'} <span style={{color:'rgba(251,191,36,0.6)',fontWeight:'700'}}>{AEMTER_ART_LABELS[a.art]||'Amt'}:</span> {a.titel}{a.bis?` (${a.von||'?'}–${a.bis})`:a.von?` (seit ${a.von})`:''}
                                   </p>
                                 ))}
                               </div>
@@ -12946,7 +12947,7 @@ export default function TrainingsApp() {
                 <div>
                   <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Art</span>
                   <div style={{display:'flex',gap:'6px'}}>
-                    {[{key:'amt',label:'Amt'},{key:'ehrentitel',label:'Ehrentitel'},{key:'sonstiges',label:'Sonstiges'}].map(o=>(
+                    {[{key:'amt',label:'💼 Amt'},{key:'ehrentitel',label:'🏅 Ehrentitel'},{key:'sonstiges',label:'📌 Sonstiges'}].map(o=>(
                       <button key={o.key} onClick={()=>setAemterForm(p=>({...p,art:o.key}))}
                         style={{flex:1,padding:'7px 8px',borderRadius:'8px',border:`1px solid ${aemterForm.art===o.key?'rgba(251,191,36,0.6)':'rgba(255,255,255,0.15)'}`,background:aemterForm.art===o.key?'rgba(251,191,36,0.15)':'rgba(255,255,255,0.03)',color:aemterForm.art===o.key?'#fbbf24':'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>{o.label}</button>
                     ))}
@@ -12982,7 +12983,7 @@ export default function TrainingsApp() {
                     return aemterEditKey===key ? (
                       <div key={key} style={{display:'grid',gap:'6px',padding:'8px',background:'rgba(0,0,0,0.2)',borderRadius:'8px'}}>
                         <div style={{display:'flex',gap:'6px'}}>
-                          {[{key:'amt',label:'Amt'},{key:'ehrentitel',label:'Ehrentitel'},{key:'sonstiges',label:'Sonstiges'}].map(o=>(
+                          {[{key:'amt',label:'💼 Amt'},{key:'ehrentitel',label:'🏅 Ehrentitel'},{key:'sonstiges',label:'📌 Sonstiges'}].map(o=>(
                             <button key={o.key} onClick={()=>updateAemt(mid,idx,{art:o.key})}
                               style={{flex:1,padding:'6px 8px',borderRadius:'7px',border:`1px solid ${(a.art||'amt')===o.key?'rgba(251,191,36,0.6)':'rgba(255,255,255,0.15)'}`,background:(a.art||'amt')===o.key?'rgba(251,191,36,0.15)':'rgba(255,255,255,0.03)',color:(a.art||'amt')===o.key?'#fbbf24':'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>{o.label}</button>
                           ))}
@@ -13000,7 +13001,7 @@ export default function TrainingsApp() {
                     ) : (
                       <div key={key} style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
                         <span style={{flex:1,minWidth:'150px',fontSize:'12px',color:'rgba(255,255,255,0.75)'}}>
-                          🎖️ <span style={{color:'rgba(251,191,36,0.6)',fontWeight:'700'}}>{AEMTER_ART_LABELS[a.art]||'Amt'}:</span> {a.titel}{a.bis?` (${a.von||'?'}–${a.bis})`:a.von?` (seit ${a.von})`:''}
+                          {AEMTER_ART_ICONS[a.art]||'💼'} <span style={{color:'rgba(251,191,36,0.6)',fontWeight:'700'}}>{AEMTER_ART_LABELS[a.art]||'Amt'}:</span> {a.titel}{a.bis?` (${a.von||'?'}–${a.bis})`:a.von?` (seit ${a.von})`:''}
                         </span>
                         <button onClick={()=>setAemterEditKey(key)} style={{padding:'4px 9px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'rgba(255,255,255,0.6)',cursor:'pointer',fontSize:'11px'}}>✏️</button>
                         <button onClick={()=>removeAemt(mid,idx)} style={{padding:'4px 9px',background:'rgba(220,38,38,0.15)',border:'1px solid rgba(220,38,38,0.4)',borderRadius:'7px',color:'#fca5a5',cursor:'pointer',fontSize:'11px'}}>🗑️</button>
