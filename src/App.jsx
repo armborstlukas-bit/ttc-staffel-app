@@ -12238,12 +12238,15 @@ export default function TrainingsApp() {
               style={{padding:'8px 14px',background:'rgba(134,239,172,0.1)',border:'1px solid rgba(134,239,172,0.3)',borderRadius:'9px',color:'#86efac',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:'700'}}>🏅 Jubiläumsjahre</button>
             <button onClick={()=>{
                 ensureXlsxLoaded();
+                const jahr = new Date().getFullYear();
+                // Wer im Teileinzug landet, darf hier NICHT nochmal auftauchen und umgekehrt.
+                const isEntryPartial = fin => { if (!fin.eintrittsdatum) return false; const [ey,em]=fin.eintrittsdatum.split('-').map(Number); return ey===jahr && em>1; };
+                const isExitPartial = fin => { if (!fin.austrittsdatum) return false; const [ay,am]=fin.austrittsdatum.split('-').map(Number); return ay===jahr && am<=6; };
+                const isExitFullThisYear = fin => { if (!fin.austrittsdatum) return false; const [ay,am]=fin.austrittsdatum.split('-').map(Number); return ay===jahr && am>6; };
+
                 const rows = [];
                 let gesamt = 0, missingIban = 0, missingBic = 0, missingMandat = 0;
-                activeEntries.forEach(([bid,bm])=>{
-                  const fin = mitgliederFinanzen[bid] || {};
-                  const betrag = Number(fin.beitrag);
-                  if (!betrag || betrag<=0) return; // nur wer tatsächlich etwas zahlt
+                const addRow = (bm, fin, betrag) => {
                   gesamt += betrag;
                   if (!fin.iban) missingIban++;
                   if (!fin.bic) missingBic++;
@@ -12255,6 +12258,20 @@ export default function TrainingsApp() {
                     Beitragsart: BEITRAGSARTEN.find(a=>a.key===fin.beitragsart)?.label||'',
                     'Betrag (€)': betrag,
                   });
+                };
+                // Normale (volle) Beiträge: alle aktiven Mitglieder außer Teilzahler
+                activeEntries.forEach(([bid,bm])=>{
+                  const fin = mitgliederFinanzen[bid] || {};
+                  const betrag = Number(fin.beitrag);
+                  if (!betrag || betrag<=0 || isEntryPartial(fin)) return;
+                  addRow(bm, fin, betrag);
+                });
+                // Wer dieses Jahr zum Jahresende austritt, zahlt trotzdem den vollen Beitrag noch mit
+                exitedEntries.forEach(([bid,bm])=>{
+                  const fin = mitgliederFinanzen[bid] || {};
+                  const betrag = Number(fin.beitrag);
+                  if (!betrag || betrag<=0 || !isExitFullThisYear(fin)) return;
+                  addRow(bm, fin, betrag);
                 });
                 rows.sort((a,b)=>a.Nachname.localeCompare(b.Nachname,'de'));
                 rows.push({ Vorname:'', Nachname:'GESAMTSUMME', IBAN:'', BIC:'', 'SEPA-Mandatsreferenz':'', 'SEPA-Mandatsdatum':'', Beitragsart:`${rows.length} Personen`, 'Betrag (€)': gesamt });
@@ -12262,7 +12279,7 @@ export default function TrainingsApp() {
                 if (missingIban>0) missingParts.push(`${missingIban}× IBAN fehlt`);
                 if (missingBic>0) missingParts.push(`${missingBic}× BIC fehlt`);
                 if (missingMandat>0) missingParts.push(`${missingMandat}× SEPA-Mandatsreferenz fehlt`);
-                const noteText = `⚠️ Für einen vollständigen SEPA-Export fehlt noch: ${missingParts.join(' · ')}`;
+                const noteText = `⚠️ Enthält keine Teilzahler (siehe "Teileinzug"). Für einen vollständigen SEPA-Export fehlt noch: ${missingParts.join(' · ')}`;
                 exportRowsToXlsx(rows, 'Beitragseinzug', `Beitragseinzug_${TODAY}.xlsx`, noteText);
               }}
               style={{padding:'8px 14px',background:'rgba(103,232,249,0.1)',border:'1px solid rgba(103,232,249,0.3)',borderRadius:'9px',color:'#67e8f9',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:'700'}}>💳 Beitragseinzug</button>
@@ -12272,37 +12289,38 @@ export default function TrainingsApp() {
                 const rows = [];
                 let gesamt = 0, missingIban = 0, missingBic = 0, missingMandat = 0;
 
-                // Eintritt im laufenden Jahr, 2. Halbjahr (Juli–Dezember) → nur halber Jahresbeitrag fällig
+                // Eintritt im laufenden Jahr NACH Januar → monatsgenau anteilig (Monat des Eintritts bis Dezember)
                 activeEntries.forEach(([bid,bm])=>{
                   const fin = mitgliederFinanzen[bid] || {};
                   const betrag = Number(fin.beitrag);
                   if (!betrag || betrag<=0 || !fin.eintrittsdatum) return;
                   const [ey,em] = fin.eintrittsdatum.split('-').map(Number);
-                  if (ey!==jahr || em<7) return; // nur 2. Halbjahr-Eintritte sind teilzahlungspflichtig
-                  const anteilig = Math.round((betrag/2)*100)/100;
+                  if (ey!==jahr || em<=1) return; // Januar-Eintritt = voller Beitrag, kein Teileinzug
+                  const monateOffen = 13-em;
+                  const anteilig = Math.round((betrag*monateOffen/12)*100)/100;
                   gesamt += anteilig;
                   if (!fin.iban) missingIban++; if (!fin.bic) missingBic++; if (!fin.sepaMandatsRef) missingMandat++;
                   rows.push({
                     Vorname: bm.vorname||'', Nachname: bm.nachname||'',
-                    Grund: `Eintritt ${fin.eintrittsdatum} (2. Halbjahr)`,
+                    Grund: `Eintritt ${fin.eintrittsdatum} (${monateOffen}/12)`,
                     'Jahresbeitrag (€)': betrag, 'Anteiliger Beitrag (€)': anteilig,
                     IBAN: fin.iban||'⚠️ fehlt', BIC: fin.bic||'⚠️ fehlt', 'SEPA-Mandatsreferenz': fin.sepaMandatsRef||'⚠️ fehlt',
                   });
                 });
 
-                // Austritt im laufenden Jahr, 1. Halbjahr (Januar–Juni) → nur halber Jahresbeitrag fällig
+                // Austritt im laufenden Jahr zur Jahresmitte (1. Halbjahr) → halber Beitrag; zum Jahresende → voller Beitrag (nicht hier)
                 exitedEntries.forEach(([bid,bm])=>{
                   const fin = mitgliederFinanzen[bid] || {};
                   const betrag = Number(fin.beitrag);
                   if (!betrag || betrag<=0 || !fin.austrittsdatum) return;
                   const [ay,am] = fin.austrittsdatum.split('-').map(Number);
-                  if (ay!==jahr || am>6) return; // nur 1. Halbjahr-Austritte sind teilzahlungspflichtig
+                  if (ay!==jahr || am>6) return; // nur Austritt zur Jahresmitte ist teilzahlungspflichtig
                   const anteilig = Math.round((betrag/2)*100)/100;
                   gesamt += anteilig;
                   if (!fin.iban) missingIban++; if (!fin.bic) missingBic++; if (!fin.sepaMandatsRef) missingMandat++;
                   rows.push({
                     Vorname: bm.vorname||'', Nachname: bm.nachname||'',
-                    Grund: `Austritt ${fin.austrittsdatum} (1. Halbjahr)`,
+                    Grund: `Austritt ${fin.austrittsdatum} (6/12, Jahresmitte)`,
                     'Jahresbeitrag (€)': betrag, 'Anteiliger Beitrag (€)': anteilig,
                     IBAN: fin.iban||'⚠️ fehlt', BIC: fin.bic||'⚠️ fehlt', 'SEPA-Mandatsreferenz': fin.sepaMandatsRef||'⚠️ fehlt',
                   });
@@ -12314,7 +12332,7 @@ export default function TrainingsApp() {
                 if (missingIban>0) missingParts.push(`${missingIban}× IBAN fehlt`);
                 if (missingBic>0) missingParts.push(`${missingBic}× BIC fehlt`);
                 if (missingMandat>0) missingParts.push(`${missingMandat}× SEPA-Mandatsreferenz fehlt`);
-                const noteText = `⚠️ Halber Jahresbeitrag bei Eintritt im 2. Halbjahr bzw. Austritt im 1. Halbjahr ${jahr}. Für vollständigen SEPA-Export fehlt noch: ${missingParts.join(' · ')}`;
+                const noteText = `⚠️ Monatsgenauer Teilbeitrag bei Eintritt nach Januar bzw. Austritt zur Jahresmitte ${jahr}. Diese Personen erscheinen NICHT im normalen Beitragseinzug. Für vollständigen SEPA-Export fehlt noch: ${missingParts.join(' · ')}`;
                 if (rows.length<=1) { alert('Aktuell keine Personen mit anteiligem Beitrag im laufenden Jahr gefunden.'); return; }
                 exportRowsToXlsx(rows, 'Teileinzug', `Teileinzug_${jahr}.xlsx`, noteText);
               }}
