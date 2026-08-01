@@ -745,7 +745,6 @@ export default function TrainingsApp() {
   const [wzFilter, setWzFilter] = useState('alle');
   const [wzAddOptionsId, setWzAddOptionsId] = useState(null);
   const [wzAddOptions, setWzAddOptions] = useState(['','']);
-  const [wzExpandedBets, setWzExpandedBets] = useState(new Set());
   const [trainingsdoppel, setTrainingsdoppel] = useState([]);
   const [tmDoppelAdding, setTmDoppelAdding] = useState(false);
   const [tmDoppelEditId, setTmDoppelEditId] = useState(null);
@@ -14256,7 +14255,11 @@ export default function TrainingsApp() {
       return true;
     };
 
+    // Eine Änderung ist NUR innerhalb von 24h nach der eigenen Stimmabgabe möglich UND nur,
+    // solange der Wettzeitraum insgesamt noch offen ist (canPlaceNewBet) — ist die Wette
+    // erst mal geschlossen, ist die Stimme endgültig eingefroren, egal wie frisch sie war.
     const canChangeBet = (entry) => {
+      if (!canPlaceNewBet(entry)) return false;
       const ts = entry.betTimestamps?.[authorName];
       if (!ts) return true;
       return (Date.now() - new Date(ts).getTime()) < 86400000;
@@ -14422,7 +14425,7 @@ export default function TrainingsApp() {
           {wettenZitate.length === 0 && !wzAdding ? (
             <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.2)',fontSize:'14px'}}>Noch keine Einträge. Lege den ersten an!</div>
           ) : (
-            <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+            <div style={{display:'flex',flexDirection:'column',gap:'22px'}}>
               {wettenZitate.filter(entry=>{
                 if (!canSeeEntry(entry)) return false;
                 if (wzFilter !== 'alle' && entry.type !== wzFilter) return false;
@@ -14437,7 +14440,8 @@ export default function TrainingsApp() {
                 const dueDateStr = entry.dueDate ? new Date(entry.dueDate+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : '';
                 const isDue = entry.dueDate && entry.dueDate <= TODAY && !entry.dueSeen;
                 const isEditing = wzEditId === entry.id;
-                const rot = entryIdx % 3 === 0 ? -1.4 : entryIdx % 3 === 1 ? 1.2 : -0.4;
+                const rotSeed = String(entry.id).split('').reduce((h,c)=>((h*31+c.charCodeAt(0))|0),entryIdx*17);
+                const rot = ((Math.abs(rotSeed)%41)-20)/6; // ~ -3.3° bis +3.3°, pro Eintrag unterschiedlich
                 return (
                   <div key={entry.id} style={{position:'relative',background: isDue ? '#fde3e3' : cfg.paper,borderRadius:'3px',overflow:'hidden',transform:`rotate(${rot}deg)`,boxShadow:'0 6px 14px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.4) inset'}}>
                     <span style={{position:'absolute',top:'-10px',left:'50%',transform:'translateX(-50%) rotate(-6deg)',fontSize:'20px',filter:'drop-shadow(0 3px 3px rgba(0,0,0,0.45))',zIndex:2}}>📌</span>
@@ -14542,30 +14546,12 @@ export default function TrainingsApp() {
                           const myBet = bets[authorName];
                           const hasBet = myBet !== undefined;
                           const totalVotes = Object.keys(bets).length;
-                          const isExpanded = wzExpandedBets.has(entry.id);
-                          const toggleExpand = () => setWzExpandedBets(prev => { const s=new Set(prev); s.has(entry.id)?s.delete(entry.id):s.add(entry.id); return s; });
                           const betOpen = canPlaceNewBet(entry);
                           const changeOpen = hasBet && canChangeBet(entry);
                           const canAct = (!hasBet && betOpen) || (hasBet && changeOpen);
 
-                          // Compact summary when voted and collapsed
-                          if (hasBet && !isExpanded) {
-                            const myOptLabel = entry.options[myBet];
-                            return (
-                              <div style={{margin:'0 14px 12px',padding:'8px',background:'#2a1c10',borderRadius:'9px'}}>
-                                <button onClick={toggleExpand}
-                                  style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'9px',cursor:'pointer',gap:'8px'}}>
-                                  <span style={{fontSize:'13px',fontWeight:'700',color:'#fbbf24'}}>✓ {myOptLabel}</span>
-                                  <div style={{display:'flex',alignItems:'center',gap:'8px',flexShrink:0}}>
-                                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{totalVotes} {totalVotes===1?'Stimme':'Stimmen'}</span>
-                                    {changeOpen && <span style={{fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>änderbar</span>}
-                                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>▾ Details</span>
-                                  </div>
-                                </button>
-                              </div>
-                            );
-                          }
-
+                          // Abstimmungen bleiben immer vollständig ausgeklappt sichtbar (alle Optionen +
+                          // wer wofür gestimmt hat), statt sich nach der eigenen Stimmabgabe zu verstecken.
                           return (
                             <div style={{margin:'0 14px 14px',padding:'10px',background:'#2a1c10',borderRadius:'10px',display:'flex',flexDirection:'column',gap:'7px'}}>
                               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'2px'}}>
@@ -14573,10 +14559,9 @@ export default function TrainingsApp() {
                                   🗳️ {betOpen ? 'Abstimmen' : 'Geschlossen'} · {totalVotes} {totalVotes===1?'Stimme':'Stimmen'}
                                   {!betOpen && <span style={{marginLeft:'6px',color:'rgba(239,68,68,0.6)'}}>🔒</span>}
                                 </span>
-                                {hasBet && <button onClick={toggleExpand} style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',background:'none',border:'none',cursor:'pointer',padding:'0'}}>▴ Einklappen</button>}
                               </div>
                               {!betOpen && !hasBet && <span style={{fontSize:'11px',color:'rgba(239,68,68,0.5)',marginBottom:'2px'}}>Wettzeitraum abgelaufen – keine neue Wette möglich.</span>}
-                              {hasBet && !changeOpen && <span style={{fontSize:'11px',color:'rgba(239,68,68,0.5)',marginBottom:'2px'}}>Wette abgegeben – Änderungsfenster (24h) abgelaufen.</span>}
+                              {hasBet && !changeOpen && <span style={{fontSize:'11px',color:'rgba(239,68,68,0.5)',marginBottom:'2px'}}>{!betOpen ? 'Wette abgegeben – Wettzeitraum geschlossen, Stimme eingefroren.' : 'Wette abgegeben – Änderungsfenster (24h) abgelaufen.'}</span>}
                               {entry.options.map((opt,i)=>{
                                 const count = Object.values(bets).filter(v=>v===i).length;
                                 const pct = totalVotes>0 ? Math.round(count/totalVotes*100) : 0;
