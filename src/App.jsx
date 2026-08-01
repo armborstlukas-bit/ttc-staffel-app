@@ -12527,6 +12527,24 @@ export default function TrainingsApp() {
                           </div>
                         );
                       })()}
+                      {roles.includes('jugendlich') && (()=>{
+                        const fullName = `${m.vorname} ${m.nachname}`.trim().toLowerCase();
+                        const matchedChild = Object.values(children).find(c => (c.name||'').trim().toLowerCase() === fullName);
+                        const childSub = matchedChild ? subgroups[matchedChild.subgroupId] : null;
+                        const childGroup = childSub ? FIXED_GROUPS.find(g=>g.id===childSub.groupId) : null;
+                        return (
+                          <div>
+                            <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'6px'}}>🏓 Trainingsgruppe</span>
+                            {!matchedChild ? (
+                              <p style={{margin:0,fontSize:'12px',color:'#fca5a5'}}>❌ Kein passendes Kind in der Gruppenverwaltung gefunden</p>
+                            ) : childSub ? (
+                              <p style={{margin:0,fontSize:'12px',color:'#86efac'}}>✅ {childGroup ? `${childGroup.emoji} ${childGroup.name} — ` : ''}{childSub.name}</p>
+                            ) : (
+                              <p style={{margin:0,fontSize:'12px',color:'#fbbf24'}}>⚠️ In der Gruppenverwaltung erfasst, aber keiner Trainingsgruppe zugeordnet</p>
+                            )}
+                          </div>
+                        );
+                      })()}
                       {matchedUser && roles.length>1 && (()=>{
                         const primary = roles.includes(matchedUser.primaryRole) ? matchedUser.primaryRole : roles[0];
                         return (
