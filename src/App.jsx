@@ -2295,18 +2295,26 @@ export default function TrainingsApp() {
 
   // Erzeugt aus einer Liste gleichförmiger Zeilenobjekte (jede Zeile MUSS dieselben Keys
   // haben, sonst verteilt SheetJS sie über unterschiedliche Spalten) eine schön formatierte
-  // .xlsx-Datei: Arial-Schrift, fette Kopfzeile, automatische Spaltenbreite.
-  const exportRowsToXlsx = (rows, sheetName, filename) => {
+  // .xlsx-Datei: Arial-Schrift, fette Kopfzeile, automatische Spaltenbreite. Mit noteText
+  // wird ganz oben eine zusätzliche, über alle Spalten verschmolzene Hinweiszeile eingefügt
+  // (z.B. was für einen vollständigen SEPA-Export noch fehlt).
+  const exportRowsToXlsx = (rows, sheetName, filename, noteText = null) => {
     const XLSX = window._XLSX;
     if (!XLSX) { alert('Export-Werkzeug lädt noch — bitte kurz warten und nochmal versuchen.'); return; }
-    const ws = XLSX.utils.json_to_sheet(rows);
     const headers = rows.length ? Object.keys(rows[0]) : [];
+    const headerRow = noteText ? 1 : 0;
+    const ws = noteText ? XLSX.utils.aoa_to_sheet([[noteText]]) : XLSX.utils.json_to_sheet(rows);
+    if (noteText) {
+      XLSX.utils.sheet_add_json(ws, rows, { origin: headerRow, skipHeader: false });
+      ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: Math.max(0, headers.length - 1) } }];
+    }
     const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
     for (let R = range.s.r; R <= range.e.r; R++) {
       for (let C = range.s.c; C <= range.e.c; C++) {
         const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
         if (!cell) continue;
-        cell.s = { font: { name: 'Arial', sz: 11, bold: R === 0 } };
+        const isNoteRow = noteText && R === 0;
+        cell.s = { font: { name: 'Arial', sz: isNoteRow ? 11 : 11, bold: isNoteRow || R === headerRow, color: isNoteRow ? { rgb: 'CC0000' } : undefined } };
       }
     }
     ws['!cols'] = headers.map(h => ({ wch: Math.max(12, h.length + 2) }));
@@ -12981,12 +12989,15 @@ export default function TrainingsApp() {
             <button onClick={()=>{
                 ensureXlsxLoaded();
                 const rows = [];
-                let gesamt = 0;
+                let gesamt = 0, missingIban = 0, missingBic = 0, missingMandat = 0;
                 activeEntries.forEach(([bid,bm])=>{
                   const fin = mitgliederFinanzen[bid] || {};
                   const betrag = Number(fin.beitrag);
                   if (!betrag || betrag<=0) return; // nur wer tatsächlich etwas zahlt
                   gesamt += betrag;
+                  if (!fin.iban) missingIban++;
+                  if (!fin.bic) missingBic++;
+                  if (!fin.sepaMandatsRef) missingMandat++;
                   rows.push({
                     Vorname: bm.vorname||'', Nachname: bm.nachname||'',
                     IBAN: fin.iban||'⚠️ fehlt', BIC: fin.bic||'⚠️ fehlt',
@@ -12997,7 +13008,12 @@ export default function TrainingsApp() {
                 });
                 rows.sort((a,b)=>a.Nachname.localeCompare(b.Nachname,'de'));
                 rows.push({ Vorname:'', Nachname:'GESAMTSUMME', IBAN:'', BIC:'', 'SEPA-Mandatsreferenz':'', 'SEPA-Mandatsdatum':'', Beitragsart:`${rows.length} Personen`, 'Betrag (€)': gesamt });
-                exportRowsToXlsx(rows, 'Beitragseinzug', `Beitragseinzug_${TODAY}.xlsx`);
+                const missingParts = ['Gläubiger-ID des Vereins', 'Vereins-IBAN/BIC'];
+                if (missingIban>0) missingParts.push(`${missingIban}× IBAN fehlt`);
+                if (missingBic>0) missingParts.push(`${missingBic}× BIC fehlt`);
+                if (missingMandat>0) missingParts.push(`${missingMandat}× SEPA-Mandatsreferenz fehlt`);
+                const noteText = `⚠️ Für einen vollständigen SEPA-Export fehlt noch: ${missingParts.join(' · ')}`;
+                exportRowsToXlsx(rows, 'Beitragseinzug', `Beitragseinzug_${TODAY}.xlsx`, noteText);
               }}
               style={{padding:'8px 14px',background:'rgba(103,232,249,0.1)',border:'1px solid rgba(103,232,249,0.3)',borderRadius:'9px',color:'#67e8f9',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:'700'}}>💳 Beitragseinzug</button>
           </div>
