@@ -786,6 +786,7 @@ export default function TrainingsApp() {
   const [ttrProTagSearch, setTtrProTagSearch] = useState('');
   const [ttrProTagSelected, setTtrProTagSelected] = useState([]); // ausgewählte mitgliederListe-ids
   const [showNewMitglied, setShowNewMitglied] = useState(false);
+  const [mitgliedSyncing, setMitgliedSyncing] = useState(false);
   const NEW_MITGLIED_DEFAULTS = { vorname:'', nachname:'', roles:[], geburtsdatum:'', email:'', strasse:'', plz:'', ort:'', telefon:'', handy:'', iban:'', bic:'', sepaMandatsRef:'', sepaMandatsDatum:'', zahlart:'', zahler:'', zahlweise:'', beitragsart:'', beitrag:'', kontosaldo:'', eintrittsdatum:'' };
   const [newMitgliedForm, setNewMitgliedForm] = useState(NEW_MITGLIED_DEFAULTS);
   const [usageStats, setUsageStats] = useState({ dailyActive:{}, viewCounts:{} });
@@ -2244,6 +2245,26 @@ export default function TrainingsApp() {
     }
   };
 
+  // Gleicht die Rollen eines Mitgliederlisten-Eintrags verbindlich mit dessen echtem
+  // App-Account ab — läuft serverseitig gegen den aktuellen DB-Stand (nicht gegen den
+  // ggf. veralteten Browser-Cache), damit eine Rollenänderung garantiert ankommt.
+  // Schlägt der Abgleich fehl, wird das dem Admin unmissverständlich angezeigt statt
+  // stillschweigend zu verpuffen.
+  const syncMitgliedRoles = async (mitgliedId) => {
+    try {
+      const idToken = await user.getIdToken();
+      const r = await fetch('/api/mitglieder?action=sync-roles', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mitgliedId }),
+      });
+      const d = await r.json();
+      if (d.error) throw new Error(d.error);
+    } catch (e) {
+      alert('⚠️ Rollen-Abgleich mit dem App-Account ist fehlgeschlagen: ' + (e?.message || e) + '\nBitte oben in der Mitgliederverwaltung "🔄 Rollen abgleichen" klicken.');
+    }
+  };
+
   const saveMitgliedField = async (id, field, value) => {
     setMitgliederListe(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
     await updateDoc(doc(db,'ttc','mitgliederListe'), { [`list.${id}.${field}`]: value });
@@ -2251,22 +2272,8 @@ export default function TrainingsApp() {
     // Falls diese Person bereits einen echten Account hat (E-Mail stimmt überein),
     // die Rollenänderung auch dort sofort live übernehmen — sonst wirkt die
     // Mitgliederverwaltung nur bei künftigen Neu-Registrierungen.
-    if (field === 'roles') {
-      const email = (mitgliederListe[id]?.email || '').trim().toLowerCase();
-      if (email) {
-        const matchedUser = Object.values(allUsers).find(u => (u.email||'').trim().toLowerCase() === email);
-        if (matchedUser?.uid) saveUserRoles(matchedUser.uid, value.length ? value : ['pending']);
-      }
-    }
-    // Falls einer bestehenden Person eine (neue) E-Mail zugeordnet wird und sie bereits
-    // Rollen hat, direkt den nun passenden Account live freischalten.
-    if (field === 'email') {
-      const roles = mitgliederListe[id]?.roles?.length ? mitgliederListe[id].roles : (mitgliederListe[id]?.role ? [mitgliederListe[id].role] : []);
-      const email = (value || '').trim().toLowerCase();
-      if (email && roles.length) {
-        const matchedUser = Object.values(allUsers).find(u => (u.email||'').trim().toLowerCase() === email);
-        if (matchedUser?.uid) saveUserRoles(matchedUser.uid, roles);
-      }
+    if (field === 'roles' || field === 'email') {
+      await syncMitgliedRoles(id);
     }
     // Manuelle TTR-Zuordnung (Aktiver → aktiveSpieler) auch am bestehenden Account spiegeln,
     // damit die schon vorhandene Spieler-Verknüpfung (z.B. fürs Trainingsmatch-System) mitzieht.
@@ -12887,8 +12894,29 @@ export default function TrainingsApp() {
           <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
             Importierte Mitgliederliste. Klicke auf eine Person, um Rollen (Mehrfachauswahl möglich) und bei "Eltern" die zugehörigen Kinder/Jugendlichen zuzuordnen (auch mehrere möglich). Meldet sich jemand mit einer hier hinterlegten E-Mail-Adresse und zugewiesener Rolle an, wird der Account automatisch freigeschaltet.
           </p>
-          <button onClick={()=>{setNewMitgliedForm(NEW_MITGLIED_DEFAULTS);setShowNewMitglied(true);}}
-            style={{marginBottom:'14px',padding:'9px 16px',background:'#16a34a',color:'white',border:'none',borderRadius:'9px',cursor:'pointer',fontWeight:'800',fontSize:'13px'}}>+ Neues Mitglied anlegen</button>
+          <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
+            <button onClick={()=>{setNewMitgliedForm(NEW_MITGLIED_DEFAULTS);setShowNewMitglied(true);}}
+              style={{padding:'9px 16px',background:'#16a34a',color:'white',border:'none',borderRadius:'9px',cursor:'pointer',fontWeight:'800',fontSize:'13px'}}>+ Neues Mitglied anlegen</button>
+            <button disabled={mitgliedSyncing} onClick={async ()=>{
+                setMitgliedSyncing(true);
+                try {
+                  const idToken = await user.getIdToken();
+                  const r = await fetch('/api/mitglieder?action=sync-roles', {
+                    method:'POST', headers:{ Authorization:`Bearer ${idToken}`, 'Content-Type':'application/json' }, body: JSON.stringify({}),
+                  });
+                  const d = await r.json();
+                  if (d.error) throw new Error(d.error);
+                  alert(d.fixed>0
+                    ? `✅ ${d.fixed} Account(s) korrigiert:\n${d.fixedNames.join(', ')}`
+                    : '✅ Alles stimmt überein — keine Korrektur nötig.');
+                } catch(e) {
+                  alert('⚠️ Abgleich fehlgeschlagen: ' + (e?.message||e));
+                } finally { setMitgliedSyncing(false); }
+              }}
+              style={{padding:'9px 16px',background:'rgba(103,232,249,0.12)',border:'1px solid rgba(103,232,249,0.35)',borderRadius:'9px',color:'#67e8f9',cursor:mitgliedSyncing?'wait':'pointer',fontWeight:'800',fontSize:'13px',opacity:mitgliedSyncing?0.6:1}}>
+              {mitgliedSyncing?'⏳ Gleicht ab…':'🔄 Rollen abgleichen'}
+            </button>
+          </div>
           {unmatchedPending.length > 0 && (
             <div style={{marginBottom:'16px',padding:'14px 16px',background:'rgba(220,38,38,0.12)',border:'2px solid #dc2626',borderRadius:'12px',boxShadow:'0 0 0 1px rgba(220,38,38,0.3)'}}>
               <p style={{margin:'0 0 10px',fontSize:'14px',fontWeight:'800',color:'#fca5a5'}}>🚫 {unmatchedPending.length} Anmeldung{unmatchedPending.length===1?'':'en'} — Nicht Mitglied</p>
