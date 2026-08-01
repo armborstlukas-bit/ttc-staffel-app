@@ -11619,7 +11619,16 @@ export default function TrainingsApp() {
   // ── TTR / TAGE VIEW ─────────────────────────────────────────────────────
   // TTR-Wert geteilt durch Lebenstage (Geburtsdatum aus der Mitgliederverwaltung) —
   // ein kleines Spaß-Ranking: TTR-Punkte pro gelebtem Tag.
-  if (view === 'ttrProTag' && canEdit()) {
+  if (view === 'ttrProTag' && userRole!=='admin') {
+    return (
+      <div style={{minHeight:'100vh',background:'linear-gradient(170deg,#00151a 0%,#012129 45%,#000e11 100%)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'16px',color:'white',padding:'20px',textAlign:'center'}}>
+        <span style={{fontSize:'48px'}}>🔒</span>
+        <p style={{fontSize:'16px',color:'rgba(255,255,255,0.6)',fontWeight:'700',margin:0}}>TTR / Tage benötigt Geburtsdaten aus der Mitgliederverwaltung, die nur Admins zugänglich sind.</p>
+        <button onClick={()=>navTo('ttrWerte')} style={{padding:'10px 20px',background:'rgba(103,232,249,0.1)',border:'1px solid rgba(103,232,249,0.25)',borderRadius:'10px',color:'#67e8f9',cursor:'pointer',fontWeight:'700'}}>← Zurück</button>
+      </div>
+    );
+  }
+  if (view === 'ttrProTag' && userRole==='admin') {
     const accent = '#67e8f9';
     const wordSet = s => (s||'').replace(/,/g,' ').trim().toLowerCase().replace(/\s+/g,' ').split(' ').filter(Boolean).sort().join(' ');
     // Pool trägt für jeden Spieler die rohe id (identisch zum ttrHistory-Key, egal ob
@@ -11667,7 +11676,10 @@ export default function TrainingsApp() {
       : allRows.filter(r=>!ttrProTagGroupFilter || r.subgroupId===ttrProTagGroupFilter)
     ).sort((a,b)=>b.quotient-a.quotient);
 
-    const availableSubgroups = Object.values(subgroups).sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
+    const TTR_PRO_TAG_HIDDEN_GROUPS = ['Ballspiegruppe','Ballspielgruppe','Große Gruppe'];
+    const availableSubgroups = Object.values(subgroups)
+      .filter(sg=>!TTR_PRO_TAG_HIDDEN_GROUPS.includes(sg.name))
+      .sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
     const isCurrentMonth = ttrProTagYear===new Date().getFullYear() && ttrProTagMonth===new Date().getMonth()+1;
     const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
     const searchQ = ttrProTagSearch.trim().toLowerCase();
