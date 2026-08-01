@@ -780,9 +780,11 @@ export default function TrainingsApp() {
   const [mitgliedAustrittEditId, setMitgliedAustrittEditId] = useState(null);
   const [mitgliedAustrittDatum, setMitgliedAustrittDatum] = useState('');
   const [showExitedMitglieder, setShowExitedMitglieder] = useState(false);
-  const [ttrProTagFilter, setTtrProTagFilter] = useState('all'); // 'all' | 'jugend' | 'aktiv'
+  const [ttrProTagGroupFilter, setTtrProTagGroupFilter] = useState(''); // '' = alle, sonst subgroupId
   const [ttrProTagYear, setTtrProTagYear] = useState(new Date().getFullYear());
   const [ttrProTagMonth, setTtrProTagMonth] = useState(new Date().getMonth()+1);
+  const [ttrProTagSearch, setTtrProTagSearch] = useState('');
+  const [ttrProTagSelected, setTtrProTagSelected] = useState([]); // ausgewählte mitgliederListe-ids
   const [showNewMitglied, setShowNewMitglied] = useState(false);
   const NEW_MITGLIED_DEFAULTS = { vorname:'', nachname:'', roles:[], geburtsdatum:'', email:'', strasse:'', plz:'', ort:'', telefon:'', handy:'', iban:'', bic:'', sepaMandatsRef:'', sepaMandatsDatum:'', zahlart:'', zahler:'', zahlweise:'', beitragsart:'', beitrag:'', kontosaldo:'', eintrittsdatum:'' };
   const [newMitgliedForm, setNewMitgliedForm] = useState(NEW_MITGLIED_DEFAULTS);
@@ -11621,7 +11623,7 @@ export default function TrainingsApp() {
     const accent = '#67e8f9';
     const wordSet = s => (s||'').replace(/,/g,' ').trim().toLowerCase().replace(/\s+/g,' ').split(' ').filter(Boolean).sort().join(' ');
     // Pool trägt für jeden Spieler die rohe id (identisch zum ttrHistory-Key, egal ob
-    // Aktiver oder Jugendlicher) plus die Art, damit gefiltert und historisch nachgeschlagen werden kann.
+    // Aktiver oder Jugendlicher) plus die Art, damit historisch nachgeschlagen werden kann.
     const pool = [
       ...Object.values(aktiveSpieler).map(sp=>({id:sp.id, kind:'aktiv', label:sp.name})),
       ...Object.values(children).map(c=>(ttrHistory[c.id]?.entries?.length ? {id:c.id, kind:'jugend', label:c.name} : null)).filter(Boolean),
@@ -11635,7 +11637,11 @@ export default function TrainingsApp() {
     const refDate = new Date(`${targetMonth}-01T00:00:00`);
     const refMs = refDate.getTime();
 
-    const rows = Object.values(mitgliederListe).map(m=>{
+    // Kind (Jugendlicher) → Trainingsgruppe: über den Namen die passende children-Person
+    // finden und deren subgroupId auflösen. Aktive haben keine Trainingsgruppe.
+    const findChildByName = label => Object.values(children).find(c=>wordSet(c.name)===wordSet(label));
+
+    const allRows = Object.entries(mitgliederListe).map(([id,m])=>{
       if (!m.geburtsdatum) return null;
       let rawId = null, kind = null;
       if (m.ttrRefId) { const [k,rid]=m.ttrRefId.split(':'); rawId=rid; kind=k; }
@@ -11651,13 +11657,23 @@ export default function TrainingsApp() {
       if (isNaN(geb.getTime())) return null;
       const lebenstage = Math.floor((refMs - geb.getTime())/86400000);
       if (lebenstage<=0) return null;
-      return { name:`${m.vorname} ${m.nachname}`, kind, ttr, lebenstage, quotient: ttr/lebenstage };
-    }).filter(Boolean)
-      .filter(r=>ttrProTagFilter==='all' || r.kind===ttrProTagFilter)
-      .sort((a,b)=>b.quotient-a.quotient);
+      const child = kind==='jugend' ? children[rawId] : findChildByName(`${m.vorname} ${m.nachname}`);
+      const subgroupId = child?.subgroupId || null;
+      return { id, name:`${m.vorname} ${m.nachname}`, kind, subgroupId, ttr, lebenstage, quotient: ttr/lebenstage };
+    }).filter(Boolean);
 
+    const rows = (ttrProTagSelected.length>0
+      ? allRows.filter(r=>ttrProTagSelected.includes(r.id))
+      : allRows.filter(r=>!ttrProTagGroupFilter || r.subgroupId===ttrProTagGroupFilter)
+    ).sort((a,b)=>b.quotient-a.quotient);
+
+    const availableSubgroups = Object.values(subgroups).sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
     const isCurrentMonth = ttrProTagYear===new Date().getFullYear() && ttrProTagMonth===new Date().getMonth()+1;
     const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    const searchQ = ttrProTagSearch.trim().toLowerCase();
+    const searchResults = searchQ ? Object.entries(mitgliederListe)
+      .filter(([id,m])=>!ttrProTagSelected.includes(id) && `${m.vorname} ${m.nachname}`.toLowerCase().includes(searchQ))
+      .slice(0,8) : [];
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#00151a 0%,#012129 45%,#000e11 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
@@ -11671,14 +11687,51 @@ export default function TrainingsApp() {
             TTR-Wert geteilt durch die Anzahl gelebter Tage (aus dem Geburtsdatum in der Mitgliederverwaltung berechnet, Stand: 1. des gewählten Monats). Nur Spieler mit bekanntem TTR-Wert UND Geburtsdatum erscheinen hier.
           </p>
 
-          <div style={{display:'flex',gap:'6px',marginBottom:'10px',flexWrap:'wrap'}}>
-            {[{id:'all',label:'Alle'},{id:'jugend',label:'Nachwuchs'},{id:'aktiv',label:'Erwachsene'}].map(tab=>(
-              <button key={tab.id} onClick={()=>setTtrProTagFilter(tab.id)}
-                style={{padding:'7px 14px',borderRadius:'20px',border:`1px solid ${ttrProTagFilter===tab.id?'rgba(103,232,249,0.5)':'rgba(255,255,255,0.1)'}`,background:ttrProTagFilter===tab.id?'rgba(103,232,249,0.12)':'transparent',color:ttrProTagFilter===tab.id?accent:'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>
-                {tab.label}
-              </button>
-            ))}
+          {/* Einzelne Spieler suchen & auswählen */}
+          <div style={{marginBottom:'12px',position:'relative'}}>
+            <input value={ttrProTagSearch} onChange={e=>setTtrProTagSearch(e.target.value)} placeholder="Einzelne Spieler suchen und auswählen…"
+              style={{width:'100%',boxSizing:'border-box',padding:'9px 12px',background:'#001f24',border:'1px solid rgba(103,232,249,0.25)',borderRadius:'9px',color:'white',fontSize:'13px',outline:'none'}}/>
+            {searchResults.length>0 && (
+              <div style={{position:'absolute',zIndex:20,top:'calc(100% + 4px)',left:0,right:0,background:'#001f24',border:'1px solid rgba(103,232,249,0.3)',borderRadius:'9px',maxHeight:'180px',overflowY:'auto',boxShadow:'0 10px 30px rgba(0,0,0,0.4)'}}>
+                {searchResults.map(([id,m])=>(
+                  <button key={id} onClick={()=>{setTtrProTagSelected(p=>[...p,id]);setTtrProTagSearch('');}}
+                    style={{display:'block',width:'100%',textAlign:'left',padding:'8px 12px',background:'transparent',border:'none',cursor:'pointer',color:'white',fontSize:'13px'}}>
+                    {m.vorname} {m.nachname}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+          {ttrProTagSelected.length>0 && (
+            <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'12px'}}>
+              {ttrProTagSelected.map(id=>{
+                const m = mitgliederListe[id];
+                if (!m) return null;
+                return (
+                  <span key={id} style={{display:'inline-flex',alignItems:'center',gap:'5px',padding:'4px 6px 4px 10px',borderRadius:'20px',background:'rgba(103,232,249,0.12)',border:`1px solid ${accent}`,fontSize:'12px',fontWeight:'700',color:accent}}>
+                    {m.vorname} {m.nachname}
+                    <button onClick={()=>setTtrProTagSelected(p=>p.filter(x=>x!==id))} style={{background:'none',border:'none',cursor:'pointer',color:accent,padding:'0',lineHeight:1,fontSize:'14px',fontWeight:'700'}}>×</button>
+                  </span>
+                );
+              })}
+              <button onClick={()=>setTtrProTagSelected([])} style={{padding:'4px 10px',background:'transparent',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'20px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'11px'}}>Auswahl zurücksetzen</button>
+            </div>
+          )}
+
+          {ttrProTagSelected.length===0 && (
+            <div style={{display:'flex',gap:'6px',marginBottom:'10px',flexWrap:'wrap'}}>
+              <button onClick={()=>setTtrProTagGroupFilter('')}
+                style={{padding:'7px 14px',borderRadius:'20px',border:`1px solid ${!ttrProTagGroupFilter?'rgba(103,232,249,0.5)':'rgba(255,255,255,0.1)'}`,background:!ttrProTagGroupFilter?'rgba(103,232,249,0.12)':'transparent',color:!ttrProTagGroupFilter?accent:'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>
+                Alle
+              </button>
+              {availableSubgroups.map(sg=>(
+                <button key={sg.id} onClick={()=>setTtrProTagGroupFilter(sg.id)}
+                  style={{padding:'7px 14px',borderRadius:'20px',border:`1px solid ${ttrProTagGroupFilter===sg.id?'rgba(103,232,249,0.5)':'rgba(255,255,255,0.1)'}`,background:ttrProTagGroupFilter===sg.id?'rgba(103,232,249,0.12)':'transparent',color:ttrProTagGroupFilter===sg.id?accent:'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>
+                  {sg.name}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div style={{display:'flex',gap:'6px',marginBottom:'16px',flexWrap:'wrap',alignItems:'center'}}>
             <select value={ttrProTagMonth} onChange={e=>setTtrProTagMonth(Number(e.target.value))}
@@ -11695,11 +11748,11 @@ export default function TrainingsApp() {
 
           <div style={{display:'grid',gap:'6px'}}>
             {rows.map((r,i)=>(
-              <div key={r.name} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(103,232,249,0.15)',borderRadius:'10px'}}>
+              <div key={r.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(103,232,249,0.15)',borderRadius:'10px'}}>
                 <span style={{width:'26px',textAlign:'center',fontSize:'12px',fontWeight:'800',color:'rgba(103,232,249,0.6)'}}>{i+1}</span>
                 <div style={{flex:1,minWidth:0}}>
                   <p style={{margin:0,fontSize:'13px',fontWeight:'700'}}>{r.name}</p>
-                  <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>TTR {r.ttr} · {r.lebenstage.toLocaleString('de-DE')} Lebenstage · {r.kind==='jugend'?'Nachwuchs':'Erwachsen'}</p>
+                  <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>TTR {r.ttr} · {r.lebenstage.toLocaleString('de-DE')} Lebenstage{r.subgroupId&&subgroups[r.subgroupId]?` · ${subgroups[r.subgroupId].name}`:''}</p>
                 </div>
                 <span style={{fontSize:'15px',fontWeight:'800',color:accent}}>{r.quotient.toFixed(4)}</span>
               </div>
