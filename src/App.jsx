@@ -558,6 +558,7 @@ export default function TrainingsApp() {
   const [mitgliederListe, setMitgliederListe] = useState({}); // { [id]: {vorname,nachname,geburtsdatum,email,roles:[],linkedMemberIds:[]} }
   const [mitgliederFinanzen, setMitgliederFinanzen] = useState({}); // { [id]: {strasse,plz,ort,telefon,handy,iban,bic,sepaMandatsRef,sepaMandatsDatum,zahlart,zahler,beitrag,kontosaldo,eintrittsdatum} } — admin-only, siehe firestore.rules
   const [mitgliederSearch, setMitgliederSearch] = useState('');
+  const [jugendlicheFuerKinder, setJugendlicheFuerKinder] = useState(null); // null=noch nicht geladen — Liste der Jugendlichen aus der Mitgliedsdatei, per API (auch für Trainer ohne direkten mitgliederListe-Zugriff)
   const [pageScrollPos, setPageScrollPos] = useState('top'); // 'top' | 'middle' | 'bottom' — für Scroll-Buttons in langen Listen (z.B. Mitgliederverwaltung)
   const [mitgliedExpandedId, setMitgliedExpandedId] = useState(null);
   const [mitgliedChildSearch, setMitgliedChildSearch] = useState('');
@@ -2014,7 +2015,7 @@ export default function TrainingsApp() {
     // Falls diese Person bereits einen echten Account hat (E-Mail stimmt überein),
     // die Rollenänderung auch dort sofort live übernehmen — sonst wirkt die
     // Mitgliederverwaltung nur bei künftigen Neu-Registrierungen.
-    if (field === 'roles' || field === 'email') {
+    if (field === 'roles' || field === 'email' || field === 'linkedMemberIds') {
       await syncMitgliedRoles(id);
     }
     // Manuelle TTR-Zuordnung (Aktiver → aktiveSpieler) auch am bestehenden Account spiegeln,
@@ -3132,6 +3133,18 @@ export default function TrainingsApp() {
     const id='child_'+Date.now();
     saveChildren({...children,[id]:{id,name:newChildName,subgroupId:activeSubgroup.id,attendance:{}}});
     setNewChildName('');
+  }
+  // Legt ein Kind direkt aus einem bestehenden Mitgliederlisten-Eintrag (Rolle "jugendlich")
+  // an, statt den Namen nochmal per Hand zu tippen — Name wird 1:1 aus der Mitgliedsdatei
+  // übernommen, damit spätere Namensabgleiche (z.B. Eltern-Kind-Zuordnung) sauber greifen.
+  function addChildFromMitglied(mitgliedId) {
+    const m = (jugendlicheFuerKinder||[]).find(x=>x.id===mitgliedId);
+    if (!m) return;
+    const name = `${m.vorname} ${m.nachname}`.trim();
+    const alreadyExists = Object.values(children).some(c => (c.name||'').trim().toLowerCase() === name.toLowerCase());
+    if (alreadyExists) { alert(`"${name}" ist schon als Kind vorhanden.`); return; }
+    const id='child_'+Date.now();
+    saveChildren({...children,[id]:{id,name,subgroupId:activeSubgroup.id,attendance:{}}});
   }
   function deleteChild(cid) {
     if (!window.confirm('Kind löschen?')) return;
@@ -5624,6 +5637,17 @@ export default function TrainingsApp() {
 
   // ── UNTERGRUPPE ──────────────────────────────────────────────
   if (view==='subgroup') {
+    if (jugendlicheFuerKinder === null && canEdit()) {
+      setJugendlicheFuerKinder([]); // Ladevorgang anstoßen, aber nicht mehrfach parallel
+      (async () => {
+        try {
+          const idToken = await user.getIdToken();
+          const r = await fetch('/api/mitglieder?action=list-jugendliche', { headers: { Authorization: `Bearer ${idToken}` } });
+          const d = await r.json();
+          setJugendlicheFuerKinder(Array.isArray(d.jugendliche) ? d.jugendliche : []);
+        } catch { setJugendlicheFuerKinder([]); }
+      })();
+    }
     const sub=subgroups[activeSubgroup.id]||activeSubgroup;
     const kids=getChildrenForSubgroup(sub.id);
     const activeKids=kids.filter(c=>!c.nachwuchsKarriereBeendet);
@@ -5676,11 +5700,26 @@ export default function TrainingsApp() {
 
           {/* Kind hinzufügen */}
           {canEdit()&&(
-            <div style={{display:'flex',gap:'8px',marginBottom:'24px',paddingBottom:'24px',borderBottom:'1px solid rgba(74,222,128,0.08)'}}>
-              <input style={{...DI,flex:1,padding:'11px 14px'}} placeholder="Kind hinzufügen..." value={newChildName} onChange={e=>setNewChildName(e.target.value)} onKeyPress={e=>e.key==='Enter'&&addChild()}/>
-              <button onClick={addChild} style={{padding:'11px 18px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',gap:'6px',whiteSpace:'nowrap'}}>
-                <Plus size={16}/> Kind
-              </button>
+            <div style={{display:'grid',gap:'8px',marginBottom:'24px',paddingBottom:'24px',borderBottom:'1px solid rgba(74,222,128,0.08)'}}>
+              <div style={{display:'flex',gap:'8px'}}>
+                <input style={{...DI,flex:1,padding:'11px 14px'}} placeholder="Kind hinzufügen..." value={newChildName} onChange={e=>setNewChildName(e.target.value)} onKeyPress={e=>e.key==='Enter'&&addChild()}/>
+                <button onClick={addChild} style={{padding:'11px 18px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',gap:'6px',whiteSpace:'nowrap'}}>
+                  <Plus size={16}/> Kind
+                </button>
+              </div>
+              {(() => {
+                const existingNames = new Set(Object.values(children).map(c=>(c.name||'').trim().toLowerCase()));
+                const mitgliedOptions = (jugendlicheFuerKinder||[])
+                  .filter(m => !existingNames.has(`${m.vorname} ${m.nachname}`.trim().toLowerCase()))
+                  .sort((a,b)=>`${a.nachname}${a.vorname}`.localeCompare(`${b.nachname}${b.vorname}`,'de'));
+                return (
+                  <select value="" onChange={e=>{ if (e.target.value) addChildFromMitglied(e.target.value); }}
+                    style={{...DI,padding:'11px 14px',cursor:'pointer'}}>
+                    <option value="" style={{background:'#04220f'}}>👤 Kind aus Mitgliedsdatei auswählen…</option>
+                    {mitgliedOptions.map(m=><option key={m.id} value={m.id} style={{background:'#04220f'}}>{m.vorname} {m.nachname}</option>)}
+                  </select>
+                );
+              })()}
             </div>
           )}
 
