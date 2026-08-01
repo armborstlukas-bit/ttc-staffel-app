@@ -780,6 +780,9 @@ export default function TrainingsApp() {
   const [mitgliedAustrittEditId, setMitgliedAustrittEditId] = useState(null);
   const [mitgliedAustrittDatum, setMitgliedAustrittDatum] = useState('');
   const [showExitedMitglieder, setShowExitedMitglieder] = useState(false);
+  const [showNewMitglied, setShowNewMitglied] = useState(false);
+  const NEW_MITGLIED_DEFAULTS = { vorname:'', nachname:'', roles:[], geburtsdatum:'', email:'', strasse:'', plz:'', ort:'', telefon:'', handy:'', iban:'', bic:'', sepaMandatsRef:'', sepaMandatsDatum:'', zahlart:'', zahler:'', zahlweise:'', beitragsart:'', beitrag:'', kontosaldo:'', eintrittsdatum:'' };
+  const [newMitgliedForm, setNewMitgliedForm] = useState(NEW_MITGLIED_DEFAULTS);
   const [usageStats, setUsageStats] = useState({ dailyActive:{}, viewCounts:{} });
   const [ranglisteHistory, setRanglisteHistory] = useState([]); // [{date:'YYYY-MM-DD', order:[childId,...]}]
   const [showRangStats, setShowRangStats] = useState(false);
@@ -2304,6 +2307,19 @@ export default function TrainingsApp() {
   const saveFinanzField = async (id, field, value) => {
     setMitgliederFinanzen(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
     await updateDoc(doc(db,'ttc','mitgliederFinanzen'), { [`list.${id}.${field}`]: value });
+  };
+
+  // Legt ein komplett neues Mitglied inkl. Rollen, persönlichen Daten und Zahlungsdaten an
+  // (aus dem "+ Neues Mitglied anlegen"-Formular in der Mitgliederverwaltung).
+  const createNewMitglied = async (form) => {
+    const id = 'm_new_' + Date.now();
+    const listeEntry = { vorname: form.vorname.trim(), nachname: form.nachname.trim(), geburtsdatum: form.geburtsdatum||'', email: form.email||'', roles: form.roles||[], linkedMemberIds: [] };
+    const finanzEntry = { strasse:form.strasse||'', plz:form.plz||'', ort:form.ort||'', telefon:form.telefon||'', handy:form.handy||'', iban:form.iban||'', bic:form.bic||'', sepaMandatsRef:form.sepaMandatsRef||'', sepaMandatsDatum:form.sepaMandatsDatum||'', zahlart:form.zahlart||'', zahler:form.zahler||'', zahlweise:form.zahlweise||'', beitragsart:form.beitragsart||'', beitrag:form.beitrag||'', kontosaldo:form.kontosaldo||0, eintrittsdatum:form.eintrittsdatum||'' };
+    await updateDoc(doc(db,'ttc','mitgliederListe'), { [`list.${id}`]: listeEntry });
+    await updateDoc(doc(db,'ttc','mitgliederFinanzen'), { [`list.${id}`]: finanzEntry });
+    setMitgliederListe(prev => ({ ...prev, [id]: listeEntry }));
+    setMitgliederFinanzen(prev => ({ ...prev, [id]: finanzEntry }));
+    return id;
   };
 
   // Legt aus einem nicht zugeordneten Pending-Account einen neuen Mitgliederlisten-Eintrag an
@@ -12577,6 +12593,112 @@ export default function TrainingsApp() {
             </Modal>
           );
         })()}
+        {showNewMitglied && (()=>{
+          const f = newMitgliedForm;
+          const set = (key,val) => setNewMitgliedForm(p=>({...p,[key]:val}));
+          const canSave = f.vorname.trim() && f.nachname.trim();
+          const inS = {width:'100%',boxSizing:'border-box',padding:'7px 9px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none'};
+          const lbl = {fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'};
+          const fld = (key,label,opts={}) => (
+            <div style={{minWidth:0}}>
+              <span style={lbl}>{label}</span>
+              <input value={f[key]??''} type={opts.type||'text'} onChange={e=>set(key,e.target.value)} style={inS}/>
+            </div>
+          );
+          const submit = async () => {
+            if (!canSave) return;
+            const id = await createNewMitglied(f);
+            setShowNewMitglied(false);
+            setMitgliedExpandedId(id);
+            setMitgliederSearch('');
+          };
+          return (
+            <Modal>
+            <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
+              <div style={{background:'#0a2210',border:'1px solid rgba(74,222,128,0.35)',borderRadius:'16px',padding:'22px',maxWidth:'460px',width:'100%',maxHeight:'85vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.4)'}}>
+                <h3 style={{margin:'0 0 4px',color:'white',fontSize:'17px',fontWeight:'800'}}>+ Neues Mitglied anlegen</h3>
+                <p style={{margin:'0 0 16px',color:'rgba(255,255,255,0.4)',fontSize:'12px'}}>Vorname und Nachname sind Pflicht, alles andere kann auch später noch ergänzt werden.</p>
+
+                <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'10px',padding:'10px',display:'grid',gap:'10px',marginBottom:'14px'}}>
+                  <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(196,181,253,0.6)',textTransform:'uppercase',letterSpacing:'0.5px'}}>⚙️ App-Steuerung</span>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
+                    {fld('vorname','Vorname *')}{fld('nachname','Nachname *')}
+                  </div>
+                  <div>
+                    <span style={lbl}>Rollen</span>
+                    <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                      {ROLE_OPTIONS.map(o=>{
+                        const on = f.roles.includes(o.key);
+                        const rc = ROLE_COLORS[o.key];
+                        return <button key={o.key} onClick={()=>set('roles', on?f.roles.filter(r=>r!==o.key):[...f.roles,o.key])}
+                          style={{padding:'5px 12px',borderRadius:'20px',border:`1px solid ${on?rc.border:'rgba(255,255,255,0.15)'}`,background:on?rc.bg:'rgba(255,255,255,0.03)',color:on?rc.color:'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>{o.label}</button>;
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{background:'rgba(251,191,36,0.04)',border:'1px solid rgba(251,191,36,0.15)',borderRadius:'10px',padding:'10px',display:'grid',gap:'14px'}}>
+                  <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(251,191,36,0.6)',textTransform:'uppercase',letterSpacing:'0.5px'}}>🗂️ Mitgliedsdaten</span>
+
+                  <div style={{display:'grid',gap:'8px'}}>
+                    <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.35)'}}>Persönliche Daten</span>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1.4fr',gap:'6px'}}>
+                      {fld('geburtsdatum','Geburtsdatum',{type:'date'})}{fld('email','E-Mail',{type:'email'})}
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1.5fr',gap:'6px'}}>
+                      {fld('strasse','Straße')}{fld('plz','PLZ')}{fld('ort','Ort')}
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
+                      {fld('telefon','Telefon')}{fld('handy','Handy')}
+                    </div>
+                  </div>
+
+                  <div style={{display:'grid',gap:'8px',paddingTop:'12px',borderTop:'1px solid rgba(251,191,36,0.15)'}}>
+                    <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.35)'}}>Zahlungsdaten</span>
+                    <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:'6px'}}>
+                      {fld('iban','IBAN')}{fld('bic','BIC')}
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
+                      {fld('sepaMandatsRef','SEPA-Mandatsreferenz')}{fld('sepaMandatsDatum','SEPA-Mandatsdatum')}
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'6px'}}>
+                      {fld('zahlart','Zahlart')}{fld('zahler','Zahler')}{fld('zahlweise','Zahlweise')}
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'1.4fr 1fr 1fr',gap:'6px'}}>
+                      <div style={{minWidth:0}}>
+                        <span style={lbl}>Beitragsart</span>
+                        <select value={f.beitragsart} onChange={e=>{
+                            const key = e.target.value;
+                            const art = BEITRAGSARTEN.find(a=>a.key===key);
+                            set('beitragsart',key);
+                            if (art) set('beitrag',art.amount);
+                          }}
+                          style={{...inS,cursor:'pointer'}}>
+                          <option value="" style={{background:'#1a1206'}}>– auswählen –</option>
+                          {BEITRAGSARTEN.map(a=><option key={a.key} value={a.key} style={{background:'#1a1206'}}>{a.label} ({a.amount}€)</option>)}
+                        </select>
+                      </div>
+                      {fld('beitrag','Beitrag (€)')}{fld('kontosaldo','Kontosaldo (€)')}
+                    </div>
+                  </div>
+
+                  <div style={{padding:'10px 12px',background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'8px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+                    <span style={{fontSize:'12px',fontWeight:'800',color:'#fbbf24',whiteSpace:'nowrap'}}>📅 Eintrittsdatum</span>
+                    <input value={f.eintrittsdatum} onChange={e=>set('eintrittsdatum',e.target.value)}
+                      style={{flex:1,minWidth:'140px',padding:'7px 10px',background:'#1a1206',border:'1px solid rgba(251,191,36,0.4)',borderRadius:'7px',color:'white',fontSize:'13px',fontWeight:'700',outline:'none'}}/>
+                  </div>
+                </div>
+
+                <div style={{display:'grid',gap:'8px',marginTop:'16px'}}>
+                  <button onClick={submit} disabled={!canSave}
+                    style={{padding:'12px',background:canSave?'#16a34a':'#374151',color:'white',border:'none',borderRadius:'10px',cursor:canSave?'pointer':'not-allowed',fontWeight:'700',fontSize:'14px'}}>+ Mitglied anlegen</button>
+                  <button onClick={()=>setShowNewMitglied(false)} style={{padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.6)',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>Abbrechen</button>
+                </div>
+              </div>
+            </div>
+            </Modal>
+          );
+        })()}
         <div className="ttc-sticky-hdr" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
           <button onClick={()=>navTo('home')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'9px',color:'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:'600'}}><Home size={15}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🗂️ Mitgliederverwaltung</h1>
@@ -12586,6 +12708,8 @@ export default function TrainingsApp() {
           <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
             Importierte Mitgliederliste. Klicke auf eine Person, um Rollen (Mehrfachauswahl möglich) und bei "Eltern" die zugehörigen Kinder/Jugendlichen zuzuordnen (auch mehrere möglich). Meldet sich jemand mit einer hier hinterlegten E-Mail-Adresse und zugewiesener Rolle an, wird der Account automatisch freigeschaltet.
           </p>
+          <button onClick={()=>{setNewMitgliedForm(NEW_MITGLIED_DEFAULTS);setShowNewMitglied(true);}}
+            style={{marginBottom:'14px',padding:'9px 16px',background:'#16a34a',color:'white',border:'none',borderRadius:'9px',cursor:'pointer',fontWeight:'800',fontSize:'13px'}}>+ Neues Mitglied anlegen</button>
           {unmatchedPending.length > 0 && (
             <div style={{marginBottom:'16px',padding:'14px 16px',background:'rgba(220,38,38,0.12)',border:'2px solid #dc2626',borderRadius:'12px',boxShadow:'0 0 0 1px rgba(220,38,38,0.3)'}}>
               <p style={{margin:'0 0 10px',fontSize:'14px',fontWeight:'800',color:'#fca5a5'}}>🚫 {unmatchedPending.length} Anmeldung{unmatchedPending.length===1?'':'en'} — Nicht Mitglied</p>
