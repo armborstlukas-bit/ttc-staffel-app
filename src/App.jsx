@@ -4023,11 +4023,11 @@ export default function TrainingsApp() {
   // ── STARTSEITE (Trainer/Admin Dashboard) ───────────────────────────────
   if (view==='home' && canEdit()) {
     const todayStr = new Date().toISOString().split('T')[0];
-    const in6 = new Date(); in6.setDate(in6.getDate()+6);
-    const in6Str = in6.toISOString().split('T')[0];
+    const in13 = new Date(); in13.setDate(in13.getDate()+13);
+    const in13Str = in13.toISOString().split('T')[0];
     const allSess = getAllUpcomingSessions().filter(s=>canAccessSession(s));
     const pastSess = allSess.filter(s=>s.date<todayStr).sort((a,b)=>b.date.localeCompare(a.date));
-    const upcomingSess = allSess.filter(s=>s.date>=todayStr&&s.date<=in6Str);
+    const upcomingSess = allSess.filter(s=>s.date>=todayStr&&s.date<=in13Str);
     const unreadCount = getTrainerUnreadCount();
     const hour = new Date().getHours();
     const greeting = hour<12?'Guten Morgen':hour<18?'Guten Tag':'Guten Abend';
@@ -4168,16 +4168,16 @@ export default function TrainingsApp() {
             <h1 style={{margin:0,color:'white',fontSize:isMobile?'28px':'36px',fontWeight:'800',letterSpacing:'-1px',lineHeight:1.1}}>{greeting}, <span style={{color:'#4ade80'}}>{(userProfile?.name||'Trainer').split(' ')[0]}</span> 👋</h1>
           </div>
 
-          {/* ── 1. Training diese Woche ──────────────────────────── */}
-          <p style={{color:'rgba(74,222,128,0.45)',fontSize:'10px',fontWeight:'800',textTransform:'uppercase',letterSpacing:'2px',margin:'0 0 12px'}}>Training diese Woche</p>
+          {/* ── 1. Training nächste 14 Tage ──────────────────────────── */}
+          <p style={{color:'rgba(74,222,128,0.45)',fontSize:'10px',fontWeight:'800',textTransform:'uppercase',letterSpacing:'2px',margin:'0 0 12px'}}>Training nächste 14 Tage</p>
           <div style={{background:'rgba(74,222,128,0.03)',border:'1px solid rgba(74,222,128,0.12)',borderRadius:'20px',overflow:'hidden',marginBottom:'32px',boxShadow:'inset 0 1px 0 rgba(74,222,128,0.07)'}}>
             <div style={{padding:'16px 22px',borderBottom:'1px solid rgba(74,222,128,0.08)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-              <span style={{fontWeight:'800',color:'white',fontSize:'16px',letterSpacing:'-0.3px'}}>📅 Training diese Woche</span>
+              <span style={{fontWeight:'800',color:'white',fontSize:'16px',letterSpacing:'-0.3px'}}>📅 Training nächste 14 Tage</span>
               <button onClick={()=>navTo('trainingsplan')} style={{background:'rgba(74,222,128,0.12)',border:'1px solid rgba(74,222,128,0.25)',color:'#4ade80',borderRadius:'10px',padding:'6px 14px',fontSize:'12px',cursor:'pointer',fontWeight:'700'}}>Trainingsplan →</button>
             </div>
             <div style={{padding:'14px 18px',display:'flex',flexDirection:'column',gap:'8px'}}>
               {pastSess.length===0&&upcomingSess.length===0
-                ? <p style={{color:'rgba(255,255,255,0.2)',fontSize:'13px',textAlign:'center',padding:'32px 0',margin:0}}>Keine Einheiten in den nächsten 7 Tagen.</p>
+                ? <p style={{color:'rgba(255,255,255,0.2)',fontSize:'13px',textAlign:'center',padding:'32px 0',margin:0}}>Keine Einheiten in den nächsten 14 Tagen.</p>
                 : <>
                   {pastSess.length>0&&<p style={{margin:'0 0 6px',fontSize:'11px',fontWeight:'700',color:'rgba(252,165,165,0.55)',textTransform:'uppercase',letterSpacing:'1px'}}>Vergangen – Anwesenheit eintragen</p>}
                   {pastSess.map(session=>{
