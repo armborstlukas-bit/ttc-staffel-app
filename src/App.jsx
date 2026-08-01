@@ -578,7 +578,7 @@ export default function TrainingsApp() {
   const [ttrProTagSearch, setTtrProTagSearch] = useState('');
   const [ttrProTagSelected, setTtrProTagSelected] = useState([]); // ausgewählte mitgliederListe-ids
   const [showNewMitglied, setShowNewMitglied] = useState(false);
-  const NEW_MITGLIED_DEFAULTS = { vorname:'', nachname:'', roles:[], geburtsdatum:'', email:'', strasse:'', plz:'', ort:'', telefon:'', handy:'', iban:'', bic:'', sepaMandatsRef:'', sepaMandatsDatum:'', zahlart:'', zahler:'', zahlweise:'', beitragsart:'', beitrag:'', kontosaldo:'', eintrittsdatum:'' };
+  const NEW_MITGLIED_DEFAULTS = { vorname:'', nachname:'', roles:[], geburtsdatum:'', email:'', strasse:'', plz:'', ort:'', telefon:'', handy:'', iban:'', bic:'', sepaMandatsRef:'', sepaMandatsDatum:'', zahlart:'', zahler:'', zahlweise:'', beitragsart:'', beitrag:'', kontosaldo:'', eintrittsdatum:'', familienZahlerId:'' };
   const [newMitgliedForm, setNewMitgliedForm] = useState(NEW_MITGLIED_DEFAULTS);
   const [usageStats, setUsageStats] = useState({ dailyActive:{}, viewCounts:{} });
   const [verbesserungswuensche, setVerbesserungswuensche] = useState({}); // { [id]: {text,createdAt,updatedAt,submitterUid} } — anonym angezeigt
@@ -2106,7 +2106,7 @@ export default function TrainingsApp() {
   const createNewMitglied = async (form) => {
     const id = 'm_new_' + Date.now();
     const listeEntry = { vorname: form.vorname.trim(), nachname: form.nachname.trim(), geburtsdatum: form.geburtsdatum||'', email: form.email||'', roles: form.roles||[], linkedMemberIds: [] };
-    const finanzEntry = { strasse:form.strasse||'', plz:form.plz||'', ort:form.ort||'', telefon:form.telefon||'', handy:form.handy||'', iban:form.iban||'', bic:form.bic||'', sepaMandatsRef:form.sepaMandatsRef||'', sepaMandatsDatum:form.sepaMandatsDatum||'', zahlart:form.zahlart||'', zahler:form.zahler||'', zahlweise:form.zahlweise||'', beitragsart:form.beitragsart||'', beitrag:form.beitrag||'', kontosaldo:form.kontosaldo||0, eintrittsdatum:form.eintrittsdatum||'' };
+    const finanzEntry = { strasse:form.strasse||'', plz:form.plz||'', ort:form.ort||'', telefon:form.telefon||'', handy:form.handy||'', iban:form.iban||'', bic:form.bic||'', sepaMandatsRef:form.sepaMandatsRef||'', sepaMandatsDatum:form.sepaMandatsDatum||'', zahlart:form.zahlart||'', zahler:form.zahler||'', zahlweise:form.zahlweise||'', beitragsart:form.beitragsart||'', beitrag:form.beitrag||'', kontosaldo:form.kontosaldo||0, eintrittsdatum:form.eintrittsdatum||'', familienZahlerId:form.familienZahlerId||null };
     await updateDoc(doc(db,'ttc','mitgliederListe'), { [`list.${id}`]: listeEntry });
     await updateDoc(doc(db,'ttc','mitgliederFinanzen'), { [`list.${id}`]: finanzEntry });
     setMitgliederListe(prev => ({ ...prev, [id]: listeEntry }));
@@ -2126,7 +2126,6 @@ export default function TrainingsApp() {
     setMitgliederListe(prev => ({ ...prev, [id]: entry }));
     setMitgliedExpandedId(id);
     setMitgliederSearch('');
-    setMitgliederRoleFilter('');
   };
 
   const fetchKalender = async () => {
@@ -12137,6 +12136,18 @@ export default function TrainingsApp() {
                       </div>
                       {fld('beitrag','Beitrag (€)')}{fld('kontosaldo','Kontosaldo (€)')}
                     </div>
+                    {f.beitragsart==='familienmitglied' && (()=>{
+                      const familienZahlerOptions = entries.filter(([oid])=>mitgliederFinanzen[oid]?.beitragsart==='familienbeitrag').sort((a,b)=>`${a[1].nachname}${a[1].vorname}`.localeCompare(`${b[1].nachname}${b[1].vorname}`,'de'));
+                      return (
+                        <div style={{minWidth:0}}>
+                          <span style={lbl}>Gehört zu (Familienbeitrag-Zahler)</span>
+                          <select value={f.familienZahlerId||''} onChange={e=>set('familienZahlerId',e.target.value||'')} style={{...inS,cursor:'pointer'}}>
+                            <option value="" style={{background:'#1a1206'}}>– niemand ausgewählt –</option>
+                            {familienZahlerOptions.map(([oid,om])=><option key={oid} value={oid} style={{background:'#1a1206'}}>{om.vorname} {om.nachname}</option>)}
+                          </select>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <div style={{padding:'10px 12px',background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'8px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
@@ -12635,11 +12646,11 @@ export default function TrainingsApp() {
         </div>
         {pageScrollPos !== 'top' && (
           <button onClick={()=>window.scrollTo({top:0,behavior:'smooth'})} title="Nach oben"
-            style={{position:'fixed',right:'16px',bottom: pageScrollPos==='middle' ? '68px' : '16px',zIndex:500,width:'44px',height:'44px',borderRadius:'50%',background:'#16a34a',color:'white',border:'none',boxShadow:'0 4px 14px rgba(0,0,0,0.4)',fontSize:'18px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>▲</button>
+            style={{position:'fixed',right:'16px',bottom: `calc(${pageScrollPos==='middle' ? '130px' : '82px'} + env(safe-area-inset-bottom,0px))`,zIndex:950,width:'46px',height:'46px',borderRadius:'50%',background:'#16a34a',color:'white',border:'2px solid rgba(255,255,255,0.25)',boxShadow:'0 4px 18px rgba(0,0,0,0.5)',fontSize:'19px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>▲</button>
         )}
         {pageScrollPos !== 'bottom' && (
           <button onClick={()=>window.scrollTo({top:document.documentElement.scrollHeight,behavior:'smooth'})} title="Nach unten"
-            style={{position:'fixed',right:'16px',bottom:'16px',zIndex:500,width:'44px',height:'44px',borderRadius:'50%',background:'#16a34a',color:'white',border:'none',boxShadow:'0 4px 14px rgba(0,0,0,0.4)',fontSize:'18px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>▼</button>
+            style={{position:'fixed',right:'16px',bottom:'calc(82px + env(safe-area-inset-bottom,0px))',zIndex:950,width:'46px',height:'46px',borderRadius:'50%',background:'#16a34a',color:'white',border:'2px solid rgba(255,255,255,0.25)',boxShadow:'0 4px 18px rgba(0,0,0,0.5)',fontSize:'19px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>▼</button>
         )}
       </div>
     );
