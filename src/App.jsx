@@ -4658,8 +4658,30 @@ export default function TrainingsApp() {
           // Kompakte Chips-Reihe (für TTR, Rangliste-Tiers etc.)
           const ChipRow=({children})=><div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'8px'}}>{children}</div>;
 
+          const trainingMilestones=[10,25,50,100,200,500,1000];
+          const streakMilestones=[5,10,20,30,50];
+          const unlockedCount = ttrUnlocked.length
+            + trainingMilestones.filter(m=>totalTrainings>=m).length
+            + streakMilestones.filter(m=>streak>=m).length
+            + (spielerDesMonatsWins[myChild.id]||[]).length
+            + (ach.team>0?1:0);
+          const totalCount = TTR_MILESTONES.length + trainingMilestones.length + streakMilestones.length + 1 + 1;
+          const progressPct = Math.min(100, Math.round((unlockedCount/totalCount)*100));
+          const motivational = progressPct>=80 ? '🔥 Fast alles freigeschaltet — stark!' : progressPct>=50 ? '💪 Mehr als die Hälfte geschafft!' : progressPct>=20 ? '🚀 Gut unterwegs, weiter so!' : '🌱 Los geht\'s — die ersten Erfolge warten!';
+
           return (
             <div>
+              {/* ── Fortschritts-Hero ── */}
+              <div style={{position:'relative',overflow:'hidden',borderRadius:'20px',padding:'22px 20px',marginBottom:'22px',background:'linear-gradient(135deg,#1e0a3c 0%,#4c1d95 55%,#7c3aed 100%)',border:'1px solid rgba(196,181,253,0.3)',boxShadow:'0 10px 30px rgba(124,58,237,0.25)'}}>
+                <span style={{position:'absolute',top:'-24px',right:'-16px',fontSize:'110px',opacity:0.12,transform:'rotate(12deg)',pointerEvents:'none'}}>🏆</span>
+                <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'900',letterSpacing:'1.5px',textTransform:'uppercase',color:'rgba(255,255,255,0.6)'}}>Deine Errungenschaften</p>
+                <p style={{margin:'0 0 14px',fontSize:'28px',fontWeight:'900',color:'white',textShadow:'0 2px 8px rgba(0,0,0,0.3)'}}>{unlockedCount} <span style={{fontSize:'16px',fontWeight:'700',color:'rgba(255,255,255,0.55)'}}>von {totalCount} freigeschaltet</span></p>
+                <div style={{height:'10px',borderRadius:'6px',background:'rgba(255,255,255,0.12)',overflow:'hidden',marginBottom:'10px'}}>
+                  <div style={{height:'100%',width:`${progressPct}%`,borderRadius:'6px',background:'linear-gradient(90deg,#fbbf24,#f97316)',transition:'width 0.4s ease'}}/>
+                </div>
+                <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'#fde68a'}}>{motivational}</p>
+              </div>
+
               {/* ── TTR Meilensteine ── */}
               <SH icon="🏓" title="TTR Meilensteine" mt={false}/>
               <ChipRow>
@@ -4677,18 +4699,6 @@ export default function TrainingsApp() {
               {[10,25,50,100,200,500,1000].map(m=>{const has=totalTrainings>=m;return<AC key={m} icon="🏋️" title={`${m} Trainings absolviert`} sub={has?`Erreicht! (${totalTrainings} gesamt)`:`${totalTrainings} von ${m}`} has={has} accent="#4ade80" acBg="rgba(74,222,128,0.07)" acBorder="rgba(74,222,128,0.2)" onClick={()=>setAchievementPopup({icon:'🏋️',title:`${m} Trainings`,desc:`Du hast insgesamt ${m} Trainingseinheiten absolviert! Aktuell: ${totalTrainings} Trainings.`})}/>;} )}
               {[5,10,20,30,50].map(m=>{const has=streak>=m;return<AC key={`str${m}`} icon="🔥" title={`${m}er Trainingsserie`} sub={has?`Erreicht! (Längste Serie: ${streak})`:`Längste Serie: ${streak}/${m}`} has={has} accent="#fb923c" acBg="rgba(251,146,60,0.07)" acBorder="rgba(251,146,60,0.22)" onClick={()=>setAchievementPopup({icon:'🔥',title:`${m}er Trainingsserie`,desc:`${m} Trainingseinheiten in Folge ohne Fehlzeit! Deine längste Serie: ${streak} Einheiten.`})}/>;} )}
 
-              {/* ── Turnierergebnisse (Einzel & Doppel zusammen) ── */}
-              <SH icon="🎖️" title="Turnierergebnisse"/>
-              <div style={{background:'rgba(255,255,255,0.025)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'16px',overflow:'hidden',marginBottom:'6px'}}>
-                <div style={{padding:'7px 14px',background:'rgba(253,230,138,0.05)',borderBottom:'1px solid rgba(255,255,255,0.06)',fontSize:'10px',fontWeight:'800',color:'rgba(253,230,138,0.5)',letterSpacing:'1.5px'}}>EINZEL</div>
-                <div style={{padding:'6px 8px',display:'flex',flexDirection:'column',gap:'4px'}}>
-                  {[{icon:'🥇',title:'1. Platz Einzel',field:'einzel1',desc:ACHIEVEMENT_DESCRIPTIONS.einzel1},{icon:'🥈',title:'2. Platz Einzel',field:'einzel2',desc:ACHIEVEMENT_DESCRIPTIONS.einzel2},{icon:'🥉',title:'3. Platz Einzel',field:'einzel3',desc:ACHIEVEMENT_DESCRIPTIONS.einzel3}].map(({icon,title,field,desc})=>{const count=ach[field]||0;return<AC key={field} icon={icon} title={title} sub={count>0?`${count}× erreicht`:undefined} note="Noch kein Podestplatz im Einzel" has={count>0} accent="#fde68a" acBg="rgba(253,230,138,0.07)" acBorder="rgba(253,230,138,0.22)" onClick={()=>openCount(icon,title,desc,count)}/>;} )}
-                </div>
-                <div style={{padding:'7px 14px',background:'rgba(103,232,249,0.04)',borderTop:'1px solid rgba(255,255,255,0.06)',borderBottom:'1px solid rgba(255,255,255,0.06)',fontSize:'10px',fontWeight:'800',color:'rgba(103,232,249,0.5)',letterSpacing:'1.5px'}}>DOPPEL</div>
-                <div style={{padding:'6px 8px',display:'flex',flexDirection:'column',gap:'4px'}}>
-                  {[{icon:'🥇',title:'1. Platz Doppel',field:'doppel1',desc:ACHIEVEMENT_DESCRIPTIONS.doppel1},{icon:'🥈',title:'2. Platz Doppel',field:'doppel2',desc:ACHIEVEMENT_DESCRIPTIONS.doppel2},{icon:'🥉',title:'3. Platz Doppel',field:'doppel3',desc:ACHIEVEMENT_DESCRIPTIONS.doppel3}].map(({icon,title,field,desc})=>{const count=ach[field]||0;return<AC key={field} icon={icon} title={title} sub={count>0?`${count}× erreicht`:undefined} note="Noch kein Podestplatz im Doppel" has={count>0} accent="#67e8f9" acBg="rgba(103,232,249,0.07)" acBorder="rgba(103,232,249,0.22)" onClick={()=>openCount(icon,title,desc,count)}/>;} )}
-                </div>
-              </div>
 
               {/* ── Mannschaftsmeisterschaft ── */}
               <SH icon="🏆" title="Mannschaftsmeisterschaft"/>
@@ -5412,32 +5422,6 @@ export default function TrainingsApp() {
                         })}
                       </Sec>
 
-
-                      <Sec title="🥊 Turnierergebnisse Einzel">
-                        {[
-                          {icon:'🥇',label:'1. Platz',field:'einzel1',desc:ACHIEVEMENT_DESCRIPTIONS.einzel1},
-                          {icon:'🥈',label:'2. Platz',field:'einzel2',desc:ACHIEVEMENT_DESCRIPTIONS.einzel2},
-                          {icon:'🥉',label:'3. Platz',field:'einzel3',desc:ACHIEVEMENT_DESCRIPTIONS.einzel3},
-                        ].map(({icon,label,field,desc})=>{
-                          const count=ach[field]||0;
-                          return <Tile key={field} icon={icon} label={label} sub={count>0?`×${count}`:undefined}
-                            has={count>0} activeBg="rgba(253,230,138,0.1)" activeBorder="rgba(253,230,138,0.3)" activeTextColor="#fde68a"
-                            onClick={()=>openCount(icon,label,desc,count)}/>;
-                        })}
-                      </Sec>
-
-                      <Sec title="🤝 Turnierergebnisse Doppel">
-                        {[
-                          {icon:'🥇',label:'1. Platz',field:'doppel1',desc:ACHIEVEMENT_DESCRIPTIONS.doppel1},
-                          {icon:'🥈',label:'2. Platz',field:'doppel2',desc:ACHIEVEMENT_DESCRIPTIONS.doppel2},
-                          {icon:'🥉',label:'3. Platz',field:'doppel3',desc:ACHIEVEMENT_DESCRIPTIONS.doppel3},
-                        ].map(({icon,label,field,desc})=>{
-                          const count=ach[field]||0;
-                          return <Tile key={field} icon={icon} label={label} sub={count>0?`×${count}`:undefined}
-                            has={count>0} activeBg="rgba(253,230,138,0.1)" activeBorder="rgba(253,230,138,0.3)" activeTextColor="#fde68a"
-                            onClick={()=>openCount(icon,label,desc,count)}/>;
-                        })}
-                      </Sec>
 
                       <Sec title="🏅 Mannschaft & Auszeichnungen">
                         {(()=>{const count=ach['team']||0;return <Tile icon='🏆' label='Meisterschaft' sub={count>0?`×${count}`:undefined} has={count>0} activeBg="rgba(253,230,138,0.1)" activeBorder="rgba(253,230,138,0.3)" activeTextColor="#fde68a" onClick={()=>openCount('🏆','Meisterschaft',ACHIEVEMENT_DESCRIPTIONS.team,count)}/>;})()}
@@ -6198,12 +6182,6 @@ export default function TrainingsApp() {
                 <Sec2 title="Trainings-Meilensteine">
                   {[10,25,50,100,200,500,1000].map(m=>{const has=totalTrainings2>=m;return <SmTile2 key={m} icon="🏋️" label={`${m}×`} sub2={has?'✓':`${totalTrainings2}/${m}`} has={has} activeBg="rgba(74,222,128,0.1)" activeBorder="rgba(74,222,128,0.3)" activeTextColor="#4ade80" onClick={()=>openP('🏋️',`${m} Trainings`,`Aktuell: ${totalTrainings2}.`)}/>;  })}
                   {[5,10,20,30,50].map(m=>{const has=streak2>=m;return <SmTile2 key={`s${m}`} icon="🔥" label={`${m}er`} sub2={has?'✓':`${streak2}/${m}`} has={has} activeBg="rgba(251,146,60,0.1)" activeBorder="rgba(251,146,60,0.3)" activeTextColor="#fb923c" onClick={()=>openP('🔥',`${m}er Serie`,`Längste Serie: ${streak2}.`)}/>;  })}
-                </Sec2>
-                <Sec2 title="Einzel">
-                  {[{i:'🥇',f:'einzel1',d:ACHIEVEMENT_DESCRIPTIONS.einzel1},{i:'🥈',f:'einzel2',d:ACHIEVEMENT_DESCRIPTIONS.einzel2},{i:'🥉',f:'einzel3',d:ACHIEVEMENT_DESCRIPTIONS.einzel3}].map(({i,f,d})=>{const c=ach[f]||0;return <SmTile2 key={f} icon={i} label="Platz" sub2={c>0?`×${c}`:undefined} has={c>0} activeBg="rgba(253,230,138,0.1)" activeBorder="rgba(253,230,138,0.3)" activeTextColor="#fde68a" onClick={()=>openP(i,f,d,c)}/>;  })}
-                </Sec2>
-                <Sec2 title="Doppel">
-                  {[{i:'🥇',f:'doppel1',d:ACHIEVEMENT_DESCRIPTIONS.doppel1},{i:'🥈',f:'doppel2',d:ACHIEVEMENT_DESCRIPTIONS.doppel2},{i:'🥉',f:'doppel3',d:ACHIEVEMENT_DESCRIPTIONS.doppel3}].map(({i,f,d})=>{const c=ach[f]||0;return <SmTile2 key={f} icon={i} label="Platz" sub2={c>0?`×${c}`:undefined} has={c>0} activeBg="rgba(253,230,138,0.1)" activeBorder="rgba(253,230,138,0.3)" activeTextColor="#fde68a" onClick={()=>openP(i,f,d,c)}/>;  })}
                 </Sec2>
                 <Sec2 title="Mannschaft & Auszeichnungen">
                   {(()=>{const c=ach['team']||0;return <SmTile2 icon='🏆' label='Meister' sub2={c>0?`×${c}`:undefined} has={c>0} activeBg="rgba(253,230,138,0.1)" activeBorder="rgba(253,230,138,0.3)" activeTextColor="#fde68a" onClick={()=>openP('🏆','Meisterschaft',ACHIEVEMENT_DESCRIPTIONS.team,c)}/>;})()}
@@ -7199,33 +7177,6 @@ export default function TrainingsApp() {
                                 </div>
                               );
                             })}
-                          </div>
-                        </div>
-
-                        {/* Turnierergebnisse */}
-                        <div>
-                          <SecLbl>🎖️ Turnierergebnisse</SecLbl>
-                          <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'12px',overflow:'hidden'}}>
-                            <div style={{padding:'6px 12px',borderBottom:'1px solid rgba(255,255,255,0.06)',fontSize:'10px',fontWeight:'800',color:'rgba(253,230,138,0.4)',letterSpacing:'1.2px'}}>EINZEL</div>
-                            <div style={{padding:'6px 10px',display:'flex',flexDirection:'column',gap:'4px'}}>
-                              {[{label:'🥇 1. Platz',field:'einzel1'},{label:'🥈 2. Platz',field:'einzel2'},{label:'🥉 3. Platz',field:'einzel3'}].map(({label,field})=>{const v=ach[field]||0;return(
-                                <div key={field} style={{display:'flex',alignItems:'center',gap:'10px',padding:'4px 6px',borderRadius:'8px',background:v>0?'rgba(251,146,60,0.08)':'transparent',border:v>0?'1px solid rgba(251,146,60,0.25)':'1px solid transparent'}}>
-                                  <span style={{flex:1,fontSize:'13px',color:v>0?'#fb923c':'rgba(255,255,255,0.3)',fontWeight:'700'}}>{label}</span>
-                                  {v>0&&<span style={{fontSize:'9px',fontWeight:'800',color:'#fb923c',background:'rgba(251,146,60,0.15)',border:'1px solid rgba(251,146,60,0.3)',borderRadius:'4px',padding:'1px 5px'}}>MANUELL</span>}
-                                  <AchCounter label="" val={v} onInc={()=>incField(field)} onDec={()=>decField(field)}/>
-                                </div>
-                              );})}
-                            </div>
-                            <div style={{padding:'6px 12px',borderTop:'1px solid rgba(255,255,255,0.06)',borderBottom:'1px solid rgba(255,255,255,0.06)',fontSize:'10px',fontWeight:'800',color:'rgba(103,232,249,0.4)',letterSpacing:'1.2px'}}>DOPPEL</div>
-                            <div style={{padding:'6px 10px',display:'flex',flexDirection:'column',gap:'4px'}}>
-                              {[{label:'🥇 1. Platz',field:'doppel1'},{label:'🥈 2. Platz',field:'doppel2'},{label:'🥉 3. Platz',field:'doppel3'}].map(({label,field})=>{const v=ach[field]||0;return(
-                                <div key={field} style={{display:'flex',alignItems:'center',gap:'10px',padding:'4px 6px',borderRadius:'8px',background:v>0?'rgba(251,146,60,0.08)':'transparent',border:v>0?'1px solid rgba(251,146,60,0.25)':'1px solid transparent'}}>
-                                  <span style={{flex:1,fontSize:'13px',color:v>0?'#fb923c':'rgba(255,255,255,0.3)',fontWeight:'700'}}>{label}</span>
-                                  {v>0&&<span style={{fontSize:'9px',fontWeight:'800',color:'#fb923c',background:'rgba(251,146,60,0.15)',border:'1px solid rgba(251,146,60,0.3)',borderRadius:'4px',padding:'1px 5px'}}>MANUELL</span>}
-                                  <AchCounter label="" val={v} onInc={()=>incField(field)} onDec={()=>decField(field)}/>
-                                </div>
-                              );})}
-                            </div>
                           </div>
                         </div>
 
