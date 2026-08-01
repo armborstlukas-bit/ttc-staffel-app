@@ -565,7 +565,7 @@ export default function TrainingsApp() {
   const [vergangeneExpandedId, setVergangeneExpandedId] = useState(null);
   const [aemterPickSearch, setAemterPickSearch] = useState('');
   const [aemterPickId, setAemterPickId] = useState(null);
-  const [aemterForm, setAemterForm] = useState({titel:'',von:'',bis:''});
+  const [aemterForm, setAemterForm] = useState({art:'amt',titel:'',von:'',bis:''});
   const [aemterEditKey, setAemterEditKey] = useState(null); // `${mitgliedId}_${index}` // 'top' | 'middle' | 'bottom' — für Scroll-Buttons in langen Listen (z.B. Mitgliederverwaltung)
   const [mitgliedExpandedId, setMitgliedExpandedId] = useState(null);
   const [mitgliedChildSearch, setMitgliedChildSearch] = useState('');
@@ -2023,7 +2023,8 @@ export default function TrainingsApp() {
   // "Ämter & Ehrentitel" (Vorstandsposten, sonstige Funktionen, Ehrenmitgliedschaften) —
   // liegen als Array direkt am Mitgliederlisten-Eintrag, damit sie 1:1 mit der Person
   // verknüpft bleiben (auch nach einem eventuellen Austritt) und sich einfach anzeigen/exportieren lassen.
-  const formatAemter = m => (m.aemter||[]).map(a => `${a.titel}${a.bis ? ` (${a.von||'?'}–${a.bis})` : a.von ? ` (seit ${a.von})` : ''}`).join('; ');
+  const AEMTER_ART_LABELS = {amt:'Amt',ehrentitel:'Ehrentitel',sonstiges:'Sonstiges'};
+  const formatAemter = m => (m.aemter||[]).map(a => `[${AEMTER_ART_LABELS[a.art]||'Amt'}] ${a.titel}${a.bis ? ` (${a.von||'?'}–${a.bis})` : a.von ? ` (seit ${a.von})` : ''}`).join('; ');
 
   const saveMitgliedAemter = async (id, aemter) => {
     setMitgliederListe(prev => ({ ...prev, [id]: { ...prev[id], aemter } }));
@@ -12710,7 +12711,7 @@ export default function TrainingsApp() {
                                 <span style={{fontSize:'11px',fontWeight:'800',color:'#fbbf24',display:'block',marginBottom:'4px'}}>🎖️ Ämter & Ehrentitel</span>
                                 {m.aemter.map((a,i)=>(
                                   <p key={i} style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.75)'}}>
-                                    {a.titel}{a.bis?` (${a.von||'?'}–${a.bis})`:a.von?` (seit ${a.von})`:''}
+                                    <span style={{color:'rgba(251,191,36,0.6)',fontWeight:'700'}}>{AEMTER_ART_LABELS[a.art]||'Amt'}:</span> {a.titel}{a.bis?` (${a.von||'?'}–${a.bis})`:a.von?` (seit ${a.von})`:''}
                                   </p>
                                 ))}
                               </div>
@@ -12894,8 +12895,8 @@ export default function TrainingsApp() {
       if (!aemterPickId || !aemterForm.titel.trim()) return;
       const m = mitgliederListe[aemterPickId];
       const cur = m?.aemter || [];
-      saveMitgliedAemter(aemterPickId, [...cur, {titel:aemterForm.titel.trim(), von:aemterForm.von||'', bis:aemterForm.bis||''}]);
-      setAemterForm({titel:'',von:'',bis:''});
+      saveMitgliedAemter(aemterPickId, [...cur, {art:aemterForm.art||'amt', titel:aemterForm.titel.trim(), von:aemterForm.von||'', bis:aemterForm.bis||''}]);
+      setAemterForm({art:'amt',titel:'',von:'',bis:''});
       setAemterPickId(null);
       setAemterPickSearch('');
     };
@@ -12942,6 +12943,15 @@ export default function TrainingsApp() {
                   <span style={{color:'#fbbf24',fontWeight:'700'}}>{mitgliederListe[aemterPickId]?.vorname} {mitgliederListe[aemterPickId]?.nachname}</span>
                   <button onClick={()=>setAemterPickId(null)} style={{padding:'2px 8px',background:'transparent',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'6px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'11px'}}>ändern</button>
                 </div>
+                <div>
+                  <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Art</span>
+                  <div style={{display:'flex',gap:'6px'}}>
+                    {[{key:'amt',label:'Amt'},{key:'ehrentitel',label:'Ehrentitel'},{key:'sonstiges',label:'Sonstiges'}].map(o=>(
+                      <button key={o.key} onClick={()=>setAemterForm(p=>({...p,art:o.key}))}
+                        style={{flex:1,padding:'7px 8px',borderRadius:'8px',border:`1px solid ${aemterForm.art===o.key?'rgba(251,191,36,0.6)':'rgba(255,255,255,0.15)'}`,background:aemterForm.art===o.key?'rgba(251,191,36,0.15)':'rgba(255,255,255,0.03)',color:aemterForm.art===o.key?'#fbbf24':'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>{o.label}</button>
+                    ))}
+                  </div>
+                </div>
                 <input value={aemterForm.titel} onChange={e=>setAemterForm(p=>({...p,titel:e.target.value}))} placeholder="Titel, z.B. Erster Vorsitzender, Hallenwart, Ehrenmitglied…"
                   style={{width:'100%',boxSizing:'border-box',padding:'9px 12px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'8px',color:'white',fontSize:'13px',outline:'none'}}/>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
@@ -12971,6 +12981,12 @@ export default function TrainingsApp() {
                     const key = `${mid}_${idx}`;
                     return aemterEditKey===key ? (
                       <div key={key} style={{display:'grid',gap:'6px',padding:'8px',background:'rgba(0,0,0,0.2)',borderRadius:'8px'}}>
+                        <div style={{display:'flex',gap:'6px'}}>
+                          {[{key:'amt',label:'Amt'},{key:'ehrentitel',label:'Ehrentitel'},{key:'sonstiges',label:'Sonstiges'}].map(o=>(
+                            <button key={o.key} onClick={()=>updateAemt(mid,idx,{art:o.key})}
+                              style={{flex:1,padding:'6px 8px',borderRadius:'7px',border:`1px solid ${(a.art||'amt')===o.key?'rgba(251,191,36,0.6)':'rgba(255,255,255,0.15)'}`,background:(a.art||'amt')===o.key?'rgba(251,191,36,0.15)':'rgba(255,255,255,0.03)',color:(a.art||'amt')===o.key?'#fbbf24':'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>{o.label}</button>
+                          ))}
+                        </div>
                         <input value={a.titel} onChange={e=>updateAemt(mid,idx,{titel:e.target.value})}
                           style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none'}}/>
                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
@@ -12984,7 +13000,7 @@ export default function TrainingsApp() {
                     ) : (
                       <div key={key} style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
                         <span style={{flex:1,minWidth:'150px',fontSize:'12px',color:'rgba(255,255,255,0.75)'}}>
-                          🎖️ {a.titel}{a.bis?` (${a.von||'?'}–${a.bis})`:a.von?` (seit ${a.von})`:''}
+                          🎖️ <span style={{color:'rgba(251,191,36,0.6)',fontWeight:'700'}}>{AEMTER_ART_LABELS[a.art]||'Amt'}:</span> {a.titel}{a.bis?` (${a.von||'?'}–${a.bis})`:a.von?` (seit ${a.von})`:''}
                         </span>
                         <button onClick={()=>setAemterEditKey(key)} style={{padding:'4px 9px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'rgba(255,255,255,0.6)',cursor:'pointer',fontSize:'11px'}}>✏️</button>
                         <button onClick={()=>removeAemt(mid,idx)} style={{padding:'4px 9px',background:'rgba(220,38,38,0.15)',border:'1px solid rgba(220,38,38,0.4)',borderRadius:'7px',color:'#fca5a5',cursor:'pointer',fontSize:'11px'}}>🗑️</button>
