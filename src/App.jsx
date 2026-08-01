@@ -12978,6 +12978,28 @@ export default function TrainingsApp() {
               style={{padding:'8px 14px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'9px',color:'#fbbf24',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:'700'}}>🎂 Geburtstagsliste</button>
             <button onClick={()=>{ensureXlsxLoaded();setShowJubilaeumExport(true);}}
               style={{padding:'8px 14px',background:'rgba(134,239,172,0.1)',border:'1px solid rgba(134,239,172,0.3)',borderRadius:'9px',color:'#86efac',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:'700'}}>🏅 Jubiläumsjahre</button>
+            <button onClick={()=>{
+                ensureXlsxLoaded();
+                const rows = [];
+                let gesamt = 0;
+                activeEntries.forEach(([bid,bm])=>{
+                  const fin = mitgliederFinanzen[bid] || {};
+                  const betrag = Number(fin.beitrag);
+                  if (!betrag || betrag<=0) return; // nur wer tatsächlich etwas zahlt
+                  gesamt += betrag;
+                  rows.push({
+                    Vorname: bm.vorname||'', Nachname: bm.nachname||'',
+                    IBAN: fin.iban||'⚠️ fehlt', BIC: fin.bic||'⚠️ fehlt',
+                    'SEPA-Mandatsreferenz': fin.sepaMandatsRef||'⚠️ fehlt', 'SEPA-Mandatsdatum': fin.sepaMandatsDatum||'',
+                    Beitragsart: BEITRAGSARTEN.find(a=>a.key===fin.beitragsart)?.label||'',
+                    'Betrag (€)': betrag,
+                  });
+                });
+                rows.sort((a,b)=>a.Nachname.localeCompare(b.Nachname,'de'));
+                rows.push({ Vorname:'', Nachname:'GESAMTSUMME', IBAN:'', BIC:'', 'SEPA-Mandatsreferenz':'', 'SEPA-Mandatsdatum':'', Beitragsart:`${rows.length} Personen`, 'Betrag (€)': gesamt });
+                exportRowsToXlsx(rows, 'Beitragseinzug', `Beitragseinzug_${TODAY}.xlsx`);
+              }}
+              style={{padding:'8px 14px',background:'rgba(103,232,249,0.1)',border:'1px solid rgba(103,232,249,0.3)',borderRadius:'9px',color:'#67e8f9',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:'700'}}>💳 Beitragseinzug</button>
           </div>
           <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
             <input value={mitgliederSearch} onChange={e=>setMitgliederSearch(e.target.value)} placeholder="Suche nach Name oder E-Mail…"
