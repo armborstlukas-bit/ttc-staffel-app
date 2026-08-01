@@ -559,7 +559,9 @@ export default function TrainingsApp() {
   const [mitgliederFinanzen, setMitgliederFinanzen] = useState({}); // { [id]: {strasse,plz,ort,telefon,handy,iban,bic,sepaMandatsRef,sepaMandatsDatum,zahlart,zahler,beitrag,kontosaldo,eintrittsdatum} } — admin-only, siehe firestore.rules
   const [mitgliederSearch, setMitgliederSearch] = useState('');
   const [jugendlicheFuerKinder, setJugendlicheFuerKinder] = useState(null); // null=noch nicht geladen — Liste der Jugendlichen aus der Mitgliedsdatei, per API (auch für Trainer ohne direkten mitgliederListe-Zugriff)
-  const [pageScrollPos, setPageScrollPos] = useState('top'); // 'top' | 'middle' | 'bottom' — für Scroll-Buttons in langen Listen (z.B. Mitgliederverwaltung)
+  const [pageScrollPos, setPageScrollPos] = useState('top');
+  const [vergangeneSearch, setVergangeneSearch] = useState('');
+  const [vergangeneExpandedId, setVergangeneExpandedId] = useState(null); // 'top' | 'middle' | 'bottom' — für Scroll-Buttons in langen Listen (z.B. Mitgliederverwaltung)
   const [mitgliedExpandedId, setMitgliedExpandedId] = useState(null);
   const [mitgliedChildSearch, setMitgliedChildSearch] = useState('');
   const [mitgliedLinkUid, setMitgliedLinkUid] = useState(null);
@@ -572,7 +574,6 @@ export default function TrainingsApp() {
   const [jubilaeumJahr, setJubilaeumJahr] = useState(String(new Date().getFullYear()));
   const [mitgliedAustrittEditId, setMitgliedAustrittEditId] = useState(null);
   const [mitgliedAustrittDatum, setMitgliedAustrittDatum] = useState('');
-  const [showExitedMitglieder, setShowExitedMitglieder] = useState(false);
   const [ttrProTagGroupFilter, setTtrProTagGroupFilter] = useState(''); // '' = alle, sonst subgroupId
   const [ttrProTagYear, setTtrProTagYear] = useState(new Date().getFullYear());
   const [ttrProTagMonth, setTtrProTagMonth] = useState(new Date().getMonth()+1);
@@ -12272,6 +12273,8 @@ export default function TrainingsApp() {
           <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
             <button onClick={()=>{setNewMitgliedForm(NEW_MITGLIED_DEFAULTS);setShowNewMitglied(true);}}
               style={{padding:'9px 16px',background:'#16a34a',color:'white',border:'none',borderRadius:'9px',cursor:'pointer',fontWeight:'800',fontSize:'13px'}}>+ Neues Mitglied anlegen</button>
+            <button onClick={()=>navTo('vergangeneMitglieder')}
+              style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.7)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'9px',cursor:'pointer',fontWeight:'800',fontSize:'13px'}}>📦 Ehemalige Mitglieder{exitedEntries.length>0?` (${exitedEntries.length})`:''}</button>
           </div>
           {blockedUsers.length > 0 && (
             <div style={{marginBottom:'16px',padding:'12px 14px',background:'rgba(153,27,27,0.1)',border:'1px solid rgba(153,27,27,0.4)',borderRadius:'12px'}}>
@@ -12694,29 +12697,6 @@ export default function TrainingsApp() {
             })}
             {filtered.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.3)',fontSize:'13px'}}>Keine Treffer.</p>}
           </div>
-          {exitedEntries.length > 0 && (
-            <div style={{marginTop:'20px'}}>
-              <button onClick={()=>setShowExitedMitglieder(o=>!o)}
-                style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'10px',cursor:'pointer',color:'rgba(255,255,255,0.6)'}}>
-                <span style={{fontSize:'13px',fontWeight:'800'}}>📦 {exitedEntries.length} vergangene{exitedEntries.length===1?'s':''} Mitglied{exitedEntries.length===1?'':'er'}</span>
-                <span style={{fontSize:'12px'}}>{showExitedMitglieder?'▲':'▼'}</span>
-              </button>
-              {showExitedMitglieder && (
-                <div style={{display:'grid',gap:'6px',marginTop:'8px'}}>
-                  {exitedEntries.map(([eid,em])=>(
-                    <div key={eid} style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',padding:'8px 10px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'8px'}}>
-                      <span style={{flex:1,minWidth:'150px',fontSize:'12px',color:'rgba(255,255,255,0.7)'}}><b>{em.vorname} {em.nachname}</b> · <span style={{color:'rgba(255,255,255,0.4)'}}>ausgetreten {mitgliederFinanzen[eid]?.austrittsdatum}</span></span>
-                      <button onClick={()=>saveFinanzField(eid,'austrittsdatum',null)}
-                        style={{padding:'5px 10px',background:'rgba(74,222,128,0.15)',color:'#86efac',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>↩️ Zurückholen</button>
-                      <button onClick={()=>{ if(window.confirm(`"${em.vorname} ${em.nachname}" wirklich unwiderruflich löschen? Das kann nicht rückgängig gemacht werden.`)) deleteMitgliedPermanently(eid); }}
-                        title="Unwiderruflich löschen"
-                        style={{padding:'5px 10px',background:'rgba(220,38,38,0.15)',color:'#fca5a5',border:'1px solid rgba(220,38,38,0.4)',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>🗑️</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
         </div>
         {pageScrollPos !== 'top' && (
           <button onClick={()=>window.scrollTo({top:0,behavior:'smooth'})} title="Nach oben"
@@ -12726,6 +12706,141 @@ export default function TrainingsApp() {
           <button onClick={()=>window.scrollTo({top:document.documentElement.scrollHeight,behavior:'smooth'})} title="Nach unten"
             style={{position:'fixed',right:'16px',bottom:'calc(82px + env(safe-area-inset-bottom,0px))',zIndex:950,width:'46px',height:'46px',borderRadius:'50%',background:'#16a34a',color:'white',border:'2px solid rgba(255,255,255,0.25)',boxShadow:'0 4px 18px rgba(0,0,0,0.5)',fontSize:'19px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>▼</button>
         )}
+      </div>
+    );
+  }
+
+  // ── EHEMALIGE MITGLIEDER VIEW ────────────────────────────────────────────
+  if (view === 'vergangeneMitglieder' && userRole === 'admin') {
+    const ROLE_LABELS = {admin:'Admin',trainer:'Trainer',aktiver:'Aktiver',eltern:'Eltern',jugendlich:'Jugendlicher',passiv:'Passives Mitglied'};
+    const getRoles = m => m.roles?.length ? m.roles : (m.role ? [m.role] : []);
+    const isAusgetreten = id => !!mitgliederFinanzen[id]?.austrittsdatum;
+    const exited = Object.entries(mitgliederListe)
+      .filter(([id]) => isAusgetreten(id))
+      .sort((a,b)=>(mitgliederFinanzen[b[0]]?.austrittsdatum||'').localeCompare(mitgliederFinanzen[a[0]]?.austrittsdatum||''));
+    const q = vergangeneSearch.trim().toLowerCase();
+    const filtered = exited.filter(([,m]) => !q || `${m.vorname} ${m.nachname} ${m.email||''}`.toLowerCase().includes(q));
+
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
+          <button onClick={()=>navTo('mitglieder')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'9px',color:'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:'600'}}><ArrowLeft size={15}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>📦 Ehemalige Mitglieder</h1>
+          <span style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>{exited.length}</span>
+        </div>
+        <div style={{padding:'16px 14px',maxWidth:'900px',margin:'0 auto'}}>
+          <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
+            Alle ausgetretenen Mitglieder. Ein Austritt in der aktiven Mitgliederverwaltung landet automatisch hier. Personen, die im laufenden Halbjahr ausgetreten sind, werden weiterhin beim "➗ Teileinzug" berücksichtigt.
+          </p>
+          <input value={vergangeneSearch} onChange={e=>setVergangeneSearch(e.target.value)} placeholder="Suche nach Name oder E-Mail…"
+            style={{width:'100%',boxSizing:'border-box',padding:'10px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(196,181,253,0.25)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',marginBottom:'14px'}}/>
+          <div style={{display:'grid',gap:'6px'}}>
+            {filtered.map(([id,m])=>{
+              const fin = mitgliederFinanzen[id] || {};
+              const roles = getRoles(m);
+              const isExpanded = vergangeneExpandedId === id;
+              return (
+                <div key={id} style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',overflow:'hidden'}}>
+                  <button onClick={()=>setVergangeneExpandedId(isExpanded?null:id)}
+                    style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',background:'transparent',border:'none',cursor:'pointer',textAlign:'left'}}>
+                    <div style={{flex:'1 1 200px',minWidth:0}}>
+                      <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'white'}}>{m.vorname} {m.nachname}</p>
+                      <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.4)'}}>ausgetreten {fin.austrittsdatum}</p>
+                    </div>
+                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',flexShrink:0}}>{isExpanded?'▲':'▼'}</span>
+                  </button>
+                  {isExpanded && (()=>{
+                    const fld = (key, label, opts={}) => (
+                      <div key={key} style={{minWidth:0}}>
+                        <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>{label}</span>
+                        <input value={fin[key]??''} type={opts.type||'text'} onChange={e=>saveFinanzField(id,key,e.target.value)}
+                          style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',fontFamily:opts.mono?'monospace':'inherit'}}/>
+                      </div>
+                    );
+                    const mfld = (key, label, opts={}) => (
+                      <div key={key} style={{minWidth:0}}>
+                        <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>{label}</span>
+                        <input value={m[key]??''} type={opts.type||'text'} onChange={e=>saveMitgliedField(id,key,e.target.value)}
+                          style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none'}}/>
+                      </div>
+                    );
+                    return (
+                      <div style={{padding:'0 12px 14px',display:'grid',gap:'12px'}}>
+                        <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'10px',padding:'10px',display:'grid',gap:'10px'}}>
+                          <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(196,181,253,0.6)',textTransform:'uppercase',letterSpacing:'0.5px'}}>⚙️ Rollen (früher)</span>
+                          <div style={{display:'flex',gap:'4px',flexWrap:'wrap'}}>
+                            {roles.length===0?<span style={{fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>keine Rolle</span>:
+                              roles.map(r=><span key={r} style={{fontSize:'10px',fontWeight:'700',padding:'2px 7px',borderRadius:'20px',background:'rgba(255,255,255,0.08)',color:'rgba(255,255,255,0.5)'}}>{ROLE_LABELS[r]||r}</span>)}
+                          </div>
+                        </div>
+                        <div style={{background:'rgba(251,191,36,0.04)',border:'1px solid rgba(251,191,36,0.15)',borderRadius:'10px',padding:'10px',display:'grid',gap:'14px'}}>
+                          <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(251,191,36,0.6)',textTransform:'uppercase',letterSpacing:'0.5px'}}>🗂️ Mitgliedsdaten</span>
+                          <div style={{display:'grid',gap:'8px'}}>
+                            <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.35)'}}>Persönliche Daten</span>
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1.4fr',gap:'6px'}}>
+                              {mfld('geburtsdatum','Geburtsdatum',{type:'date'})}{mfld('email','E-Mail',{type:'email'})}
+                            </div>
+                            <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1.5fr',gap:'6px'}}>
+                              {fld('strasse','Straße')}{fld('plz','PLZ')}{fld('ort','Ort')}
+                            </div>
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
+                              {fld('telefon','Telefon')}{fld('handy','Handy')}
+                            </div>
+                          </div>
+                          <div style={{display:'grid',gap:'8px',paddingTop:'12px',borderTop:'1px solid rgba(251,191,36,0.15)'}}>
+                            <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.35)'}}>Zahlungsdaten</span>
+                            <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:'6px'}}>
+                              {fld('iban','IBAN',{mono:true})}{fld('bic','BIC',{mono:true})}
+                            </div>
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
+                              {fld('sepaMandatsRef','SEPA-Mandatsreferenz')}{fld('sepaMandatsDatum','SEPA-Mandatsdatum')}
+                            </div>
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'6px'}}>
+                              {fld('zahlart','Zahlart')}{fld('zahler','Zahler')}{fld('zahlweise','Zahlweise')}
+                            </div>
+                            <div style={{display:'grid',gridTemplateColumns:'1.4fr 1fr 1fr',gap:'6px'}}>
+                              <div style={{minWidth:0}}>
+                                <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Beitragsart</span>
+                                <select value={fin.beitragsart||''} onChange={e=>{
+                                    const key = e.target.value;
+                                    const art = BEITRAGSARTEN.find(a=>a.key===key);
+                                    saveFinanzField(id,'beitragsart',key);
+                                    if (art) saveFinanzField(id,'beitrag',art.amount);
+                                  }}
+                                  style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',cursor:'pointer'}}>
+                                  <option value="" style={{background:'#1a1206'}}>– auswählen –</option>
+                                  {BEITRAGSARTEN.map(a=><option key={a.key} value={a.key} style={{background:'#1a1206'}}>{a.label} ({a.amount}€)</option>)}
+                                </select>
+                              </div>
+                              {fld('beitrag','Beitrag (€)')}{fld('kontosaldo','Kontosaldo (€)')}
+                            </div>
+                          </div>
+                          <div style={{padding:'10px 12px',background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'8px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+                            <span style={{fontSize:'12px',fontWeight:'800',color:'#fbbf24',whiteSpace:'nowrap'}}>📅 Eintrittsdatum</span>
+                            <input value={fin.eintrittsdatum??''} onChange={e=>saveFinanzField(id,'eintrittsdatum',e.target.value)}
+                              style={{flex:1,minWidth:'140px',padding:'7px 10px',background:'#1a1206',border:'1px solid rgba(251,191,36,0.4)',borderRadius:'7px',color:'white',fontSize:'13px',fontWeight:'700',outline:'none'}}/>
+                          </div>
+                          <div style={{padding:'10px 12px',background:'rgba(220,38,38,0.08)',border:'1px solid rgba(220,38,38,0.3)',borderRadius:'8px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+                            <span style={{fontSize:'12px',fontWeight:'800',color:'#fca5a5',whiteSpace:'nowrap'}}>🚪 Austrittsdatum</span>
+                            <input value={fin.austrittsdatum??''} onChange={e=>saveFinanzField(id,'austrittsdatum',e.target.value)}
+                              style={{flex:1,minWidth:'140px',padding:'7px 10px',background:'#1a1206',border:'1px solid rgba(220,38,38,0.4)',borderRadius:'7px',color:'white',fontSize:'13px',fontWeight:'700',outline:'none'}}/>
+                          </div>
+                        </div>
+                        <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                          <button onClick={()=>{saveFinanzField(id,'austrittsdatum',null);setVergangeneExpandedId(null);}}
+                            style={{padding:'8px 14px',background:'rgba(74,222,128,0.15)',color:'#86efac',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>↩️ Zurückholen (wieder aktiv)</button>
+                          <button onClick={()=>{ if(window.confirm(`"${m.vorname} ${m.nachname}" wirklich unwiderruflich löschen? Das kann nicht rückgängig gemacht werden.`)) { deleteMitgliedPermanently(id); setVergangeneExpandedId(null); } }}
+                            style={{padding:'8px 14px',background:'rgba(220,38,38,0.15)',color:'#fca5a5',border:'1px solid rgba(220,38,38,0.4)',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>🗑️ Unwiderruflich löschen</button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              );
+            })}
+            {filtered.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.3)',fontSize:'13px'}}>Keine Treffer.</p>}
+          </div>
+        </div>
       </div>
     );
   }
