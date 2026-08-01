@@ -12266,6 +12266,59 @@ export default function TrainingsApp() {
                 exportRowsToXlsx(rows, 'Beitragseinzug', `Beitragseinzug_${TODAY}.xlsx`, noteText);
               }}
               style={{padding:'8px 14px',background:'rgba(103,232,249,0.1)',border:'1px solid rgba(103,232,249,0.3)',borderRadius:'9px',color:'#67e8f9',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:'700'}}>💳 Beitragseinzug</button>
+            <button onClick={()=>{
+                ensureXlsxLoaded();
+                const jahr = new Date().getFullYear();
+                const rows = [];
+                let gesamt = 0, missingIban = 0, missingBic = 0, missingMandat = 0;
+
+                // Eintritt im laufenden Jahr, 2. Halbjahr (Juli–Dezember) → nur halber Jahresbeitrag fällig
+                activeEntries.forEach(([bid,bm])=>{
+                  const fin = mitgliederFinanzen[bid] || {};
+                  const betrag = Number(fin.beitrag);
+                  if (!betrag || betrag<=0 || !fin.eintrittsdatum) return;
+                  const [ey,em] = fin.eintrittsdatum.split('-').map(Number);
+                  if (ey!==jahr || em<7) return; // nur 2. Halbjahr-Eintritte sind teilzahlungspflichtig
+                  const anteilig = Math.round((betrag/2)*100)/100;
+                  gesamt += anteilig;
+                  if (!fin.iban) missingIban++; if (!fin.bic) missingBic++; if (!fin.sepaMandatsRef) missingMandat++;
+                  rows.push({
+                    Vorname: bm.vorname||'', Nachname: bm.nachname||'',
+                    Grund: `Eintritt ${fin.eintrittsdatum} (2. Halbjahr)`,
+                    'Jahresbeitrag (€)': betrag, 'Anteiliger Beitrag (€)': anteilig,
+                    IBAN: fin.iban||'⚠️ fehlt', BIC: fin.bic||'⚠️ fehlt', 'SEPA-Mandatsreferenz': fin.sepaMandatsRef||'⚠️ fehlt',
+                  });
+                });
+
+                // Austritt im laufenden Jahr, 1. Halbjahr (Januar–Juni) → nur halber Jahresbeitrag fällig
+                exitedEntries.forEach(([bid,bm])=>{
+                  const fin = mitgliederFinanzen[bid] || {};
+                  const betrag = Number(fin.beitrag);
+                  if (!betrag || betrag<=0 || !fin.austrittsdatum) return;
+                  const [ay,am] = fin.austrittsdatum.split('-').map(Number);
+                  if (ay!==jahr || am>6) return; // nur 1. Halbjahr-Austritte sind teilzahlungspflichtig
+                  const anteilig = Math.round((betrag/2)*100)/100;
+                  gesamt += anteilig;
+                  if (!fin.iban) missingIban++; if (!fin.bic) missingBic++; if (!fin.sepaMandatsRef) missingMandat++;
+                  rows.push({
+                    Vorname: bm.vorname||'', Nachname: bm.nachname||'',
+                    Grund: `Austritt ${fin.austrittsdatum} (1. Halbjahr)`,
+                    'Jahresbeitrag (€)': betrag, 'Anteiliger Beitrag (€)': anteilig,
+                    IBAN: fin.iban||'⚠️ fehlt', BIC: fin.bic||'⚠️ fehlt', 'SEPA-Mandatsreferenz': fin.sepaMandatsRef||'⚠️ fehlt',
+                  });
+                });
+
+                rows.sort((a,b)=>a.Nachname.localeCompare(b.Nachname,'de'));
+                rows.push({ Vorname:'', Nachname:'GESAMTSUMME', Grund:`${rows.length} Personen`, 'Jahresbeitrag (€)':'', 'Anteiliger Beitrag (€)':gesamt, IBAN:'', BIC:'', 'SEPA-Mandatsreferenz':'' });
+                const missingParts = ['Gläubiger-ID des Vereins', 'Vereins-IBAN/BIC'];
+                if (missingIban>0) missingParts.push(`${missingIban}× IBAN fehlt`);
+                if (missingBic>0) missingParts.push(`${missingBic}× BIC fehlt`);
+                if (missingMandat>0) missingParts.push(`${missingMandat}× SEPA-Mandatsreferenz fehlt`);
+                const noteText = `⚠️ Halber Jahresbeitrag bei Eintritt im 2. Halbjahr bzw. Austritt im 1. Halbjahr ${jahr}. Für vollständigen SEPA-Export fehlt noch: ${missingParts.join(' · ')}`;
+                if (rows.length<=1) { alert('Aktuell keine Personen mit anteiligem Beitrag im laufenden Jahr gefunden.'); return; }
+                exportRowsToXlsx(rows, 'Teileinzug', `Teileinzug_${jahr}.xlsx`, noteText);
+              }}
+              style={{padding:'8px 14px',background:'rgba(196,181,253,0.1)',border:'1px solid rgba(196,181,253,0.3)',borderRadius:'9px',color:'#c4b5fd',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:'700'}}>➗ Teileinzug</button>
           </div>
           <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
             <input value={mitgliederSearch} onChange={e=>setMitgliederSearch(e.target.value)} placeholder="Suche nach Name oder E-Mail…"
