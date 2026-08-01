@@ -81,6 +81,38 @@ if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styl
     @media (min-width: 601px) {
       .ttc-hide-desktop { display: none !important; }
     }
+    @keyframes ttcConfettiFall {
+      0%   { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(110vh) rotate(600deg); opacity: 0.9; }
+    }
+    @keyframes ttcUnlockPop {
+      0%   { transform: scale(0.3) rotate(-8deg); opacity: 0; }
+      55%  { transform: scale(1.12) rotate(3deg); opacity: 1; }
+      75%  { transform: scale(0.96) rotate(-1deg); }
+      100% { transform: scale(1) rotate(0deg); }
+    }
+    @keyframes ttcUnlockRing {
+      0%   { transform: scale(0.6); opacity: 0.9; }
+      100% { transform: scale(2.4); opacity: 0; }
+    }
+    @keyframes ttcUnlockGlow {
+      0%, 100% { filter: drop-shadow(0 0 18px rgba(74,222,128,0.55)); }
+      50%      { filter: drop-shadow(0 0 34px rgba(74,222,128,0.9)); }
+    }
+    @keyframes ttcUnlockBadgeSpin {
+      0%   { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .ttc-confetti-piece {
+      position: absolute; top: -12px; width: 9px; height: 14px; opacity: 0.95;
+      animation-name: ttcConfettiFall; animation-timing-function: linear; animation-iteration-count: infinite;
+    }
+    .ttc-unlock-badge {
+      animation: ttcUnlockPop 0.7s cubic-bezier(0.34,1.56,0.64,1) both, ttcUnlockGlow 1.8s ease-in-out 0.7s infinite;
+    }
+    .ttc-unlock-ring {
+      animation: ttcUnlockRing 1.6s cubic-bezier(0.16,1,0.3,1) infinite;
+    }
   `;
   document.head.appendChild(st);
 }
@@ -267,6 +299,61 @@ function AchievementPopup({ data, onClose }) {
   );
 }
 
+
+// ── Feier-Animation für neu freigeschaltete Errungenschaften (beim App-Start) ──
+function AchievementUnlockCelebration({ queue, onDone }) {
+  const [idx, setIdx] = useState(0);
+  const confetti = React.useMemo(() => Array.from({ length: 36 }, (_, i) => ({
+    left: Math.random() * 100,
+    delay: Math.random() * 1.4,
+    duration: 2.6 + Math.random() * 1.8,
+    color: ['#4ade80', '#16a34a', '#ffffff', '#bbf7d0', '#166534'][i % 5],
+    rotate: Math.random() * 360,
+    size: 7 + Math.random() * 6,
+  })), []);
+  if (!queue || queue.length === 0) return null;
+  const item = queue[idx];
+  const isLast = idx >= queue.length - 1;
+  const next = () => { if (isLast) onDone(); else setIdx(i => i + 1); };
+  return (
+    <Modal>
+      <div onClick={next} style={{position:'fixed',inset:0,zIndex:99999,cursor:'pointer',overflow:'hidden',
+        background:'radial-gradient(circle at 50% 38%, rgba(22,101,52,0.55), rgba(0,0,0,0.88) 70%)',
+        display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
+        {confetti.map((c,i) => (
+          <span key={i} className="ttc-confetti-piece" style={{
+            left:`${c.left}%`, background:c.color, borderRadius: i%3===0?'50%':'2px',
+            width:`${c.size}px`, height:`${c.size*1.5}px`,
+            animationDuration:`${c.duration}s`, animationDelay:`${c.delay}s`,
+            transform:`rotate(${c.rotate}deg)`,
+          }}/>
+        ))}
+        <div onClick={e=>e.stopPropagation()} style={{position:'relative',textAlign:'center',maxWidth:'380px',width:'100%'}}>
+          <div style={{position:'relative',width:'170px',height:'170px',margin:'0 auto 18px',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <span className="ttc-unlock-ring" style={{position:'absolute',inset:0,borderRadius:'50%',border:'3px solid #4ade80'}}/>
+            <span className="ttc-unlock-ring" style={{position:'absolute',inset:0,borderRadius:'50%',border:'3px solid #86efac',animationDelay:'0.4s'}}/>
+            <div className="ttc-unlock-badge" style={{position:'relative',width:'150px',height:'150px',borderRadius:'50%',
+              background:'radial-gradient(circle at 35% 30%, #4ade80, #15803d 70%)',
+              border:'5px solid white',display:'flex',alignItems:'center',justifyContent:'center',
+              boxShadow:'0 0 0 6px rgba(74,222,128,0.25)'}}>
+              <span style={{fontSize:'62px',filter:'drop-shadow(0 3px 6px rgba(0,0,0,0.4))'}}>{item.icon}</span>
+            </div>
+          </div>
+          <img src="/logo.png" alt="TTC Logo" style={{width:'34px',height:'34px',objectFit:'contain',opacity:0.9,marginBottom:'10px',filter:'drop-shadow(0 2px 6px rgba(0,0,0,0.5))'}}/>
+          <p style={{margin:'0 0 6px',fontSize:'12px',fontWeight:'900',letterSpacing:'2px',textTransform:'uppercase',color:'#86efac'}}>🎉 Neue Errungenschaft!</p>
+          <h2 style={{margin:'0 0 10px',fontSize:'25px',fontWeight:'900',color:'white',textShadow:'0 2px 10px rgba(0,0,0,0.5)',lineHeight:1.2}}>{item.title}</h2>
+          <p style={{margin:'0 0 22px',fontSize:'14px',color:'rgba(255,255,255,0.75)',lineHeight:'1.5'}}>{item.desc}</p>
+          {queue.length > 1 && (
+            <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.4)',fontWeight:'700'}}>{idx+1} / {queue.length}</p>
+          )}
+          <button onClick={next} style={{padding:'13px 34px',background:'linear-gradient(135deg,#4ade80,#16a34a)',color:'white',border:'none',borderRadius:'99px',cursor:'pointer',fontWeight:'800',fontSize:'15px',boxShadow:'0 8px 24px rgba(22,163,74,0.5)'}}>
+            {isLast ? '🎊 Klasse!' : 'Weiter →'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 // ── Spieler des Monats/Jahres: individuell gestaltete Auszeichnungs-Kachel je Monat ──
 const MONTH_THEMES = [
@@ -631,6 +718,7 @@ export default function TrainingsApp() {
   const [editingArchivedSession, setEditingArchivedSession] = useState(null);
   const [editArchivedForm, setEditArchivedForm]             = useState({});
   const [achievementPopup, setAchievementPopup]             = useState(null);
+  const [unlockCelebrationQueue, setUnlockCelebrationQueue] = useState([]); // neu freigeschaltete Errungenschaften, warten auf die Feier-Animation
   const [notifications, setNotifications]                   = useState({});
   const [notificationsLoaded, setNotificationsLoaded]       = useState(false);
   const notificationsRef = React.useRef({});  // immer aktueller Wert ohne Dep-Trigger
@@ -2949,6 +3037,70 @@ export default function TrainingsApp() {
     return max;
   };
 
+  // Baut eine Menge eindeutiger Schlüssel für ALLE aktuell freigeschalteten Errungenschaften
+  // eines Kindes (TTR-Meilensteine, Trainings-Meilensteine, Trainingsserien, Ranglisten-Tiers,
+  // Spieler des Monats/Jahres). Dient als Grundlage für den Neu-Erkennungs-Vergleich beim
+  // App-Start (siehe unlockCelebration-Logik) — ein Schlüssel, der neu dazukommt, löst die
+  // Feier-Animation aus.
+  const getAchievementKeysForChild = (childId) => {
+    const keys = [];
+    const child = children[childId];
+    if (!child) return keys;
+    (child.achievements?.ttrUnlocked || []).forEach(v => keys.push({ key:`ttr_${v}`, icon:'🏓', title:`${v} TTR erreicht!`, desc: ACHIEVEMENT_DESCRIPTIONS.ttr(v) }));
+    const total = getTotalTrainingsAttended(childId);
+    [10,25,50,100,200,500,1000].forEach(m => { if (total>=m) keys.push({ key:`training_${m}`, icon:'🏋️', title:`${m} Trainings absolviert!`, desc:`Du hast insgesamt ${m} Trainingseinheiten absolviert.` }); });
+    const streak = getLongestStreak(childId);
+    [5,10,20,30,50].forEach(m => { if (streak>=m) keys.push({ key:`streak_${m}`, icon:'🔥', title:`${m}er Trainingsserie!`, desc:`${m} Trainingseinheiten in Folge ohne Fehlzeit.` }); });
+    const rAch = ranglisteAch[childId];
+    RANK_TIERS.forEach(t => { if (rAch?.reached?.[t.key]) keys.push({ key:`rank_${t.key}`, icon:t.icon, title:`${t.label} in der Rangliste!`, desc:`Du hast in der TTC-Rangliste ${t.label} erreicht.` }); });
+    (spielerDesMonatsWins[childId] || []).forEach(w => {
+      const isYear = w.type === 'year';
+      keys.push({ key:`sdm_${w.type}_${w.period}`, icon: isYear?'👑':'⭐', title: isYear?`Spieler des Jahres ${w.period}!`:'Spieler des Monats!', desc: isYear?`Du warst Spieler des Jahres ${w.period}!`:`Du warst Spieler des Monats — starke Leistung!` });
+    });
+    return keys;
+  };
+
+  // Vergleicht die aktuell freigeschalteten Errungenschaften eines Kindes mit den zuletzt
+  // gesehenen (children[id].seenAchievementKeys) und liefert die neuen zurück. Ganz neue Kinder
+  // (Feld existiert noch nicht) werden beim allerersten Mal nur "stillschweigend" geseedet, damit
+  // nicht sofort die komplette bisherige Sammlung als "neu" gefeiert wird.
+  const checkNewAchievements = (childId) => {
+    const child = children[childId];
+    if (!child) return [];
+    const current = getAchievementKeysForChild(childId);
+    const seen = child.seenAchievementKeys;
+    if (!seen) {
+      setChildren(prev => ({ ...prev, [childId]: { ...prev[childId], seenAchievementKeys: current.map(c=>c.key) } }));
+      updateDoc(doc(db,'ttc','children'), { [`${childId}.seenAchievementKeys`]: current.map(c=>c.key) }).catch(()=>{});
+      return [];
+    }
+    const seenSet = new Set(seen);
+    const fresh = current.filter(c => !seenSet.has(c.key));
+    if (fresh.length > 0) {
+      const union = [...new Set([...seen, ...current.map(c=>c.key)])];
+      setChildren(prev => ({ ...prev, [childId]: { ...prev[childId], seenAchievementKeys: union } }));
+      updateDoc(doc(db,'ttc','children'), { [`${childId}.seenAchievementKeys`]: union }).catch(()=>{});
+    }
+    return fresh;
+  };
+
+  // Prüft einmal pro App-Start (nicht bei jedem Re-Render), ob das eigene Kind seit dem
+  // letzten Öffnen neue Errungenschaften freigeschaltet hat, und reiht sie für die
+  // Feier-Animation ein. Nur für Eltern/Jugendliche relevant, läuft erst wenn Kinder- und
+  // Ranglisten-Daten geladen sind.
+  const achievementCheckDone = useRef(false);
+  useEffect(() => {
+    if (achievementCheckDone.current) return;
+    if (!(userRole === 'eltern' || userRole === 'jugendlich')) return;
+    if (Object.keys(children).length === 0) return;
+    const myChild = getMyChild();
+    if (!myChild) return;
+    achievementCheckDone.current = true;
+    const fresh = checkNewAchievements(myChild.id);
+    if (fresh.length > 0) setUnlockCelebrationQueue(fresh);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userRole, children, ranglisteAch]);
+
   const deleteArchivedSession = (id) => {
     if (!window.confirm('Eintrag wirklich endgültig aus dem Archiv löschen? Das kann nicht rückgängig gemacht werden.')) return;
     const u = {...archivedSessions}; delete u[id]; saveArchivedSessions(u);
@@ -4806,6 +4958,7 @@ export default function TrainingsApp() {
       return (
         <div className="ttc-view-enter" key={`${viewKey}-sub-${elternSubView}`} style={{minHeight:'100vh',background:meta.bg,fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
           <AchievementPopup data={achievementPopup} onClose={()=>setAchievementPopup(null)}/>
+          {unlockCelebrationQueue.length>0 && <AchievementUnlockCelebration queue={unlockCelebrationQueue} onDone={()=>setUnlockCelebrationQueue([])}/>}
           {ptDetailModal&&(()=>{
             const mpt=ptDetailModal;const mPlayers=mpt.players||[];const mMatches=mpt.matches||[];const isArchived=!!mpt.archivedAt;
             const placeEmojiM=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
@@ -4840,6 +4993,7 @@ export default function TrainingsApp() {
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <AchievementPopup data={achievementPopup} onClose={()=>setAchievementPopup(null)}/>
+        {unlockCelebrationQueue.length>0 && <AchievementUnlockCelebration queue={unlockCelebrationQueue} onDone={()=>setUnlockCelebrationQueue([])}/>}
 
         {/* Profil-Modal */}
         {showProfile&&(
