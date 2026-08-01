@@ -11531,6 +11531,12 @@ export default function TrainingsApp() {
               onMouseLeave={e=>{e.currentTarget.style.background='rgba(252,211,77,0.07)';e.currentTarget.style.borderColor='rgba(252,211,77,0.2)';}}>
               <span style={{fontSize:'16px'}}>🥇</span> Spieler des Monats
             </button>
+            <button onClick={()=>navTo('ttrProTag')}
+              style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',padding:'12px',background:'rgba(103,232,249,0.07)',border:'1px solid rgba(103,232,249,0.2)',borderRadius:'14px',color:'#67e8f9',cursor:'pointer',fontWeight:'700',fontSize:'14px',transition:'all 0.12s'}}
+              onMouseEnter={e=>{e.currentTarget.style.background='rgba(103,232,249,0.13)';e.currentTarget.style.borderColor='rgba(103,232,249,0.4)';}}
+              onMouseLeave={e=>{e.currentTarget.style.background='rgba(103,232,249,0.07)';e.currentTarget.style.borderColor='rgba(103,232,249,0.2)';}}>
+              <span style={{fontSize:'16px'}}>📆</span> TTR / Tage
+            </button>
           </div>
 
           <div style={{display:'flex',gap:'6px',marginBottom:'16px',flexWrap:'wrap'}}>
@@ -11600,6 +11606,75 @@ export default function TrainingsApp() {
               </div>
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── TTR / TAGE VIEW ─────────────────────────────────────────────────────
+  // TTR-Wert geteilt durch Lebenstage (Geburtsdatum aus der Mitgliederverwaltung) —
+  // ein kleines Spaß-Ranking: TTR-Punkte pro gelebtem Tag.
+  if (view === 'ttrProTag' && canEdit()) {
+    const accent = '#67e8f9';
+    const wordSet = s => (s||'').replace(/,/g,' ').trim().toLowerCase().replace(/\s+/g,' ').split(' ').filter(Boolean).sort().join(' ');
+    const pool = [
+      ...Object.values(aktiveSpieler).map(sp=>({label:sp.name, ttr:sp.ttr})),
+      ...Object.values(children).map(c=>{
+        const hist=(ttrHistory[c.id]?.entries||[]).slice().sort((a,b)=>a.month.localeCompare(b.month));
+        const last=hist[hist.length-1];
+        return last ? {refId:'jugend:'+c.id, id:c.id, label:c.name, ttr:last.ttr} : null;
+      }).filter(Boolean),
+    ];
+    const resolveTtrRef = refId => {
+      if (!refId) return null;
+      const [kind, rid] = refId.split(':');
+      if (kind==='aktiv') return aktiveSpieler[rid]?.ttr ?? null;
+      if (kind==='jugend') {
+        const hist=(ttrHistory[rid]?.entries||[]).slice().sort((a,b)=>a.month.localeCompare(b.month));
+        return hist[hist.length-1]?.ttr ?? null;
+      }
+      return null;
+    };
+    const todayMs = Date.now();
+    const rows = Object.values(mitgliederListe).map(m=>{
+      if (!m.geburtsdatum) return null;
+      let ttr = m.ttrRefId ? resolveTtrRef(m.ttrRefId) : null;
+      if (ttr==null) {
+        const fullNameWords = wordSet(`${m.vorname} ${m.nachname}`);
+        ttr = pool.find(p=>wordSet(p.label)===fullNameWords)?.ttr ?? null;
+      }
+      if (ttr==null) return null;
+      const geb = new Date(m.geburtsdatum+'T00:00:00');
+      if (isNaN(geb.getTime())) return null;
+      const lebenstage = Math.floor((todayMs - geb.getTime())/86400000);
+      if (lebenstage<=0) return null;
+      return { name:`${m.vorname} ${m.nachname}`, ttr, lebenstage, quotient: ttr/lebenstage };
+    }).filter(Boolean).sort((a,b)=>b.quotient-a.quotient);
+
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#00151a 0%,#012129 45%,#000e11 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+          <button onClick={()=>navTo('ttrWerte')} style={s.btn(accent)}><Home size={16}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>📆 TTR / Tage</h1>
+          <span style={{fontSize:'12px',color:'rgba(103,232,249,0.7)',fontWeight:'600'}}>{rows.length} Spieler</span>
+        </div>
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:'16px'}}>
+          <p style={{margin:'0 0 16px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
+            TTR-Wert geteilt durch die Anzahl gelebter Tage (aus dem Geburtsdatum in der Mitgliederverwaltung berechnet). Nur Spieler mit bekanntem TTR-Wert UND Geburtsdatum erscheinen hier.
+          </p>
+          <div style={{display:'grid',gap:'6px'}}>
+            {rows.map((r,i)=>(
+              <div key={r.name} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(103,232,249,0.15)',borderRadius:'10px'}}>
+                <span style={{width:'26px',textAlign:'center',fontSize:'12px',fontWeight:'800',color:'rgba(103,232,249,0.6)'}}>{i+1}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <p style={{margin:0,fontSize:'13px',fontWeight:'700'}}>{r.name}</p>
+                  <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>TTR {r.ttr} · {r.lebenstage.toLocaleString('de-DE')} Lebenstage</p>
+                </div>
+                <span style={{fontSize:'15px',fontWeight:'800',color:accent}}>{r.quotient.toFixed(4)}</span>
+              </div>
+            ))}
+            {rows.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.3)',fontSize:'13px'}}>Noch keine Spieler mit TTR-Wert und Geburtsdatum gefunden.</p>}
+          </div>
         </div>
       </div>
     );
