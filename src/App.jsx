@@ -4711,7 +4711,7 @@ export default function TrainingsApp() {
             {label:'Trikotgrößen', icon:'👕', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.2)', action:()=>navTo('trikotgroessen')},
           ]:[]),
           ...(userRole==='admin'?[
-            {label:'Mitgliederverwaltung', icon:'🗂️', color:'#c4b5fd', bg:'rgba(196,181,253,0.08)', border:'rgba(196,181,253,0.2)', action:()=>navTo('mitglieder')},
+            {label:'Mitglieder', icon:'🗂️', color:'#c4b5fd', bg:'rgba(196,181,253,0.08)', border:'rgba(196,181,253,0.2)', action:()=>navTo('mitglieder')},
           ]:[]),
           ...(canAccessRompel()?[
             {label:'Rompel Bereich', icon:{type:'img',src:'/rompel.jpg'}, color:'#fda4af', bg:'rgba(253,164,175,0.08)', border:'rgba(253,164,175,0.25)', action:()=>navTo('rompel')},
@@ -4724,7 +4724,7 @@ export default function TrainingsApp() {
             {label:'Datenlöschen',   icon:'🗑️', color:'#fca5a5', bg:'rgba(220,38,38,0.08)', border:'rgba(220,38,38,0.25)', action:()=>navTo('datenloeschen')},
             {label:'App-Statistik',  icon:'📈', color:'#7dd3fc', bg:'rgba(125,211,252,0.1)', border:'rgba(125,211,252,0.25)', action:()=>navTo('usageStats')},
           ]:[]),
-          {label:'Verbesserungsvorschläge', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.08)', border:'rgba(196,181,253,0.25)', action:()=>navTo('verbesserungswuensche')},
+          {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.08)', border:'rgba(196,181,253,0.25)', action:()=>navTo('verbesserungswuensche')},
         ],
       },
     ];
@@ -5041,7 +5041,7 @@ export default function TrainingsApp() {
               {label:'Trainingsmatches',icon:'⚔️', desc:'Duelle & Allzeittabelle',                  color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>navTo('trainingsmatches')},
               ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', desc:'Wetten, Zitate & Lessons Learned', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
               {label:'MyTischtennis', icon:'🏓', desc:'Vereinsübersicht auf MyTischtennis',                                                                  color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)',  action:()=>(()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953/mannschaften';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);})()},
-              {label:'Verbesserungsvorschläge', icon:'💡', desc:'Deine Ideen für die App', color:'#c4b5fd', bg:'rgba(196,181,253,0.07)', border:'rgba(196,181,253,0.2)', action:()=>navTo('verbesserungswuensche')},
+              {label:'Verbesserungen', icon:'💡', desc:'Deine Ideen für die App', color:'#c4b5fd', bg:'rgba(196,181,253,0.07)', border:'rgba(196,181,253,0.2)', action:()=>navTo('verbesserungswuensche')},
             ].map(t=>(
               <button key={t.label} onClick={t.action} className={t.blink?'ttc-blink':''}
                 style={{position:'relative',background:t.bg,border:`1px solid ${t.border}`,borderRadius:'18px',padding:'22px 20px',cursor:'pointer',textAlign:'left',display:'flex',flexDirection:'column',gap:'8px',transition:'transform 0.15s'}}
@@ -5619,7 +5619,7 @@ export default function TrainingsApp() {
                   {label:'Vereinskalender', icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.1)', border:'rgba(251,191,36,0.25)', action:()=>{navTo('kalender');fetchKalender();}},
                   {label: tippspielNeedsAttention&&tippspielConfig?.deadline ? `Tipps bis ${new Date(tippspielConfig.deadline+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}!` : 'TTC Tippspiel', icon:'🎱', color:'#f9a8d4', bg:'rgba(244,114,182,0.1)', border:'rgba(244,114,182,0.25)', blink: tippspielNeedsAttention, action:()=>{markTippspielSeen();navTo('tippspiel');fetchTippspiel();}},
                   ...(isJugend ? [{label:'Gegnerlogbuch', icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.1)', border:'rgba(8,145,178,0.25)', action:()=>navTo('gegnerlogbuch')}] : []),
-                  {label:'Verbesserungsvorschläge', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('verbesserungswuensche')},
+                  {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('verbesserungswuensche')},
                 ],
               },
             ];
