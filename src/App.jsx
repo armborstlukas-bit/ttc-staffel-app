@@ -3400,7 +3400,7 @@ export default function TrainingsApp() {
   }
 
   // ── PASSIVES MITGLIED: stark eingeschränkter Bereich ──────────────────────
-  if (userRole === 'passiv' && !['ttcnews','kalender','tippspiel'].includes(view)) {
+  if (userRole === 'passiv' && !['ttcnews','kalender','tippspiel','wettenZitate'].includes(view)) {
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <div className="ttc-sticky-hdr" style={{padding:'16px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
@@ -3418,11 +3418,12 @@ export default function TrainingsApp() {
               {label:'Vereinskalender', icon:'📅', desc:'Termine & Hallenbelegungen', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.2)', action:()=>{navTo('kalender');fetchKalender();}},
               {label:'TTC Tippspiel', icon:'🎱', desc:'Endplatzierungen tippen', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>{navTo('tippspiel');fetchTippspiel();}},
               {label:'MyTischtennis', icon:'🏓', desc:'Vereinsübersicht auf MyTischtennis', color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)', action:()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953/mannschaften';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);}},
+              ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', desc:'Wetten, Zitate & Lessons Learned', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
             ].map(t=>(
-              <button key={t.label} onClick={t.action}
-                style={{background:t.bg,border:`1px solid ${t.border}`,borderRadius:'18px',padding:'22px 20px',cursor:'pointer',textAlign:'left',display:'flex',flexDirection:'column',gap:'8px',transition:'transform 0.15s'}}
+              <button key={t.label} onClick={t.action} style={{position:'relative',background:t.bg,border:`1px solid ${t.border}`,borderRadius:'18px',padding:'22px 20px',cursor:'pointer',textAlign:'left',display:'flex',flexDirection:'column',gap:'8px',transition:'transform 0.15s'}}
                 onMouseEnter={e=>e.currentTarget.style.transform='translateY(-2px)'}
                 onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
+                {t.badge>0&&<span style={{position:'absolute',top:'10px',right:'10px',background:'#dc2626',color:'white',borderRadius:'50%',width:'20px',height:'20px',fontSize:'11px',fontWeight:'800',display:'flex',alignItems:'center',justifyContent:'center'}}>{t.badge>9?'9+':t.badge}</span>}
                 <span style={{fontSize:'32px'}}>{t.icon}</span>
                 <p style={{margin:0,fontWeight:'800',fontSize:'17px',color:t.color}}>{t.label}</p>
                 <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)',lineHeight:'1.5'}}>{t.desc}</p>
@@ -5003,6 +5004,7 @@ export default function TrainingsApp() {
                   {label:'Vereinskalender', icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.1)', border:'rgba(251,191,36,0.25)', action:()=>{navTo('kalender');fetchKalender();}},
                   {label: tippspielNeedsAttention&&tippspielConfig?.deadline ? `Tipps bis ${new Date(tippspielConfig.deadline+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}!` : 'TTC Tippspiel', icon:'🎱', color:'#f9a8d4', bg:'rgba(244,114,182,0.1)', border:'rgba(244,114,182,0.25)', blink: tippspielNeedsAttention, action:()=>{markTippspielSeen();navTo('tippspiel');fetchTippspiel();}},
                   ...(isJugend ? [{label:'Gegnerlogbuch', icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.1)', border:'rgba(8,145,178,0.25)', action:()=>navTo('gegnerlogbuch')}] : []),
+                  ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.1)', border:'rgba(253,230,138,0.25)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
                   {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('verbesserungswuensche')},
                 ],
               },
@@ -14429,13 +14431,13 @@ export default function TrainingsApp() {
                 const isDue = entry.dueDate && entry.dueDate <= TODAY && !entry.dueSeen;
                 const isEditing = wzEditId === entry.id;
                 return (
-                  <div key={entry.id} style={{background: isDue ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.03)',border:`1px solid ${isDue ? 'rgba(239,68,68,0.4)' : acBorder}`,borderRadius:'14px',overflow:'hidden'}}>
+                  <div key={entry.id} style={{background: isDue ? 'rgba(239,68,68,0.06)' : cfg.bg,border:`1px solid ${isDue ? 'rgba(239,68,68,0.4)' : cfg.border}`,borderRadius:'14px',overflow:'hidden'}}>
                     {/* Kopfzeile — zwei Zeilen: oben Typ/Autor/Aktionen, unten Meta-Infos, statt alles in eine Zeile zu quetschen */}
                     <div style={{padding:'10px 14px 6px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
                       <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                        <span style={{fontSize:'11px',fontWeight:'800',color:cfg.color,background:cfg.bg,border:`1px solid ${cfg.border}`,borderRadius:'6px',padding:'2px 8px',flexShrink:0}}>{cfg.icon} {cfg.label}</span>
-                        <span style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',flex:1}}>{entry.createdBy}</span>
-                        <span style={{fontSize:'11px',color:'rgba(255,255,255,0.25)',flexShrink:0}}>{dateStr}</span>
+                        <span style={{fontSize:'11px',fontWeight:'800',color:cfg.color,background:'rgba(0,0,0,0.25)',border:`1px solid ${cfg.border}`,borderRadius:'6px',padding:'2px 8px',flexShrink:0}}>{cfg.icon} {cfg.label}</span>
+                        <span style={{fontSize:'14px',fontWeight:'700',color:'rgba(255,255,255,0.85)',flex:1}}>{entry.createdBy}</span>
+                        <span style={{fontSize:'12px',fontWeight:'600',color:'rgba(255,255,255,0.5)',flexShrink:0}}>{dateStr}</span>
                         {canEditEntry(entry) && !isEditing && (
                           <div style={{display:'flex',gap:'4px',flexShrink:0}}>
                             <button onClick={()=>{setWzEditId(entry.id);setWzEditText(entry.text);setWzEditVisibility(entry.visibility||{mode:'all',roles:[],userIds:[]});}}
@@ -14484,7 +14486,7 @@ export default function TrainingsApp() {
                       </div>
                     ) : (
                       <>
-                        <p style={{margin:0,padding:'12px 14px 10px',fontSize:'14px',color:'rgba(255,255,255,0.85)',lineHeight:'1.6',whiteSpace:'pre-wrap'}}>{entry.text}</p>
+                        <p style={{margin:0,padding:'12px 14px 10px',fontSize:'16px',fontWeight:'600',color:'white',lineHeight:'1.6',whiteSpace:'pre-wrap'}}>{entry.text}</p>
                         {wzAddOptionsId===entry.id && (
                           <div style={{margin:'0 14px 14px',padding:'12px',background:'rgba(251,191,36,0.05)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:'10px'}}>
                             <span style={{fontSize:'12px',fontWeight:'700',color:'rgba(251,191,36,0.7)',display:'block',marginBottom:'8px'}}>🎯 Optionen hinzufügen (min. 2)</span>
