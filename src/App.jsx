@@ -3092,6 +3092,18 @@ export default function TrainingsApp() {
   // die Feier-Animation ein. Bei Eltern mit mehreren Kindern werden ALLE geprüft, nicht nur das
   // gerade aktive. Läuft für Eltern/Jugendliche, erst wenn Kinder-/Ranglisten-Daten geladen sind.
   const achievementCheckDone = useRef(false);
+  // Da An-/Abmelden in dieser App KEINEN Seiten-Reload auslöst (SPA), bleiben Refs/State sonst
+  // über einen Accountwechsel im selben Tab hinweg bestehen — die Prüfung (und eine ggf. schon
+  // gequeuete Feier-Animation) würde dann fälschlich beim NÄCHSTEN eingeloggten Account statt
+  // beim ursprünglichen erscheinen. Bei jedem Wechsel der uid wird deshalb hart zurückgesetzt.
+  const achievementCheckUid = useRef(null);
+  useEffect(() => {
+    if (achievementCheckUid.current !== (user?.uid || null)) {
+      achievementCheckUid.current = user?.uid || null;
+      achievementCheckDone.current = false;
+      setUnlockCelebrationQueue([]);
+    }
+  }, [user?.uid]);
   useEffect(() => {
     if (achievementCheckDone.current) return;
     // Bewusst NICHT an die aktuell aktive Rolle gekoppelt: ein Nutzer mit mehreren Rollen
@@ -3107,7 +3119,10 @@ export default function TrainingsApp() {
       if (!child) return [];
       return checkNewAchievements(id).map(a => multi ? { ...a, title: `${child.name}: ${a.title}` } : a);
     });
-    if (fresh.length > 0) setUnlockCelebrationQueue(fresh);
+    // Direkt zum Home-Hub navigieren, damit die Animation garantiert auf einer Ansicht landet,
+    // die sie auch rendert — statt evtl. auf einer Unterseite zu "verpuffen", bis man zufällig
+    // mal wieder auf einem der Haupt-Hubs landet.
+    if (fresh.length > 0) { setUnlockCelebrationQueue(fresh); navTo('home'); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userRole, children, ranglisteAch, userProfile]);
 
