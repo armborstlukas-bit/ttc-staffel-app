@@ -3093,7 +3093,9 @@ export default function TrainingsApp() {
   const achievementCheckDone = useRef(false);
   useEffect(() => {
     if (achievementCheckDone.current) return;
-    if (!(userRole === 'eltern' || userRole === 'jugendlich')) return;
+    // Bewusst NICHT an die aktuell aktive Rolle gekoppelt: ein Nutzer mit mehreren Rollen
+    // (z.B. Trainer UND Jugendlicher zugleich) landet ggf. auf dem Trainer-Hub, hat aber
+    // trotzdem ein verknüpftes Kind — die Prüfung soll trotzdem laufen.
     if (Object.keys(children).length === 0) return;
     const ids = getMyLinkedChildIds();
     if (ids.length === 0) return;
@@ -3561,6 +3563,7 @@ export default function TrainingsApp() {
   if (userRole === 'passiv' && !['ttcnews','kalender','tippspiel','wettenZitate'].includes(view)) {
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        {unlockCelebrationQueue.length>0 && <AchievementUnlockCelebration queue={unlockCelebrationQueue} onDone={()=>setUnlockCelebrationQueue([])}/>}
         <div className="ttc-sticky-hdr" style={{padding:'16px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
           <div style={{flex:1,minWidth:0}}>
             <h2 style={{margin:0,color:'white',fontWeight:'800',fontSize:'18px'}}>Hallo, {(userProfile?.name||'').split(' ')[0]||'Mitglied'} 👋</h2>
@@ -4308,6 +4311,7 @@ export default function TrainingsApp() {
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        {unlockCelebrationQueue.length>0 && <AchievementUnlockCelebration queue={unlockCelebrationQueue} onDone={()=>setUnlockCelebrationQueue([])}/>}
         {/* Profil-Modal */}
         {showProfile&&(
           <Modal>
@@ -4510,6 +4514,7 @@ export default function TrainingsApp() {
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#0c1a2e 0%,#0e2a3a 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        {unlockCelebrationQueue.length>0 && <AchievementUnlockCelebration queue={unlockCelebrationQueue} onDone={()=>setUnlockCelebrationQueue([])}/>}
 
         {/* Rollenwechsel-Modal */}
         {showRolePicker&&(
