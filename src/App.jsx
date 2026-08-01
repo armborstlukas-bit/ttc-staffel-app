@@ -3108,7 +3108,7 @@ export default function TrainingsApp() {
     });
     if (fresh.length > 0) setUnlockCelebrationQueue(fresh);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userRole, children, ranglisteAch]);
+  }, [userRole, children, ranglisteAch, userProfile]);
 
   const deleteArchivedSession = (id) => {
     if (!window.confirm('Eintrag wirklich endgültig aus dem Archiv löschen? Das kann nicht rückgängig gemacht werden.')) return;
