@@ -25,6 +25,21 @@ export default async function handler(req, res) {
       }
     });
 
+    if (req.method === 'POST' && req.query.action === 'fix-seen') {
+      const childId = String(req.query.childId || '');
+      const child = childrenMap[childId];
+      if (!child) { res.status(404).json({ error: 'child not found' }); return; }
+      const realTeam = child.achievements?.team || 0;
+      const fixedSeen = (child.seenAchievementKeys || []).filter(k => {
+        const m = k.match(/^team_(\d+)$/);
+        if (!m) return true;
+        return Number(m[1]) <= realTeam;
+      });
+      await db.collection('ttc').doc('children').update({ [`${childId}.seenAchievementKeys`]: fixedSeen });
+      res.status(200).json({ fixedSeen });
+      return;
+    }
+
     res.status(200).json({ childMatches, userMatches });
   } catch (e) {
     res.status(500).json({ error: String(e?.message || e) });

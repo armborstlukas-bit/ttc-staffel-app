@@ -3066,25 +3066,35 @@ export default function TrainingsApp() {
   // gesehenen (children[id].seenAchievementKeys) und liefert die neuen zurück. Ganz neue Kinder
   // (Feld existiert noch nicht) werden beim allerersten Mal nur "stillschweigend" geseedet, damit
   // nicht sofort die komplette bisherige Sammlung als "neu" gefeiert wird.
+  // Markiert NUR die als "gesehen", die die Feier-Animation auch tatsächlich angezeigt bekommen
+  // hat (aufgerufen aus deren onDone) — NICHT schon beim bloßen Erkennen. Sonst würde eine neue
+  // Errungenschaft z.B. beim Login als Trainer (wo die Animation gar nicht angezeigt wird) still
+  // als "gesehen" verbucht und der Jugendliche/Elternteil hätte sie nie zu Gesicht bekommen.
+  const markAchievementsSeen = (childId, keys) => {
+    const child = children[childId];
+    const prevSeen = child?.seenAchievementKeys || [];
+    const union = [...new Set([...prevSeen, ...keys])];
+    setChildren(prev => ({ ...prev, [childId]: { ...prev[childId], seenAchievementKeys: union } }));
+    updateDoc(doc(db,'ttc','children'), { [`${childId}.seenAchievementKeys`]: union }).catch(()=>{});
+  };
+
   const checkNewAchievements = (childId) => {
     const child = children[childId];
     if (!child) return [];
-    updateDoc(doc(db,'ttc','children'), { [`${childId}.lastAchievementCheckAt`]: new Date().toISOString() }).catch(()=>{});
     const current = getAchievementKeysForChild(childId);
     const seen = child.seenAchievementKeys;
     if (!seen) {
+      // Erst-Seed: keine Animation, aber sofort als Baseline speichern (sonst würde die
+      // komplette bisherige Sammlung beim allerersten Lauf als "neu" gefeiert).
       setChildren(prev => ({ ...prev, [childId]: { ...prev[childId], seenAchievementKeys: current.map(c=>c.key) } }));
       updateDoc(doc(db,'ttc','children'), { [`${childId}.seenAchievementKeys`]: current.map(c=>c.key) }).catch(()=>{});
       return [];
     }
     const seenSet = new Set(seen);
     const fresh = current.filter(c => !seenSet.has(c.key));
-    if (fresh.length > 0) {
-      const union = [...new Set([...seen, ...current.map(c=>c.key)])];
-      setChildren(prev => ({ ...prev, [childId]: { ...prev[childId], seenAchievementKeys: union } }));
-      updateDoc(doc(db,'ttc','children'), { [`${childId}.seenAchievementKeys`]: union }).catch(()=>{});
-    }
-    return fresh;
+    // WICHTIG: hier wird NICHTS mehr als "gesehen" gespeichert — das passiert erst,
+    // wenn die Animation tatsächlich lief (siehe markAchievementsSeen/onDone).
+    return fresh.map(f => ({ ...f, childId }));
   };
 
   // Prüft einmal pro App-Start (nicht bei jedem Re-Render), ob eines der eigenen/verknüpften
@@ -4986,7 +4996,12 @@ export default function TrainingsApp() {
       return (
         <div className="ttc-view-enter" key={`${viewKey}-sub-${elternSubView}`} style={{minHeight:'100vh',background:meta.bg,fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
           <AchievementPopup data={achievementPopup} onClose={()=>setAchievementPopup(null)}/>
-          {unlockCelebrationQueue.length>0 && <AchievementUnlockCelebration queue={unlockCelebrationQueue} onDone={()=>setUnlockCelebrationQueue([])}/>}
+          {unlockCelebrationQueue.length>0 && <AchievementUnlockCelebration queue={unlockCelebrationQueue} onDone={()=>{
+            const byChild = {};
+            unlockCelebrationQueue.forEach(a => { (byChild[a.childId] = byChild[a.childId]||[]).push(a.key); });
+            Object.entries(byChild).forEach(([cid,keys]) => markAchievementsSeen(cid, keys));
+            setUnlockCelebrationQueue([]);
+          }}/>}
           {ptDetailModal&&(()=>{
             const mpt=ptDetailModal;const mPlayers=mpt.players||[];const mMatches=mpt.matches||[];const isArchived=!!mpt.archivedAt;
             const placeEmojiM=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
@@ -5021,7 +5036,12 @@ export default function TrainingsApp() {
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <AchievementPopup data={achievementPopup} onClose={()=>setAchievementPopup(null)}/>
-        {unlockCelebrationQueue.length>0 && <AchievementUnlockCelebration queue={unlockCelebrationQueue} onDone={()=>setUnlockCelebrationQueue([])}/>}
+        {unlockCelebrationQueue.length>0 && <AchievementUnlockCelebration queue={unlockCelebrationQueue} onDone={()=>{
+            const byChild = {};
+            unlockCelebrationQueue.forEach(a => { (byChild[a.childId] = byChild[a.childId]||[]).push(a.key); });
+            Object.entries(byChild).forEach(([cid,keys]) => markAchievementsSeen(cid, keys));
+            setUnlockCelebrationQueue([]);
+          }}/>}
 
         {/* Profil-Modal */}
         {showProfile&&(
