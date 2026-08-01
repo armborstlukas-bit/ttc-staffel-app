@@ -168,6 +168,7 @@ const MITGLIED_EXPORT_FIELDS = [
   { group: 'Zahlungsdaten',      key: 'beitrag',          label: 'Beitrag (€)' },
   { group: 'Zahlungsdaten',      key: 'kontosaldo',       label: 'Kontosaldo (€)' },
   { group: 'Zahlungsdaten',      key: 'eintrittsdatum',   label: 'Eintrittsdatum' },
+  { group: 'Ämter & Ehrentitel', key: 'aemterUndEhrentitel', label: 'Ämter & Ehrentitel' },
 ];
 
 const emptySession = { subgroupIds: [], extraPlayerIds: [], date: new Date().toISOString().split('T')[0], time: '17:00', endTime: '', trainer: '', trainerUids: [], info: '', repeat: false, repeatWeeks: 8, isRecurring: false };
@@ -561,7 +562,11 @@ export default function TrainingsApp() {
   const [jugendlicheFuerKinder, setJugendlicheFuerKinder] = useState(null); // null=noch nicht geladen — Liste der Jugendlichen aus der Mitgliedsdatei, per API (auch für Trainer ohne direkten mitgliederListe-Zugriff)
   const [pageScrollPos, setPageScrollPos] = useState('top');
   const [vergangeneSearch, setVergangeneSearch] = useState('');
-  const [vergangeneExpandedId, setVergangeneExpandedId] = useState(null); // 'top' | 'middle' | 'bottom' — für Scroll-Buttons in langen Listen (z.B. Mitgliederverwaltung)
+  const [vergangeneExpandedId, setVergangeneExpandedId] = useState(null);
+  const [aemterPickSearch, setAemterPickSearch] = useState('');
+  const [aemterPickId, setAemterPickId] = useState(null);
+  const [aemterForm, setAemterForm] = useState({titel:'',von:'',bis:''});
+  const [aemterEditKey, setAemterEditKey] = useState(null); // `${mitgliedId}_${index}` // 'top' | 'middle' | 'bottom' — für Scroll-Buttons in langen Listen (z.B. Mitgliederverwaltung)
   const [mitgliedExpandedId, setMitgliedExpandedId] = useState(null);
   const [mitgliedChildSearch, setMitgliedChildSearch] = useState('');
   const [mitgliedLinkUid, setMitgliedLinkUid] = useState(null);
@@ -2013,6 +2018,16 @@ export default function TrainingsApp() {
     } catch (e) {
       alert('⚠️ Rollen-Abgleich mit dem App-Account ist fehlgeschlagen: ' + (e?.message || e) + '\nBitte die Rolle noch einmal speichern oder später erneut versuchen.');
     }
+  };
+
+  // "Ämter & Ehrentitel" (Vorstandsposten, sonstige Funktionen, Ehrenmitgliedschaften) —
+  // liegen als Array direkt am Mitgliederlisten-Eintrag, damit sie 1:1 mit der Person
+  // verknüpft bleiben (auch nach einem eventuellen Austritt) und sich einfach anzeigen/exportieren lassen.
+  const formatAemter = m => (m.aemter||[]).map(a => `${a.titel}${a.bis ? ` (${a.von||'?'}–${a.bis})` : a.von ? ` (seit ${a.von})` : ''}`).join('; ');
+
+  const saveMitgliedAemter = async (id, aemter) => {
+    setMitgliederListe(prev => ({ ...prev, [id]: { ...prev[id], aemter } }));
+    await updateDoc(doc(db,'ttc','mitgliederListe'), { [`list.${id}.aemter`]: aemter });
   };
 
   const saveMitgliedField = async (id, field, value) => {
@@ -11984,6 +11999,7 @@ export default function TrainingsApp() {
                 else if (f.key==='geburtsdatum') row[f.label]=m.geburtsdatum||'';
                 else if (f.key==='email') row[f.label]=m.email||'';
                 else if (f.key==='beitragsart') row[f.label]=BEITRAGSARTEN.find(a=>a.key===fin.beitragsart)?.label||'';
+                else if (f.key==='aemterUndEhrentitel') row[f.label]=formatAemter(m);
                 else row[f.label]=fin[f.key]??'';
               });
               return row;
@@ -12273,6 +12289,8 @@ export default function TrainingsApp() {
           <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
             <button onClick={()=>{setNewMitgliedForm(NEW_MITGLIED_DEFAULTS);setShowNewMitglied(true);}}
               style={{padding:'9px 16px',background:'#16a34a',color:'white',border:'none',borderRadius:'9px',cursor:'pointer',fontWeight:'800',fontSize:'13px'}}>+ Neues Mitglied anlegen</button>
+            <button onClick={()=>navTo('aemterUndEhrentitel')}
+              style={{padding:'9px 16px',background:'rgba(251,191,36,0.1)',color:'#fbbf24',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'9px',cursor:'pointer',fontWeight:'800',fontSize:'13px'}}>🎖️ Ämter und Ehrentitel</button>
             <button onClick={()=>navTo('vergangeneMitglieder')}
               style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.7)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'9px',cursor:'pointer',fontWeight:'800',fontSize:'13px'}}>📦 Ehemalige Mitglieder{exitedEntries.length>0?` (${exitedEntries.length})`:''}</button>
           </div>
@@ -12687,6 +12705,16 @@ export default function TrainingsApp() {
                                 </button>
                               )}
                             </div>
+                            {(m.aemter||[]).length > 0 && (
+                              <div style={{padding:'10px 12px',background:'rgba(251,191,36,0.06)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:'8px'}}>
+                                <span style={{fontSize:'11px',fontWeight:'800',color:'#fbbf24',display:'block',marginBottom:'4px'}}>🎖️ Ämter & Ehrentitel</span>
+                                {m.aemter.map((a,i)=>(
+                                  <p key={i} style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.75)'}}>
+                                    {a.titel}{a.bis?` (${a.von||'?'}–${a.bis})`:a.von?` (seit ${a.von})`:''}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         );
                       })()}
@@ -12825,6 +12853,16 @@ export default function TrainingsApp() {
                             <input value={fin.austrittsdatum??''} onChange={e=>saveFinanzField(id,'austrittsdatum',e.target.value)}
                               style={{flex:1,minWidth:'140px',padding:'7px 10px',background:'#1a1206',border:'1px solid rgba(220,38,38,0.4)',borderRadius:'7px',color:'white',fontSize:'13px',fontWeight:'700',outline:'none'}}/>
                           </div>
+                          {(m.aemter||[]).length > 0 && (
+                            <div style={{padding:'10px 12px',background:'rgba(251,191,36,0.06)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:'8px'}}>
+                              <span style={{fontSize:'11px',fontWeight:'800',color:'#fbbf24',display:'block',marginBottom:'4px'}}>🎖️ Ämter & Ehrentitel</span>
+                              {m.aemter.map((a,i)=>(
+                                <p key={i} style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.75)'}}>
+                                  {a.titel}{a.bis?` (${a.von||'?'}–${a.bis})`:a.von?` (seit ${a.von})`:''}
+                                </p>
+                              ))}
+                            </div>
+                          )}
                         </div>
                         <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
                           <button onClick={()=>{saveFinanzField(id,'austrittsdatum',null);setVergangeneExpandedId(null);}}
@@ -12839,6 +12877,124 @@ export default function TrainingsApp() {
               );
             })}
             {filtered.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.3)',fontSize:'13px'}}>Keine Treffer.</p>}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── ÄMTER UND EHRENTITEL VIEW ────────────────────────────────────────────
+  if (view === 'aemterUndEhrentitel' && userRole === 'admin') {
+    const allMembers = Object.entries(mitgliederListe).sort((a,b)=>`${a[1].nachname}${a[1].vorname}`.localeCompare(`${b[1].nachname}${b[1].vorname}`,'de'));
+    const pickQ = aemterPickSearch.trim().toLowerCase();
+    const pickOptions = pickQ ? allMembers.filter(([,m])=>`${m.vorname} ${m.nachname}`.toLowerCase().includes(pickQ)) : [];
+    const holders = allMembers.filter(([,m])=>(m.aemter||[]).length>0);
+
+    const addAemt = () => {
+      if (!aemterPickId || !aemterForm.titel.trim()) return;
+      const m = mitgliederListe[aemterPickId];
+      const cur = m?.aemter || [];
+      saveMitgliedAemter(aemterPickId, [...cur, {titel:aemterForm.titel.trim(), von:aemterForm.von||'', bis:aemterForm.bis||''}]);
+      setAemterForm({titel:'',von:'',bis:''});
+      setAemterPickId(null);
+      setAemterPickSearch('');
+    };
+    const removeAemt = (mid, idx) => {
+      const cur = mitgliederListe[mid]?.aemter || [];
+      saveMitgliedAemter(mid, cur.filter((_,i)=>i!==idx));
+    };
+    const updateAemt = (mid, idx, patch) => {
+      const cur = mitgliederListe[mid]?.aemter || [];
+      saveMitgliedAemter(mid, cur.map((a,i)=>i===idx?{...a,...patch}:a));
+    };
+
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
+          <button onClick={()=>navTo('mitglieder')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'9px',color:'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:'600'}}><ArrowLeft size={15}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🎖️ Ämter und Ehrentitel</h1>
+        </div>
+        <div style={{padding:'16px 14px',maxWidth:'700px',margin:'0 auto'}}>
+          <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
+            Vorstandsposten, sonstige Funktionen (z.B. Hallenwart) und Ehrenmitgliedschaften — aktuelle und vergangene. Ohne "Bis"-Jahr gilt das Amt als laufend. Erscheint bei der Person unter Mitgliedsdaten und im Excel-Export.
+          </p>
+
+          <div style={{background:'rgba(251,191,36,0.06)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'12px',padding:'14px',marginBottom:'20px'}}>
+            <p style={{margin:'0 0 10px',fontSize:'13px',fontWeight:'800',color:'#fbbf24'}}>+ Amt / Ehrentitel hinzufügen</p>
+            {!aemterPickId ? (
+              <div>
+                <input value={aemterPickSearch} onChange={e=>setAemterPickSearch(e.target.value)} placeholder="Mitglied suchen…"
+                  style={{width:'100%',boxSizing:'border-box',padding:'9px 12px',background:'#1a1206',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'8px',color:'white',fontSize:'13px',outline:'none'}}/>
+                {pickOptions.length>0 && (
+                  <div style={{display:'grid',gap:'2px',maxHeight:'180px',overflowY:'auto',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'8px',padding:'4px',marginTop:'6px'}}>
+                    {pickOptions.map(([mid,m])=>(
+                      <button key={mid} onClick={()=>{setAemterPickId(mid);setAemterPickSearch('');}}
+                        style={{textAlign:'left',padding:'6px 8px',borderRadius:'6px',background:'transparent',border:'none',cursor:'pointer',color:'white',fontSize:'12px'}}>
+                        {m.vorname} {m.nachname}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{display:'grid',gap:'8px'}}>
+                <div style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'13px'}}>
+                  <span style={{color:'#fbbf24',fontWeight:'700'}}>{mitgliederListe[aemterPickId]?.vorname} {mitgliederListe[aemterPickId]?.nachname}</span>
+                  <button onClick={()=>setAemterPickId(null)} style={{padding:'2px 8px',background:'transparent',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'6px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'11px'}}>ändern</button>
+                </div>
+                <input value={aemterForm.titel} onChange={e=>setAemterForm(p=>({...p,titel:e.target.value}))} placeholder="Titel, z.B. Erster Vorsitzender, Hallenwart, Ehrenmitglied…"
+                  style={{width:'100%',boxSizing:'border-box',padding:'9px 12px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'8px',color:'white',fontSize:'13px',outline:'none'}}/>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
+                  <div>
+                    <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Von (Jahr)</span>
+                    <input value={aemterForm.von} onChange={e=>setAemterForm(p=>({...p,von:e.target.value}))} placeholder="z.B. 2010"
+                      style={{width:'100%',boxSizing:'border-box',padding:'8px 10px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'8px',color:'white',fontSize:'13px',outline:'none'}}/>
+                  </div>
+                  <div>
+                    <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Bis (Jahr, leer = laufend)</span>
+                    <input value={aemterForm.bis} onChange={e=>setAemterForm(p=>({...p,bis:e.target.value}))} placeholder="z.B. 2020"
+                      style={{width:'100%',boxSizing:'border-box',padding:'8px 10px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'8px',color:'white',fontSize:'13px',outline:'none'}}/>
+                  </div>
+                </div>
+                <button onClick={addAemt} disabled={!aemterForm.titel.trim()}
+                  style={{padding:'9px',background:aemterForm.titel.trim()?'#16a34a':'#374151',color:'white',border:'none',borderRadius:'8px',cursor:aemterForm.titel.trim()?'pointer':'not-allowed',fontWeight:'700',fontSize:'13px'}}>Hinzufügen</button>
+              </div>
+            )}
+          </div>
+
+          <div style={{display:'grid',gap:'8px'}}>
+            {holders.map(([mid,m])=>(
+              <div key={mid} style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px 12px'}}>
+                <p style={{margin:'0 0 6px',fontSize:'13px',fontWeight:'700',color:'white'}}>{m.vorname} {m.nachname}</p>
+                <div style={{display:'grid',gap:'6px'}}>
+                  {(m.aemter||[]).map((a,idx)=>{
+                    const key = `${mid}_${idx}`;
+                    return aemterEditKey===key ? (
+                      <div key={key} style={{display:'grid',gap:'6px',padding:'8px',background:'rgba(0,0,0,0.2)',borderRadius:'8px'}}>
+                        <input value={a.titel} onChange={e=>updateAemt(mid,idx,{titel:e.target.value})}
+                          style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none'}}/>
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
+                          <input value={a.von} onChange={e=>updateAemt(mid,idx,{von:e.target.value})} placeholder="Von"
+                            style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none'}}/>
+                          <input value={a.bis} onChange={e=>updateAemt(mid,idx,{bis:e.target.value})} placeholder="Bis"
+                            style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none'}}/>
+                        </div>
+                        <button onClick={()=>setAemterEditKey(null)} style={{padding:'6px',background:'rgba(74,222,128,0.15)',color:'#86efac',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'7px',cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>✓ Fertig</button>
+                      </div>
+                    ) : (
+                      <div key={key} style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                        <span style={{flex:1,minWidth:'150px',fontSize:'12px',color:'rgba(255,255,255,0.75)'}}>
+                          🎖️ {a.titel}{a.bis?` (${a.von||'?'}–${a.bis})`:a.von?` (seit ${a.von})`:''}
+                        </span>
+                        <button onClick={()=>setAemterEditKey(key)} style={{padding:'4px 9px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'rgba(255,255,255,0.6)',cursor:'pointer',fontSize:'11px'}}>✏️</button>
+                        <button onClick={()=>removeAemt(mid,idx)} style={{padding:'4px 9px',background:'rgba(220,38,38,0.15)',border:'1px solid rgba(220,38,38,0.4)',borderRadius:'7px',color:'#fca5a5',cursor:'pointer',fontSize:'11px'}}>🗑️</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            {holders.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.3)',fontSize:'13px'}}>Noch keine Ämter/Ehrentitel vergeben.</p>}
           </div>
         </div>
       </div>
