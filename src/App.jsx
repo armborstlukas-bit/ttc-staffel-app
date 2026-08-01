@@ -1286,6 +1286,12 @@ export default function TrainingsApp() {
     await setDoc(doc(db,'users',user.uid), { notifPrefs: next }, { merge:true });
   };
 
+  const dismissHakenHinweis = async () => {
+    if (!user?.uid) return;
+    setUserProfile(p => ({...(p||{}), hakenHinweisGelesen: true}));
+    await setDoc(doc(db,'users',user.uid), { hakenHinweisGelesen: true }, { merge:true });
+  };
+
   const renderNotifSettings = (dark=true) => {
     const prefs = userProfile?.notifPrefs || { training:true, achievements:true, other:true };
     const hasToken = (userProfile?.fcmTokens||[]).length > 0;
@@ -12212,6 +12218,14 @@ export default function TrainingsApp() {
           <span style={{fontSize:'12px',color:'rgba(196,181,253,0.7)',fontWeight:'600'}}>{assignedCount}/{entries.length} zugeordnet</span>
         </div>
         <div style={{padding:'16px 14px',maxWidth:'900px',margin:'0 auto'}}>
+          {!userProfile?.hakenHinweisGelesen && (
+            <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'12px',padding:'7px 10px',background:'rgba(74,222,128,0.08)',border:'1px solid rgba(74,222,128,0.25)',borderRadius:'8px',fontSize:'11px',color:'rgba(255,255,255,0.6)'}}>
+              <span style={{fontSize:'11px',fontWeight:'800',color:'#4ade80',background:'rgba(74,222,128,0.15)',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'50%',width:'15px',height:'15px',display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>✓</span>
+              <span style={{flex:1}}>= App-Account zugeordnet</span>
+              <button onClick={dismissHakenHinweis}
+                style={{padding:'3px 9px',background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'7px',color:'rgba(255,255,255,0.6)',cursor:'pointer',fontWeight:'700',fontSize:'10px',whiteSpace:'nowrap'}}>Verstanden</button>
+            </div>
+          )}
           {unmatchedPending.length > 0 && (
             <div style={{marginBottom:'16px',padding:'14px 16px',background:'rgba(220,38,38,0.12)',border:'2px solid #dc2626',borderRadius:'12px',boxShadow:'0 0 0 1px rgba(220,38,38,0.3)'}}>
               <p style={{margin:'0 0 10px',fontSize:'14px',fontWeight:'800',color:'#fca5a5'}}>🚫 {unmatchedPending.length} Anmeldung{unmatchedPending.length===1?'':'en'} — Nicht Mitglied</p>
