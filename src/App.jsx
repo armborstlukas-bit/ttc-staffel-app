@@ -790,6 +790,10 @@ export default function TrainingsApp() {
   const NEW_MITGLIED_DEFAULTS = { vorname:'', nachname:'', roles:[], geburtsdatum:'', email:'', strasse:'', plz:'', ort:'', telefon:'', handy:'', iban:'', bic:'', sepaMandatsRef:'', sepaMandatsDatum:'', zahlart:'', zahler:'', zahlweise:'', beitragsart:'', beitrag:'', kontosaldo:'', eintrittsdatum:'' };
   const [newMitgliedForm, setNewMitgliedForm] = useState(NEW_MITGLIED_DEFAULTS);
   const [usageStats, setUsageStats] = useState({ dailyActive:{}, viewCounts:{} });
+  const [verbesserungswuensche, setVerbesserungswuensche] = useState({}); // { [id]: {text,createdAt,updatedAt,submitterUid} } — anonym angezeigt
+  const [wunschText, setWunschText] = useState('');
+  const [wunschEditId, setWunschEditId] = useState(null);
+  const [wunschEditText, setWunschEditText] = useState('');
   const [ranglisteHistory, setRanglisteHistory] = useState([]); // [{date:'YYYY-MM-DD', order:[childId,...]}]
   const [showRangStats, setShowRangStats] = useState(false);
   const [rangStatsH2H, setRangStatsH2H] = useState(['', '']);
@@ -1128,6 +1132,7 @@ export default function TrainingsApp() {
         onSnapshot(doc(db,'ttc','mitgliederFinanzen'), s => setMitgliederFinanzen(s.exists()&&s.data().list ? s.data().list : {})),
       ] : []),
       onSnapshot(doc(db,'ttc','usageStats'), s => setUsageStats(s.exists() ? { dailyActive: s.data().dailyActive||{}, viewCounts: s.data().viewCounts||{} } : { dailyActive:{}, viewCounts:{} })),
+      onSnapshot(doc(db,'ttc','verbesserungswuensche'), s => setVerbesserungswuensche(s.exists()&&s.data().list ? s.data().list : {})),
       onSnapshot(doc(db,'ttc','ranglistenspiele'), s => setRanglistenspiele(s.exists() ? { active: s.data().active||[], archived: s.data().archived||[] } : { active:[], archived:[] })),
       onSnapshot(doc(db,'ttc','ranglisteAchievements'), s => setRanglisteAch(s.exists() ? s.data() : {})),
       onSnapshot(doc(db,'ttc','practiceTournaments'),          s => setPracticeTournaments(s.exists()?s.data():{})),
@@ -2335,6 +2340,28 @@ export default function TrainingsApp() {
     await updateDoc(doc(db,'ttc','mitgliederFinanzen'), { [`list.${id}`]: deleteField() });
     setMitgliederListe(prev => { const n = {...prev}; delete n[id]; return n; });
     setMitgliederFinanzen(prev => { const n = {...prev}; delete n[id]; return n; });
+  };
+
+  // Verbesserungsvorschläge: für alle sichtbar anonym (kein Name wird je angezeigt), aber
+  // intern per submitterUid an den Ersteller gebunden, damit nur er selbst bearbeiten/löschen
+  // kann — zusätzlich dürfen Admins jeden Vorschlag löschen (z.B. wenn umgesetzt).
+  const addWunsch = async (text) => {
+    if (!text.trim() || !user) return;
+    const id = 'w_' + Date.now();
+    const entry = { text: text.trim(), createdAt: new Date().toISOString(), updatedAt: null, submitterUid: user.uid };
+    await updateDoc(doc(db,'ttc','verbesserungswuensche'), { [`list.${id}`]: entry }).catch(async () => {
+      await setDoc(doc(db,'ttc','verbesserungswuensche'), { list: { [id]: entry } }, { merge: true });
+    });
+    setVerbesserungswuensche(prev => ({ ...prev, [id]: entry }));
+  };
+  const updateWunsch = async (id, text) => {
+    if (!text.trim()) return;
+    await updateDoc(doc(db,'ttc','verbesserungswuensche'), { [`list.${id}.text`]: text.trim(), [`list.${id}.updatedAt`]: new Date().toISOString() });
+    setVerbesserungswuensche(prev => ({ ...prev, [id]: { ...prev[id], text: text.trim(), updatedAt: new Date().toISOString() } }));
+  };
+  const deleteWunsch = async (id) => {
+    await updateDoc(doc(db,'ttc','verbesserungswuensche'), { [`list.${id}`]: deleteField() });
+    setVerbesserungswuensche(prev => { const n = {...prev}; delete n[id]; return n; });
   };
 
   // Legt ein komplett neues Mitglied inkl. Rollen, persönlichen Daten und Zahlungsdaten an
@@ -4697,6 +4724,7 @@ export default function TrainingsApp() {
             {label:'Datenlöschen',   icon:'🗑️', color:'#fca5a5', bg:'rgba(220,38,38,0.08)', border:'rgba(220,38,38,0.25)', action:()=>navTo('datenloeschen')},
             {label:'App-Statistik',  icon:'📈', color:'#7dd3fc', bg:'rgba(125,211,252,0.1)', border:'rgba(125,211,252,0.25)', action:()=>navTo('usageStats')},
           ]:[]),
+          {label:'Verbesserungsvorschläge', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.08)', border:'rgba(196,181,253,0.25)', action:()=>navTo('verbesserungswuensche')},
         ],
       },
     ];
@@ -5013,6 +5041,7 @@ export default function TrainingsApp() {
               {label:'Trainingsmatches',icon:'⚔️', desc:'Duelle & Allzeittabelle',                  color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>navTo('trainingsmatches')},
               ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', desc:'Wetten, Zitate & Lessons Learned', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
               {label:'MyTischtennis', icon:'🏓', desc:'Vereinsübersicht auf MyTischtennis',                                                                  color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)',  action:()=>(()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953/mannschaften';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);})()},
+              {label:'Verbesserungsvorschläge', icon:'💡', desc:'Deine Ideen für die App', color:'#c4b5fd', bg:'rgba(196,181,253,0.07)', border:'rgba(196,181,253,0.2)', action:()=>navTo('verbesserungswuensche')},
             ].map(t=>(
               <button key={t.label} onClick={t.action} className={t.blink?'ttc-blink':''}
                 style={{position:'relative',background:t.bg,border:`1px solid ${t.border}`,borderRadius:'18px',padding:'22px 20px',cursor:'pointer',textAlign:'left',display:'flex',flexDirection:'column',gap:'8px',transition:'transform 0.15s'}}
@@ -5590,6 +5619,7 @@ export default function TrainingsApp() {
                   {label:'Vereinskalender', icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.1)', border:'rgba(251,191,36,0.25)', action:()=>{navTo('kalender');fetchKalender();}},
                   {label: tippspielNeedsAttention&&tippspielConfig?.deadline ? `Tipps bis ${new Date(tippspielConfig.deadline+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}!` : 'TTC Tippspiel', icon:'🎱', color:'#f9a8d4', bg:'rgba(244,114,182,0.1)', border:'rgba(244,114,182,0.25)', blink: tippspielNeedsAttention, action:()=>{markTippspielSeen();navTo('tippspiel');fetchTippspiel();}},
                   ...(isJugend ? [{label:'Gegnerlogbuch', icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.1)', border:'rgba(8,145,178,0.25)', action:()=>navTo('gegnerlogbuch')}] : []),
+                  {label:'Verbesserungsvorschläge', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('verbesserungswuensche')},
                 ],
               },
             ];
@@ -12393,6 +12423,82 @@ export default function TrainingsApp() {
   }
 
   // ── TTC NEWS VIEW ─────────────────────────────────────────────────────────
+  // ── VERBESSERUNGSVORSCHLÄGE ────────────────────────────────────────────────
+  // Für alle eingeloggten Nutzer offen. Jeder sieht nur seine eigenen Einträge (anonym,
+  // ohne Namen), außer Admins — die sehen alle. Bearbeiten/Löschen: nur der Ersteller
+  // selbst, Admins dürfen zusätzlich jeden Vorschlag löschen (z.B. wenn umgesetzt).
+  if (view === 'verbesserungswuensche') {
+    const accent = '#c4b5fd';
+    const isAdminView = userRole === 'admin';
+    const entries = Object.entries(verbesserungswuensche)
+      .filter(([,w]) => isAdminView || w.submitterUid === user?.uid)
+      .sort((a,b) => (b[1].createdAt||'').localeCompare(a[1].createdAt||''));
+
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#0c0520 0%,#1a0f2e 45%,#080314 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
+          <button onClick={()=>navTo('home')} style={s.btn(accent)}><Home size={16}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>💡 Verbesserungsvorschläge</h1>
+          {isAdminView && <span style={{fontSize:'12px',color:'rgba(196,181,253,0.7)',fontWeight:'600'}}>{entries.length} gesamt</span>}
+        </div>
+        <div style={{maxWidth:'700px',margin:'0 auto',padding:'16px'}}>
+          <p style={{margin:'0 0 16px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
+            {isAdminView
+              ? 'Als Admin siehst du alle eingereichten Vorschläge (anonym, ohne Namen). Du kannst sie löschen, sobald sie umgesetzt sind.'
+              : 'Trag hier ein, was an der App verbessert werden könnte. Deine Vorschläge werden anonym an die Admins weitergegeben — nur du selbst siehst und bearbeitest deine eigenen Einträge.'}
+          </p>
+
+          <div style={{display:'flex',gap:'8px',marginBottom:'20px'}}>
+            <textarea value={wunschText} onChange={e=>setWunschText(e.target.value)} placeholder="Neuer Verbesserungswunsch…" rows={2}
+              style={{flex:1,boxSizing:'border-box',padding:'10px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(196,181,253,0.25)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',resize:'vertical'}}/>
+            <button onClick={()=>{addWunsch(wunschText);setWunschText('');}} disabled={!wunschText.trim()}
+              style={{padding:'10px 18px',background:wunschText.trim()?'#7c3aed':'#374151',color:'white',border:'none',borderRadius:'10px',cursor:wunschText.trim()?'pointer':'not-allowed',fontWeight:'700',fontSize:'13px',whiteSpace:'nowrap',alignSelf:'flex-start'}}>+ Hinzufügen</button>
+          </div>
+
+          <div style={{display:'grid',gap:'8px'}}>
+            {entries.map(([id,w])=>{
+              const isOwn = w.submitterUid === user?.uid;
+              const isEditing = wunschEditId === id;
+              return (
+                <div key={id} style={{padding:'12px 14px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(196,181,253,0.15)',borderRadius:'10px'}}>
+                  {isEditing ? (
+                    <div style={{display:'grid',gap:'8px'}}>
+                      <textarea value={wunschEditText} onChange={e=>setWunschEditText(e.target.value)} rows={2}
+                        style={{boxSizing:'border-box',padding:'8px 10px',background:'#0a0518',border:'1px solid rgba(196,181,253,0.3)',borderRadius:'8px',color:'white',fontSize:'13px',outline:'none',resize:'vertical'}}/>
+                      <div style={{display:'flex',gap:'6px'}}>
+                        <button onClick={()=>{updateWunsch(id,wunschEditText);setWunschEditId(null);}}
+                          style={{padding:'6px 12px',background:'#7c3aed',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>Speichern</button>
+                        <button onClick={()=>setWunschEditId(null)}
+                          style={{padding:'6px 12px',background:'transparent',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'8px',color:'rgba(255,255,255,0.6)',cursor:'pointer',fontSize:'12px'}}>Abbrechen</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p style={{margin:'0 0 8px',fontSize:'14px',lineHeight:1.5,whiteSpace:'pre-wrap'}}>{w.text}</p>
+                      <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                        <span style={{fontSize:'10px',color:'rgba(255,255,255,0.3)'}}>{w.updatedAt?'bearbeitet':'eingereicht'} {new Date(w.updatedAt||w.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}</span>
+                        <div style={{flex:1}}/>
+                        {isOwn && (
+                          <button onClick={()=>{setWunschEditId(id);setWunschEditText(w.text);}}
+                            style={{padding:'4px 10px',background:'rgba(196,181,253,0.12)',border:'1px solid rgba(196,181,253,0.35)',borderRadius:'7px',color:accent,cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>✏️ Bearbeiten</button>
+                        )}
+                        {(isOwn || isAdminView) && (
+                          <button onClick={()=>{ if(window.confirm('Diesen Vorschlag wirklich löschen?')) deleteWunsch(id); }}
+                            style={{padding:'4px 10px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.35)',borderRadius:'7px',color:'#fca5a5',cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>🗑️ Löschen</button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+            {entries.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.3)',fontSize:'13px'}}>Noch keine Vorschläge{isAdminView?'':' von dir'}.</p>}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (view === 'ttcnews') {
     const isAktiver = userRole === 'aktiver';
     const accentColor = isAktiver ? '#0891b2' : '#4ade80';
