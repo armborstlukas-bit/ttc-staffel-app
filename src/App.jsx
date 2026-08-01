@@ -267,6 +267,45 @@ function AchievementPopup({ data, onClose }) {
 }
 
 
+// ── Spieler des Monats/Jahres: individuell gestaltete Auszeichnungs-Kachel je Monat ──
+const MONTH_THEMES = [
+  { name:'Januar',    grad:'linear-gradient(150deg,#38bdf8 0%,#0369a1 100%)', icon:'❄️' },
+  { name:'Februar',   grad:'linear-gradient(150deg,#f9a8d4 0%,#be185d 100%)', icon:'💗' },
+  { name:'März',      grad:'linear-gradient(150deg,#86efac 0%,#15803d 100%)', icon:'🌱' },
+  { name:'April',     grad:'linear-gradient(150deg,#bef264 0%,#4d7c0f 100%)', icon:'🌦️' },
+  { name:'Mai',       grad:'linear-gradient(150deg,#fda4af 0%,#be123c 100%)', icon:'🌸' },
+  { name:'Juni',      grad:'linear-gradient(150deg,#fde047 0%,#ca8a04 100%)', icon:'☀️' },
+  { name:'Juli',      grad:'linear-gradient(150deg,#fdba74 0%,#c2410c 100%)', icon:'🏖️' },
+  { name:'August',    grad:'linear-gradient(150deg,#fcd34d 0%,#b45309 100%)', icon:'🌻' },
+  { name:'September', grad:'linear-gradient(150deg,#fb923c 0%,#9a3412 100%)', icon:'🍂' },
+  { name:'Oktober',   grad:'linear-gradient(150deg,#f97316 0%,#7c2d12 100%)', icon:'🎃' },
+  { name:'November',  grad:'linear-gradient(150deg,#cbd5e1 0%,#334155 100%)', icon:'🌫️' },
+  { name:'Dezember',  grad:'linear-gradient(150deg,#f87171 0%,#7f1d1d 100%)', icon:'🎄' },
+];
+function SpielerDesMonatsBadge({ win, onClick }) {
+  const isYear = win.type === 'year';
+  const [y, m] = String(win.period).split('-');
+  const theme = isYear
+    ? { grad:'linear-gradient(150deg,#fde68a 0%,#b45309 55%,#451a03 100%)', icon:'👑' }
+    : MONTH_THEMES[Number(m)-1] || MONTH_THEMES[0];
+  return (
+    <button onClick={onClick} style={{
+      position:'relative', overflow:'hidden', borderRadius:'18px', padding:'20px 12px 16px',
+      textAlign:'center', background:theme.grad, border:isYear?'2px solid #fde68a':'2px solid rgba(255,255,255,0.25)',
+      cursor:'pointer', boxShadow:'0 10px 26px rgba(0,0,0,0.35)', transition:'transform 0.15s',
+    }}
+      onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-3px) scale(1.03)';}}
+      onMouseLeave={e=>{e.currentTarget.style.transform='translateY(0) scale(1)';}}>
+      <span style={{position:'absolute',top:'-18px',right:'-14px',fontSize:'76px',opacity:0.16,transform:'rotate(12deg)',pointerEvents:'none'}}>{theme.icon}</span>
+      <span style={{position:'absolute',bottom:'-22px',left:'-16px',fontSize:'60px',opacity:0.1,pointerEvents:'none'}}>✨</span>
+      <div style={{fontSize:'32px',marginBottom:'6px',filter:'drop-shadow(0 2px 4px rgba(0,0,0,0.3))'}}>{theme.icon}</div>
+      <p style={{margin:'0 0 3px',fontSize:'10px',fontWeight:'900',letterSpacing:'1.5px',textTransform:'uppercase',color:'rgba(255,255,255,0.85)'}}>{isYear?'★ Spieler des Jahres ★':'Spieler des Monats'}</p>
+      <p style={{margin:0,fontSize:'17px',fontWeight:'900',color:'white',textShadow:'0 2px 6px rgba(0,0,0,0.35)',lineHeight:1.15}}>{isYear ? y : theme.name}</p>
+      {!isYear && <p style={{margin:'2px 0 0',fontSize:'12px',fontWeight:'700',color:'rgba(255,255,255,0.75)'}}>{y}</p>}
+    </button>
+  );
+}
+
 // ── Mobile Bottom Navigation ─────────────────────────────────────────────────
 function MobileBottomNav({ view, navTo, userRole, canEdit, appSettings, unreadCount }) {
   const isTrainer = canEdit();
@@ -4658,11 +4697,13 @@ export default function TrainingsApp() {
               {/* ── Spieler des Monats / Jahres ── */}
               <SH icon="⭐" title="Spieler des Monats / Jahres"/>
               {(spielerDesMonatsWins[myChild.id]||[]).length>0
-                ? (spielerDesMonatsWins[myChild.id]||[]).map(w=>{
-                    const isYear=w.type==='year';
-                    const lbl=isYear?`Spieler des Jahres ${w.period}`:`Spieler des Monats ${fmtYM(w.period)}`;
-                    return<AC key={`${w.type}-${w.period}`} icon={isYear?'👑':'⭐'} title={lbl} sub="Ausgezeichnet!" has={true} accent="#fcd34d" acBg="rgba(252,211,77,0.07)" acBorder="rgba(252,211,77,0.3)" onClick={()=>openCount(isYear?'👑':'⭐',lbl,isYear?`Spieler des Jahres ${w.period}!`:`Spieler des Monats ${fmtYM(w.period)}!`,1)}/>;
-                  })
+                ? <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))',gap:'10px',marginBottom:'6px'}}>
+                    {(spielerDesMonatsWins[myChild.id]||[]).map(w=>{
+                      const isYear=w.type==='year';
+                      const lbl=isYear?`Spieler des Jahres ${w.period}`:`Spieler des Monats ${fmtYM(w.period)}`;
+                      return <SpielerDesMonatsBadge key={`${w.type}-${w.period}`} win={w} onClick={()=>openCount(isYear?'👑':'⭐',lbl,isYear?`Spieler des Jahres ${w.period}!`:`Spieler des Monats ${fmtYM(w.period)}!`,1)}/>;
+                    })}
+                  </div>
                 : <AC icon='⭐' title='Spieler des Monats' note="Erziele die größte TTR-Verbesserung im Monat" has={false} onClick={()=>openCount('⭐','Spieler des Monats','Werde Spieler des Monats mit der größten TTR-Verbesserung im Monat!',0)}/>
               }
 
