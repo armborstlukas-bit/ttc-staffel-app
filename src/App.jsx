@@ -780,6 +780,9 @@ export default function TrainingsApp() {
   const [mitgliedAustrittEditId, setMitgliedAustrittEditId] = useState(null);
   const [mitgliedAustrittDatum, setMitgliedAustrittDatum] = useState('');
   const [showExitedMitglieder, setShowExitedMitglieder] = useState(false);
+  const [ttrProTagFilter, setTtrProTagFilter] = useState('all'); // 'all' | 'jugend' | 'aktiv'
+  const [ttrProTagYear, setTtrProTagYear] = useState(new Date().getFullYear());
+  const [ttrProTagMonth, setTtrProTagMonth] = useState(new Date().getMonth()+1);
   const [showNewMitglied, setShowNewMitglied] = useState(false);
   const NEW_MITGLIED_DEFAULTS = { vorname:'', nachname:'', roles:[], geburtsdatum:'', email:'', strasse:'', plz:'', ort:'', telefon:'', handy:'', iban:'', bic:'', sepaMandatsRef:'', sepaMandatsDatum:'', zahlart:'', zahler:'', zahlweise:'', beitragsart:'', beitrag:'', kontosaldo:'', eintrittsdatum:'' };
   const [newMitgliedForm, setNewMitgliedForm] = useState(NEW_MITGLIED_DEFAULTS);
@@ -11617,39 +11620,44 @@ export default function TrainingsApp() {
   if (view === 'ttrProTag' && canEdit()) {
     const accent = '#67e8f9';
     const wordSet = s => (s||'').replace(/,/g,' ').trim().toLowerCase().replace(/\s+/g,' ').split(' ').filter(Boolean).sort().join(' ');
+    // Pool trägt für jeden Spieler die rohe id (identisch zum ttrHistory-Key, egal ob
+    // Aktiver oder Jugendlicher) plus die Art, damit gefiltert und historisch nachgeschlagen werden kann.
     const pool = [
-      ...Object.values(aktiveSpieler).map(sp=>({label:sp.name, ttr:sp.ttr})),
-      ...Object.values(children).map(c=>{
-        const hist=(ttrHistory[c.id]?.entries||[]).slice().sort((a,b)=>a.month.localeCompare(b.month));
-        const last=hist[hist.length-1];
-        return last ? {refId:'jugend:'+c.id, id:c.id, label:c.name, ttr:last.ttr} : null;
-      }).filter(Boolean),
+      ...Object.values(aktiveSpieler).map(sp=>({id:sp.id, kind:'aktiv', label:sp.name})),
+      ...Object.values(children).map(c=>(ttrHistory[c.id]?.entries?.length ? {id:c.id, kind:'jugend', label:c.name} : null)).filter(Boolean),
     ];
-    const resolveTtrRef = refId => {
-      if (!refId) return null;
-      const [kind, rid] = refId.split(':');
-      if (kind==='aktiv') return aktiveSpieler[rid]?.ttr ?? null;
-      if (kind==='jugend') {
-        const hist=(ttrHistory[rid]?.entries||[]).slice().sort((a,b)=>a.month.localeCompare(b.month));
-        return hist[hist.length-1]?.ttr ?? null;
-      }
-      return null;
+    const targetMonth = `${ttrProTagYear}-${String(ttrProTagMonth).padStart(2,'0')}`;
+    const ttrAtMonth = rawId => {
+      const hist = (ttrHistory[rawId]?.entries||[]).slice().sort((a,b)=>a.month.localeCompare(b.month));
+      const upTo = hist.filter(e=>e.month<=targetMonth);
+      return upTo.length ? upTo[upTo.length-1].ttr : null;
     };
-    const todayMs = Date.now();
+    const refDate = new Date(`${targetMonth}-01T00:00:00`);
+    const refMs = refDate.getTime();
+
     const rows = Object.values(mitgliederListe).map(m=>{
       if (!m.geburtsdatum) return null;
-      let ttr = m.ttrRefId ? resolveTtrRef(m.ttrRefId) : null;
-      if (ttr==null) {
+      let rawId = null, kind = null;
+      if (m.ttrRefId) { const [k,rid]=m.ttrRefId.split(':'); rawId=rid; kind=k; }
+      if (!rawId) {
         const fullNameWords = wordSet(`${m.vorname} ${m.nachname}`);
-        ttr = pool.find(p=>wordSet(p.label)===fullNameWords)?.ttr ?? null;
+        const match = pool.find(p=>wordSet(p.label)===fullNameWords);
+        if (match) { rawId=match.id; kind=match.kind; }
       }
+      if (!rawId) return null;
+      const ttr = ttrAtMonth(rawId);
       if (ttr==null) return null;
       const geb = new Date(m.geburtsdatum+'T00:00:00');
       if (isNaN(geb.getTime())) return null;
-      const lebenstage = Math.floor((todayMs - geb.getTime())/86400000);
+      const lebenstage = Math.floor((refMs - geb.getTime())/86400000);
       if (lebenstage<=0) return null;
-      return { name:`${m.vorname} ${m.nachname}`, ttr, lebenstage, quotient: ttr/lebenstage };
-    }).filter(Boolean).sort((a,b)=>b.quotient-a.quotient);
+      return { name:`${m.vorname} ${m.nachname}`, kind, ttr, lebenstage, quotient: ttr/lebenstage };
+    }).filter(Boolean)
+      .filter(r=>ttrProTagFilter==='all' || r.kind===ttrProTagFilter)
+      .sort((a,b)=>b.quotient-a.quotient);
+
+    const isCurrentMonth = ttrProTagYear===new Date().getFullYear() && ttrProTagMonth===new Date().getMonth()+1;
+    const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#00151a 0%,#012129 45%,#000e11 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
@@ -11659,21 +11667,44 @@ export default function TrainingsApp() {
           <span style={{fontSize:'12px',color:'rgba(103,232,249,0.7)',fontWeight:'600'}}>{rows.length} Spieler</span>
         </div>
         <div style={{maxWidth:'820px',margin:'0 auto',padding:'16px'}}>
-          <p style={{margin:'0 0 16px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
-            TTR-Wert geteilt durch die Anzahl gelebter Tage (aus dem Geburtsdatum in der Mitgliederverwaltung berechnet). Nur Spieler mit bekanntem TTR-Wert UND Geburtsdatum erscheinen hier.
+          <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
+            TTR-Wert geteilt durch die Anzahl gelebter Tage (aus dem Geburtsdatum in der Mitgliederverwaltung berechnet, Stand: 1. des gewählten Monats). Nur Spieler mit bekanntem TTR-Wert UND Geburtsdatum erscheinen hier.
           </p>
+
+          <div style={{display:'flex',gap:'6px',marginBottom:'10px',flexWrap:'wrap'}}>
+            {[{id:'all',label:'Alle'},{id:'jugend',label:'Nachwuchs'},{id:'aktiv',label:'Erwachsene'}].map(tab=>(
+              <button key={tab.id} onClick={()=>setTtrProTagFilter(tab.id)}
+                style={{padding:'7px 14px',borderRadius:'20px',border:`1px solid ${ttrProTagFilter===tab.id?'rgba(103,232,249,0.5)':'rgba(255,255,255,0.1)'}`,background:ttrProTagFilter===tab.id?'rgba(103,232,249,0.12)':'transparent',color:ttrProTagFilter===tab.id?accent:'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div style={{display:'flex',gap:'6px',marginBottom:'16px',flexWrap:'wrap',alignItems:'center'}}>
+            <select value={ttrProTagMonth} onChange={e=>setTtrProTagMonth(Number(e.target.value))}
+              style={{padding:'8px 10px',background:'#001f24',border:'1px solid rgba(103,232,249,0.25)',borderRadius:'9px',color:'white',fontSize:'12px',cursor:'pointer'}}>
+              {monthNames.map((mn,i)=><option key={mn} value={i+1} style={{background:'#001f24'}}>{mn}</option>)}
+            </select>
+            <input type="number" value={ttrProTagYear} onChange={e=>setTtrProTagYear(Number(e.target.value))}
+              style={{width:'90px',padding:'8px 10px',background:'#001f24',border:'1px solid rgba(103,232,249,0.25)',borderRadius:'9px',color:'white',fontSize:'12px',outline:'none'}}/>
+            {!isCurrentMonth && (
+              <button onClick={()=>{setTtrProTagYear(new Date().getFullYear());setTtrProTagMonth(new Date().getMonth()+1);}}
+                style={{padding:'8px 12px',background:'rgba(103,232,249,0.1)',border:'1px solid rgba(103,232,249,0.3)',borderRadius:'9px',color:accent,cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>Heute</button>
+            )}
+          </div>
+
           <div style={{display:'grid',gap:'6px'}}>
             {rows.map((r,i)=>(
               <div key={r.name} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(103,232,249,0.15)',borderRadius:'10px'}}>
                 <span style={{width:'26px',textAlign:'center',fontSize:'12px',fontWeight:'800',color:'rgba(103,232,249,0.6)'}}>{i+1}</span>
                 <div style={{flex:1,minWidth:0}}>
                   <p style={{margin:0,fontSize:'13px',fontWeight:'700'}}>{r.name}</p>
-                  <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>TTR {r.ttr} · {r.lebenstage.toLocaleString('de-DE')} Lebenstage</p>
+                  <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>TTR {r.ttr} · {r.lebenstage.toLocaleString('de-DE')} Lebenstage · {r.kind==='jugend'?'Nachwuchs':'Erwachsen'}</p>
                 </div>
                 <span style={{fontSize:'15px',fontWeight:'800',color:accent}}>{r.quotient.toFixed(4)}</span>
               </div>
             ))}
-            {rows.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.3)',fontSize:'13px'}}>Noch keine Spieler mit TTR-Wert und Geburtsdatum gefunden.</p>}
+            {rows.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.3)',fontSize:'13px'}}>Für {monthNames[ttrProTagMonth-1]} {ttrProTagYear} keine passenden Spieler gefunden.</p>}
           </div>
         </div>
       </div>
