@@ -646,6 +646,7 @@ export default function TrainingsApp() {
   const [mitgliederListe, setMitgliederListe] = useState({}); // { [id]: {vorname,nachname,geburtsdatum,email,roles:[],linkedMemberIds:[]} }
   const [mitgliederFinanzen, setMitgliederFinanzen] = useState({}); // { [id]: {strasse,plz,ort,telefon,handy,iban,bic,sepaMandatsRef,sepaMandatsDatum,zahlart,zahler,beitrag,kontosaldo,eintrittsdatum} } — admin-only, siehe firestore.rules
   const [mitgliederSearch, setMitgliederSearch] = useState('');
+  const [mitgliederRoleFilter, setMitgliederRoleFilter] = useState('');
   const [jugendlicheFuerKinder, setJugendlicheFuerKinder] = useState(null); // null=noch nicht geladen — Liste der Jugendlichen aus der Mitgliedsdatei, per API (auch für Trainer ohne direkten mitgliederListe-Zugriff)
   const [pageScrollPos, setPageScrollPos] = useState('top');
   const [vergangeneSearch, setVergangeneSearch] = useState('');
@@ -12116,6 +12117,7 @@ export default function TrainingsApp() {
     const q = mitgliederSearch.trim().toLowerCase();
     const filtered = activeEntries
       .filter(([,m]) => !q || `${m.vorname} ${m.nachname} ${m.email}`.toLowerCase().includes(q))
+      .filter(([,m]) => !mitgliederRoleFilter || (mitgliederRoleFilter==='__none__' ? getRoles(m).length===0 : getRoles(m).includes(mitgliederRoleFilter)))
       .sort((a,b)=>`${a[1].nachname}${a[1].vorname}`.localeCompare(`${b[1].nachname}${b[1].vorname}`,'de'));
     const assignedCount = activeEntries.filter(([,m])=>getRoles(m).length>0).length;
 
@@ -12498,6 +12500,12 @@ export default function TrainingsApp() {
               style={{padding:'9px 16px',background:'rgba(251,191,36,0.1)',color:'#fbbf24',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'9px',cursor:'pointer',fontWeight:'800',fontSize:'13px'}}>🎖️ Ämter und Ehrentitel</button>
             <button onClick={()=>navTo('vergangeneMitglieder')}
               style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.7)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'9px',cursor:'pointer',fontWeight:'800',fontSize:'13px'}}>📦 Ehemalige Mitglieder{exitedEntries.length>0?` (${exitedEntries.length})`:''}</button>
+            <select value={mitgliederRoleFilter} onChange={e=>setMitgliederRoleFilter(e.target.value)}
+              style={{padding:'9px 14px',background:'#0a2210',border:'1px solid rgba(196,181,253,0.25)',borderRadius:'9px',color:'#c4b5fd',fontSize:'13px',fontWeight:'700',cursor:'pointer'}}>
+              <option value="" style={{background:'#0a2210'}}>Alle Rollen</option>
+              <option value="__none__" style={{background:'#0a2210'}}>– keine Rolle –</option>
+              {ROLE_OPTIONS.map(o=><option key={o.key} value={o.key} style={{background:'#0a2210'}}>{o.label}</option>)}
+            </select>
           </div>
           {blockedUsers.length > 0 && (
             <div style={{marginBottom:'16px',padding:'12px 14px',background:'rgba(153,27,27,0.1)',border:'1px solid rgba(153,27,27,0.4)',borderRadius:'12px'}}>
