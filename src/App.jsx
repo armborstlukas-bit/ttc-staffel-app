@@ -4222,7 +4222,7 @@ export default function TrainingsApp() {
 
 
   // ── AKTIVER DASHBOARD ────────────────────────────────────────────────────
-  if (userRole === 'aktiver' && !['gegnerlogbuch','ttcnews','trainingsmatches','wettenZitate','fahrplan','tippspiel','kalender'].includes(view)) {
+  if (userRole === 'aktiver' && !['gegnerlogbuch','ttcnews','trainingsmatches','wettenZitate','fahrplan','tippspiel','kalender','verbesserungswuensche'].includes(view)) {
     const dateLabel = new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
     const greeting = new Date().getHours()<12?'Guten Morgen':new Date().getHours()<18?'Hallo':'Guten Abend';
 
