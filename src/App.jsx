@@ -2309,6 +2309,14 @@ export default function TrainingsApp() {
     await updateDoc(doc(db,'ttc','mitgliederFinanzen'), { [`list.${id}.${field}`]: value });
   };
 
+  // Löscht ein vergangenes Mitglied unwiderruflich aus mitgliederListe + mitgliederFinanzen.
+  const deleteMitgliedPermanently = async (id) => {
+    await updateDoc(doc(db,'ttc','mitgliederListe'), { [`list.${id}`]: deleteField() });
+    await updateDoc(doc(db,'ttc','mitgliederFinanzen'), { [`list.${id}`]: deleteField() });
+    setMitgliederListe(prev => { const n = {...prev}; delete n[id]; return n; });
+    setMitgliederFinanzen(prev => { const n = {...prev}; delete n[id]; return n; });
+  };
+
   // Legt ein komplett neues Mitglied inkl. Rollen, persönlichen Daten und Zahlungsdaten an
   // (aus dem "+ Neues Mitglied anlegen"-Formular in der Mitgliederverwaltung).
   const createNewMitglied = async (form) => {
@@ -13069,6 +13077,9 @@ export default function TrainingsApp() {
                       <span style={{flex:1,minWidth:'150px',fontSize:'12px',color:'rgba(255,255,255,0.7)'}}><b>{em.vorname} {em.nachname}</b> · <span style={{color:'rgba(255,255,255,0.4)'}}>ausgetreten {mitgliederFinanzen[eid]?.austrittsdatum}</span></span>
                       <button onClick={()=>saveFinanzField(eid,'austrittsdatum',null)}
                         style={{padding:'5px 10px',background:'rgba(74,222,128,0.15)',color:'#86efac',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>↩️ Zurückholen</button>
+                      <button onClick={()=>{ if(window.confirm(`"${em.vorname} ${em.nachname}" wirklich unwiderruflich löschen? Das kann nicht rückgängig gemacht werden.`)) deleteMitgliedPermanently(eid); }}
+                        title="Unwiderruflich löschen"
+                        style={{padding:'5px 10px',background:'rgba(220,38,38,0.15)',color:'#fca5a5',border:'1px solid rgba(220,38,38,0.4)',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>🗑️</button>
                     </div>
                   ))}
                 </div>
