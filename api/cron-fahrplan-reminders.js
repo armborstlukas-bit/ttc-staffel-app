@@ -148,7 +148,59 @@ export default async function handler(req, res) {
 
     await db.collection('ttc').doc('fahrplanReminderLog').set(updatedLog);
 
-    res.status(200).json({ sent });
+    // ── Änderungserkennung: Spielverlegungen etc. ────────────────────────────
+    // Vergleicht jedes Spiel mit dem zuletzt gespeicherten Stand (ttc/fahrplanSnapshot).
+    // Weicht Datum, Uhrzeit, Heim/Auswärts, Halle oder Treffpunkt/Abfahrt ab, wird NUR
+    // der aktuell zugeordnete Betreuer (falls dort eine E-Mail steht) per Mail informiert.
+    const snapSnap = await db.collection('ttc').doc('fahrplanSnapshot').get();
+    const prevSnapshot = snapSnap.exists ? (snapSnap.data().items || {}) : {};
+    const newSnapshot = {};
+    const TRACKED_FIELDS = [
+      { key: 'datum', label: 'Datum' },
+      { key: 'zeit', label: 'Uhrzeit' },
+      { key: 'isHeimspiel', label: 'Heim/Auswärts', fmt: v => (v === 'true' || v === true) ? 'Heimspiel' : 'Auswärtsspiel' },
+      { key: 'halle', label: 'Halle' },
+      { key: 'treffpunkt', label: 'Treffpunkt/Abfahrt' },
+    ];
+    let changeMailsSent = 0;
+    for (const game of items) {
+      if (!game.meetingId) continue;
+      const snap = { datum: game.datum || '', zeit: game.zeit || '', isHeimspiel: !!game.isHeimspiel, halle: game.halle || '', treffpunkt: game.treffpunkt || '' };
+      newSnapshot[game.meetingId] = snap;
+      const prev = prevSnapshot[game.meetingId];
+      if (!prev) continue; // erster bekannter Stand für dieses Spiel — keine "Änderung"
+
+      const diffs = TRACKED_FIELDS.filter(f => String(prev[f.key]) !== String(snap[f.key]));
+      if (diffs.length === 0) continue;
+
+      const fahrer = (game.fahrer || '').trim();
+      if (!EMAIL_REGEX.test(fahrer)) continue; // nur informieren, wenn ein Betreuer mit E-Mail zugeordnet ist
+
+      const rows = diffs.map(f => {
+        const fmt = f.fmt || (v => v || '–');
+        return `<tr><td><b>${f.label}</b></td><td>${fmt(prev[f.key])} → <b>${fmt(snap[f.key])}</b></td></tr>`;
+      }).join('');
+      const html = `
+        <p>Hallo,</p>
+        <p>bei deinem Spiel hat sich etwas geändert:</p>
+        <table cellpadding="6" style="border-collapse:collapse">
+          <tr><td><b>Spiel</b></td><td>${game.heim} – ${game.gast}</td></tr>
+          <tr><td><b>Liga</b></td><td>${game.ligaName || game.liga}</td></tr>
+          ${rows}
+        </table>
+        <p>Den aktuellen Stand findest du jederzeit in der App unter "Wer fährt wann".</p>
+        <p>Sportliche Grüße<br/>TTC Grün-Weiß Staffel</p>
+      `;
+      try {
+        await sendEmail({ to: fahrer, subject: `Änderung bei deinem Spiel: ${game.heim} – ${game.gast}`, html });
+        changeMailsSent++;
+      } catch (e) {
+        console.error('[cron-fahrplan-reminders] Fehler bei Änderungs-Mail an', fahrer, e?.message);
+      }
+    }
+    await db.collection('ttc').doc('fahrplanSnapshot').set({ items: newSnapshot, updatedAt: new Date().toISOString() });
+
+    res.status(200).json({ sent, changeMailsSent });
   } catch (e) {
     res.status(500).json({ error: String(e?.message || e) });
   }
