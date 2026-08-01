@@ -14287,18 +14287,24 @@ export default function TrainingsApp() {
     };
 
     const typeCfg = {
-      zitat:           {label:'Zitat',           icon:'💬', color:'#67e8f9', bg:'rgba(103,232,249,0.1)', border:'rgba(103,232,249,0.3)'},
-      wette:           {label:'Wette',           icon:'🎰', color:'#fbbf24', bg:'rgba(251,191,36,0.1)',  border:'rgba(251,191,36,0.3)'},
-      lessons_learned: {label:'Lessons Learned', icon:'📚', color:'#86efac', bg:'rgba(134,239,172,0.1)', border:'rgba(134,239,172,0.3)'},
+      zitat:           {label:'Zitat',           icon:'💬', color:'#67e8f9', bg:'rgba(103,232,249,0.1)', border:'rgba(103,232,249,0.3)', paper:'#dff6fb', ink:'#0e4a57', pin:'#0891b2'},
+      wette:           {label:'Wette',           icon:'🎰', color:'#fbbf24', bg:'rgba(251,191,36,0.1)',  border:'rgba(251,191,36,0.3)',  paper:'#fff6da', ink:'#6b4a06', pin:'#d97706'},
+      lessons_learned: {label:'Lessons Learned', icon:'📚', color:'#86efac', bg:'rgba(134,239,172,0.1)', border:'rgba(134,239,172,0.3)', paper:'#e3f7e8', ink:'#0f4023', pin:'#16a34a'},
     };
     const wzDueCount = wettenZitate.filter(e => e.dueDate && e.dueDate <= TODAY && !e.dueSeen).length;
 
+    const corkBg = {
+      backgroundColor: '#a97c50',
+      backgroundImage: `radial-gradient(rgba(0,0,0,0.18) 1px, transparent 1.4px), radial-gradient(rgba(0,0,0,0.14) 1px, transparent 1.4px), radial-gradient(ellipse at top, rgba(255,255,255,0.08), transparent 60%)`,
+      backgroundSize: '18px 18px, 13px 13px, 100% 100%',
+      backgroundPosition: '0 0, 9px 9px, 0 0',
+    };
     return (
-      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#1a1000 0%,#0d0a00 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
-        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
-          <button onClick={()=>navTo('home')} style={s.btn('#fbbf24')}><Home size={16}/></button>
-          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>📋 Pinnwand</h1>
-          <span style={{fontSize:'12px',color:'rgba(251,191,36,0.6)',fontWeight:'600'}}>{wettenZitate.length} Einträge</span>
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',...corkBg,fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',background:'linear-gradient(180deg,#6b4423,#5a3a1e)',borderBottom:'4px solid #4a2f18',boxShadow:'0 3px 10px rgba(0,0,0,0.3)',position:'sticky',top:0,zIndex:100}}>
+          <button onClick={()=>navTo('home')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.12)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'9px',color:'#fde68a',cursor:'pointer',display:'flex',alignItems:'center'}}><Home size={16}/></button>
+          <h1 style={{margin:0,color:'#fde68a',fontSize:'20px',fontWeight:'800',flex:1,textShadow:'0 1px 2px rgba(0,0,0,0.4)'}}>📌 Pinnwand</h1>
+          <span style={{fontSize:'12px',color:'rgba(253,230,138,0.7)',fontWeight:'600'}}>{wettenZitate.length} Einträge</span>
         </div>
 
         <div style={{padding:'20px',maxWidth:'820px',margin:'0 auto'}}>
@@ -14313,19 +14319,19 @@ export default function TrainingsApp() {
             </div>
           )}
 
-          {/* Übersicht — große Kacheln statt kleiner Filter-Pillen, dienen gleichzeitig als Navigation */}
-          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'8px',marginBottom:'16px'}}>
+          {/* Übersicht — wie kleine Washi-Tape-Etiketten auf dem Brett, dienen gleichzeitig als Navigation */}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'10px',marginBottom:'18px'}}>
             {[
-              ['alle','Alle','📋',wettenZitate.length,'#e5e7eb'],
-              ['zitat','Zitate','💬',wettenZitate.filter(e=>e.type==='zitat').length,'#67e8f9'],
-              ['wette','Wetten','🎰',wettenZitate.filter(e=>e.type==='wette').length,'#fbbf24'],
-              ['lessons_learned','Lessons','📚',wettenZitate.filter(e=>e.type==='lessons_learned').length,'#86efac'],
-            ].map(([key,lbl,icon,count,color])=>(
+              ['alle','Alle','📋',wettenZitate.length,'#f3f4f6','#374151'],
+              ['zitat','Zitate','💬',wettenZitate.filter(e=>e.type==='zitat').length,'#dff6fb','#0e7490'],
+              ['wette','Wetten','🎰',wettenZitate.filter(e=>e.type==='wette').length,'#fff6da','#92620a'],
+              ['lessons_learned','Lessons','📚',wettenZitate.filter(e=>e.type==='lessons_learned').length,'#e3f7e8','#166534'],
+            ].map(([key,lbl,icon,count,paper,ink],i)=>(
               <button key={key} onClick={()=>setWzFilter(key)}
-                style={{padding:'10px 6px',borderRadius:'12px',border:`1.5px solid ${wzFilter===key?color:'rgba(255,255,255,0.1)'}`,background:wzFilter===key?`${color}22`:'rgba(255,255,255,0.03)',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:'2px'}}>
+                style={{padding:'10px 6px',borderRadius:'4px',border:'none',background:paper,cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:'2px',transform:`rotate(${wzFilter===key?0:(i%2===0?-2:2)}deg)`,boxShadow:wzFilter===key?'0 4px 10px rgba(0,0,0,0.35)':'0 2px 6px rgba(0,0,0,0.25)',outline:wzFilter===key?`2px solid ${ink}`:'none',outlineOffset:'2px',transition:'transform 0.15s'}}>
                 <span style={{fontSize:'18px'}}>{icon}</span>
-                <span style={{fontSize:'17px',fontWeight:'800',color:wzFilter===key?color:'white'}}>{count}</span>
-                <span style={{fontSize:'10px',fontWeight:'700',color:wzFilter===key?color:'rgba(255,255,255,0.4)'}}>{lbl}</span>
+                <span style={{fontSize:'17px',fontWeight:'800',color:ink}}>{count}</span>
+                <span style={{fontSize:'10px',fontWeight:'700',color:ink}}>{lbl}</span>
               </button>
             ))}
           </div>
@@ -14334,20 +14340,21 @@ export default function TrainingsApp() {
           <input
             value={wzSearch} onChange={e=>setWzSearch(e.target.value)}
             placeholder="🔍 Suche…"
-            style={{width:'100%',padding:'9px 14px',background:'rgba(255,255,255,0.06)',border:`1px solid ${acBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box',fontFamily:'inherit',marginBottom:'14px'}}
+            style={{width:'100%',padding:'9px 14px',background:'#fdf6e8',border:'1px solid rgba(0,0,0,0.15)',borderRadius:'8px',color:'#3f2d1a',fontSize:'14px',outline:'none',boxSizing:'border-box',fontFamily:'inherit',marginBottom:'14px',boxShadow:'0 2px 6px rgba(0,0,0,0.2)'}}
           />
 
           {/* Neuer Eintrag Button */}
           {!wzAdding && (
             <button onClick={()=>setWzAdding(true)}
-              style={{width:'100%',padding:'11px',background:`linear-gradient(135deg,${ac},#d97706)`,border:'none',borderRadius:'12px',color:'white',fontWeight:'700',fontSize:'14px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',marginBottom:'16px'}}>
+              style={{width:'100%',padding:'11px',background:`linear-gradient(135deg,${ac},#d97706)`,border:'none',borderRadius:'10px',color:'white',fontWeight:'700',fontSize:'14px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',marginBottom:'18px',boxShadow:'0 3px 8px rgba(0,0,0,0.3)'}}>
               <Plus size={16}/> Neuer Eintrag
             </button>
           )}
 
           {/* Formular */}
           {wzAdding && (
-            <div style={{background:acBg,border:`1px solid ${acBorder}`,borderRadius:'16px',padding:'18px',marginBottom:'20px'}}>
+            <div style={{position:'relative',background:'#2a1c10',border:`1px solid ${acBorder}`,borderRadius:'8px',padding:'22px 18px 18px',marginBottom:'20px',boxShadow:'0 6px 16px rgba(0,0,0,0.4)'}}>
+              <span style={{position:'absolute',top:'-11px',left:'50%',transform:'translateX(-50%)',fontSize:'22px',filter:'drop-shadow(0 2px 3px rgba(0,0,0,0.5))'}}>📌</span>
               {/* Typ-Auswahl */}
               <div style={{display:'flex',gap:'8px',marginBottom:'14px'}}>
                 {Object.entries(typeCfg).map(([key,cfg])=>(
@@ -14424,35 +14431,44 @@ export default function TrainingsApp() {
                   return entry.text?.toLowerCase().includes(q) || entry.createdBy?.toLowerCase().includes(q);
                 }
                 return true;
-              }).map(entry=>{
+              }).map((entry,entryIdx)=>{
                 const cfg = typeCfg[entry.type] || typeCfg.zitat;
                 const dateStr = entry.date ? new Date(entry.date+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : '';
                 const dueDateStr = entry.dueDate ? new Date(entry.dueDate+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : '';
                 const isDue = entry.dueDate && entry.dueDate <= TODAY && !entry.dueSeen;
                 const isEditing = wzEditId === entry.id;
+                const rot = entryIdx % 3 === 0 ? -1.4 : entryIdx % 3 === 1 ? 1.2 : -0.4;
                 return (
-                  <div key={entry.id} style={{background: isDue ? 'rgba(239,68,68,0.06)' : cfg.bg,border:`1px solid ${isDue ? 'rgba(239,68,68,0.4)' : cfg.border}`,borderRadius:'14px',overflow:'hidden'}}>
+                  <div key={entry.id} style={{position:'relative',background: isDue ? '#fde3e3' : cfg.paper,borderRadius:'3px',overflow:'hidden',transform:`rotate(${rot}deg)`,boxShadow:'0 6px 14px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.4) inset'}}>
+                    <span style={{position:'absolute',top:'-10px',left:'50%',transform:'translateX(-50%) rotate(-6deg)',fontSize:'20px',filter:'drop-shadow(0 3px 3px rgba(0,0,0,0.45))',zIndex:2}}>📌</span>
                     {/* Kopfzeile — zwei Zeilen: oben Typ/Autor/Aktionen, unten Meta-Infos, statt alles in eine Zeile zu quetschen */}
-                    <div style={{padding:'10px 14px 6px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
+                    <div style={{padding:'16px 14px 6px',borderBottom:`1px dashed ${isDue?'rgba(153,27,27,0.25)':'rgba(0,0,0,0.15)'}`}}>
                       <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                        <span style={{fontSize:'11px',fontWeight:'800',color:cfg.color,background:'rgba(0,0,0,0.25)',border:`1px solid ${cfg.border}`,borderRadius:'6px',padding:'2px 8px',flexShrink:0}}>{cfg.icon} {cfg.label}</span>
-                        <span style={{fontSize:'14px',fontWeight:'700',color:'rgba(255,255,255,0.85)',flex:1}}>{entry.createdBy}</span>
-                        <span style={{fontSize:'12px',fontWeight:'600',color:'rgba(255,255,255,0.5)',flexShrink:0}}>{dateStr}</span>
-                        {canEditEntry(entry) && !isEditing && (
+                        <span style={{fontSize:'11px',fontWeight:'800',color:'white',background:isDue?'#b91c1c':cfg.pin,borderRadius:'6px',padding:'2px 8px',flexShrink:0}}>{cfg.icon} {cfg.label}</span>
+                        <span style={{fontSize:'14px',fontWeight:'800',color:isDue?'#7f1d1d':cfg.ink,flex:1}}>{entry.createdBy}</span>
+                        <span style={{fontSize:'12px',fontWeight:'600',color:isDue?'rgba(127,29,29,0.6)':`${cfg.ink}99`,flexShrink:0}}>{dateStr}</span>
+                        {(canEditEntry(entry) || userRole==='admin') && !isEditing && (
                           <div style={{display:'flex',gap:'4px',flexShrink:0}}>
+                            {userRole==='admin' && entry.createdBy!==authorName && (
+                              <button onClick={()=>{setWzEditId(entry.id);setWzEditText(entry.text);setWzEditVisibility(entry.visibility||{mode:'all',roles:[],userIds:[]});}}
+                                title="Sichtbarkeit anpassen (Admin)"
+                                style={{width:'24px',height:'24px',borderRadius:'7px',background:'rgba(0,0,0,0.12)',border:'none',color:isDue?'#7f1d1d':cfg.ink,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'11px'}}>🔒</button>
+                            )}
+                            {canEditEntry(entry) && (<>
                             <button onClick={()=>{setWzEditId(entry.id);setWzEditText(entry.text);setWzEditVisibility(entry.visibility||{mode:'all',roles:[],userIds:[]});}}
-                              style={{width:'24px',height:'24px',borderRadius:'7px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.2)',color:ac,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Pencil size={11}/></button>
+                              style={{width:'24px',height:'24px',borderRadius:'7px',background:'rgba(0,0,0,0.12)',border:'none',color:isDue?'#7f1d1d':cfg.ink,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Pencil size={11}/></button>
                             <button onClick={()=>{if(!window.confirm('Eintrag löschen?'))return;saveWZ(wettenZitate.filter(e=>e.id!==entry.id));}}
-                              style={{width:'24px',height:'24px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Trash2 size={11}/></button>
+                              style={{width:'24px',height:'24px',borderRadius:'7px',background:'rgba(220,38,38,0.15)',border:'none',color:'#b91c1c',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Trash2 size={11}/></button>
+                            </>)}
                           </div>
                         )}
                       </div>
                       {(entry.dueDate || entry.visibility?.mode==='restricted' || entry.edited || (entry.type==='wette' && !entry.options?.length && canEditEntry(entry))) && (
-                        <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap',marginTop:'6px'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap',marginTop:'6px',paddingBottom:'6px'}}>
                           {entry.dueDate && (
                             <span
                               onClick={isDue ? ()=>saveWZ(wettenZitate.map(e=>e.id===entry.id?{...e,dueSeen:true}:e)) : undefined}
-                              style={{fontSize:'11px',fontWeight:'700',color:isDue?'#fca5a5':'rgba(255,255,255,0.3)',background:isDue?'rgba(239,68,68,0.15)':'rgba(255,255,255,0.05)',border:`1px solid ${isDue?'rgba(239,68,68,0.4)':'rgba(255,255,255,0.1)'}`,borderRadius:'6px',padding:'2px 8px',cursor:isDue?'pointer':'default',flexShrink:0}}>
+                              style={{fontSize:'11px',fontWeight:'700',color:isDue?'white':cfg.ink,background:isDue?'#b91c1c':'rgba(0,0,0,0.08)',borderRadius:'6px',padding:'2px 8px',cursor:isDue?'pointer':'default',flexShrink:0}}>
                               {isDue ? '⚠️ ' : '📅 '}fällig {dueDateStr}
                             </span>
                           )}
@@ -14461,21 +14477,21 @@ export default function TrainingsApp() {
                                 ...(entry.visibility.roles||[]).map(r=>VISIBILITY_ROLES.find(x=>x.key===r)?.label||r),
                                 ...(entry.visibility.userIds||[]).map(uid=>allUsers[uid]?.name||allUsers[uid]?.email).filter(Boolean),
                               ].join(', ') || 'Eingeschränkt sichtbar'}
-                              style={{fontSize:'11px',fontWeight:'800',color:'#fca5a5',background:'rgba(239,68,68,0.12)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:'6px',padding:'2px 8px',flexShrink:0,cursor:'help'}}>
+                              style={{fontSize:'11px',fontWeight:'800',color:'#7f1d1d',background:'rgba(220,38,38,0.15)',borderRadius:'6px',padding:'2px 8px',flexShrink:0,cursor:'help'}}>
                               🔒 Eingeschränkt sichtbar
                             </span>
                           )}
-                          {entry.edited&&<span style={{fontSize:'10px',color:'rgba(255,255,255,0.25)',fontStyle:'italic'}}>bearbeitet</span>}
+                          {entry.edited&&<span style={{fontSize:'10px',color:`${cfg.ink}99`,fontStyle:'italic'}}>bearbeitet</span>}
                           {entry.type==='wette' && !entry.options?.length && wzAddOptionsId!==entry.id && canEditEntry(entry) && (
                             <button onClick={()=>{setWzAddOptionsId(entry.id);setWzAddOptions(['','']);}}
-                              style={{padding:'3px 8px',borderRadius:'7px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.2)',color:ac,cursor:'pointer',fontSize:'11px',fontWeight:'700',flexShrink:0}}>+ Optionen</button>
+                              style={{padding:'3px 8px',borderRadius:'7px',background:'rgba(0,0,0,0.1)',border:'none',color:cfg.ink,cursor:'pointer',fontSize:'11px',fontWeight:'700',flexShrink:0}}>+ Optionen</button>
                           )}
                         </div>
                       )}
                     </div>
                     {/* Text */}
                     {isEditing ? (
-                      <div style={{padding:'12px 14px'}}>
+                      <div style={{padding:'12px 14px',background:'#2a1c10'}}>
                         <textarea value={wzEditText} onChange={e=>setWzEditText(e.target.value)} rows={4}
                           style={{width:'100%',padding:'10px',background:'rgba(0,0,0,0.3)',border:`1px solid ${acBorder}`,borderRadius:'8px',color:'white',fontSize:'14px',outline:'none',resize:'vertical',boxSizing:'border-box',fontFamily:'inherit',lineHeight:'1.5'}}/>
                         {VisibilityPicker(wzEditVisibility, updater=>setWzEditVisibility(v=>typeof updater==='function'?updater(v):updater))}
@@ -14486,9 +14502,9 @@ export default function TrainingsApp() {
                       </div>
                     ) : (
                       <>
-                        <p style={{margin:0,padding:'12px 14px 10px',fontSize:'16px',fontWeight:'600',color:'white',lineHeight:'1.6',whiteSpace:'pre-wrap'}}>{entry.text}</p>
+                        <p style={{margin:0,padding:'12px 14px 10px',fontSize:'16px',fontWeight:'700',color:cfg.ink,lineHeight:'1.6',whiteSpace:'pre-wrap'}}>{entry.text}</p>
                         {wzAddOptionsId===entry.id && (
-                          <div style={{margin:'0 14px 14px',padding:'12px',background:'rgba(251,191,36,0.05)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:'10px'}}>
+                          <div style={{margin:'0 14px 14px',padding:'12px',background:'#2a1c10',border:'1px solid rgba(251,191,36,0.2)',borderRadius:'10px'}}>
                             <span style={{fontSize:'12px',fontWeight:'700',color:'rgba(251,191,36,0.7)',display:'block',marginBottom:'8px'}}>🎯 Optionen hinzufügen (min. 2)</span>
                             <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
                               {wzAddOptions.map((opt,i)=>(
@@ -14536,7 +14552,7 @@ export default function TrainingsApp() {
                           if (hasBet && !isExpanded) {
                             const myOptLabel = entry.options[myBet];
                             return (
-                              <div style={{padding:'0 14px 12px'}}>
+                              <div style={{margin:'0 14px 12px',padding:'8px',background:'#2a1c10',borderRadius:'9px'}}>
                                 <button onClick={toggleExpand}
                                   style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'9px',cursor:'pointer',gap:'8px'}}>
                                   <span style={{fontSize:'13px',fontWeight:'700',color:'#fbbf24'}}>✓ {myOptLabel}</span>
@@ -14551,7 +14567,7 @@ export default function TrainingsApp() {
                           }
 
                           return (
-                            <div style={{padding:'0 14px 14px',display:'flex',flexDirection:'column',gap:'7px'}}>
+                            <div style={{margin:'0 14px 14px',padding:'10px',background:'#2a1c10',borderRadius:'10px',display:'flex',flexDirection:'column',gap:'7px'}}>
                               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'2px'}}>
                                 <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',fontWeight:'700'}}>
                                   🗳️ {betOpen ? 'Abstimmen' : 'Geschlossen'} · {totalVotes} {totalVotes===1?'Stimme':'Stimmen'}
