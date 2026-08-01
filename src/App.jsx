@@ -2884,19 +2884,24 @@ export default function TrainingsApp() {
     return { gold, silver, bronze };
   };
 
+  // Trainings-Errungenschaften (Meilensteine/Serien) zählen bewusst nur ab diesem Datum —
+  // Reset zum Saisonstart 01.08.2026, echte Anwesenheitshistorie vor diesem Datum bleibt
+  // unangetastet und wird weiterhin überall sonst (Statistiken etc.) normal angezeigt.
+  const ACHIEVEMENT_RESET_DATE = '2026-08-01';
+
   const getTotalTrainingsAttended = (childId) => {
     const child = children[childId];
     if (!child) return 0;
     const allSess = [...Object.values(sessions), ...Object.values(archivedSessions)];
     const excludedDates = new Set(allSess.filter(s=>s.excludeFromQuota && (s.subgroupIds||[]).includes(child.subgroupId)).map(s=>s.date));
-    return Object.entries(child.attendance||{}).filter(([date,st])=>st==='present' && !excludedDates.has(date)).length;
+    return Object.entries(child.attendance||{}).filter(([date,st])=>st==='present' && date>=ACHIEVEMENT_RESET_DATE && !excludedDates.has(date)).length;
   };
 
   const getLongestStreak = (childId) => {
     const child = children[childId];
     if (!child) return 0;
     const allSess = [...Object.values(sessions), ...Object.values(archivedSessions)]
-      .filter(s => (s.subgroupIds||[]).includes(child.subgroupId) && !s.excludeFromQuota)
+      .filter(s => (s.subgroupIds||[]).includes(child.subgroupId) && !s.excludeFromQuota && s.date>=ACHIEVEMENT_RESET_DATE)
       .sort((a,b) => (a.date||'').localeCompare(b.date||''));
     let max=0, cur=0;
     allSess.forEach(s => {
@@ -7119,9 +7124,17 @@ export default function TrainingsApp() {
 
                 const ttrEntries = ttrHistory[child.id]?.entries || [];
                 const personalMax = ttrEntries.length ? Math.max(...ttrEntries.map(e=>Number(e.ttr)||0)) : null;
+                const totalTrainingsAdm = getTotalTrainingsAttended(child.id);
+                const streakAdm = getLongestStreak(child.id);
 
-                // Sektionstitel-Stil
-                const SecLbl = ({children:ch})=><p style={{margin:'0 0 6px',fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.35)',textTransform:'uppercase',letterSpacing:'1.2px'}}>{ch}</p>;
+                // Sektionstitel-Stil — angelehnt an die Errungenschaftsseite der Kinder selbst,
+                // nur kompakter (schmalere Trennlinie statt volle SH-Kachel).
+                const SecLbl = ({children:ch})=>(
+                  <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'7px'}}>
+                    <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',letterSpacing:'1.2px',whiteSpace:'nowrap'}}>{ch}</span>
+                    <div style={{flex:1,height:'1px',background:'rgba(255,255,255,0.08)'}}/>
+                  </div>
+                );
 
                 return (
                   <div key={child.id} style={{borderRadius:'14px',overflow:'hidden',border:'1px solid rgba(255,255,255,0.08)',background:'rgba(255,255,255,0.04)'}}>
@@ -7176,6 +7189,24 @@ export default function TrainingsApp() {
                                   {manualOverride&&<span style={{position:'absolute',top:'-6px',right:'-4px',background:'#fb923c',color:'white',fontSize:'8px',fontWeight:'800',borderRadius:'4px',padding:'1px 3px',lineHeight:'1.2',pointerEvents:'none'}}>M</span>}
                                 </div>
                               );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Trainings-Meilensteine & Serie (rein informativ, automatisch aus Anwesenheit ab 01.08.2026) */}
+                        <div>
+                          <SecLbl>🏋️ Trainings-Meilensteine · {totalTrainingsAdm} Trainings</SecLbl>
+                          <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'8px'}}>
+                            {[10,25,50,100,200,500,1000].map(m=>{
+                              const has=totalTrainingsAdm>=m;
+                              return <span key={m} style={{padding:'5px 10px',borderRadius:'9px',border:`1.5px solid ${has?'rgba(74,222,128,0.4)':'rgba(255,255,255,0.1)'}`,background:has?'rgba(74,222,128,0.12)':'rgba(255,255,255,0.04)',color:has?'#4ade80':'rgba(255,255,255,0.25)',fontWeight:'800',fontSize:'12px'}}>{has?'✓ ':''}{m}</span>;
+                            })}
+                          </div>
+                          <SecLbl>🔥 Trainingsserie · längste {streakAdm}</SecLbl>
+                          <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                            {[5,10,20,30,50].map(m=>{
+                              const has=streakAdm>=m;
+                              return <span key={m} style={{padding:'5px 10px',borderRadius:'9px',border:`1.5px solid ${has?'rgba(251,146,60,0.4)':'rgba(255,255,255,0.1)'}`,background:has?'rgba(251,146,60,0.12)':'rgba(255,255,255,0.04)',color:has?'#fb923c':'rgba(255,255,255,0.25)',fontWeight:'800',fontSize:'12px'}}>{has?'✓ ':''}{m}er</span>;
                             })}
                           </div>
                         </div>
