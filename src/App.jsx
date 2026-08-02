@@ -1275,6 +1275,13 @@ export default function TrainingsApp() {
   const canAccessRompel    = () => userRole === 'admin' || (appSettings.rompelTrainers  || []).includes(user?.uid);
   const canAccessPfand     = () => userRole === 'admin' || (appSettings.pfandTrainers   || []).includes(user?.uid);
   const canAccessPinnwand  = () => !!user; // Pinnwand ist fuer alle eingeloggten Nutzer sichtbar; Sichtbarkeit einzelner Beitraege wird pro Beitrag geregelt
+  const canAccessTeams = () => !!user; // TTC Mannschaften ist fuer alle eingeloggten Nutzer sichtbar (Admin, Trainer, Aktive, Eltern, Jugendliche, Passive)
+  const toggleFavoriteTeam = async (teamId) => {
+    if (!user?.uid) return;
+    const next = userProfile?.favoriteTeamId === teamId ? null : teamId;
+    setUserProfile(p => ({...(p||{}), favoriteTeamId: next}));
+    await setDoc(doc(db,'users',user.uid), { favoriteTeamId: next }, { merge:true });
+  };
   // Schmale Admin-Zeile zur Zugangsverwaltung, direkt im jeweiligen Spezialbereich (statt zentral im Adminbereich).
   const renderAccessManagerRow = (settingsKey, label, accent) => {
     if (userRole !== 'admin') return null;
@@ -3651,7 +3658,7 @@ export default function TrainingsApp() {
   }
 
   // ── PASSIVES MITGLIED: stark eingeschränkter Bereich ──────────────────────
-  if (userRole === 'passiv' && !['ttcnews','kalender','tippspiel','wettenZitate'].includes(view)) {
+  if (userRole === 'passiv' && !['ttcnews','kalender','tippspiel','wettenZitate','ttcMannschaften'].includes(view)) {
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <div className="ttc-sticky-hdr" style={{padding:'16px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
@@ -3669,6 +3676,7 @@ export default function TrainingsApp() {
               {label:'Vereinskalender', icon:'📅', desc:'Termine & Hallenbelegungen', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.2)', action:()=>{navTo('kalender');fetchKalender();}},
               {label:'TTC Tippspiel', icon:'🎱', desc:'Endplatzierungen tippen', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>{navTo('tippspiel');fetchTippspiel();}},
               {label:'MyTischtennis', icon:'🏓', desc:'Vereinsübersicht auf MyTischtennis', color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)', action:()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953/mannschaften';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);}},
+              ...(canAccessTeams()?[{label:'TTC Mannschaften', icon:'🏆', desc:'Alle Mannschaften & nächste Spiele', color:'#2dd4bf', bg:'rgba(45,212,191,0.08)', border:'rgba(45,212,191,0.2)', action:()=>navTo('ttcMannschaften')}]:[]),
               ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', desc:'Wetten, Zitate & Lessons Learned', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
             ].map(t=>(
               <button key={t.label} onClick={t.action} style={{position:'relative',background:t.bg,border:`1px solid ${t.border}`,borderRadius:'18px',padding:'22px 20px',cursor:'pointer',textAlign:'left',display:'flex',flexDirection:'column',gap:'8px',transition:'transform 0.15s'}}
@@ -4357,6 +4365,7 @@ export default function TrainingsApp() {
           {label:'Errungenschaften', icon:'🏅', color:'#d9f99d', bg:'rgba(217,249,157,0.1)',  border:'rgba(217,249,157,0.25)', action:()=>navTo('achievements')},
           {label:'Rangliste',        icon:'📊', color:'#fcd34d', bg:'rgba(252,211,77,0.1)',   border:'rgba(252,211,77,0.25)',  action:()=>navTo('rangliste')},
           {label:'Mannschaften',     icon:'🏓', color:'#6ee7b7', bg:'rgba(110,231,183,0.1)',  border:'rgba(110,231,183,0.25)', action:()=>navTo('mannschaften')},
+          {label:'TTC Mannschaften', icon:'🏆', color:'#2dd4bf', bg:'rgba(45,212,191,0.1)',   border:'rgba(45,212,191,0.25)',  action:()=>navTo('ttcMannschaften')},
           {label:'Gegnerlogbuch',    icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.08)',   border:'rgba(8,145,178,0.25)',   action:()=>navTo('gegnerlogbuch')},
           {label:'TTR Werte',        icon:'📈', color:'#fbbf24', bg:'rgba(251,191,36,0.08)',  border:'rgba(251,191,36,0.25)',  action:()=>navTo('ttrWerte')},
         ],
@@ -4568,7 +4577,7 @@ export default function TrainingsApp() {
 
 
   // ── AKTIVER DASHBOARD ────────────────────────────────────────────────────
-  if (userRole === 'aktiver' && !['gegnerlogbuch','ttcnews','trainingsmatches','wettenZitate','fahrplan','tippspiel','kalender','verbesserungswuensche'].includes(view)) {
+  if (userRole === 'aktiver' && !['gegnerlogbuch','ttcnews','trainingsmatches','wettenZitate','fahrplan','tippspiel','kalender','verbesserungswuensche','ttcMannschaften'].includes(view)) {
     const dateLabel = new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
     const greeting = new Date().getHours()<12?'Guten Morgen':new Date().getHours()<18?'Hallo':'Guten Abend';
 
@@ -4704,6 +4713,7 @@ export default function TrainingsApp() {
               {label:'Vereinskalender', icon:'📅', desc:'Termine & Hallenbelegungen',               color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.2)', action:()=>{navTo('kalender');fetchKalender();}},
               {label:'TTC Tippspiel',  icon:'🎱', desc: tippspielNeedsAttention&&tippspielConfig?.deadline ? `Noch nicht abgegeben — Frist ${new Date(tippspielConfig.deadline+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}` : 'Endplatzierungen tippen', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', blink: tippspielNeedsAttention, action:()=>{markTippspielSeen();navTo('tippspiel');fetchTippspiel();}},
               {label:'Trainingsmatches',icon:'⚔️', desc:'Duelle & Allzeittabelle',                  color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>navTo('trainingsmatches')},
+              ...(canAccessTeams()?[{label:'TTC Mannschaften', icon:'🏆', desc:'Alle Mannschaften & nächste Spiele', color:'#2dd4bf', bg:'rgba(45,212,191,0.08)', border:'rgba(45,212,191,0.2)', action:()=>navTo('ttcMannschaften')}]:[]),
               ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', desc:'Wetten, Zitate & Lessons Learned', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
               {label:'MyTischtennis', icon:'🏓', desc:'Vereinsübersicht auf MyTischtennis',                                                                  color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)',  action:()=>(()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953/mannschaften';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);})()},
               {label:'Verbesserungen', icon:'💡', desc:'Deine Ideen für die App', color:'#c4b5fd', bg:'rgba(196,181,253,0.07)', border:'rgba(196,181,253,0.2)', action:()=>navTo('verbesserungswuensche')},
@@ -4767,7 +4777,6 @@ export default function TrainingsApp() {
     const subViewMeta = {
       benachrichtigungen: { label:'Benachrichtigungen', icon:'🔔', color:'#c4b5fd', colorFaint:'rgba(167,139,250,0.5)', border:'rgba(167,139,250,0.15)', bg:'linear-gradient(170deg,#0d0a1f 0%,#150d2e 45%,#0a0818 100%)', hdrBg:'rgba(13,10,31,0.97)' },
       trainingsverlauf:   { label:'Trainingsverlauf',   icon:'📋', color:'#67e8f9', colorFaint:'rgba(103,232,249,0.5)', border:'rgba(103,232,249,0.15)', bg:'linear-gradient(170deg,#051a20 0%,#082d38 45%,#041520 100%)', hdrBg:'rgba(5,26,32,0.97)'  },
-      mannschaft:         { label:'TTC Mannschaften',    icon:'🏓', color:'#2dd4bf', colorFaint:'rgba(45,212,191,0.5)',  border:'rgba(45,212,191,0.15)',  bg:'linear-gradient(170deg,#041a1a 0%,#072d2a 45%,#041816 100%)', hdrBg:'rgba(4,26,26,0.97)'  },
       rangliste:          { label:'Rangliste',           icon:'📊', color:'#fbbf24', colorFaint:'rgba(251,191,36,0.5)',  border:'rgba(251,191,36,0.15)',  bg:'linear-gradient(170deg,#1a1200 0%,#2d1e00 45%,#1a1000 100%)', hdrBg:'rgba(26,18,0,0.97)'  },
       errungenschaften:   { label:'Errungenschaften',    icon:'🏅', color:'#86efac', colorFaint:'rgba(134,239,172,0.5)', border:'rgba(134,239,172,0.15)', bg:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)', hdrBg:'rgba(2,26,10,0.97)'  },
     };
@@ -4858,38 +4867,6 @@ export default function TrainingsApp() {
                   })
                 }
               </div>
-            </>
-          );
-        }
-        if (elternSubView === 'mannschaft') {
-          if (clubTeams === null && !clubTeamsLoading) fetchClubTeams();
-          const groupLabel = name => /^Damen/i.test(name) ? 'Damen' : /^Erwachsene/i.test(name) ? 'Herren' : 'Jugend';
-          const grouped = {};
-          (clubTeams||[]).forEach(t => { (grouped[groupLabel(t.name)] = grouped[groupLabel(t.name)]||[]).push(t); });
-          const openTeam = t => { if (!t.url) return; const a=document.createElement('a'); a.href=t.url; a.target='_blank'; a.rel='noopener noreferrer'; document.body.appendChild(a); a.click(); document.body.removeChild(a); };
-          return (
-            <>
-              <p style={{margin:'0 0 16px',fontSize:'12px',color:'rgba(255,255,255,0.4)',lineHeight:'1.5'}}>Alle Mannschaften des TTC Grün-Weiß Staffel, live von mytischtennis.de. Antippen führt direkt zur jeweiligen Mannschaftsseite (Kader, Tabelle, Spielplan).</p>
-              {clubTeamsLoading && (clubTeams===null) && <div style={{...DARK_CARD,textAlign:'center',padding:'40px'}}><p style={{color:'rgba(255,255,255,0.3)',margin:0}}>⏳ Lade Mannschaften…</p></div>}
-              {clubTeams!==null && clubTeams.length===0 && !clubTeamsLoading && <div style={{...DARK_CARD,textAlign:'center',padding:'40px'}}><p style={{color:'rgba(255,255,255,0.3)',margin:0}}>Mannschaften konnten nicht geladen werden.</p></div>}
-              {['Damen','Herren','Jugend'].filter(g=>grouped[g]?.length).map(g=>(
-                <div key={g} style={{marginBottom:'18px'}}>
-                  <p style={{margin:'0 0 8px',fontSize:'11px',fontWeight:'800',color:'rgba(45,212,191,0.6)',textTransform:'uppercase',letterSpacing:'1px'}}>{g}</p>
-                  <div style={{display:'grid',gap:'6px'}}>
-                    {grouped[g].map(t=>(
-                      <button key={t.teamId} onClick={()=>openTeam(t)} disabled={!t.url}
-                        style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 14px',background:'rgba(45,212,191,0.06)',border:'1px solid rgba(45,212,191,0.2)',borderRadius:'12px',cursor:t.url?'pointer':'default',textAlign:'left'}}>
-                        <span style={{fontSize:'20px',flexShrink:0}}>🏓</span>
-                        <div style={{flex:1,minWidth:0}}>
-                          <p style={{margin:0,fontWeight:'800',color:'white',fontSize:'14px'}}>{t.name}</p>
-                          <p style={{margin:'2px 0 0',fontSize:'12px',color:'rgba(45,212,191,0.7)'}}>{t.league}{t.currentRank&&t.leagueSize?` · Platz ${t.currentRank}/${t.leagueSize}`:''}</p>
-                        </div>
-                        {t.url && <span style={{fontSize:'12px',color:'rgba(255,255,255,0.3)',flexShrink:0}}>↗</span>}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
             </>
           );
         }
@@ -5234,7 +5211,7 @@ export default function TrainingsApp() {
               {
                 label:'Wettkampf', color:'rgba(253,230,138,0.45)',
                 links:[
-                  {label:'TTC Mannschaften', icon:'🏓', color:'#2dd4bf', bg:'rgba(45,212,191,0.1)',  border:'rgba(45,212,191,0.25)',  action:()=>setElternSubView('mannschaft')},
+                  {label:'TTC Mannschaften', icon:'🏓', color:'#2dd4bf', bg:'rgba(45,212,191,0.1)',  border:'rgba(45,212,191,0.25)',  action:()=>navTo('ttcMannschaften')},
                   {label:'MyTischtennis',    icon:'🌐', color:'#fcd34d', bg:'rgba(252,211,77,0.1)',   border:'rgba(252,211,77,0.25)',   action:()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953/mannschaften';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);}},
                   ...(isJugend ? [{label:'Errungenschaften', icon:'🏅', color:'#86efac', bg:'rgba(134,239,172,0.1)', border:'rgba(134,239,172,0.25)', action:()=>setElternSubView('errungenschaften')}] : []),
                 ],
@@ -14459,6 +14436,65 @@ export default function TrainingsApp() {
               })}
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── TTC MANNSCHAFTEN ─────────────────────────────────────────────────────
+  if (view === 'ttcMannschaften' && canAccessTeams()) {
+    if (clubTeams === null && !clubTeamsLoading) fetchClubTeams();
+    const favId = userProfile?.favoriteTeamId || null;
+    const groupLabel = name => /^Damen/i.test(name) ? 'Damen' : /^Erwachsene/i.test(name) ? 'Herren' : 'Jugend';
+    const grouped = {};
+    (clubTeams||[]).filter(t=>t.teamId!==favId).forEach(t => { (grouped[groupLabel(t.name)] = grouped[groupLabel(t.name)]||[]).push(t); });
+    const favTeam = (clubTeams||[]).find(t=>t.teamId===favId) || null;
+    const openTeam = t => { if (!t.url) return; const a=document.createElement('a'); a.href=t.url; a.target='_blank'; a.rel='noopener noreferrer'; document.body.appendChild(a); a.click(); document.body.removeChild(a); };
+    const fmtNextMatch = nm => {
+      if (!nm) return null;
+      const isHome = (nm.home||'').includes('Staffel');
+      const opponent = isHome ? nm.away : nm.home;
+      const d = new Date(nm.date);
+      const dateStr = d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
+      const timeStr = d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+      return `${dateStr}, ${timeStr} Uhr ${isHome?'vs.':'bei'} ${opponent}`;
+    };
+    const TeamTile = ({t, isFav}) => (
+      <div key={t.teamId} style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 14px',background: isFav?'rgba(251,191,36,0.08)':'rgba(45,212,191,0.06)',border:`1px solid ${isFav?'rgba(251,191,36,0.35)':'rgba(45,212,191,0.2)'}`,borderRadius:'12px'}}>
+        <button onClick={()=>toggleFavoriteTeam(t.teamId)} title={isFav?'Favorit entfernen':'Als Favorit markieren'}
+          style={{background:'none',border:'none',cursor:'pointer',fontSize:'20px',padding:0,flexShrink:0,lineHeight:1,opacity:isFav?1:0.35}}>{isFav?'⭐':'☆'}</button>
+        <button onClick={()=>openTeam(t)} disabled={!t.url} style={{flex:1,minWidth:0,background:'none',border:'none',cursor:t.url?'pointer':'default',textAlign:'left',padding:0}}>
+          <p style={{margin:0,fontWeight:'800',color:'white',fontSize:'14px'}}>{t.name}</p>
+          <p style={{margin:'2px 0 0',fontSize:'12px',color:'rgba(45,212,191,0.7)'}}>{t.league}{t.currentRank&&t.leagueSize?` · Platz ${t.currentRank}/${t.leagueSize}`:''}</p>
+          <p style={{margin:'4px 0 0',fontSize:'12px',color:t.nextMatch?'#fbbf24':'rgba(255,255,255,0.3)',fontWeight:'700'}}>Nächstes Spiel: {fmtNextMatch(t.nextMatch)||'–'}</p>
+        </button>
+        {t.url && <span style={{fontSize:'12px',color:'rgba(255,255,255,0.3)',flexShrink:0}}>↗</span>}
+      </div>
+    );
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#041a1a 0%,#072d2a 45%,#041816 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
+          <button onClick={()=>navTo('home')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'9px',color:'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:'600'}}><Home size={15}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🏓 TTC Mannschaften</h1>
+        </div>
+        <div style={{padding:'16px 14px',maxWidth:'700px',margin:'0 auto'}}>
+          <p style={{margin:'0 0 16px',fontSize:'12px',color:'rgba(255,255,255,0.4)',lineHeight:'1.5'}}>Alle Mannschaften des TTC Grün-Weiß Staffel, live von mytischtennis.de. ⭐ markiert deine Favoritenmannschaft — die steht dann immer ganz oben. Antippen führt direkt zur jeweiligen Mannschaftsseite (Kader, Tabelle, Spielplan).</p>
+          {clubTeamsLoading && clubTeams===null && <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.3)'}}>⏳ Lade Mannschaften…</div>}
+          {clubTeams!==null && clubTeams.length===0 && !clubTeamsLoading && <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.3)'}}>Mannschaften konnten nicht geladen werden.</div>}
+          {favTeam && (
+            <div style={{marginBottom:'18px'}}>
+              <p style={{margin:'0 0 8px',fontSize:'11px',fontWeight:'800',color:'rgba(251,191,36,0.7)',textTransform:'uppercase',letterSpacing:'1px'}}>⭐ Favorit</p>
+              <TeamTile t={favTeam} isFav={true}/>
+            </div>
+          )}
+          {['Damen','Herren','Jugend'].filter(g=>grouped[g]?.length).map(g=>(
+            <div key={g} style={{marginBottom:'18px'}}>
+              <p style={{margin:'0 0 8px',fontSize:'11px',fontWeight:'800',color:'rgba(45,212,191,0.6)',textTransform:'uppercase',letterSpacing:'1px'}}>{g}</p>
+              <div style={{display:'grid',gap:'6px'}}>
+                {grouped[g].map(t=><TeamTile key={t.teamId} t={t} isFav={false}/>)}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );

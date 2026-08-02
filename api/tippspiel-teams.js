@@ -32,6 +32,38 @@ async function fetchLeagueTable(groupId, html) {
   return data?.data?.league_table || null;
 }
 
+// Sucht das naechste noch nicht gespielte Spiel dieser Mannschaft ueber die
+// Spielplan-Unterseite (gleiche URL wie die Mannschaftsseite, nur "spielplan" statt
+// "spielerbilanzen" am Ende).
+async function fetchNextMatch(teamUrl) {
+  if (!teamUrl) return null;
+  const spielplanUrl = teamUrl.replace(/spielerbilanzen\/gesamt$/, 'spielplan/gesamt');
+  if (spielplanUrl === teamUrl) return null;
+  const resp = await fetch(spielplanUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  if (!resp.ok) return null;
+  const spHtml = await resp.text();
+  const data = extractRemixData(spHtml, k => k.includes('spielplan'));
+  const meetings = data?.data?.meetings_excerpt?.meetings || [];
+  const now = Date.now();
+  let next = null;
+  for (const group of meetings) {
+    for (const dayMeetings of Object.values(group)) {
+      for (const meeting of dayMeetings) {
+        if (meeting.state !== 'scheduled') continue;
+        const t = new Date(meeting.date).getTime();
+        if (t < now) continue;
+        if (!next || t < new Date(next.date).getTime()) next = meeting;
+      }
+    }
+  }
+  if (!next) return null;
+  return {
+    date: next.date,
+    home: next.team_home,
+    away: next.team_away,
+  };
+}
+
 export default async function handler(req, res) {
   try {
     const response = await fetch(TEAMS_URL, { headers: { 'User-Agent': 'Mozilla/5.0' } });
@@ -63,6 +95,8 @@ export default async function handler(req, res) {
       const linkRe = new RegExp(`href="(/click-tt/[^"]*/mannschaft/${t.team_id}/[^"]*)"`);
       const linkMatch = html.match(linkRe);
       if (linkMatch) url = BASE + linkMatch[1].replace(/&amp;/g, '&');
+      let nextMatch = null;
+      try { nextMatch = await fetchNextMatch(url); } catch { /* Spielplan optional */ }
       return {
         teamId: t.team_id,
         name: t.team_name,
@@ -70,6 +104,7 @@ export default async function handler(req, res) {
         leagueSize,
         currentRank,
         url,
+        nextMatch,
       };
     }));
 
