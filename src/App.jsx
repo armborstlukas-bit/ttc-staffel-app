@@ -1747,7 +1747,11 @@ export default function TrainingsApp() {
       if (n.type === 'new_registration') {
         const tdb = typeof n.trainerDeletedBy === 'object' && n.trainerDeletedBy ? n.trainerDeletedBy : {};
         const tta = typeof n.trainerTrashedAt === 'object' && n.trainerTrashedAt ? n.trainerTrashedAt : {};
-        return !tdb[uid] && !tta[uid];
+        const fu = allUsers[n.fromUid];
+        // Ist die Person inzwischen freigeschaltet (nicht mehr "pending"), gilt die Meldung
+        // automatisch als erledigt — auch ohne dass sie manuell weggeklickt wurde.
+        const stillPending = fu ? (fu.roles?.includes('pending') || fu.role==='pending') : true;
+        return !tdb[uid] && !tta[uid] && stillPending;
       }
       return false;
     }).length;
@@ -7602,7 +7606,9 @@ export default function TrainingsApp() {
     const regNotifs = Object.values(notifications).filter(n => {
       if (n.type !== 'new_registration') return false;
       const tdb = typeof n.trainerDeletedBy === 'object' && n.trainerDeletedBy ? n.trainerDeletedBy : {};
-      return !tdb[uid];
+      const fu = allUsers[n.fromUid];
+      const stillPending = fu ? (fu.roles?.includes('pending') || fu.role==='pending') : true;
+      return !tdb[uid] && stillPending;
     }).sort((a,b) => b.createdAt.localeCompare(a.createdAt));
 
     const trainerMessages = Object.values(notifications).filter(n => n.type === 'trainer_message');
