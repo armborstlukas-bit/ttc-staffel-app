@@ -179,10 +179,13 @@ const BEITRAGSARTEN = [
 
 // Verfügbare Spalten für den Mitglieder-Excel-Export, gruppiert wie in der Mitgliedsdaten-Karte.
 const MITGLIED_EXPORT_FIELDS = [
+  { group: 'Basis',              key: 'excelMitgliedId',  label: 'Mitgliedsnummer' },
   { group: 'Basis',              key: 'vorname',          label: 'Vorname' },
   { group: 'Basis',              key: 'nachname',         label: 'Nachname' },
   { group: 'Basis',              key: 'rollen',           label: 'Rollen' },
   { group: 'Persönliche Daten',  key: 'geburtsdatum',     label: 'Geburtsdatum' },
+  { group: 'Persönliche Daten',  key: 'alter',            label: 'Alter' },
+  { group: 'Persönliche Daten',  key: 'geschlecht',       label: 'Geschlecht' },
   { group: 'Persönliche Daten',  key: 'email',            label: 'E-Mail' },
   { group: 'Persönliche Daten',  key: 'strasse',          label: 'Straße' },
   { group: 'Persönliche Daten',  key: 'plz',              label: 'PLZ' },
@@ -230,6 +233,18 @@ const levenshtein = (a, b) => {
 };
 
 const TODAY = new Date().toISOString().split('T')[0];
+const calcAge = (geburtsdatum) => {
+  if (!geburtsdatum) return null;
+  const bd = new Date(geburtsdatum);
+  if (isNaN(bd)) return null;
+  const now = new Date();
+  let age = now.getFullYear() - bd.getFullYear();
+  const m = now.getMonth() - bd.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < bd.getDate())) age--;
+  return age;
+};
+const ZAHLART_LABELS = { b: 'Barzahler', s: 'SEPA-Lastschrift' };
+const GESCHLECHT_LABELS = { m: 'Männlich', w: 'Weiblich', d: 'Divers' };
 
 // ── Errungenschaften ─────────────────────────────────────────────────────────
 const TTR_MILESTONES = [700,800,900,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000];
@@ -12201,9 +12216,13 @@ export default function TrainingsApp() {
                 if (!mitgliedExportFields[f.key]) return;
                 if (f.key==='vorname') row[f.label]=m.vorname||'';
                 else if (f.key==='nachname') row[f.label]=m.nachname||'';
+                else if (f.key==='excelMitgliedId') row[f.label]=m.excelMitgliedId??'';
                 else if (f.key==='rollen') row[f.label]=getRoles(m).map(r=>ROLE_OPTIONS.find(o=>o.key===r)?.label||r).join(', ');
                 else if (f.key==='geburtsdatum') row[f.label]=m.geburtsdatum||'';
+                else if (f.key==='alter') row[f.label]=calcAge(m.geburtsdatum)??'';
+                else if (f.key==='geschlecht') row[f.label]=GESCHLECHT_LABELS[fin.geschlecht]||'';
                 else if (f.key==='email') row[f.label]=m.email||'';
+                else if (f.key==='zahlart') row[f.label]=ZAHLART_LABELS[fin.zahlart]||'';
                 else if (f.key==='beitragsart') row[f.label]=BEITRAGSARTEN.find(a=>a.key===fin.beitragsart)?.label||'';
                 else if (f.key==='aemterUndEhrentitel') row[f.label]=formatAemter(m);
                 else row[f.label]=fin[f.key]??'';
@@ -12386,7 +12405,14 @@ export default function TrainingsApp() {
                       {fld('sepaMandatsRef','SEPA-Mandatsreferenz')}{fld('sepaMandatsDatum','SEPA-Mandatsdatum')}
                     </div>
                     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'6px'}}>
-                      {fld('zahlart','Zahlart')}{fld('zahler','Zahler')}{fld('zahlweise','Zahlweise')}
+                      <div style={{minWidth:0}}>
+                        <span style={lbl}>Zahlart</span>
+                        <select value={f.zahlart} onChange={e=>set('zahlart',e.target.value)} style={{...inS,cursor:'pointer'}}>
+                          <option value="" style={{background:'#1a1206'}}>– auswählen –</option>
+                          {Object.entries(ZAHLART_LABELS).map(([k,l])=><option key={k} value={k} style={{background:'#1a1206'}}>{l}</option>)}
+                        </select>
+                      </div>
+                      {fld('zahler','Zahler')}{fld('zahlweise','Zahlweise')}
                     </div>
                     <div style={{display:'grid',gridTemplateColumns:'1.4fr 1fr',gap:'6px'}}>
                       <div style={{minWidth:0}}>
@@ -12659,7 +12685,8 @@ export default function TrainingsApp() {
                     style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',background:'transparent',border:'none',cursor:'pointer',textAlign:'left'}}>
                     <div style={{flex:'1 1 200px',minWidth:0}}>
                       <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'white',display:'flex',alignItems:'center',gap:'6px'}}>
-                        {m.vorname} {m.nachname}
+                        {m.nachname}, {m.vorname}
+                        {m.excelMitgliedId&&<span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.35)'}}>#{m.excelMitgliedId}</span>}
                         {matchedUser&&<span title="App-Account zugeordnet" style={{fontSize:'11px',fontWeight:'800',color:'#4ade80',background:'rgba(74,222,128,0.15)',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'50%',width:'16px',height:'16px',display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>✓</span>}
                       </p>
                       {elternOhneKind&&<p style={{margin:0,fontSize:'10px',color:'#fca5a5',fontWeight:'700'}}>⚠️ Kein Kind zugeordnet</p>}
@@ -12840,8 +12867,23 @@ export default function TrainingsApp() {
                             {/* Persönliche Daten */}
                             <div style={{display:'grid',gap:'8px'}}>
                               <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.35)'}}>Persönliche Daten</span>
-                              <div style={{display:'grid',gridTemplateColumns:'1fr 1.4fr',gap:'6px'}}>
-                                {mfld('geburtsdatum','Geburtsdatum',{type:'date'})}{mfld('email','E-Mail',{type:'email'})}
+                              <div style={{display:'grid',gridTemplateColumns:'1fr auto 1.4fr',gap:'6px',alignItems:'end'}}>
+                                {mfld('geburtsdatum','Geburtsdatum',{type:'date'})}
+                                <div style={{minWidth:0}}>
+                                  <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Alter</span>
+                                  <div style={{padding:'6px 10px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'7px',color:'#fbbf24',fontSize:'12px',fontWeight:'800',whiteSpace:'nowrap'}}>{calcAge(m.geburtsdatum)!==null?`${calcAge(m.geburtsdatum)} Jahre`:'–'}</div>
+                                </div>
+                                {mfld('email','E-Mail',{type:'email'})}
+                              </div>
+                              <div style={{display:'grid',gridTemplateColumns:'1fr',gap:'6px'}}>
+                                <div style={{minWidth:0}}>
+                                  <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Geschlecht</span>
+                                  <select value={fin.geschlecht||''} onChange={e=>saveFinanzField(id,'geschlecht',e.target.value)}
+                                    style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',cursor:'pointer'}}>
+                                    <option value="" style={{background:'#1a1206'}}>– auswählen –</option>
+                                    {Object.entries(GESCHLECHT_LABELS).map(([k,l])=><option key={k} value={k} style={{background:'#1a1206'}}>{l}</option>)}
+                                  </select>
+                                </div>
                               </div>
                               <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1.5fr',gap:'6px'}}>
                                 {fld('strasse','Straße')}{fld('plz','PLZ')}{fld('ort','Ort')}
@@ -12861,7 +12903,15 @@ export default function TrainingsApp() {
                                 {fld('sepaMandatsRef','SEPA-Mandatsreferenz')}{fld('sepaMandatsDatum','SEPA-Mandatsdatum')}
                               </div>
                               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'6px'}}>
-                                {fld('zahlart','Zahlart')}{fld('zahler','Zahler')}{fld('zahlweise','Zahlweise')}
+                                <div style={{minWidth:0}}>
+                                  <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Zahlart</span>
+                                  <select value={fin.zahlart||''} onChange={e=>saveFinanzField(id,'zahlart',e.target.value)}
+                                    style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',cursor:'pointer'}}>
+                                    <option value="" style={{background:'#1a1206'}}>– auswählen –</option>
+                                    {Object.entries(ZAHLART_LABELS).map(([k,l])=><option key={k} value={k} style={{background:'#1a1206'}}>{l}</option>)}
+                                  </select>
+                                </div>
+                                {fld('zahler','Zahler')}{fld('zahlweise','Zahlweise')}
                               </div>
                               <div style={{display:'grid',gridTemplateColumns:'1.4fr 1fr',gap:'6px'}}>
                                 <div style={{minWidth:0}}>
@@ -12984,7 +13034,7 @@ export default function TrainingsApp() {
                   <button onClick={()=>setVergangeneExpandedId(isExpanded?null:id)}
                     style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',background:'transparent',border:'none',cursor:'pointer',textAlign:'left'}}>
                     <div style={{flex:'1 1 200px',minWidth:0}}>
-                      <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'white'}}>{m.vorname} {m.nachname}</p>
+                      <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'white'}}>{m.nachname}, {m.vorname}{m.excelMitgliedId?<span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.35)'}}> #{m.excelMitgliedId}</span>:null}</p>
                       <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.4)'}}>ausgetreten {fin.austrittsdatum}</p>
                     </div>
                     <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',flexShrink:0}}>{isExpanded?'▲':'▼'}</span>
@@ -13017,8 +13067,21 @@ export default function TrainingsApp() {
                           <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(251,191,36,0.6)',textTransform:'uppercase',letterSpacing:'0.5px'}}>🗂️ Mitgliedsdaten</span>
                           <div style={{display:'grid',gap:'8px'}}>
                             <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.35)'}}>Persönliche Daten</span>
-                            <div style={{display:'grid',gridTemplateColumns:'1fr 1.4fr',gap:'6px'}}>
-                              {mfld('geburtsdatum','Geburtsdatum',{type:'date'})}{mfld('email','E-Mail',{type:'email'})}
+                            <div style={{display:'grid',gridTemplateColumns:'1fr auto 1.4fr',gap:'6px',alignItems:'end'}}>
+                              {mfld('geburtsdatum','Geburtsdatum',{type:'date'})}
+                              <div style={{minWidth:0}}>
+                                <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Alter</span>
+                                <div style={{padding:'6px 10px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'7px',color:'#fbbf24',fontSize:'12px',fontWeight:'800',whiteSpace:'nowrap'}}>{calcAge(m.geburtsdatum)!==null?`${calcAge(m.geburtsdatum)} Jahre`:'–'}</div>
+                              </div>
+                              {mfld('email','E-Mail',{type:'email'})}
+                            </div>
+                            <div style={{minWidth:0}}>
+                              <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Geschlecht</span>
+                              <select value={fin.geschlecht||''} onChange={e=>saveFinanzField(id,'geschlecht',e.target.value)}
+                                style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',cursor:'pointer'}}>
+                                <option value="" style={{background:'#1a1206'}}>– auswählen –</option>
+                                {Object.entries(GESCHLECHT_LABELS).map(([k,l])=><option key={k} value={k} style={{background:'#1a1206'}}>{l}</option>)}
+                              </select>
                             </div>
                             <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1.5fr',gap:'6px'}}>
                               {fld('strasse','Straße')}{fld('plz','PLZ')}{fld('ort','Ort')}
@@ -13186,7 +13249,7 @@ export default function TrainingsApp() {
           <div style={{display:'grid',gap:'8px'}}>
             {holders.map(([mid,m])=>(
               <div key={mid} style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'10px 12px'}}>
-                <p style={{margin:'0 0 6px',fontSize:'13px',fontWeight:'700',color:'white'}}>{m.vorname} {m.nachname}</p>
+                <p style={{margin:'0 0 6px',fontSize:'13px',fontWeight:'700',color:'white'}}>{m.nachname}, {m.vorname}</p>
                 <div style={{display:'grid',gap:'6px'}}>
                   {(m.aemter||[]).map((a,idx)=>{
                     const key = `${mid}_${idx}`;
