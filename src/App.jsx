@@ -756,8 +756,6 @@ export default function TrainingsApp() {
   const [notificationsLoaded, setNotificationsLoaded]       = useState(false);
   const notificationsRef = React.useRef({});  // immer aktueller Wert ohne Dep-Trigger
   const [appSettings, setAppSettings]                       = useState({});
-  const [leagueData, setLeagueData]                         = useState({ table: null, schedule: null, fetchedAt: null });
-  const [leagueFetching, setLeagueFetching]                 = useState(false);
   const [notifComposeTarget, setNotifComposeTarget]         = useState('all'); // 'all' | subgroupId | childId
   const [notifComposeText, setNotifComposeText]             = useState('');
   const [notifComposeTitle, setNotifComposeTitle]           = useState('');
@@ -1039,7 +1037,6 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','rompel'),             s => setRompelData(s.exists()?s.data():{hours:[],expenses:[]})),
       onSnapshot(doc(db,'ttc','pfandkasse'),          s => setPfandDaten(s.exists()?s.data():{entries:[]})),
       onSnapshot(doc(db,'ttc','aktiveSpieler'),      s => setAktiveSpieler(s.exists()?s.data():{})),
-      onSnapshot(doc(db,'ttc','leagueData'),         s => setLeagueData(s.exists()?s.data():{ table: null, schedule: null, fetchedAt: null })),
       onSnapshot(doc(db,'ttc','rangliste'), s => setRangliste(s.exists()&&s.data().entries ? s.data().entries : [])),
       onSnapshot(doc(db,'ttc','ranglisteHistory'), s => setRanglisteHistory(s.exists()&&Array.isArray(s.data().snapshots) ? s.data().snapshots : [])),
       // mitgliederListe/mitgliederFinanzen sind seit der DSGVO-Absicherung nur noch für Admins
@@ -1508,110 +1505,6 @@ export default function TrainingsApp() {
     setAllUsers(updated);
     await setDoc(doc(db,'ttc','users'), updated);
     await setDoc(doc(db,'users',uid), updatedProfile);
-  };
-  const saveLeagueData                   = u => { setLeagueData(u);                   setDoc(doc(db,'ttc','leagueData'),                   u); };
-
-  // ── Liga-Daten via eigene Vercel Serverless Function laden ──────────────
-  const fetchLeagueData = async () => {
-    const tableUrl    = appSettings.leagueTableUrl?.trim();
-    const scheduleUrl = appSettings.leagueScheduleUrl?.trim();
-    if (!tableUrl && !scheduleUrl) { alert('Bitte erst URLs in den Einstellungen eintragen.'); return; }
-    setLeagueFetching(true);
-
-    // Extrahiere Association + GroupId aus einer click-tt URL
-    const parseClickTTUrl = (url) => {
-      const m = url.match(/click-tt\/([^/]+)\/[^/]+\/ligen\/[^/]+\/gruppe\/(\d+)/);
-      return m ? { assoc: m[1], groupId: m[2] } : null;
-    };
-
-    try {
-      let table = null, schedule = null;
-
-      const fmtDate = (iso) => {
-        if (!iso) return '';
-        const d = new Date(iso);
-        if (isNaN(d)) return iso;
-        return d.toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'2-digit', year:'numeric' })
-          + ', ' + d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' }) + ' Uhr';
-      };
-      const buildSchedule = (meetings) => ({
-        headers: ['Datum', 'Heim', 'Gast', 'Ergebnis'],
-        rows: meetings.map(m => ({ c: [
-          fmtDate(m.date),
-          m.team_home ?? '',
-          m.team_away ?? '',
-          m.state === 'done' ? `${m.matches_won ?? ''}:${m.matches_lost ?? ''}` : '–',
-        ]})),
-      });
-
-      const buildProxyUrl = (url, type) => {
-        const parsed = parseClickTTUrl(url);
-        if (!parsed) return null;
-        const seasonM = url.match(/click-tt\/[^/]+\/([^/]+)\/ligen/);
-        const leagueM = url.match(/ligen\/([^/]+)\/gruppe/);
-        const season  = seasonM?.[1] ?? '';
-        const league  = leagueM?.[1] ?? '_';
-        return `/api/league-proxy?assoc=${encodeURIComponent(parsed.assoc)}&groupId=${encodeURIComponent(parsed.groupId)}&season=${encodeURIComponent(season)}&league=${encodeURIComponent(league)}&type=${type}&filter=gesamt`;
-      };
-
-      // ── Tabelle: Vercel Function → Remix _data endpoint (volle Stats) ───
-      if (tableUrl) {
-        const proxyUrl = buildProxyUrl(tableUrl, 'tabelle');
-        if (!proxyUrl) throw new Error('Tabellen-URL nicht erkannt. Bitte eine mytischtennis.de click-tt URL eintragen.');
-        const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
-        if (!res.ok) throw new Error(`Tabelle konnte nicht geladen werden (HTTP ${res.status}).`);
-        const json = await res.json();
-        // Remix _data: { data: { league_table: [...], meetings_excerpt: { meetings: [...] } } }
-        const leagueTable = json?.data?.league_table ?? json?.data ?? [];
-        if (!Array.isArray(leagueTable) || leagueTable.length === 0) throw new Error('Keine Tabellendaten gefunden.');
-        table = {
-          headers: ['#', 'Mannschaft', 'Sp', 'S', 'U', 'N', 'Sätze', 'Punkte'],
-          rows: leagueTable.map(t => ({ c: [
-            String(t.table_rank ?? ''),
-            t.team_name ?? '',
-            String((t.meetings_won ?? 0) + (t.meetings_lost ?? 0) + (t.meetings_tie ?? 0)),
-            String(t.meetings_won ?? ''),
-            String(t.meetings_tie ?? ''),
-            String(t.meetings_lost ?? ''),
-            `${t.sets_won ?? 0}:${t.sets_lost ?? 0}`,
-            `${t.points_won ?? 0}:${t.points_lost ?? 0}`,
-          ]})),
-        };
-        // Spielplan aus demselben Response extrahieren (meetings_excerpt)
-        const meetings = json?.data?.meetings_excerpt?.meetings ?? [];
-        if (Array.isArray(meetings) && meetings.length > 0) {
-          schedule = buildSchedule(meetings);
-        }
-      }
-
-      // ── Spielplan-URL: falls anders als Tabellen-URL, separaten Request ──
-      if (scheduleUrl && !schedule) {
-        const proxyUrl = buildProxyUrl(scheduleUrl, 'spielplan');
-        if (proxyUrl) {
-          try {
-            const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
-            if (res.ok) {
-              const json = await res.json();
-              const meetings = json?.data?.meetings_excerpt?.meetings ?? json?.data?.meetings ?? [];
-              if (Array.isArray(meetings) && meetings.length > 0) {
-                schedule = buildSchedule(meetings);
-              }
-            }
-          } catch {}
-        }
-      }
-
-      saveLeagueData({ table, schedule, fetchedAt: new Date().toISOString() });
-      const msg = table && !schedule
-        ? '✅ Tabelle geladen!\n(Spielplan: konnte nicht geladen werden — wird ggf. ab September verfügbar sein.)'
-        : '✅ Liga-Daten erfolgreich aktualisiert!';
-      alert(msg);
-    } catch (err) {
-      console.error('Fehler beim Laden der Liga-Daten:', err);
-      alert('❌ ' + (err.message || 'Fehler beim Laden der Daten.'));
-    } finally {
-      setLeagueFetching(false);
-    }
   };
   const saveRangliste = (entries) => {
     setRangliste(entries);
