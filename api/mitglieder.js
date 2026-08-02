@@ -3,6 +3,14 @@ import { verifyRequestUser, adminDb } from './_lib/firebaseAdmin.js';
 const getMemberRoles = m => m.roles?.length ? m.roles : (m.role ? [m.role] : []);
 const getMemberLinkedIds = m => m.linkedMemberIds?.length ? m.linkedMemberIds : (m.linkedMemberId ? [m.linkedMemberId] : []);
 const normName = s => (s || '').trim().toLowerCase();
+// Ein Mitglied (v.a. Kinder) kann mehrere zugehörige E-Mail-Adressen haben — die eigene
+// (falls schon vorhanden) UND z.B. die der Mutter/des Vaters, damit beide sich einloggen
+// und auf dasselbe Profil zugreifen können, ohne dass sich ein Elternteil extra als "eltern"
+// mit linkedMemberIds eintragen muss.
+const getMemberEmails = m => {
+  const all = [m.email, ...(Array.isArray(m.zusatzEmails) ? m.zusatzEmails : [])];
+  return [...new Set(all.map(e => (e || '').trim().toLowerCase()).filter(Boolean))];
+};
 
 async function requireAdmin(req, res) {
   const uid = await verifyRequestUser(req);
@@ -79,23 +87,21 @@ async function handleSyncRoles(req, res) {
 
   for (const [id, m] of Object.entries(liste)) {
     if (onlyId && id !== onlyId) continue;
-    const email = (m.email || '').trim().toLowerCase();
-    if (!email) continue;
+    // Ein Mitglied kann mehrere hinterlegte E-Mails haben (z.B. ein Kind, das noch keine
+    // eigene E-Mail konsequent nutzt, PLUS die E-Mail eines Elternteils) — jede davon kann
+    // sich einloggen und muss auf denselben Mitgliederlisten-Eintrag/dieselben Kinddaten
+    // zugreifen können, daher wird hier über ALLE Adressen synchronisiert, nicht nur eine.
+    const emails = getMemberEmails(m);
+    if (!emails.length) continue;
     // Wurden alle Rollen entfernt, fällt der Account auf "pending" zurück statt unverändert
     // (mit alten, nicht mehr gültigen Rollen) zu bleiben.
     const mRoles = getMemberRoles(m).length ? getMemberRoles(m) : ['pending'];
-    const uid = byEmail.get(email);
-    if (!uid) continue;
-
-    const user = allUsers[uid];
-    const curRoles = user.roles?.length ? user.roles : (user.role ? [user.role] : []);
-    const rolesSame = curRoles.length === mRoles.length && mRoles.every(r => curRoles.includes(r));
 
     // Zugeordnete Kinder aus der Mitgliederliste (linkedMemberIds, jugendlich-Einträge) auf
     // echte children-IDs abbilden, damit ein Elternteil auch nach der Erstregistrierung neu
     // zugeordnete Kinder live angezeigt bekommt — bisher wurde das nur einmalig bei der
     // Registrierung gesetzt und danach nie wieder abgeglichen.
-    let newLinkedChildIds = null;
+    let mappedUnique = null;
     if (mRoles.includes('eltern') || mRoles.includes('jugendlich')) {
       const mappedChildIds = [];
       if (mRoles.includes('eltern')) {
@@ -112,24 +118,37 @@ async function handleSyncRoles(req, res) {
         const selfCid = childIdByName.get(normName(`${m.vorname} ${m.nachname}`));
         if (selfCid) mappedChildIds.push(selfCid);
       }
-      const mappedUnique = [...new Set(mappedChildIds)];
-      const curLinkedChildIds = user.linkedChildIds?.length ? user.linkedChildIds : (user.linkedChildId ? [user.linkedChildId] : []);
-      const childrenSame = curLinkedChildIds.length === mappedUnique.length && mappedUnique.every(c => curLinkedChildIds.includes(c));
-      if (!childrenSame) newLinkedChildIds = mappedUnique;
+      mappedUnique = [...new Set(mappedChildIds)];
     }
 
-    if (rolesSame && newLinkedChildIds === null) continue;
+    for (const email of emails) {
+      const uid = byEmail.get(email);
+      if (!uid) continue;
 
-    const primaryRole = (user.primaryRole && mRoles.includes(user.primaryRole)) ? user.primaryRole : mRoles[0];
-    const updated = { ...user, roles: mRoles, role: primaryRole, primaryRole };
-    if (newLinkedChildIds !== null) {
-      updated.linkedChildIds = newLinkedChildIds;
-      updated.linkedChildId = newLinkedChildIds[0] || null;
+      const user = allUsers[uid];
+      const curRoles = user.roles?.length ? user.roles : (user.role ? [user.role] : []);
+      const rolesSame = curRoles.length === mRoles.length && mRoles.every(r => curRoles.includes(r));
+
+      let newLinkedChildIds = null;
+      if (mappedUnique !== null) {
+        const curLinkedChildIds = user.linkedChildIds?.length ? user.linkedChildIds : (user.linkedChildId ? [user.linkedChildId] : []);
+        const childrenSame = curLinkedChildIds.length === mappedUnique.length && mappedUnique.every(c => curLinkedChildIds.includes(c));
+        if (!childrenSame) newLinkedChildIds = mappedUnique;
+      }
+
+      if (rolesSame && newLinkedChildIds === null) continue;
+
+      const primaryRole = (user.primaryRole && mRoles.includes(user.primaryRole)) ? user.primaryRole : mRoles[0];
+      const updated = { ...user, roles: mRoles, role: primaryRole, primaryRole };
+      if (newLinkedChildIds !== null) {
+        updated.linkedChildIds = newLinkedChildIds;
+        updated.linkedChildId = newLinkedChildIds[0] || null;
+      }
+      writes.push(db.collection('users').doc(uid).set(updated, { merge: true }));
+      ttcUsers[uid] = updated;
+      fixed++;
+      if (!fixedNames.includes(`${m.vorname} ${m.nachname}`)) fixedNames.push(`${m.vorname} ${m.nachname}`);
     }
-    writes.push(db.collection('users').doc(uid).set(updated, { merge: true }));
-    ttcUsers[uid] = updated;
-    fixed++;
-    fixedNames.push(`${m.vorname} ${m.nachname}`);
   }
 
   await Promise.all(writes);
@@ -150,7 +169,7 @@ async function handleMatchEmail(req, res) {
 
   const snap = await adminDb().collection('ttc').doc('mitgliederListe').get();
   const list = snap.exists ? (snap.data().list || {}) : {};
-  const matches = Object.values(list).filter(m => (m.email || '').trim().toLowerCase() === email && getMemberRoles(m).length > 0);
+  const matches = Object.values(list).filter(m => getMemberEmails(m).includes(email) && getMemberRoles(m).length > 0);
   const roles = [...new Set(matches.flatMap(getMemberRoles))];
 
   let linkedMembers = [];

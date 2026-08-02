@@ -701,6 +701,7 @@ export default function TrainingsApp() {
   const [mitgliedAustrittDatum, setMitgliedAustrittDatum] = useState('');
   const [wiedereintrittEditId, setWiedereintrittEditId] = useState(null);
   const [wiedereintrittDatum, setWiedereintrittDatum] = useState('');
+  const [zusatzEmailDraft, setZusatzEmailDraft] = useState({});
   const [ttrProTagGroupFilter, setTtrProTagGroupFilter] = useState(''); // '' = alle, sonst subgroupId
   const [ttrProTagYear, setTtrProTagYear] = useState(new Date().getFullYear());
   const [ttrProTagMonth, setTtrProTagMonth] = useState(new Date().getMonth()+1);
@@ -2018,7 +2019,7 @@ export default function TrainingsApp() {
     // Falls diese Person bereits einen echten Account hat (E-Mail stimmt überein),
     // die Rollenänderung auch dort sofort live übernehmen — sonst wirkt die
     // Mitgliederverwaltung nur bei künftigen Neu-Registrierungen.
-    if (field === 'roles' || field === 'email' || field === 'linkedMemberIds') {
+    if (field === 'roles' || field === 'email' || field === 'zusatzEmails' || field === 'linkedMemberIds') {
       await syncMitgliedRoles(id);
     }
     // Manuelle TTR-Zuordnung (Aktiver → aktiveSpieler) auch am bestehenden Account spiegeln,
@@ -11875,7 +11876,7 @@ export default function TrainingsApp() {
     };
 
     const entries = Object.entries(mitgliederListe);
-    const knownEmails = new Set(entries.map(([,m])=>(m.email||'').trim().toLowerCase()).filter(Boolean));
+    const knownEmails = new Set(entries.flatMap(([,m])=>[m.email,...(m.zusatzEmails||[])]).map(e=>(e||'').trim().toLowerCase()).filter(Boolean));
     const unmatchedPending = Object.values(allUsers).filter(u => {
       const roles = u.roles?.length ? u.roles : (u.role ? [u.role] : []);
       if (roles.length===0 || !roles.every(r=>r==='pending')) return false;
@@ -12459,7 +12460,9 @@ export default function TrainingsApp() {
               const cardColors = rot ? {border:'rgba(239,68,68,0.6)', bg:'rgba(239,68,68,0.06)'}
                 : ttrAehnlich ? {border:'rgba(251,191,36,0.6)', bg:'rgba(251,191,36,0.07)'}
                 : (topRole ? {border:ROLE_COLORS[topRole].border, bg:ROLE_COLORS[topRole].bg} : {border:'rgba(196,181,253,0.2)', bg:'rgba(255,255,255,0.04)'});
-              const matchedUser = Object.values(allUsers).find(u => (u.email||'').trim().toLowerCase() === (m.email||'').trim().toLowerCase());
+              const memberEmails = [m.email, ...(m.zusatzEmails||[])].map(e=>(e||'').trim().toLowerCase()).filter(Boolean);
+              const matchedUser = Object.values(allUsers).find(u => memberEmails.includes((u.email||'').trim().toLowerCase()));
+              const otherMatchedUsers = Object.values(allUsers).filter(u => u.uid!==matchedUser?.uid && memberEmails.includes((u.email||'').trim().toLowerCase()));
               return (
                 <div key={id} style={{background:cardColors.bg,border:`1px solid ${cardColors.border}`,borderRadius:'10px',overflow:'hidden',...(rot?{boxShadow:'0 0 0 1px rgba(239,68,68,0.4)'}:ttrAehnlich?{boxShadow:'0 0 0 1px rgba(251,191,36,0.4)'}:{})}}>
                   <button onClick={()=>{setMitgliedExpandedId(isExpanded?null:id);setMitgliedChildSearch('');}}
@@ -12623,6 +12626,18 @@ export default function TrainingsApp() {
                             style={{padding:'5px 10px',background:'rgba(220,38,38,0.15)',border:'1px solid rgba(220,38,38,0.4)',borderRadius:'6px',cursor:'pointer',color:'#fca5a5',fontSize:'11px',fontWeight:'700'}}>🗑️ Account löschen</button>
                         </div>
                       )}
+                      {otherMatchedUsers.length>0 && (
+                        <div style={{paddingTop:'4px',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
+                          <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(74,222,128,0.7)',display:'block',marginBottom:'4px'}}>✓ Weitere verknüpfte Accounts (über zusätzliche E-Mail)</span>
+                          {otherMatchedUsers.map(u=>(
+                            <div key={u.uid} style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'11px',color:'rgba(255,255,255,0.6)',marginBottom:'3px'}}>
+                              <span>{u.name||u.email} ({u.email})</span>
+                              <button onClick={()=>{if(window.confirm(`Account "${u.name||u.email}" wirklich löschen? Der Mitgliederlisten-Eintrag bleibt erhalten.`)){const updated={...allUsers};delete updated[u.uid];setDoc(doc(db,'ttc','users'),updated);setAllUsers(updated);}}}
+                                style={{padding:'2px 8px',background:'rgba(220,38,38,0.15)',border:'1px solid rgba(220,38,38,0.4)',borderRadius:'6px',cursor:'pointer',color:'#fca5a5',fontSize:'10px',fontWeight:'700'}}>🗑️</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                       {(()=>{
                         const fin = mitgliederFinanzen[id] || {};
@@ -12655,6 +12670,31 @@ export default function TrainingsApp() {
                                   <div style={{padding:'6px 10px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'7px',color:'#fbbf24',fontSize:'12px',fontWeight:'800',whiteSpace:'nowrap'}}>{calcAge(m.geburtsdatum)!==null?`${calcAge(m.geburtsdatum)} Jahre`:'–'}</div>
                                 </div>
                                 {mfld('email','E-Mail',{type:'email'})}
+                              </div>
+                              <div>
+                                <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Weitere E-Mails (z.B. Mutter/Vater — können sich damit ebenfalls einloggen und auf dieses Profil zugreifen)</span>
+                                <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:(m.zusatzEmails||[]).length?'6px':0}}>
+                                  {(m.zusatzEmails||[]).map((em,i)=>(
+                                    <span key={i} style={{display:'flex',alignItems:'center',gap:'5px',padding:'4px 8px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'20px',color:'#fbbf24',fontSize:'11px'}}>
+                                      {em}
+                                      <button onClick={()=>saveMitgliedField(id,'zusatzEmails',(m.zusatzEmails||[]).filter((_,j)=>j!==i))}
+                                        style={{background:'none',border:'none',color:'#fca5a5',cursor:'pointer',padding:0,fontSize:'12px',lineHeight:1,fontWeight:'800'}}>×</button>
+                                    </span>
+                                  ))}
+                                </div>
+                                <div style={{display:'flex',gap:'6px'}}>
+                                  <input type="email" placeholder="weitere.email@beispiel.de" value={zusatzEmailDraft[id]||''}
+                                    onChange={e=>setZusatzEmailDraft(d=>({...d,[id]:e.target.value}))}
+                                    style={{flex:1,boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none'}}/>
+                                  <button onClick={()=>{
+                                      const val = (zusatzEmailDraft[id]||'').trim().toLowerCase();
+                                      if (!val) return;
+                                      const cur = m.zusatzEmails||[];
+                                      if (!cur.includes(val)) saveMitgliedField(id,'zusatzEmails',[...cur,val]);
+                                      setZusatzEmailDraft(d=>({...d,[id]:''}));
+                                    }}
+                                    style={{padding:'6px 12px',background:'rgba(251,191,36,0.15)',border:'1px solid rgba(251,191,36,0.4)',borderRadius:'7px',color:'#fbbf24',cursor:'pointer',fontWeight:'700',fontSize:'12px',whiteSpace:'nowrap'}}>+ Hinzufügen</button>
+                                </div>
                               </div>
                               <div style={{display:'grid',gridTemplateColumns:'1fr',gap:'6px'}}>
                                 <div style={{minWidth:0}}>
