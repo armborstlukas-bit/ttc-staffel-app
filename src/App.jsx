@@ -2207,6 +2207,28 @@ export default function TrainingsApp() {
     await updateDoc(doc(db,'ttc','mitgliederFinanzen'), { [`list.${id}.${field}`]: value });
   };
 
+  // Sobald ein Kind mit Beitragsart "Kind unter 10" seinen 10. Geburtstag erreicht, automatisch
+  // auf "Kinder ab 10" (samt zugehörigem Beitrag) umstellen — läuft bei jedem Laden der
+  // Mitgliederdaten im Admin-Account mit, kein manuelles Eingreifen nötig. Betrifft nur aktive
+  // (nicht ausgetretene) Mitglieder, und nur wenn der Beitrag noch dem alten Tarif entspricht
+  // (sonst wurde er vermutlich bewusst individuell angepasst und bleibt unangetastet).
+  useEffect(() => {
+    if (userRole !== 'admin') return;
+    if (Object.keys(mitgliederListe).length === 0 || Object.keys(mitgliederFinanzen).length === 0) return;
+    const alt = BEITRAGSARTEN.find(a=>a.key==='kind_unter10');
+    const neu = BEITRAGSARTEN.find(a=>a.key==='kind_ab10');
+    if (!alt || !neu) return;
+    Object.entries(mitgliederFinanzen).forEach(([id, fin]) => {
+      if (fin?.beitragsart !== 'kind_unter10' || fin?.austrittsdatum) return;
+      const geb = mitgliederListe[id]?.geburtsdatum;
+      const age = calcAge(geb);
+      if (age === null || age < 10) return;
+      saveFinanzField(id, 'beitragsart', 'kind_ab10');
+      if (Number(fin.beitrag) === alt.amount) saveFinanzField(id, 'beitrag', neu.amount);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userRole, mitgliederListe, mitgliederFinanzen]);
+
   // Löscht ein vergangenes Mitglied unwiderruflich aus mitgliederListe + mitgliederFinanzen.
   const deleteMitgliedPermanently = async (id) => {
     await updateDoc(doc(db,'ttc','mitgliederListe'), { [`list.${id}`]: deleteField() });
@@ -12479,6 +12501,13 @@ export default function TrainingsApp() {
             {activeEntries.length} aktive Mitglieder · {exitedEntries.length} ausgetreten<br/>
             {assignedCount}/{activeEntries.length} Rollen zugeordnet
           </span>
+        </div>
+        <div style={{padding:'6px 20px 8px',display:'flex',gap:'6px',flexWrap:'wrap',borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
+          {BEITRAGSARTEN.map(a=>{
+            const count = activeEntries.filter(([id])=>mitgliederFinanzen[id]?.beitragsart===a.key).length;
+            return <span key={a.key} style={{fontSize:'10px',fontWeight:'700',padding:'2px 8px',borderRadius:'20px',background:'rgba(255,255,255,0.05)',color:'rgba(255,255,255,0.5)',whiteSpace:'nowrap'}}>{a.label} <b style={{color:'rgba(255,255,255,0.8)'}}>{count}</b></span>;
+          })}
+          {(() => { const oc = activeEntries.filter(([id])=>!mitgliederFinanzen[id]?.beitragsart).length; return oc>0 && <span style={{fontSize:'10px',fontWeight:'700',padding:'2px 8px',borderRadius:'20px',background:'rgba(220,38,38,0.1)',color:'#fca5a5',whiteSpace:'nowrap'}}>Ohne Beitragsart <b>{oc}</b></span>; })()}
         </div>
         <div style={{padding:'16px 14px',maxWidth:'900px',margin:'0 auto'}}>
           {!userProfile?.hakenHinweisGelesen && (
