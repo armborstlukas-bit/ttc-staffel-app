@@ -2031,6 +2031,24 @@ export default function TrainingsApp() {
     }
   };
 
+  // Ordnet eine sich registrierende Person (Pending-Account) einem bestehenden
+  // Mitgliederlisten-Eintrag zu. Ist dort bereits eine ANDERE E-Mail hinterlegt (z.B. die
+  // der Eltern, weil damit vorher schon jemand zugeordnet wurde), wird diese NICHT
+  // überschrieben, sondern in zusatzEmails übernommen — sonst verliert man beim Zuordnen
+  // eines Jugendlichen die zuvor hinterlegte Elternmail (und damit deren Zugriff).
+  const linkPendingUserToMitglied = async (mid, newEmail) => {
+    const m = mitgliederListe[mid] || {};
+    const existingEmail = (m.email||'').trim().toLowerCase();
+    const email = (newEmail||'').trim().toLowerCase();
+    if (!existingEmail) {
+      await saveMitgliedField(mid,'email',email);
+      return;
+    }
+    if (existingEmail === email) return;
+    const cur = m.zusatzEmails||[];
+    if (!cur.includes(email)) await saveMitgliedField(mid,'zusatzEmails',[...cur,email]);
+  };
+
   const ensureXlsxLoaded = () => {
     if (typeof window !== 'undefined' && !window._XLSX) {
       const s = document.createElement('script');
@@ -12264,7 +12282,7 @@ export default function TrainingsApp() {
                             .filter(([,m])=>{const s=mitgliedLinkSearch.trim().toLowerCase();return !s||`${m.vorname} ${m.nachname} ${m.email||''}`.toLowerCase().includes(s);})
                             .sort((a,b)=>`${a[1].nachname}${a[1].vorname}`.localeCompare(`${b[1].nachname}${b[1].vorname}`,'de'))
                             .map(([mid,m])=>(
-                              <button key={mid} onClick={()=>{ saveMitgliedField(mid,'email',u.email); setMitgliedLinkUid(null); setMitgliedLinkSearch(''); }}
+                              <button key={mid} onClick={()=>{ linkPendingUserToMitglied(mid, u.email); setMitgliedLinkUid(null); setMitgliedLinkSearch(''); }}
                                 style={{textAlign:'left',padding:'6px 8px',borderRadius:'6px',background:'transparent',border:'none',cursor:'pointer',color:'white',fontSize:'12px'}}>
                                 {m.vorname} {m.nachname} {m.email && <span style={{color:'rgba(255,255,255,0.4)'}}>({m.email})</span>}
                               </button>
