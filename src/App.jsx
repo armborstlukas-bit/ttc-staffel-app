@@ -14719,7 +14719,7 @@ export default function TrainingsApp() {
         <div style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',background:'linear-gradient(180deg,#6b4423,#5a3a1e)',borderBottom:'4px solid #4a2f18',boxShadow:'0 3px 10px rgba(0,0,0,0.3)',position:'sticky',top:0,zIndex:100}}>
           <button onClick={()=>navTo('home')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.12)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'9px',color:'#fde68a',cursor:'pointer',display:'flex',alignItems:'center'}}><Home size={16}/></button>
           <h1 style={{margin:0,color:'#fde68a',fontSize:'20px',fontWeight:'800',flex:1,textShadow:'0 1px 2px rgba(0,0,0,0.4)'}}>📌 Pinnwand</h1>
-          <span style={{fontSize:'12px',color:'rgba(253,230,138,0.7)',fontWeight:'600'}}>{wettenZitate.length} Einträge</span>
+          <span style={{fontSize:'12px',color:'rgba(253,230,138,0.7)',fontWeight:'600'}}>{wettenZitate.filter(canSeeEntry).length} Einträge</span>
         </div>
 
         <div style={{padding:'20px',maxWidth:'820px',margin:'0 auto'}}>
@@ -14734,13 +14734,16 @@ export default function TrainingsApp() {
             </div>
           )}
 
-          {/* Übersicht — wie kleine Washi-Tape-Etiketten auf dem Brett, dienen gleichzeitig als Navigation */}
+          {/* Übersicht — wie kleine Washi-Tape-Etiketten auf dem Brett, dienen gleichzeitig als Navigation.
+              Zählt nur für den aktuellen Nutzer sichtbare Einträge (canSeeEntry) — sonst stimmt die
+              Anzahl nicht mit der tatsächlich sichtbaren Liste überein, wenn Einträge eingeschränkt
+              sichtbar sind (siehe canSeeEntry weiter oben, Sichtbarkeitslogik bleibt unangetastet). */}
           <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'10px',marginBottom:'18px'}}>
             {[
-              ['alle','Alle','📋',wettenZitate.length,'#f3f4f6','#374151'],
-              ['zitat','Zitate','💬',wettenZitate.filter(e=>e.type==='zitat').length,'#dff6fb','#0e7490'],
-              ['wette','Wetten','🎰',wettenZitate.filter(e=>e.type==='wette').length,'#fff6da','#92620a'],
-              ['lessons_learned','Lessons','📚',wettenZitate.filter(e=>e.type==='lessons_learned').length,'#e3f7e8','#166534'],
+              ['alle','Alle','📋',wettenZitate.filter(canSeeEntry).length,'#f3f4f6','#374151'],
+              ['zitat','Zitate','💬',wettenZitate.filter(canSeeEntry).filter(e=>e.type==='zitat').length,'#dff6fb','#0e7490'],
+              ['wette','Wetten','🎰',wettenZitate.filter(canSeeEntry).filter(e=>e.type==='wette').length,'#fff6da','#92620a'],
+              ['lessons_learned','Lessons','📚',wettenZitate.filter(canSeeEntry).filter(e=>e.type==='lessons_learned').length,'#e3f7e8','#166534'],
             ].map(([key,lbl,icon,count,paper,ink],i)=>(
               <button key={key} onClick={()=>setWzFilter(key)}
                 style={{padding:'10px 6px',borderRadius:'4px',border:'none',background:paper,cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:'2px',transform:`rotate(${wzFilter===key?0:(i%2===0?-2:2)}deg)`,boxShadow:wzFilter===key?'0 4px 10px rgba(0,0,0,0.35)':'0 2px 6px rgba(0,0,0,0.25)',outline:wzFilter===key?`2px solid ${ink}`:'none',outlineOffset:'2px',transition:'transform 0.15s'}}>
