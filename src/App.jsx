@@ -761,6 +761,7 @@ export default function TrainingsApp() {
   const [stayLoggedIn, setStayLoggedIn]                     = useState(false);
   const [showLoginPassword, setShowLoginPassword]            = useState(false);
   const [registerPasswordConfirm, setRegisterPasswordConfirm] = useState('');
+  const [pendingNameInput, setPendingNameInput] = useState('');
   // Practice Tournaments
   const [practiceTournaments, setPracticeTournaments]               = useState({});
   const [archivedPracticeTournaments, setArchivedPracticeTournaments] = useState({});
@@ -2530,6 +2531,26 @@ export default function TrainingsApp() {
     }
   };
 
+  // Trägt den nachträglich angegebenen Namen ein (Pending-Screen, für E-Mail-Adressen, aus denen
+  // sich kein Name ableiten liess) — aktualisiert Profil UND die schon verschickte Admin-
+  // Benachrichtigung, damit der Admin dort auch den echten Namen statt der E-Mail sieht.
+  const submitPendingName = async (name) => {
+    if (!name.trim() || !user?.uid) return;
+    const updated = { ...userProfile, name: name.trim(), nameConfirmed: true };
+    setUserProfile(updated);
+    await setDoc(doc(db,'users',user.uid), { name: name.trim(), nameConfirmed: true }, { merge:true });
+    const ttcUsersSnap = await getDoc(doc(db,'ttc','users'));
+    if (ttcUsersSnap.exists()) {
+      const ttcUsers = ttcUsersSnap.data();
+      if (ttcUsers[user.uid]) await setDoc(doc(db,'ttc','users'), { ...ttcUsers, [user.uid]: { ...ttcUsers[user.uid], name: name.trim(), nameConfirmed: true } });
+    }
+    const notifEntry = Object.entries(notifications).find(([,n]) => n.type==='new_registration' && n.fromUid===user.uid);
+    if (notifEntry) {
+      const [nid, n] = notifEntry;
+      saveNotifications({ ...notifications, [nid]: { ...n, fromName: name.trim(), title: `🆕 Neue Anmeldung: ${name.trim()}`, message: `${name.trim()} (${n.fromEmail}) hat sich registriert und wartet auf Freischaltung.` } });
+    }
+  };
+
   const handleRegister = async (e) => {
     e.preventDefault(); setError('');
     if (loginPassword !== registerPasswordConfirm) { setError('Die Passwörter stimmen nicht überein!'); return; }
@@ -2572,6 +2593,11 @@ export default function TrainingsApp() {
         uid:cred.user.uid, email:loginEmail, name:displayName,
         role: autoRole || 'pending', roles: autoRoles.length>0 ? autoRoles : ['pending'],
         linkedChildId: autoLinkedChildIds[0] || null, linkedChildIds: autoLinkedChildIds,
+        // Bei nicht sofort erkannten E-Mail-Adressen (z.B. "m.mueller83@...") laesst sich aus der
+        // Adresse kein brauchbarer Name ableiten — die Person wird beim Warten auf Freischaltung
+        // noch explizit nach ihrem Namen gefragt (siehe Pending-Screen), damit der Admin einen
+        // echten Namen statt der E-Mail sieht.
+        ...(autoRole ? {} : { nameConfirmed: false }),
       };
       await setDoc(doc(db,'users',cred.user.uid), profile);
       const snap = await getDoc(doc(db,'ttc','users'));
@@ -3632,9 +3658,22 @@ export default function TrainingsApp() {
       <div style={{width:'100%',maxWidth:'400px',textAlign:'center'}}>
         <div style={{width:'80px',height:'80px',borderRadius:'22px',background:'linear-gradient(135deg,#15803d,#4ade80)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'38px',margin:'0 auto 20px',boxShadow:'0 8px 32px rgba(74,222,128,0.3)'}}>⏳</div>
         <h2 style={{margin:'0 0 10px',color:'white',fontSize:'24px',fontWeight:'800',letterSpacing:'-0.3px'}}>Account wird freigeschaltet</h2>
-        <p style={{margin:'0 0 32px',color:'rgba(255,255,255,0.45)',fontSize:'15px',lineHeight:'1.6'}}>
-          Hallo <strong style={{color:'#4ade80'}}>{userProfile?.name}</strong>!<br/>Ein Admin schaltet deinen Account bald frei.
-        </p>
+        {userProfile?.nameConfirmed===false ? (
+          <>
+            <p style={{margin:'0 0 16px',color:'rgba(255,255,255,0.45)',fontSize:'15px',lineHeight:'1.6'}}>
+              Gib deinen Namen an, damit wir wissen, wer du bist:
+            </p>
+            <form onSubmit={e=>{e.preventDefault();submitPendingName(pendingNameInput);}} style={{display:'flex',gap:'8px',marginBottom:'32px'}}>
+              <input value={pendingNameInput} onChange={e=>setPendingNameInput(e.target.value)} placeholder="Dein Name / Name deines Kindes" autoFocus required
+                style={{flex:1,padding:'12px 16px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'12px',color:'white',fontSize:'15px',outline:'none'}}/>
+              <button type="submit" style={{padding:'12px 18px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>✓</button>
+            </form>
+          </>
+        ) : (
+          <p style={{margin:'0 0 32px',color:'rgba(255,255,255,0.45)',fontSize:'15px',lineHeight:'1.6'}}>
+            Hallo <strong style={{color:'#4ade80'}}>{userProfile?.name}</strong>!<br/>Ein Admin schaltet deinen Account bald frei.
+          </p>
+        )}
         <div style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(74,222,128,0.15)',borderRadius:'20px',padding:'24px',marginBottom:'20px'}}>
           <p style={{margin:'0 0 6px',color:'rgba(74,222,128,0.6)',fontSize:'12px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px'}}>Registriert als</p>
           <p style={{margin:0,color:'white',fontSize:'16px',fontWeight:'700'}}>{userProfile?.email}</p>
