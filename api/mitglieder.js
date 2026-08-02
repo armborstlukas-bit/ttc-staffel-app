@@ -208,11 +208,33 @@ async function handleMatchEmail(req, res) {
   res.status(200).json({ roles, linkedMembers, ownName, linkedPlayerId });
 }
 
+// Spiegelt das eigene users/{uid}-Profil ins gemeinsame ttc/users-Übersichtsdokument.
+// Läuft übers Admin SDK (umgeht die Firestore-Regeln), weil ttc/users aus Sicherheitsgründen
+// nicht mehr direkt vom Client beschreibbar ist (sonst könnte jeder eingeloggte Nutzer dieses
+// gemeinsame Dokument für ALLE Mitglieder überschreiben/korrumpieren). Wird bei der
+// Registrierung und beim nachträglichen Eintragen des Namens (Pending-Screen) aufgerufen —
+// beides Fälle, in denen der Nutzer noch kein Admin ist, sich aber selbst eintragen muss.
+async function handleSyncSelfMirror(req, res) {
+  const uid = await verifyRequestUser(req);
+  if (!uid) { res.status(401).json({ error: 'Nicht angemeldet' }); return; }
+
+  const db = adminDb();
+  const userSnap = await db.collection('users').doc(uid).get();
+  if (!userSnap.exists) { res.status(404).json({ error: 'Profil nicht gefunden' }); return; }
+  const profile = { ...userSnap.data(), uid };
+
+  const ttcUsersRef = db.collection('ttc').doc('users');
+  await ttcUsersRef.set({ [uid]: profile }, { merge: true });
+
+  res.status(200).json({ ok: true });
+}
+
 export default async function handler(req, res) {
   try {
     if (req.method === 'POST' && req.query.action === 'match-email') return handleMatchEmail(req, res);
     if (req.method === 'POST' && req.query.action === 'sync-roles') return handleSyncRoles(req, res);
     if (req.method === 'GET' && req.query.action === 'list-jugendliche') return handleListJugendliche(req, res);
+    if (req.method === 'POST' && req.query.action === 'sync-self-mirror') return handleSyncSelfMirror(req, res);
     res.status(404).json({ error: 'unknown action' });
   } catch (e) {
     res.status(500).json({ error: String(e?.message || e) });

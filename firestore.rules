@@ -36,12 +36,15 @@ service cloud.firestore {
     //   → Eltern/Jugendliche schreiben z.B. Turnier- & Trainingsanmeldungen
     //   → Trainer/Admins schreiben alle anderen Daten
     //   → Schutz vor unbefugtem Zugriff: nur Firebase-Auth-User
-    // Ausnahme: mitgliederListe (Namen/Geburtsdaten/Rollen) und mitgliederFinanzen
+    // Ausnahme: mitgliederListe (Namen/Geburtsdaten/Rollen), mitgliederFinanzen
     // (Adresse/Bankdaten/Beiträge) sind personenbezogen bzw. hochsensibel und daher
-    // ausschließlich für Admins lesbar — siehe eigene match-Blöcke unten.
+    // ausschließlich für Admins lesbar — siehe eigene match-Blöcke unten. "users" (das
+    // gemeinsame Übersichtsdokument aller Nutzerprofile) ist ausgenommen, weil es
+    // sonst jeder eingeloggte Nutzer mit einem einzigen Schreibbefehl komplett
+    // überschreiben und damit die Profile ALLER Mitglieder korrumpieren könnte.
     match /ttc/{document} {
       allow read:  if request.auth != null && document != 'mitgliederListe' && document != 'mitgliederFinanzen';
-      allow write: if request.auth != null && document != 'mitgliederListe' && document != 'mitgliederFinanzen';
+      allow write: if request.auth != null && document != 'mitgliederListe' && document != 'mitgliederFinanzen' && document != 'users';
     }
 
     // ── Mitgliederliste & Mitglieder-Finanzdaten: nur Admins ───────────────
@@ -53,6 +56,17 @@ service cloud.firestore {
     }
     match /ttc/mitgliederFinanzen {
       allow read, write: if isAdmin();
+    }
+
+    // ── ttc/users: gespiegelte Übersicht aller Nutzerprofile ────────────────
+    // Lesen bleibt für alle eingeloggten Nutzer offen (wird an vielen Stellen der App
+    // gebraucht, z.B. Namen in Benachrichtigungen). Schreiben nur noch für Admins direkt
+    // — normale Nutzer (Registrierung, Namensbestätigung) laufen jetzt über die
+    // serverseitige Funktion sync-self-mirror (Admin SDK, umgeht diese Regel absichtlich
+    // und ausschließlich fürs eigene Profil).
+    match /ttc/users {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
     }
 
     // ── Tippspiel: eigene Tipps sind geheim, bis der Admin sie freigibt ────

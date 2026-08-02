@@ -2510,11 +2510,15 @@ export default function TrainingsApp() {
     const updated = { ...userProfile, name: name.trim(), nameConfirmed: true };
     setUserProfile(updated);
     await setDoc(doc(db,'users',user.uid), { name: name.trim(), nameConfirmed: true }, { merge:true });
-    const ttcUsersSnap = await getDoc(doc(db,'ttc','users'));
-    if (ttcUsersSnap.exists()) {
-      const ttcUsers = ttcUsersSnap.data();
-      if (ttcUsers[user.uid]) await setDoc(doc(db,'ttc','users'), { ...ttcUsers, [user.uid]: { ...ttcUsers[user.uid], name: name.trim(), nameConfirmed: true } });
-    }
+    // ttc/users ist aus Sicherheitsgründen nicht mehr direkt vom Client beschreibbar —
+    // der Server spiegelt das aktualisierte eigene Profil übers Admin SDK rein.
+    try {
+      const idTokenMirror = await user.getIdToken();
+      await fetch('/api/mitglieder?action=sync-self-mirror', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${idTokenMirror}` },
+      });
+    } catch { /* Übersichtsdokument optional */ }
     const notifEntry = Object.entries(notifications).find(([,n]) => n.type==='new_registration' && n.fromUid===user.uid);
     if (notifEntry) {
       const [nid, n] = notifEntry;
@@ -2581,8 +2585,16 @@ export default function TrainingsApp() {
         ...(autoRole ? {} : { nameConfirmed: false }),
       };
       await setDoc(doc(db,'users',cred.user.uid), profile);
-      const snap = await getDoc(doc(db,'ttc','users'));
-      await setDoc(doc(db,'ttc','users'), { ...(snap.exists()?snap.data():{}), [cred.user.uid]:profile });
+      // ttc/users (gemeinsames Übersichtsdokument aller Nutzer) ist aus Sicherheitsgründen
+      // nicht mehr direkt vom Client beschreibbar — der Server spiegelt das eigene Profil
+      // übers Admin SDK rein.
+      try {
+        const idTokenMirror = await cred.user.getIdToken();
+        await fetch('/api/mitglieder?action=sync-self-mirror', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${idTokenMirror}` },
+        });
+      } catch { /* Übersichtsdokument optional -- eigenes Profil ist trotzdem angelegt */ }
       setUserRole(profile.role); setUserProfile(profile);
 
       if (autoRole) return; // automatisch freigeschaltet — keine Admin-Benachrichtigung/Wartezeit nötig
