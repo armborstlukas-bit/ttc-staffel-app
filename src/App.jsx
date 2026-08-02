@@ -840,6 +840,7 @@ export default function TrainingsApp() {
   const [gegnerAppendDraft, setGegnerAppendDraft] = useState({});
   const [gegnerAdding, setGegnerAdding] = useState(false);
   const [gegnerEditId, setGegnerEditId] = useState(null);
+  const [gegnerMetaDraft, setGegnerMetaDraft] = useState({date:'',verein:'',gegner:''});
   const [gegnerWeitereId, setGegnerWeitereId] = useState(null);
   const [gegnerWeitereText, setGegnerWeitereText] = useState('');
   const [gegnerSearchPlayer, setGegnerSearchPlayer] = useState('');
@@ -11363,6 +11364,10 @@ export default function TrainingsApp() {
     const accentBorder= 'rgba(8,145,178,0.2)';
     const accentBg    = 'rgba(8,145,178,0.08)';
 
+    // Legt IMMER einen neuen Eintrag an — Bearbeiten bestehender Einträge passiert nicht mehr
+    // über dieses Formular oben, sondern direkt inline in der jeweils aufgeklappten Karte
+    // (siehe gegnerEditId/gegnerMetaDraft weiter unten), damit man beim Klick auf einen
+    // Gegner nicht erst nach oben springen muss, um ihn zu bearbeiten.
     const submitGegnerAdmin = () => {
       if (!gegnerForm.verein.trim() || !gegnerForm.date) return;
       const entry = {
@@ -11376,22 +11381,27 @@ export default function TrainingsApp() {
         createdByUid: user?.uid || null,
         createdAt: new Date().toISOString(),
       };
-      if (gegnerEditId) {
-        // Beim Bearbeiten darf createdBy/createdByUid des ursprünglichen Erstellers nicht
-        // überschrieben werden — sonst würde ein Eintrag durch Bearbeiten "gekapert".
-        saveGegnerLogbuch(gegnerLogbuch.map(e=>e.id===gegnerEditId?{...e,...entry,id:gegnerEditId,createdBy:e.createdBy,createdByUid:e.createdByUid}:e));
-        setGegnerEditId(null);
-      } else {
-        saveGegnerLogbuch([entry, ...gegnerLogbuch]);
-      }
+      saveGegnerLogbuch([entry, ...gegnerLogbuch]);
       setGegnerForm({date:'',verein:'',gegner:'',taktik:'',spielweise:''});
       setGegnerAdding(false);
     };
 
-    // Nur der Ersteller (oder ein Admin) darf einen Eintrag komplett bearbeiten/löschen —
-    // alte Einträge ohne createdByUid (vor Einführung dieser Prüfung) gelten als "frei",
-    // damit historische Daten nicht plötzlich für alle gesperrt werden.
-    const canFullyEdit = e => userRole==='admin' || !e.createdByUid || e.createdByUid===user?.uid;
+    // Nur der Ersteller (oder ein Admin) darf einen Eintrag komplett bearbeiten/löschen.
+    // Alte Einträge ohne gespeicherten Ersteller (von vor Einführung dieser Prüfung) gelten
+    // NICHT als "frei für alle" — sonst würde die Sperre bei praktisch allen Bestandsdaten
+    // wirkungslos bleiben. Stattdessen dürfen die nur noch Admins voll bearbeiten/löschen,
+    // alle anderen können wie bei jedem fremden Eintrag nur ergänzen.
+    const canFullyEdit = e => userRole==='admin' || (!!e.createdByUid && e.createdByUid===user?.uid);
+
+    // Verein/Gegner/Datum direkt in der aufgeklappten Karte bearbeiten (gegnerEditId hier
+    // zweckentfremdet als "wird gerade inline bearbeitet"-Marker, nicht mehr fürs Top-Formular).
+    const saveGegnerMeta = (id) => {
+      const e = gegnerLogbuch.find(x=>x.id===id);
+      if (!e || !canFullyEdit(e)) return;
+      if (!gegnerMetaDraft.verein.trim() || !gegnerMetaDraft.date) return;
+      saveGegnerLogbuch(gegnerLogbuch.map(x=>x.id===id?{...x,date:gegnerMetaDraft.date,verein:gegnerMetaDraft.verein.trim(),gegner:gegnerMetaDraft.gegner.trim()}:x));
+      setGegnerEditId(null);
+    };
 
     const deleteGegnerAdmin = id => {
       const e = gegnerLogbuch.find(x=>x.id===id);
@@ -11447,7 +11457,7 @@ export default function TrainingsApp() {
 
           {gegnerAdding&&(
             <div style={{background:accentBg,border:`1px solid ${accentBorder}`,borderRadius:'14px',padding:'16px',marginBottom:'16px'}}>
-              <p style={{margin:'0 0 12px',fontSize:'12px',fontWeight:'800',color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px'}}>{gegnerEditId?'Eintrag bearbeiten':'Neuer Eintrag'}</p>
+              <p style={{margin:'0 0 12px',fontSize:'12px',fontWeight:'800',color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px'}}>Neuer Eintrag</p>
               <div style={{display:'grid',gap:'10px'}}>
                 <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'10px'}}>
                   <div>
@@ -11486,7 +11496,7 @@ export default function TrainingsApp() {
                     <input type="text" placeholder="z.B. Max Mustermann" value={gegnerForm.gegner} onChange={e=>setGegnerForm(f=>({...f,gegner:e.target.value}))}
                       style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
                     {gegnerForm.gegner.trim()&&(()=>{
-                      const similar = findSimilarGegner(gegnerForm.gegner, gegnerEditId);
+                      const similar = findSimilarGegner(gegnerForm.gegner, null);
                       if (similar.length===0) return null;
                       const exact = similar.some(x=>normName(x.gegner)===normName(gegnerForm.gegner));
                       return (
@@ -11515,7 +11525,7 @@ export default function TrainingsApp() {
                     style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
                   <button onClick={submitGegnerAdmin} disabled={!gegnerForm.verein.trim()||!gegnerForm.date}
                     style={{padding:'9px 20px',background:gegnerForm.verein.trim()&&gegnerForm.date?`linear-gradient(135deg,${accentColor},#0e7490)`:'rgba(255,255,255,0.1)',color:'white',border:'none',borderRadius:'10px',cursor:gegnerForm.verein.trim()&&gegnerForm.date?'pointer':'not-allowed',fontWeight:'700',fontSize:'13px',opacity:gegnerForm.verein.trim()&&gegnerForm.date?1:0.5}}>
-                    {gegnerEditId?'Speichern':'Eintrag speichern'}
+                    Eintrag speichern
                   </button>
                 </div>
               </div>
@@ -11545,21 +11555,49 @@ export default function TrainingsApp() {
             </div>
           ):(
             <div style={{display:'grid',gap:'6px'}}>
-              {[...gegnerLogbuch].sort((a,b)=>(a.gegner||a.verein||'').localeCompare(b.gegner||b.verein||'','de')).filter(e=>e.id!==gegnerEditId&&(!gegnerSearchPlayer||e.gegner?.toLowerCase().includes(gegnerSearchPlayer.toLowerCase()))&&(!gegnerSearchVerein||e.verein?.toLowerCase().includes(gegnerSearchVerein.toLowerCase()))).map(e=>{
+              {[...gegnerLogbuch].sort((a,b)=>(a.gegner||a.verein||'').localeCompare(b.gegner||b.verein||'','de')).filter(e=>(!gegnerSearchPlayer||e.gegner?.toLowerCase().includes(gegnerSearchPlayer.toLowerCase()))&&(!gegnerSearchVerein||e.verein?.toLowerCase().includes(gegnerSearchVerein.toLowerCase()))).map(e=>{
                 const expandedA = gegnerExpandedId===e.id;
                 const dateStrGA = e.date?new Date(e.date+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
                 return (
                   <div key={e.id} style={{background:'rgba(255,255,255,0.03)',border:`1px solid ${expandedA?accentBorder:'rgba(255,255,255,0.07)'}`,borderRadius:'12px',overflow:'hidden'}}>
-                    <button onClick={()=>setGegnerExpandedId(expandedA?null:e.id)}
+                    <button onClick={()=>{setGegnerExpandedId(expandedA?null:e.id);setGegnerEditId(null);}}
                       style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'13px 16px',background:'none',border:'none',cursor:'pointer',gap:'10px'}}>
                       <span style={{fontWeight:'700',color:'white',fontSize:'14px',textAlign:'left'}}>{e.gegner||e.verein||'—'}</span>
                       <span style={{color:'rgba(255,255,255,0.3)',fontSize:'12px',display:'inline-block',transform:expandedA?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s'}}>▼</span>
                     </button>
                     {expandedA&&(
                       <div style={{padding:'0 16px 14px'}}>
-                        <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>
-                          {[e.verein,dateStrGA].filter(Boolean).join(' · ')}
-                        </p>
+                        {gegnerEditId===e.id ? (
+                          <div style={{display:'grid',gap:'8px',marginBottom:'10px',padding:'10px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'10px'}}>
+                            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr 1fr',gap:'8px'}}>
+                              <div>
+                                <label style={{display:'block',fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'4px',textTransform:'uppercase'}}>Datum</label>
+                                <input type="date" value={gegnerMetaDraft.date} onChange={ev=>setGegnerMetaDraft(d=>({...d,date:ev.target.value}))}
+                                  style={{width:'100%',boxSizing:'border-box',padding:'7px 9px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'8px',color:'white',fontSize:'13px',outline:'none'}}/>
+                              </div>
+                              <div>
+                                <label style={{display:'block',fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'4px',textTransform:'uppercase'}}>Verein</label>
+                                <input type="text" value={gegnerMetaDraft.verein} onChange={ev=>setGegnerMetaDraft(d=>({...d,verein:ev.target.value}))}
+                                  style={{width:'100%',boxSizing:'border-box',padding:'7px 9px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'8px',color:'white',fontSize:'13px',outline:'none'}}/>
+                              </div>
+                              <div>
+                                <label style={{display:'block',fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'4px',textTransform:'uppercase'}}>Gegner</label>
+                                <input type="text" value={gegnerMetaDraft.gegner} onChange={ev=>setGegnerMetaDraft(d=>({...d,gegner:ev.target.value}))}
+                                  style={{width:'100%',boxSizing:'border-box',padding:'7px 9px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'8px',color:'white',fontSize:'13px',outline:'none'}}/>
+                              </div>
+                            </div>
+                            <div style={{display:'flex',gap:'6px'}}>
+                              <button onClick={()=>saveGegnerMeta(e.id)} disabled={!gegnerMetaDraft.verein.trim()||!gegnerMetaDraft.date}
+                                style={{padding:'6px 14px',background:gegnerMetaDraft.verein.trim()&&gegnerMetaDraft.date?accentColor:'rgba(255,255,255,0.1)',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>✓ Speichern</button>
+                              <button onClick={()=>setGegnerEditId(null)}
+                                style={{padding:'6px 12px',background:'transparent',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'8px',color:'rgba(255,255,255,0.6)',cursor:'pointer',fontSize:'12px'}}>Abbrechen</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>
+                            {[e.verein,dateStrGA].filter(Boolean).join(' · ')}
+                          </p>
+                        )}
                         {(()=>{ const mayEdit = canFullyEdit(e); return (
                         <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'10px',marginBottom:'10px'}}>
                           <div>
@@ -11603,7 +11641,7 @@ export default function TrainingsApp() {
                         </div>
                         ); })()}
                         <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                          {canFullyEdit(e) && <button onClick={()=>{setGegnerEditId(e.id);setGegnerForm({date:e.date,verein:e.verein,gegner:e.gegner||'',taktik:e.taktik||'',spielweise:e.spielweise||''});setGegnerAdding(true);setGegnerExpandedId(null);}}
+                          {canFullyEdit(e) && gegnerEditId!==e.id && <button onClick={()=>{setGegnerEditId(e.id);setGegnerMetaDraft({date:e.date,verein:e.verein,gegner:e.gegner||''});}}
                             style={{display:'flex',alignItems:'center',gap:'5px',padding:'6px 12px',borderRadius:'8px',background:accentBg,border:`1px solid ${accentBorder}`,color:'#67e8f9',cursor:'pointer',fontSize:'12px',fontWeight:'600'}}>
                             <Pencil size={11}/> Verein/Gegner/Datum bearbeiten
                           </button>}
