@@ -847,6 +847,7 @@ export default function TrainingsApp() {
   const [gegnerSearchPlayer, setGegnerSearchPlayer] = useState('');
   const [gegnerSearchVerein, setGegnerSearchVerein] = useState('');
   const [gegnerExpandedId, setGegnerExpandedId] = useState(null);
+  const [usageDayExpanded, setUsageDayExpanded] = useState(null);
   const [trainingsmatches, setTrainingsmatches] = useState([]);
   const [tmSort, setTmSort] = useState('winrate');
   const [tmAdding, setTmAdding] = useState(false);
@@ -11872,14 +11873,38 @@ export default function TrainingsApp() {
           </div>
 
           <h2 style={{fontSize:'15px',fontWeight:'800',margin:'0 0 10px',color:'rgba(255,255,255,0.85)'}}>Aktive Nutzer pro Tag</h2>
+          <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>Auf einen Tag klicken, um zu sehen, wer die App an dem Tag genutzt hat.</p>
           <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
             {sortedDays.length === 0 && <div style={{fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>Noch keine Daten.</div>}
-            {sortedDays.map(day => (
-              <div key={day} style={{display:'flex',justifyContent:'space-between',padding:'8px 12px',background:'rgba(255,255,255,0.04)',borderRadius:'8px',fontSize:'13px'}}>
-                <span style={{color:'rgba(255,255,255,0.7)'}}>{day.split('-').reverse().join('.')}</span>
-                <span style={{fontWeight:'700',color:'#7dd3fc'}}>{(dailyActive[day]||[]).length}</span>
-              </div>
-            ))}
+            {sortedDays.map(day => {
+              const uidsToday = dailyActive[day] || [];
+              const isOpen = usageDayExpanded === day;
+              return (
+                <div key={day} style={{background:'rgba(255,255,255,0.04)',borderRadius:'8px',overflow:'hidden'}}>
+                  <button onClick={()=>setUsageDayExpanded(isOpen?null:day)}
+                    style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 12px',background:'none',border:'none',cursor:'pointer',fontSize:'13px'}}>
+                    <span style={{color:'rgba(255,255,255,0.7)'}}>{day.split('-').reverse().join('.')}</span>
+                    <span style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                      <span style={{fontWeight:'700',color:'#7dd3fc'}}>{uidsToday.length}</span>
+                      <span style={{color:'rgba(255,255,255,0.3)',fontSize:'11px',display:'inline-block',transform:isOpen?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s'}}>▼</span>
+                    </span>
+                  </button>
+                  {isOpen && (
+                    <div style={{padding:'0 12px 10px',display:'flex',flexWrap:'wrap',gap:'6px'}}>
+                      {uidsToday.length===0 && <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>Niemand.</span>}
+                      {uidsToday.map(uid => {
+                        const u = allUsers[uid];
+                        return (
+                          <span key={uid} style={{padding:'4px 10px',background:'rgba(125,211,252,0.1)',border:'1px solid rgba(125,211,252,0.3)',borderRadius:'20px',color:'#7dd3fc',fontSize:'12px',fontWeight:'600'}}>
+                            {u?.name || u?.email || 'Unbekannt'}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
