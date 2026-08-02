@@ -825,6 +825,9 @@ export default function TrainingsApp() {
   const [allTipps, setAllTipps] = useState(null);
   const [tippspielImporting, setTippspielImporting] = useState(false);
   const [clubTeams, setClubTeams] = useState(null); // null=noch nicht geladen, [] geladen aber leer
+  const [spielplanMatches, setSpielplanMatches] = useState(null);
+  const [spielplanLoading, setSpielplanLoading] = useState(false);
+  const [spielplanFilter, setSpielplanFilter] = useState('kommend'); // 'kommend' | 'alle'
   const [clubTeamsLoading, setClubTeamsLoading] = useState(false);
   const [tippspielSubmitted, setTippspielSubmitted] = useState(null); // null = noch unbekannt
   const [tippspielSeenAt, setTippspielSeenAt] = useState(null);
@@ -1993,6 +1996,19 @@ export default function TrainingsApp() {
       setClubTeams(Array.isArray(d.teams) ? d.teams : []);
     } catch { setClubTeams([]); }
     finally { setClubTeamsLoading(false); }
+  };
+
+  // Lädt den kompletten Vereins-Spielplan (alle Mannschaften, alle Ligen) für die laufende
+  // Saison live von mytischtennis.de — ersetzt den bisherigen reinen "MyTischtennis"-Link.
+  const fetchSpielplan = async () => {
+    if (spielplanMatches !== null || spielplanLoading) return;
+    setSpielplanLoading(true);
+    try {
+      const r = await fetch('/api/spielplan?date_start=2026-08-01&date_end=2027-05-31&_='+Date.now());
+      const d = await r.json();
+      setSpielplanMatches(Array.isArray(d.matches) ? d.matches : []);
+    } catch { setSpielplanMatches([]); }
+    finally { setSpielplanLoading(false); }
   };
 
   const importTippspielTeams = async () => {
@@ -3603,7 +3619,7 @@ export default function TrainingsApp() {
   }
 
   // ── PASSIVES MITGLIED: stark eingeschränkter Bereich ──────────────────────
-  if (userRole === 'passiv' && !['ttcnews','kalender','tippspiel','wettenZitate','ttcMannschaften'].includes(view)) {
+  if (userRole === 'passiv' && !['ttcnews','kalender','tippspiel','wettenZitate','ttcMannschaften','spielplan'].includes(view)) {
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px'}}>
@@ -3626,7 +3642,7 @@ export default function TrainingsApp() {
               {label:'TTC News', icon:'📰', desc:'Aktuelle Vereinsnachrichten', color:'#86efac', bg:'rgba(74,222,128,0.08)', border:'rgba(74,222,128,0.2)', action:()=>{navTo('ttcnews');fetchTtcNews();}},
               {label:'Vereinskalender', icon:'📅', desc:'Termine & Hallenbelegungen', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.2)', action:()=>{navTo('kalender');fetchKalender();}},
               {label:'TTC Tippspiel', icon:'🎱', desc:'Endplatzierungen tippen', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>{navTo('tippspiel');fetchTippspiel();}},
-              {label:'MyTischtennis', icon:'🏓', desc:'Vereinsübersicht auf MyTischtennis', color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)', action:()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953/mannschaften';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);}},
+              {label:'Spielplan', icon:'📆', desc:'Alle Vereinsspiele mit Ergebnissen', color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)', action:()=>navTo('spielplan')},
               ...(canAccessTeams()?[{label:'TTC Mannschaften', icon:'🏆', desc:'Alle Mannschaften & nächste Spiele', color:'#2dd4bf', bg:'rgba(45,212,191,0.08)', border:'rgba(45,212,191,0.2)', action:()=>navTo('ttcMannschaften')}]:[]),
               ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', desc:'Wetten, Zitate & Lessons Learned', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
             ].map(t=>(
@@ -4342,7 +4358,7 @@ export default function TrainingsApp() {
           {label:'Wer fährt wann',   icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
           {label:'Vereinskalender',  icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)', action:()=>{navTo('kalender');fetchKalender();}},
           {label: tippspielNeedsAttention&&tippspielConfig?.deadline ? `Tippspiel bis ${new Date(tippspielConfig.deadline+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}` : 'TTC Tippspiel', icon:'🎱', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.25)', blink: tippspielNeedsAttention, action:()=>{markTippspielSeen();navTo('tippspiel');fetchTippspiel();}},
-          {label:'MyTischtennis',    icon:'🌐', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)', action:()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953/mannschaften';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);}},
+          {label:'Spielplan',        icon:'📆', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)', action:()=>navTo('spielplan')},
           {label:'Materialverwaltung',icon:'🏓', color:'#fb923c', bg:'rgba(251,146,60,0.08)', border:'rgba(251,146,60,0.25)',  action:()=>navTo('materialverwaltung')},
           ...(canAccessPinnwand()?[{label:'Pinnwand',  icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.2)',  action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
           ...(canEdit()?[
@@ -4539,7 +4555,7 @@ export default function TrainingsApp() {
 
 
   // ── AKTIVER DASHBOARD ────────────────────────────────────────────────────
-  if (userRole === 'aktiver' && !['gegnerlogbuch','ttcnews','trainingsmatches','wettenZitate','fahrplan','tippspiel','kalender','verbesserungswuensche','ttcMannschaften'].includes(view)) {
+  if (userRole === 'aktiver' && !['gegnerlogbuch','ttcnews','trainingsmatches','wettenZitate','fahrplan','tippspiel','kalender','verbesserungswuensche','ttcMannschaften','spielplan'].includes(view)) {
     const dateLabel = new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
 
     const submitGegner = () => {
@@ -4676,7 +4692,7 @@ export default function TrainingsApp() {
               {label:'Trainingsmatches',icon:'⚔️', desc:'Duelle & Allzeittabelle',                  color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>navTo('trainingsmatches')},
               ...(canAccessTeams()?[{label:'TTC Mannschaften', icon:'🏆', desc:'Alle Mannschaften & nächste Spiele', color:'#2dd4bf', bg:'rgba(45,212,191,0.08)', border:'rgba(45,212,191,0.2)', action:()=>navTo('ttcMannschaften')}]:[]),
               ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', desc:'Wetten, Zitate & Lessons Learned', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
-              {label:'MyTischtennis', icon:'🏓', desc:'Vereinsübersicht auf MyTischtennis',                                                                  color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)',  action:()=>(()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953/mannschaften';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);})()},
+              {label:'Spielplan', icon:'📆', desc:'Alle Vereinsspiele mit Ergebnissen', color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)', action:()=>navTo('spielplan')},
               {label:'Verbesserungen', icon:'💡', desc:'Deine Ideen für die App', color:'#c4b5fd', bg:'rgba(196,181,253,0.07)', border:'rgba(196,181,253,0.2)', action:()=>navTo('verbesserungswuensche')},
             ].map(t=>(
               <button key={t.label} onClick={t.action} className={t.blink?'ttc-blink':''}
@@ -5171,7 +5187,7 @@ export default function TrainingsApp() {
                 label:'Wettkampf', color:'rgba(253,230,138,0.45)',
                 links:[
                   {label:'TTC Mannschaften', icon:'🏓', color:'#2dd4bf', bg:'rgba(45,212,191,0.1)',  border:'rgba(45,212,191,0.25)',  action:()=>navTo('ttcMannschaften')},
-                  {label:'MyTischtennis',    icon:'🌐', color:'#fcd34d', bg:'rgba(252,211,77,0.1)',   border:'rgba(252,211,77,0.25)',   action:()=>{const a=document.createElement('a');a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953/mannschaften';a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a);}},
+                  {label:'Spielplan',        icon:'📆', color:'#fcd34d', bg:'rgba(252,211,77,0.1)',   border:'rgba(252,211,77,0.25)',   action:()=>navTo('spielplan')},
                   ...(isJugend ? [{label:'Errungenschaften', icon:'🏅', color:'#86efac', bg:'rgba(134,239,172,0.1)', border:'rgba(134,239,172,0.25)', action:()=>setElternSubView('errungenschaften')}] : []),
                 ],
               },
@@ -14192,6 +14208,66 @@ export default function TrainingsApp() {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── SPIELPLAN ─────────────────────────────────────────────────────────────
+  if (view === 'spielplan' && !!user) {
+    if (spielplanMatches === null && !spielplanLoading) fetchSpielplan();
+    const openMyTischtennis = () => { const a=document.createElement('a'); a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953/mannschaften'; a.target='_blank'; a.rel='noopener noreferrer'; document.body.appendChild(a); a.click(); document.body.removeChild(a); };
+    const nowIso = new Date().toISOString();
+    const shown = (spielplanMatches||[]).filter(m => spielplanFilter==='alle' || !m.date || m.date >= nowIso || (m.state!=='done' && !m.isComplete));
+    const fmtDate = m => {
+      if (m.formattedDay && m.formattedTime) return `${m.formattedDay}, ${m.formattedTime} Uhr`;
+      if (!m.date) return '';
+      const d = new Date(m.date);
+      return d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'}) + ', ' + d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) + ' Uhr';
+    };
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#1a1000 0%,#2d1e00 45%,#1a1000 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
+          <button onClick={()=>navTo('home')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'9px',color:'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:'600'}}><Home size={15}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>📆 Spielplan</h1>
+        </div>
+        <div style={{padding:'16px 14px',maxWidth:'760px',margin:'0 auto'}}>
+          <button onClick={openMyTischtennis}
+            style={{width:'100%',padding:'11px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'12px',color:'#fbbf24',cursor:'pointer',fontWeight:'700',fontSize:'13px',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',marginBottom:'16px'}}>
+            🌐 Zu MyTischtennis ↗
+          </button>
+          <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.4)',lineHeight:'1.5'}}>Alle Punktspiele aller Mannschaften des TTC Grün-Weiß Staffel, live von mytischtennis.de — inklusive Ergebnis, sobald ein Spiel abgeschlossen ist.</p>
+          <div style={{display:'flex',gap:'6px',marginBottom:'16px'}}>
+            {[['kommend','Kommende Spiele'],['alle','Alle Spiele']].map(([key,lbl])=>(
+              <button key={key} onClick={()=>setSpielplanFilter(key)}
+                style={{padding:'7px 14px',borderRadius:'20px',border:`1px solid ${spielplanFilter===key?'#fbbf24':'rgba(255,255,255,0.15)'}`,background:spielplanFilter===key?'rgba(251,191,36,0.15)':'rgba(255,255,255,0.04)',color:spielplanFilter===key?'#fbbf24':'rgba(255,255,255,0.45)',fontWeight:'700',fontSize:'12px',cursor:'pointer'}}>{lbl}</button>
+            ))}
+          </div>
+          {spielplanLoading && spielplanMatches===null && <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.3)'}}>⏳ Lade Spielplan…</div>}
+          {spielplanMatches!==null && shown.length===0 && !spielplanLoading && <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.3)'}}>Keine Spiele gefunden.</div>}
+          <div style={{display:'grid',gap:'8px'}}>
+            {shown.map(m=>(
+              <div key={m.meetingId} style={{padding:'12px 14px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px',marginBottom:'4px',flexWrap:'wrap'}}>
+                  <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(251,191,36,0.6)'}}>{m.league}</span>
+                  <span style={{fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{fmtDate(m)}</span>
+                </div>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'10px',flexWrap:'wrap'}}>
+                  <p style={{margin:0,fontSize:'14px',fontWeight:'700',color:'white'}}>
+                    <span style={{color:m.isHome?'#fbbf24':'white'}}>{m.teamHome}</span>
+                    <span style={{color:'rgba(255,255,255,0.3)'}}> – </span>
+                    <span style={{color:!m.isHome?'#fbbf24':'white'}}>{m.teamAway}</span>
+                  </p>
+                  {m.isComplete ? (
+                    <span style={{fontSize:'14px',fontWeight:'800',color:'#86efac',flexShrink:0}}>{m.resultHome}:{m.resultAway}</span>
+                  ) : (
+                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',flexShrink:0}}>noch offen</span>
+                  )}
+                </div>
+                {m.location?.label && <p style={{margin:'4px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>📍 {m.location.label}{m.location.city?`, ${m.location.city}`:''}</p>}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
