@@ -832,6 +832,7 @@ export default function TrainingsApp() {
   const [clubTeamsLoading, setClubTeamsLoading] = useState(false);
   const [tippspielSubmitted, setTippspielSubmitted] = useState(null); // null = noch unbekannt
   const [tippspielSeenAt, setTippspielSeenAt] = useState(null);
+  const [verbesserungenSeenAt, setVerbesserungenSeenAt] = useState(null);
   const [tippspielJustSaved, setTippspielJustSaved] = useState(false);
   const [expandedTipper, setExpandedTipper] = useState(null);
   const [gegnerForm, setGegnerForm] = useState({date:'', verein:'', gegner:'', taktik:'', spielweise:''});
@@ -1814,6 +1815,25 @@ export default function TrainingsApp() {
 
   const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
   const tippspielNeedsAttention = tippspielSubmitted === false && (!tippspielSeenAt || (Date.now() - tippspielSeenAt) > FIVE_DAYS_MS);
+
+  // Merkt sich pro Admin, wann er die Verbesserungsvorschläge zuletzt geöffnet hat — die
+  // Glühbirnen-Kachel blinkt, solange es einen Vorschlag gibt, der neuer ist als das (also
+  // seit dem letzten Öffnen neu reingekommen oder bearbeitet wurde).
+  useEffect(() => {
+    if (!user?.uid) return;
+    const seenRaw = localStorage.getItem('verbesserungenSeenAt_' + user.uid);
+    setVerbesserungenSeenAt(seenRaw ? parseInt(seenRaw, 10) : 0);
+  }, [user?.uid]);
+  const markVerbesserungenSeen = () => {
+    if (!user?.uid) return;
+    const now = Date.now();
+    localStorage.setItem('verbesserungenSeenAt_' + user.uid, String(now));
+    setVerbesserungenSeenAt(now);
+  };
+  const verbesserungenNeedsAttention = userRole==='admin' && Object.values(verbesserungswuensche).some(w => {
+    const t = new Date(w.updatedAt || w.createdAt || 0).getTime();
+    return t > (verbesserungenSeenAt || 0);
+  });
 
   const fetchTippspiel = async () => {
     setTippspielLoading(true);
@@ -4331,7 +4351,7 @@ export default function TrainingsApp() {
           {label:'Vereinskalender',  icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)', action:()=>{navTo('kalender');fetchKalender();}},
           {label:'Wer fährt wann',   icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
           ...(canAccessPinnwand()?[{label:'Pinnwand',  icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.2)',  action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
-          {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.08)', border:'rgba(196,181,253,0.25)', action:()=>navTo('verbesserungswuensche')},
+          {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.08)', border:'rgba(196,181,253,0.25)', blink: verbesserungenNeedsAttention, action:()=>{markVerbesserungenSeen();navTo('verbesserungswuensche');}},
         ],
       },
       {
@@ -4688,7 +4708,7 @@ export default function TrainingsApp() {
                   {label:'Vereinskalender', icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.2)', action:()=>{navTo('kalender');fetchKalender();}},
                   {label:'Wer fährt wann',  icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.2)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
                   ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
-                  {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.07)', border:'rgba(196,181,253,0.2)', action:()=>navTo('verbesserungswuensche')},
+                  {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.07)', border:'rgba(196,181,253,0.2)', blink: verbesserungenNeedsAttention, action:()=>{markVerbesserungenSeen();navTo('verbesserungswuensche');}},
                 ],
               },
               {
@@ -5207,7 +5227,7 @@ export default function TrainingsApp() {
                   {label:'Vereinskalender', icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.1)', border:'rgba(251,191,36,0.25)', action:()=>{navTo('kalender');fetchKalender();}},
                   {label:'Wer fährt wann', icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.1)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
                   ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.1)', border:'rgba(253,230,138,0.25)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
-                  {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('verbesserungswuensche')},
+                  {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', blink: verbesserungenNeedsAttention, action:()=>{markVerbesserungenSeen();navTo('verbesserungswuensche');}},
                 ],
               },
               {
