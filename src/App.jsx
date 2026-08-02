@@ -4433,7 +4433,7 @@ export default function TrainingsApp() {
           </div>
         </div>
 
-        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 20px 60px'}}>
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'24px 14px 40px':'32px 20px 60px'}}>
 
           {/* ── Greeting ─────────────────────────────────────────── */}
           <div style={{marginBottom:'36px'}}>
@@ -4642,7 +4642,7 @@ export default function TrainingsApp() {
           </div>
         </div>
 
-        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 20px 60px'}}>
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'24px 14px 40px':'32px 20px 60px'}}>
 
           {/* Greeting */}
           {(()=>{
@@ -5063,7 +5063,7 @@ export default function TrainingsApp() {
           </div>
         </div>
 
-        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 20px 60px'}}>
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'20px 14px 40px':'26px 20px 60px'}}>
 
           {/* ── Greeting (kompakt) ── */}
           <div style={{marginBottom:'16px',display:'flex',alignItems:'baseline',gap:'8px',flexWrap:'wrap'}}>
