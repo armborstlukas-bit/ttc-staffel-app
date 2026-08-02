@@ -48,7 +48,13 @@ async function handleListJugendliche(req, res) {
 // Gleicht Rollen aus der Mitgliederliste verbindlich mit dem echten App-Account ab —
 // läuft komplett serverseitig gegen den aktuellen Datenbankstand (keine veralteten
 // Client-Daten wie zuvor), damit eine Rollenänderung IMMER beim Account ankommt.
-// Ohne body.mitgliedId wird die komplette Liste abgeglichen (Massen-Check vor dem Launch).
+// Läuft IMMER über die komplette Liste (auch wenn body.mitgliedId gesetzt ist — das Feld wird
+// nur noch aus Kompatibilität akzeptiert, aber ignoriert): Ein Account kann sich mit MEHREREN
+// Mitgliederlisten-Einträgen dieselbe E-Mail teilen (z.B. eine Mutter, die über dieselbe Adresse
+// bei zwei eigenen Kind-Einträgen als zusatzEmail hinterlegt ist, um beide Kinder über einen
+// Login zu sehen) — Rollen und Kinder-Verknüpfungen aus ALLEN betroffenen Einträgen werden pro
+// Account zu einer Vereinigungsmenge zusammengeführt, statt dass der zuletzt verarbeitete
+// Eintrag die Ergebnisse der anderen überschreibt (das war der eigentliche Bug).
 async function handleSyncRoles(req, res) {
   if (!(await requireAdmin(req, res))) return;
   const db = adminDb();
@@ -80,87 +86,85 @@ async function handleSyncRoles(req, res) {
     if (n) childIdByName.set(n, cid);
   });
 
-  const onlyId = req.body?.mitgliedId || null;
-  const writes = [];
-  let fixed = 0;
-  const fixedNames = [];
-
-  for (const [id, m] of Object.entries(liste)) {
-    if (onlyId && id !== onlyId) continue;
-    // Ein Mitglied kann mehrere hinterlegte E-Mails haben (z.B. ein Kind, das noch keine
-    // eigene E-Mail konsequent nutzt, PLUS die E-Mail eines Elternteils) — jede davon kann
-    // sich einloggen und muss auf denselben Mitgliederlisten-Eintrag/dieselben Kinddaten
-    // zugreifen können, daher wird hier über ALLE Adressen synchronisiert, nicht nur eine.
+  // 1) Pro Ziel-Account (uid) aus ALLEN passenden Mitgliederlisten-Einträgen sammeln, statt
+  // pro Eintrag sofort zu schreiben.
+  const aggByUid = new Map(); // uid -> { roles:Set, childIds:Set, linkedPlayerId, names:Set }
+  for (const [, m] of Object.entries(liste)) {
     const emails = getMemberEmails(m);
     if (!emails.length) continue;
     // Wurden alle Rollen entfernt, fällt der Account auf "pending" zurück statt unverändert
     // (mit alten, nicht mehr gültigen Rollen) zu bleiben.
     const mRoles = getMemberRoles(m).length ? getMemberRoles(m) : ['pending'];
 
-    // Zugeordnete Kinder aus der Mitgliederliste (linkedMemberIds, jugendlich-Einträge) auf
-    // echte children-IDs abbilden, damit ein Elternteil auch nach der Erstregistrierung neu
-    // zugeordnete Kinder live angezeigt bekommt — bisher wurde das nur einmalig bei der
-    // Registrierung gesetzt und danach nie wieder abgeglichen.
-    let mappedUnique = null;
-    if (mRoles.includes('eltern') || mRoles.includes('jugendlich')) {
-      const mappedChildIds = [];
-      if (mRoles.includes('eltern')) {
-        const linkedMemberIds = getMemberLinkedIds(m);
-        linkedMemberIds
-          .map(lid => liste[lid])
-          .filter(Boolean)
-          .forEach(lm => { const cid = childIdByName.get(normName(`${lm.vorname} ${lm.nachname}`)); if (cid) mappedChildIds.push(cid); });
-      }
-      if (mRoles.includes('jugendlich')) {
-        // Jugendliche sind mit ihrem EIGENEN Kind-Datensatz zu verknüpfen (nicht mit einem
-        // fremden Kind) — das wurde bisher nur bei "Eltern" gemacht, Jugendliche gingen leer aus
-        // und sahen dadurch nie ihre eigenen Trainings-/Errungenschaftsdaten.
-        const selfCid = childIdByName.get(normName(`${m.vorname} ${m.nachname}`));
-        if (selfCid) mappedChildIds.push(selfCid);
-      }
-      mappedUnique = [...new Set(mappedChildIds)];
+    const mappedChildIds = [];
+    if (mRoles.includes('eltern')) {
+      const linkedMemberIds = getMemberLinkedIds(m);
+      linkedMemberIds
+        .map(lid => liste[lid])
+        .filter(Boolean)
+        .forEach(lm => { const cid = childIdByName.get(normName(`${lm.vorname} ${lm.nachname}`)); if (cid) mappedChildIds.push(cid); });
+    }
+    if (mRoles.includes('jugendlich')) {
+      // Jugendliche sind mit ihrem EIGENEN Kind-Datensatz zu verknüpfen (nicht mit einem
+      // fremden Kind) — das wurde bisher nur bei "Eltern" gemacht, Jugendliche gingen leer aus
+      // und sahen dadurch nie ihre eigenen Trainings-/Errungenschaftsdaten.
+      const selfCid = childIdByName.get(normName(`${m.vorname} ${m.nachname}`));
+      if (selfCid) mappedChildIds.push(selfCid);
     }
 
     // Manuelle TTR-Zuordnung (aktiveSpieler) ebenfalls laufend abgleichen — bisher wurde
     // users.linkedPlayerId nur beim manuellen Speichern von ttrRefId gesetzt, wenn zu dem
     // Zeitpunkt schon ein Account existierte. Registrierte sich die Person erst SPÄTER (oder
     // wurde ttrRefId vor der Registrierung gesetzt), blieb der TTR-Wert im Aktiven-Portal leer.
-    let targetLinkedPlayerId = undefined; // undefined = keine TTR-Rolle/kein Ref -> nicht anfassen
-    if (mRoles.includes('aktiver')) {
-      targetLinkedPlayerId = (m.ttrRefId||'').startsWith('aktiv:') ? m.ttrRefId.slice('aktiv:'.length) : null;
-    }
+    const ttrRef = (mRoles.includes('aktiver') && (m.ttrRefId||'').startsWith('aktiv:')) ? m.ttrRefId.slice('aktiv:'.length) : null;
 
     for (const email of emails) {
       const uid = byEmail.get(email);
       if (!uid) continue;
-
-      const user = allUsers[uid];
-      const curRoles = user.roles?.length ? user.roles : (user.role ? [user.role] : []);
-      const rolesSame = curRoles.length === mRoles.length && mRoles.every(r => curRoles.includes(r));
-
-      let newLinkedChildIds = null;
-      if (mappedUnique !== null) {
-        const curLinkedChildIds = user.linkedChildIds?.length ? user.linkedChildIds : (user.linkedChildId ? [user.linkedChildId] : []);
-        const childrenSame = curLinkedChildIds.length === mappedUnique.length && mappedUnique.every(c => curLinkedChildIds.includes(c));
-        if (!childrenSame) newLinkedChildIds = mappedUnique;
-      }
-
-      const linkedPlayerSame = targetLinkedPlayerId === undefined || targetLinkedPlayerId === (user.linkedPlayerId || null);
-
-      if (rolesSame && newLinkedChildIds === null && linkedPlayerSame) continue;
-
-      const primaryRole = (user.primaryRole && mRoles.includes(user.primaryRole)) ? user.primaryRole : mRoles[0];
-      const updated = { ...user, roles: mRoles, role: primaryRole, primaryRole };
-      if (newLinkedChildIds !== null) {
-        updated.linkedChildIds = newLinkedChildIds;
-        updated.linkedChildId = newLinkedChildIds[0] || null;
-      }
-      if (!linkedPlayerSame) updated.linkedPlayerId = targetLinkedPlayerId;
-      writes.push(db.collection('users').doc(uid).set(updated, { merge: true }));
-      ttcUsers[uid] = updated;
-      fixed++;
-      if (!fixedNames.includes(`${m.vorname} ${m.nachname}`)) fixedNames.push(`${m.vorname} ${m.nachname}`);
+      if (!aggByUid.has(uid)) aggByUid.set(uid, { roles: new Set(), childIds: new Set(), linkedPlayerId: null, names: new Set() });
+      const agg = aggByUid.get(uid);
+      mRoles.forEach(r => agg.roles.add(r));
+      mappedChildIds.forEach(c => agg.childIds.add(c));
+      if (ttrRef) agg.linkedPlayerId = ttrRef;
+      agg.names.add(`${m.vorname} ${m.nachname}`);
     }
+  }
+
+  // 2) Pro Account EINMAL die zusammengeführten Rollen/Kinder schreiben.
+  const writes = [];
+  let fixed = 0;
+  const fixedNames = [];
+  for (const [uid, agg] of aggByUid.entries()) {
+    const user = allUsers[uid];
+    if (!user) continue;
+    const mRoles = agg.roles.size ? [...agg.roles] : ['pending'];
+    const curRoles = user.roles?.length ? user.roles : (user.role ? [user.role] : []);
+    const rolesSame = curRoles.length === mRoles.length && mRoles.every(r => curRoles.includes(r));
+
+    let newLinkedChildIds = null;
+    if (mRoles.includes('eltern') || mRoles.includes('jugendlich')) {
+      const mappedUnique = [...agg.childIds];
+      const curLinkedChildIds = user.linkedChildIds?.length ? user.linkedChildIds : (user.linkedChildId ? [user.linkedChildId] : []);
+      const childrenSame = curLinkedChildIds.length === mappedUnique.length && mappedUnique.every(c => curLinkedChildIds.includes(c));
+      if (!childrenSame) newLinkedChildIds = mappedUnique;
+    }
+
+    const targetLinkedPlayerId = mRoles.includes('aktiver') ? (agg.linkedPlayerId || null) : undefined;
+    const linkedPlayerSame = targetLinkedPlayerId === undefined || targetLinkedPlayerId === (user.linkedPlayerId || null);
+
+    if (rolesSame && newLinkedChildIds === null && linkedPlayerSame) continue;
+
+    const primaryRole = (user.primaryRole && mRoles.includes(user.primaryRole)) ? user.primaryRole : mRoles[0];
+    const updated = { ...user, roles: mRoles, role: primaryRole, primaryRole };
+    if (newLinkedChildIds !== null) {
+      updated.linkedChildIds = newLinkedChildIds;
+      updated.linkedChildId = newLinkedChildIds[0] || null;
+    }
+    if (!linkedPlayerSame) updated.linkedPlayerId = targetLinkedPlayerId;
+    writes.push(db.collection('users').doc(uid).set(updated, { merge: true }));
+    ttcUsers[uid] = updated;
+    fixed++;
+    agg.names.forEach(n => { if (!fixedNames.includes(n)) fixedNames.push(n); });
   }
 
   await Promise.all(writes);
@@ -189,13 +193,13 @@ async function handleMatchEmail(req, res) {
     const linkedIds = [...new Set(matches.flatMap(getMemberLinkedIds))];
     linkedMembers = linkedIds.map(lid => list[lid]).filter(Boolean).map(m => ({ vorname: m.vorname, nachname: m.nachname }));
   }
-  // Jugendliche mit der EIGENEN Mitgliedschaft mitgeben, damit der Client sich selbst mit dem
-  // passenden children-Datensatz verknüpfen kann (Trainings-/Errungenschaftsdaten).
-  let ownName = null;
-  if (roles.includes('jugendlich')) {
-    const selfEntry = matches.find(m => getMemberRoles(m).includes('jugendlich'));
-    if (selfEntry) ownName = { vorname: selfEntry.vorname, nachname: selfEntry.nachname };
-  }
+  // Jugendliche mit der/den EIGENEN Mitgliedschaft(en) mitgeben, damit der Client sich selbst
+  // mit dem/den passenden children-Datensatz/-sätzen verknüpfen kann (Trainings-/Errungenschafts-
+  // daten). Kann MEHRERE Einträge liefern, wenn dieselbe E-Mail bei mehreren eigenen
+  // jugendlich-Einträgen hinterlegt ist (z.B. ein Elternteil, das dieselbe Adresse bei beiden
+  // Kindern als zusatzEmail eingetragen hat, um mit einem Login beide zu sehen).
+  const ownNames = matches.filter(m => getMemberRoles(m).includes('jugendlich')).map(m => ({ vorname: m.vorname, nachname: m.nachname }));
+  const ownName = ownNames[0] || null; // Kompatibilität mit älteren Client-Ständen
   // Manuelle TTR-Zuordnung (aktiveSpieler) mitgeben, falls für diesen Aktiven schon vor der
   // Registrierung ein TTR-Wert manuell zugeordnet wurde — sonst bleibt der TTR-Wert im
   // Aktiven-Portal leer, bis die Zuordnung nach der Registrierung erneut gespeichert wird.
@@ -205,7 +209,7 @@ async function handleMatchEmail(req, res) {
     if (withTtrRef) linkedPlayerId = withTtrRef.ttrRefId.slice('aktiv:'.length);
   }
 
-  res.status(200).json({ roles, linkedMembers, ownName, linkedPlayerId });
+  res.status(200).json({ roles, linkedMembers, ownName, ownNames, linkedPlayerId });
 }
 
 // Spiegelt das eigene users/{uid}-Profil ins gemeinsame ttc/users-Übersichtsdokument.

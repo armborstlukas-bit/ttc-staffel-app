@@ -2472,7 +2472,7 @@ export default function TrainingsApp() {
       // hinterlegt ist und dort bereits eine Rolle zugewiesen wurde ──────────
       // Läuft über eine serverseitige Funktion, da mitgliederListe seit der DSGVO-
       // Absicherung nur noch für Admins direkt lesbar ist (Firestore-Regeln).
-      let autoRoles = [], linkedMembers = [], ownName = null, autoLinkedPlayerId = null;
+      let autoRoles = [], linkedMembers = [], ownNames = [], autoLinkedPlayerId = null;
       try {
         const idToken = await cred.user.getIdToken();
         const r = await fetch('/api/mitglieder?action=match-email', {
@@ -2483,7 +2483,7 @@ export default function TrainingsApp() {
         const d = await r.json();
         autoRoles = d.roles || [];
         linkedMembers = d.linkedMembers || [];
-        ownName = d.ownName || null;
+        ownNames = d.ownNames || (d.ownName ? [d.ownName] : []);
         autoLinkedPlayerId = d.linkedPlayerId || null;
       } catch { /* kein Treffer / Fehler -> bleibt pending, wie bisher ohne Match */ }
 
@@ -2497,12 +2497,16 @@ export default function TrainingsApp() {
           if (foundChild) autoLinkedChildIds.push(foundChild.id);
         });
       }
-      if (autoRoles.includes('jugendlich') && ownName) {
-        // Jugendliche mit dem EIGENEN Kind-Datensatz verknüpfen (nicht nur Eltern) — sonst
-        // sehen sie beim ersten Login keine eigenen Trainings-/Errungenschaftsdaten.
-        const fullName = `${ownName.vorname} ${ownName.nachname}`.trim().toLowerCase();
-        const foundSelf = Object.values(children).find(c => (c.name||'').trim().toLowerCase() === fullName);
-        if (foundSelf) autoLinkedChildIds.push(foundSelf.id);
+      if (autoRoles.includes('jugendlich') && ownNames.length) {
+        // Mit dem/den EIGENEN Kind-Datensatz/-sätzen verknüpfen (nicht nur Eltern) — sonst
+        // sehen sie beim ersten Login keine eigenen Trainings-/Errungenschaftsdaten. Kann mehr
+        // als einen Treffer geben, wenn dieselbe E-Mail bei mehreren eigenen Einträgen hinterlegt
+        // ist (z.B. ein Elternteil mit derselben Adresse bei beiden Kindern).
+        ownNames.forEach(ownName => {
+          const fullName = `${ownName.vorname} ${ownName.nachname}`.trim().toLowerCase();
+          const foundSelf = Object.values(children).find(c => (c.name||'').trim().toLowerCase() === fullName);
+          if (foundSelf) autoLinkedChildIds.push(foundSelf.id);
+        });
       }
       autoLinkedChildIds = [...new Set(autoLinkedChildIds)];
       const rolePriority = ['admin','trainer','aktiver','eltern','jugendlich'];
