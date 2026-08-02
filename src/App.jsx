@@ -198,7 +198,6 @@ const MITGLIED_EXPORT_FIELDS = [
   { group: 'Zahlungsdaten',      key: 'zahlweise',        label: 'Zahlweise' },
   { group: 'Zahlungsdaten',      key: 'beitragsart',      label: 'Beitragsart' },
   { group: 'Zahlungsdaten',      key: 'beitrag',          label: 'Beitrag (€)' },
-  { group: 'Zahlungsdaten',      key: 'kontosaldo',       label: 'Kontosaldo (€)' },
   { group: 'Zahlungsdaten',      key: 'eintrittsdatum',   label: 'Eintrittsdatum' },
   { group: 'Ämter & Ehrentitel', key: 'aemterUndEhrentitel', label: 'Ämter & Ehrentitel' },
 ];
@@ -12389,7 +12388,7 @@ export default function TrainingsApp() {
                     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'6px'}}>
                       {fld('zahlart','Zahlart')}{fld('zahler','Zahler')}{fld('zahlweise','Zahlweise')}
                     </div>
-                    <div style={{display:'grid',gridTemplateColumns:'1.4fr 1fr 1fr',gap:'6px'}}>
+                    <div style={{display:'grid',gridTemplateColumns:'1.4fr 1fr',gap:'6px'}}>
                       <div style={{minWidth:0}}>
                         <span style={lbl}>Beitragsart</span>
                         <select value={f.beitragsart} onChange={e=>{
@@ -12403,7 +12402,7 @@ export default function TrainingsApp() {
                           {BEITRAGSARTEN.map(a=><option key={a.key} value={a.key} style={{background:'#1a1206'}}>{a.label} ({a.amount}€)</option>)}
                         </select>
                       </div>
-                      {fld('beitrag','Beitrag (€)')}{fld('kontosaldo','Kontosaldo (€)')}
+                      {fld('beitrag','Beitrag (€)')}
                     </div>
                     {f.beitragsart==='familienmitglied' && (()=>{
                       const familienZahlerOptions = entries.filter(([oid])=>mitgliederFinanzen[oid]?.beitragsart==='familienbeitrag').sort((a,b)=>`${a[1].nachname}${a[1].vorname}`.localeCompare(`${b[1].nachname}${b[1].vorname}`,'de'));
@@ -12864,7 +12863,7 @@ export default function TrainingsApp() {
                               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'6px'}}>
                                 {fld('zahlart','Zahlart')}{fld('zahler','Zahler')}{fld('zahlweise','Zahlweise')}
                               </div>
-                              <div style={{display:'grid',gridTemplateColumns:'1.4fr 1fr 1fr',gap:'6px'}}>
+                              <div style={{display:'grid',gridTemplateColumns:'1.4fr 1fr',gap:'6px'}}>
                                 <div style={{minWidth:0}}>
                                   <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Beitragsart</span>
                                   <select value={fin.beitragsart||''} onChange={e=>{
@@ -12878,7 +12877,7 @@ export default function TrainingsApp() {
                                     {BEITRAGSARTEN.map(a=><option key={a.key} value={a.key} style={{background:'#1a1206'}}>{a.label} ({a.amount}€)</option>)}
                                   </select>
                                 </div>
-                                {fld('beitrag','Beitrag (€)')}{fld('kontosaldo','Kontosaldo (€)')}
+                                {fld('beitrag','Beitrag (€)')}
                               </div>
                               {fin.beitragsart==='familienmitglied' && (
                                 <div style={{minWidth:0}}>
@@ -13039,7 +13038,7 @@ export default function TrainingsApp() {
                             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'6px'}}>
                               {fld('zahlart','Zahlart')}{fld('zahler','Zahler')}{fld('zahlweise','Zahlweise')}
                             </div>
-                            <div style={{display:'grid',gridTemplateColumns:'1.4fr 1fr 1fr',gap:'6px'}}>
+                            <div style={{display:'grid',gridTemplateColumns:'1.4fr 1fr',gap:'6px'}}>
                               <div style={{minWidth:0}}>
                                 <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Beitragsart</span>
                                 <select value={fin.beitragsart||''} onChange={e=>{
@@ -13053,7 +13052,7 @@ export default function TrainingsApp() {
                                   {BEITRAGSARTEN.map(a=><option key={a.key} value={a.key} style={{background:'#1a1206'}}>{a.label} ({a.amount}€)</option>)}
                                 </select>
                               </div>
-                              {fld('beitrag','Beitrag (€)')}{fld('kontosaldo','Kontosaldo (€)')}
+                              {fld('beitrag','Beitrag (€)')}
                             </div>
                           </div>
                           <div style={{padding:'10px 12px',background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'8px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
