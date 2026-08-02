@@ -7593,12 +7593,26 @@ export default function TrainingsApp() {
       .filter(n => n.type === 'parent_message' && canAccessGroup(n.toGroupId) && !n.trashedAt)
       .sort((a,b) => b.createdAt.localeCompare(a.createdAt));
 
-    // Active auto-notifications (non-trainer-message) by child
+    // Active auto-notifications (non-trainer-message) by child — notDeletedForMe() prüft
+    // die trainerDeletedBy-Map, damit ein Admin/Trainer eine automatische Benachrichtigung
+    // bei sich wegdrücken kann, ohne sie global zu löschen (andere Trainer sehen sie weiter,
+    // und neue automatische Benachrichtigungen erscheinen wie gewohnt).
     const autoNotifsByChild = {};
-    Object.values(notifications).filter(n=>n.type!=='trainer_message'&&n.type!=='parent_message'&&!n.trashedAt).forEach(n=>{
+    Object.values(notifications).filter(n=>n.type!=='trainer_message'&&n.type!=='parent_message'&&!n.trashedAt&&notDeletedForMe(n)).forEach(n=>{
       if (!autoNotifsByChild[n.childId]) autoNotifsByChild[n.childId] = [];
       autoNotifsByChild[n.childId].push(n);
     });
+
+    // Blendet eine einzelne automatische Benachrichtigung NUR für den aktuellen Admin/Trainer
+    // aus (trainerDeletedBy pro uid) — bleibt dabei für andere Trainer und im Kind-Profil selbst
+    // weiter sichtbar/bestehen, taucht aber bei künftigen neuen Auto-Benachrichtigungen erneut auf.
+    const dismissAutoNotifForMe = (id) => {
+      if (!user?.uid) return;
+      const n = notifications[id];
+      if (!n) return;
+      const tdb = typeof n.trainerDeletedBy === 'object' && n.trainerDeletedBy ? { ...n.trainerDeletedBy } : {};
+      saveNotifications({ ...notifications, [id]: { ...n, trainerDeletedBy: { ...tdb, [user.uid]: true } } });
+    };
 
     const typeLabels = {achievement:'🏅',tournament_reminder:'🏆',training_reminder:'📅',unexcused_absences:'❗',trainer_message:'💬',parent_message:'✉️'};
 
@@ -7778,6 +7792,8 @@ export default function TrainingsApp() {
                               <p style={{margin:'0 0 1px',fontWeight:'700',fontSize:'12px',color:'#1f2937'}}>{n.title}</p>
                               <p style={{margin:0,fontSize:'10px',color:'#9ca3af'}}>{dateStr}</p>
                             </div>
+                            <button onClick={()=>dismissAutoNotifForMe(n.id)} title="Bei mir wegdrücken"
+                              style={{padding:'4px',background:'#f3f4f6',border:'none',borderRadius:'6px',cursor:'pointer',color:'#6b7280',flexShrink:0}}><Trash2 size={13}/></button>
                           </div>
                         );
                       })}
