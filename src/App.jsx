@@ -538,6 +538,17 @@ function RanglisteTile({ rangliste, myChildId, children: childMap, subgroups, al
   );
 }
 
+// Ordnet eine Errungenschafts-Benachrichtigung anhand ihres Titels einer groben Art zu —
+// es gibt kein eigenes "Typ"-Feld an den Notifications, der Titeltext ist aber immer fest
+// vorgegeben (siehe createNotification-Aufrufe für 'achievement'), daher reicht ein Mustertest.
+const ACHIEVEMENT_CATEGORIES = [
+  {key:'ttr', label:'🏓 TTR-Meilensteine', test:t=>t.includes('TTR-Meilenstein')},
+  {key:'rangliste', label:'📊 Ranglisten-Ränge', test:t=>t.includes('Ranglisten-Rang')},
+  {key:'turnier', label:'🥇 Turnier-Platzierungen', test:t=>t.includes('Platz Einzel')||t.includes('Platz Doppel')},
+  {key:'mannschaft', label:'🏆 Mannschaftserfolge', test:t=>t.includes('Mannschaftsmeister')},
+];
+const categorizeAchievement = title => (ACHIEVEMENT_CATEGORIES.find(c=>c.test(title||''))||{key:'sonstige',label:'🎖️ Sonstige'});
+
 export default function TrainingsApp() {
   const [user, setUser]               = useState(null);
   const [userRole, setUserRole]       = useState(null);
@@ -621,6 +632,8 @@ export default function TrainingsApp() {
   const [achExpandedChild, setAchExpandedChild] = useState(null);
   const [achStatsOpen, setAchStatsOpen] = useState(false);
   const [achStatsRange, setAchStatsRange] = useState('30'); // '30' | '180' | '365' | 'all'
+  const [achStatsTab, setAchStatsTab] = useState('rangliste'); // 'rangliste' | 'nachart' | 'trend'
+  const [achStatsTrendChild, setAchStatsTrendChild] = useState(''); // '' = alle Kinder zusammen
   const [karriereConfirmChild, setKarriereConfirmChild] = useState(null);
   const [achSearch, setAchSearch] = useState('');
   const [trikotDaten, setTrikotDaten] = useState({});
@@ -7201,50 +7214,121 @@ export default function TrainingsApp() {
               {key:'365', label:'12 Monate'},
               {key:'all', label:'Gesamt'},
             ];
+            const TAB_OPTIONS = [
+              {key:'rangliste', label:'🏆 Rangliste'},
+              {key:'nachart', label:'🗂️ Nach Art'},
+              {key:'trend', label:'📈 Trend'},
+            ];
             const cutoff = achStatsRange==='all' ? null : Date.now() - Number(achStatsRange)*24*60*60*1000;
-            const counts = {};
-            Object.values(notifications).forEach(n=>{
-              if (n.type!=='achievement' || !n.childId) return;
-              if (cutoff!=null && new Date(n.createdAt).getTime() < cutoff) return;
-              counts[n.childId] = (counts[n.childId]||0) + 1;
+            const achNotifs = Object.values(notifications).filter(n=>n.type==='achievement' && n.childId);
+            const inRange = achNotifs.filter(n => cutoff==null || new Date(n.createdAt).getTime() >= cutoff);
+            const barRow = (label, count, max, key) => (
+              <div key={key} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 10px',borderRadius:'10px',background:'rgba(255,255,255,0.04)'}}>
+                <span style={{fontSize:'13px',fontWeight:'700',color:'white',flex:'0 0 150px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{label}</span>
+                <div style={{flex:1,height:'14px',background:'rgba(255,255,255,0.06)',borderRadius:'7px',overflow:'hidden'}}>
+                  <div style={{width:`${Math.max(4,(count/max)*100)}%`,height:'100%',background:'linear-gradient(90deg,#7c3aed,#c4b5fd)'}}/>
+                </div>
+                <span style={{width:'26px',textAlign:'right',fontSize:'12px',fontWeight:'800',color:'#c4b5fd'}}>{count}</span>
+              </div>
+            );
+
+            // ── Tab: Rangliste (wer hat am meisten gesammelt) ──
+            const rangRows = (() => {
+              const counts = {};
+              inRange.forEach(n => { counts[n.childId] = (counts[n.childId]||0) + 1; });
+              return Object.entries(counts)
+                .map(([childId,count])=>({childId, count, child: children[childId]}))
+                .filter(r=>r.child)
+                .sort((a,b)=>b.count-a.count || a.child.name.localeCompare(b.child.name,'de'));
+            })();
+
+            // ── Tab: Nach Art (Aufschlüsselung nach Errungenschaftsart) ──
+            const artRows = (() => {
+              const counts = {};
+              inRange.forEach(n => { const cat = categorizeAchievement(n.title); counts[cat.key] = counts[cat.key] || {label:cat.label, count:0}; counts[cat.key].count++; });
+              return [...ACHIEVEMENT_CATEGORIES, {key:'sonstige',label:'🎖️ Sonstige'}]
+                .map(c => ({key:c.key, label:c.label, count: counts[c.key]?.count || 0}))
+                .filter(r=>r.count>0)
+                .sort((a,b)=>b.count-a.count);
+            })();
+
+            // ── Tab: Trend (Verlauf pro Monat, letzte 12 Monate) ──
+            const trendMonths = Array.from({length:12},(_,i)=>{
+              const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()-(11-i));
+              return d.toISOString().slice(0,7); // YYYY-MM
             });
-            const rows = Object.entries(counts)
-              .map(([childId,count])=>({childId, count, child: children[childId]}))
-              .filter(r=>r.child)
-              .sort((a,b)=>b.count-a.count || a.child.name.localeCompare(b.child.name,'de'));
-            const maxCount = rows.length ? rows[0].count : 1;
+            const trendFiltered = achStatsTrendChild ? achNotifs.filter(n=>n.childId===achStatsTrendChild) : achNotifs;
+            const trendCounts = trendMonths.map(mk => trendFiltered.filter(n=>(n.createdAt||'').slice(0,7)===mk).length);
+            const trendMax = Math.max(1, ...trendCounts);
+            const kidsForTrendFilter = Object.values(children).filter(c=>achNotifs.some(n=>n.childId===c.id)).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+
             return (
               <Modal>
                 <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}} onClick={()=>setAchStatsOpen(false)}>
-                  <div onClick={e=>e.stopPropagation()} style={{background:'#1a0b3a',border:'1px solid rgba(196,181,253,0.3)',borderRadius:'18px',padding:'20px',maxWidth:'520px',width:'100%',maxHeight:'85vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.5)'}}>
+                  <div onClick={e=>e.stopPropagation()} style={{background:'#1a0b3a',border:'1px solid rgba(196,181,253,0.3)',borderRadius:'18px',padding:'20px',maxWidth:'560px',width:'100%',maxHeight:'85vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.5)'}}>
                     <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'14px'}}>
                       <p style={{margin:0,fontWeight:'800',color:'white',fontSize:'16px',flex:1}}>📊 Errungenschaftsstatistiken</p>
                       <button onClick={()=>setAchStatsOpen(false)} style={{background:'none',border:'none',color:'rgba(255,255,255,0.5)',fontSize:'20px',cursor:'pointer',lineHeight:1}}>×</button>
                     </div>
-                    <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'16px'}}>
-                      {RANGE_OPTIONS.map(o=>(
-                        <button key={o.key} onClick={()=>setAchStatsRange(o.key)}
-                          style={{padding:'6px 14px',borderRadius:'20px',border:`1px solid ${achStatsRange===o.key?'#7c3aed':'rgba(255,255,255,0.15)'}`,background:achStatsRange===o.key?'rgba(124,58,237,0.25)':'rgba(255,255,255,0.05)',color:achStatsRange===o.key?'#c4b5fd':'rgba(255,255,255,0.6)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>
+
+                    <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'12px'}}>
+                      {TAB_OPTIONS.map(o=>(
+                        <button key={o.key} onClick={()=>setAchStatsTab(o.key)}
+                          style={{padding:'7px 14px',borderRadius:'10px',border:`1px solid ${achStatsTab===o.key?'#7c3aed':'rgba(255,255,255,0.15)'}`,background:achStatsTab===o.key?'rgba(124,58,237,0.25)':'rgba(255,255,255,0.05)',color:achStatsTab===o.key?'#c4b5fd':'rgba(255,255,255,0.6)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>
                           {o.label}
                         </button>
                       ))}
                     </div>
-                    {rows.length===0
-                      ? <div style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.35)',fontSize:'13px'}}>Keine Errungenschaften in diesem Zeitraum.</div>
-                      : (
-                        <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
-                          {rows.map((r,idx)=>(
-                            <div key={r.childId} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 10px',borderRadius:'10px',background:'rgba(255,255,255,0.04)'}}>
-                              <span style={{width:'22px',textAlign:'center',fontWeight:'800',fontSize:'12px',color:'rgba(255,255,255,0.4)',flexShrink:0}}>{idx+1}</span>
-                              <span style={{fontSize:'13px',fontWeight:'700',color:'white',flex:'0 0 130px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.child.name}</span>
-                              <div style={{flex:1,height:'14px',background:'rgba(255,255,255,0.06)',borderRadius:'7px',overflow:'hidden'}}>
-                                <div style={{width:`${Math.max(4,(r.count/maxCount)*100)}%`,height:'100%',background:'linear-gradient(90deg,#7c3aed,#c4b5fd)'}}/>
-                              </div>
-                              <span style={{width:'26px',textAlign:'right',fontSize:'12px',fontWeight:'800',color:'#c4b5fd'}}>{r.count}</span>
+
+                    {achStatsTab !== 'trend' && (
+                      <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'16px'}}>
+                        {RANGE_OPTIONS.map(o=>(
+                          <button key={o.key} onClick={()=>setAchStatsRange(o.key)}
+                            style={{padding:'6px 14px',borderRadius:'20px',border:`1px solid ${achStatsRange===o.key?'#7c3aed':'rgba(255,255,255,0.15)'}`,background:achStatsRange===o.key?'rgba(124,58,237,0.25)':'rgba(255,255,255,0.05)',color:achStatsRange===o.key?'#c4b5fd':'rgba(255,255,255,0.6)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {achStatsTab==='rangliste' && (
+                      rangRows.length===0
+                        ? <div style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.35)',fontSize:'13px'}}>Keine Errungenschaften in diesem Zeitraum.</div>
+                        : <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+                            {rangRows.map((r,idx)=>barRow(`${idx+1}. ${r.child.name}`, r.count, rangRows[0].count, r.childId))}
+                          </div>
+                    )}
+
+                    {achStatsTab==='nachart' && (
+                      artRows.length===0
+                        ? <div style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.35)',fontSize:'13px'}}>Keine Errungenschaften in diesem Zeitraum.</div>
+                        : <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+                            {artRows.map(r=>barRow(r.label, r.count, artRows[0].count, r.key))}
+                          </div>
+                    )}
+
+                    {achStatsTab==='trend' && (
+                      <div>
+                        <select value={achStatsTrendChild} onChange={e=>setAchStatsTrendChild(e.target.value)}
+                          style={{width:'100%',padding:'8px 10px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.15)',background:'#0a0518',color:'white',fontSize:'13px',marginBottom:'14px',cursor:'pointer'}}>
+                          <option value="" style={{background:'#0a0518'}}>Alle Kinder zusammen</option>
+                          {kidsForTrendFilter.map(c=><option key={c.id} value={c.id} style={{background:'#0a0518'}}>{c.name}</option>)}
+                        </select>
+                        <div style={{display:'flex',alignItems:'flex-end',gap:'4px',height:'140px',padding:'0 2px'}}>
+                          {trendMonths.map((mk,i)=>(
+                            <div key={mk} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',height:'100%',justifyContent:'flex-end'}} title={`${mk}: ${trendCounts[i]}`}>
+                              <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.5)'}}>{trendCounts[i]||''}</span>
+                              <div style={{width:'100%',height:`${Math.max(2,(trendCounts[i]/trendMax)*100)}%`,background:'linear-gradient(180deg,#c4b5fd,#7c3aed)',borderRadius:'4px 4px 0 0'}}/>
                             </div>
                           ))}
                         </div>
-                      )}
+                        <div style={{display:'flex',gap:'4px',padding:'6px 2px 0',marginTop:'4px',borderTop:'1px solid rgba(255,255,255,0.1)'}}>
+                          {trendMonths.map(mk=>(
+                            <span key={mk} style={{flex:1,textAlign:'center',fontSize:'9px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>{mk.slice(5)}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </Modal>
