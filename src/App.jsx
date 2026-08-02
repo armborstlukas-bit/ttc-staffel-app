@@ -332,7 +332,7 @@ function AchievementPopup({ data, onClose }) {
 
 
 // ── Feier-Animation für neu freigeschaltete Errungenschaften (beim App-Start) ──
-function AchievementUnlockCelebration({ queue, onDone }) {
+function AchievementUnlockCelebration({ queue, onDone, eyebrow, ctaLabel }) {
   const [idx, setIdx] = useState(0);
   const confetti = React.useMemo(() => Array.from({ length: 36 }, (_, i) => ({
     left: Math.random() * 100,
@@ -371,14 +371,14 @@ function AchievementUnlockCelebration({ queue, onDone }) {
             </div>
           </div>
           <img src="/logo.png" alt="TTC Logo" style={{width:'34px',height:'34px',objectFit:'contain',opacity:0.9,marginBottom:'10px',filter:'drop-shadow(0 2px 6px rgba(0,0,0,0.5))'}}/>
-          <p style={{margin:'0 0 6px',fontSize:'12px',fontWeight:'900',letterSpacing:'2px',textTransform:'uppercase',color:'#86efac'}}>🎉 Neue Errungenschaft!</p>
+          <p style={{margin:'0 0 6px',fontSize:'12px',fontWeight:'900',letterSpacing:'2px',textTransform:'uppercase',color:'#86efac'}}>{eyebrow || '🎉 Neue Errungenschaft!'}</p>
           <h2 style={{margin:'0 0 10px',fontSize:'25px',fontWeight:'900',color:'white',textShadow:'0 2px 10px rgba(0,0,0,0.5)',lineHeight:1.2}}>{item.title}</h2>
           <p style={{margin:'0 0 22px',fontSize:'14px',color:'rgba(255,255,255,0.75)',lineHeight:'1.5'}}>{item.desc}</p>
           {queue.length > 1 && (
             <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.4)',fontWeight:'700'}}>{idx+1} / {queue.length}</p>
           )}
           <button onClick={next} style={{padding:'13px 34px',background:'linear-gradient(135deg,#4ade80,#16a34a)',color:'white',border:'none',borderRadius:'99px',cursor:'pointer',fontWeight:'800',fontSize:'15px',boxShadow:'0 8px 24px rgba(22,163,74,0.5)'}}>
-            {isLast ? '🎊 Klasse!' : 'Weiter →'}
+            {isLast ? (ctaLabel || '🎊 Klasse!') : 'Weiter →'}
           </button>
         </div>
       </div>
@@ -663,6 +663,7 @@ export default function TrainingsApp() {
   const [editArchivedForm, setEditArchivedForm]             = useState({});
   const [achievementPopup, setAchievementPopup]             = useState(null);
   const [unlockCelebrationQueue, setUnlockCelebrationQueue] = useState([]); // neu freigeschaltete Errungenschaften, warten auf die Feier-Animation
+  const [wunschCelebrationQueue, setWunschCelebrationQueue] = useState([]); // eigene Verbesserungsvorschläge, die gerade als "umgesetzt" markiert wurden
   const [notifications, setNotifications]                   = useState({});
   const [notificationsLoaded, setNotificationsLoaded]       = useState(false);
   const notificationsRef = React.useRef({});  // immer aktueller Wert ohne Dep-Trigger
@@ -1740,10 +1741,20 @@ export default function TrainingsApp() {
     localStorage.setItem('verbesserungenSeenAt_' + user.uid, String(now));
     setVerbesserungenSeenAt(now);
   };
-  const verbesserungenNeedsAttention = userRole==='admin' && Object.values(verbesserungswuensche).some(w => {
+  // Beim Öffnen der Verbesserungsvorschläge: eigene Vorschläge, die gerade als "umgesetzt"
+  // markiert wurden (celebrationPending), für die Feier-Animation einreihen.
+  const openVerbesserungen = () => {
+    markVerbesserungenSeen();
+    const mine = Object.entries(verbesserungswuensche).filter(([,w]) => w.submitterUid===user?.uid && w.celebrationPending);
+    if (mine.length > 0) {
+      setWunschCelebrationQueue(mine.map(([id,w]) => ({ id, icon:'💡', title:'Vorschlag umgesetzt!', desc:`Dein Verbesserungsvorschlag „${w.text}“ wurde umgesetzt — danke für deine Idee! 🎉` })));
+    }
+    navTo('verbesserungswuensche');
+  };
+  const verbesserungenNeedsAttention = (userRole==='admin' && Object.values(verbesserungswuensche).some(w => {
     const t = new Date(w.updatedAt || w.createdAt || 0).getTime();
     return t > (verbesserungenSeenAt || 0);
-  });
+  })) || Object.values(verbesserungswuensche).some(w => w.submitterUid===user?.uid && w.celebrationPending);
 
   const fetchTippspiel = async () => {
     setTippspielLoading(true);
@@ -2076,6 +2087,21 @@ export default function TrainingsApp() {
     if (!text.trim()) return;
     await updateDoc(doc(db,'ttc','verbesserungswuensche'), { [`list.${id}.text`]: text.trim(), [`list.${id}.updatedAt`]: new Date().toISOString() });
     setVerbesserungswuensche(prev => ({ ...prev, [id]: { ...prev[id], text: text.trim(), updatedAt: new Date().toISOString() } }));
+  };
+  // Admin markiert einen Vorschlag als "umgesetzt" oder "geplant" (wird in Zukunft umgesetzt).
+  // Bei "umgesetzt" wird zusätzlich celebrationPending gesetzt, damit der Ersteller beim nächsten
+  // Öffnen von "Verbesserungsvorschläge" eine Feier-Animation bekommt — bewusst NICHT bei
+  // "geplant" und explizit NICHT beim Löschen (z.B. wenn der Vorschlag nichts taugt), da der
+  // Ersteller in diesen Fällen keine Benachrichtigung bekommen soll.
+  const setWunschStatus = async (id, status) => {
+    const patch = { [`list.${id}.status`]: status, [`list.${id}.statusUpdatedAt`]: new Date().toISOString() };
+    if (status === 'umgesetzt') patch[`list.${id}.celebrationPending`] = true;
+    await updateDoc(doc(db,'ttc','verbesserungswuensche'), patch);
+    setVerbesserungswuensche(prev => ({ ...prev, [id]: { ...prev[id], status, statusUpdatedAt: new Date().toISOString(), ...(status==='umgesetzt'?{celebrationPending:true}:{}) } }));
+  };
+  const clearWunschCelebration = async (id) => {
+    await updateDoc(doc(db,'ttc','verbesserungswuensche'), { [`list.${id}.celebrationPending`]: false });
+    setVerbesserungswuensche(prev => ({ ...prev, [id]: { ...prev[id], celebrationPending: false } }));
   };
   const deleteWunsch = async (id) => {
     await updateDoc(doc(db,'ttc','verbesserungswuensche'), { [`list.${id}`]: deleteField() });
@@ -4267,7 +4293,7 @@ export default function TrainingsApp() {
           {label:'Vereinskalender',  icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)', action:()=>{navTo('kalender');fetchKalender();}},
           {label:'Wer fährt wann',   icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
           ...(canAccessPinnwand()?[{label:'Pinnwand',  icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.2)',  action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
-          {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.08)', border:'rgba(196,181,253,0.25)', blink: verbesserungenNeedsAttention, action:()=>{markVerbesserungenSeen();navTo('verbesserungswuensche');}},
+          {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.08)', border:'rgba(196,181,253,0.25)', blink: verbesserungenNeedsAttention, action:openVerbesserungen},
         ],
       },
       {
@@ -4624,7 +4650,7 @@ export default function TrainingsApp() {
                   {label:'Vereinskalender', icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.2)', action:()=>{navTo('kalender');fetchKalender();}},
                   {label:'Wer fährt wann',  icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.2)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
                   ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
-                  {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.07)', border:'rgba(196,181,253,0.2)', blink: verbesserungenNeedsAttention, action:()=>{markVerbesserungenSeen();navTo('verbesserungswuensche');}},
+                  {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.07)', border:'rgba(196,181,253,0.2)', blink: verbesserungenNeedsAttention, action:openVerbesserungen},
                 ],
               },
               {
@@ -5143,7 +5169,7 @@ export default function TrainingsApp() {
                   {label:'Vereinskalender', icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.1)', border:'rgba(251,191,36,0.25)', action:()=>{navTo('kalender');fetchKalender();}},
                   {label:'Wer fährt wann', icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.1)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
                   ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.1)', border:'rgba(253,230,138,0.25)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
-                  {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', blink: verbesserungenNeedsAttention, action:()=>{markVerbesserungenSeen();navTo('verbesserungswuensche');}},
+                  {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', blink: verbesserungenNeedsAttention, action:openVerbesserungen},
                 ],
               },
               {
@@ -11800,12 +11826,25 @@ export default function TrainingsApp() {
                   ) : (
                     <>
                       <p style={{margin:'0 0 8px',fontSize:'14px',lineHeight:1.5,whiteSpace:'pre-wrap'}}>{w.text}</p>
+                      {w.status && (
+                        <span style={{display:'inline-block',margin:'0 0 8px',padding:'3px 10px',borderRadius:'20px',fontSize:'11px',fontWeight:'800',background:w.status==='umgesetzt'?'rgba(74,222,128,0.15)':'rgba(251,191,36,0.15)',color:w.status==='umgesetzt'?'#86efac':'#fbbf24',border:`1px solid ${w.status==='umgesetzt'?'rgba(74,222,128,0.4)':'rgba(251,191,36,0.4)'}`}}>
+                          {w.status==='umgesetzt'?'✅ Umgesetzt':'🔜 Wird umgesetzt'}
+                        </span>
+                      )}
                       <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
                         <span style={{fontSize:'10px',color:'rgba(255,255,255,0.3)'}}>{w.updatedAt?'bearbeitet':'eingereicht'} {new Date(w.updatedAt||w.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}</span>
                         <div style={{flex:1}}/>
                         {isOwn && (
                           <button onClick={()=>{setWunschEditId(id);setWunschEditText(w.text);}}
                             style={{padding:'4px 10px',background:'rgba(196,181,253,0.12)',border:'1px solid rgba(196,181,253,0.35)',borderRadius:'7px',color:accent,cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>✏️ Bearbeiten</button>
+                        )}
+                        {isAdminView && w.status!=='umgesetzt' && (
+                          <button onClick={()=>setWunschStatus(id,'umgesetzt')}
+                            style={{padding:'4px 10px',background:'rgba(74,222,128,0.12)',border:'1px solid rgba(74,222,128,0.35)',borderRadius:'7px',color:'#86efac',cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>✅ Umgesetzt</button>
+                        )}
+                        {isAdminView && w.status!=='geplant' && w.status!=='umgesetzt' && (
+                          <button onClick={()=>setWunschStatus(id,'geplant')}
+                            style={{padding:'4px 10px',background:'rgba(251,191,36,0.12)',border:'1px solid rgba(251,191,36,0.35)',borderRadius:'7px',color:'#fbbf24',cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>🔜 Wird umgesetzt</button>
                         )}
                         {(isOwn || isAdminView) && (
                           <button onClick={()=>{ if(window.confirm('Diesen Vorschlag wirklich löschen?')) deleteWunsch(id); }}
@@ -11820,6 +11859,12 @@ export default function TrainingsApp() {
             {entries.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.3)',fontSize:'13px'}}>Noch keine Vorschläge{isAdminView?'':' von dir'}.</p>}
           </div>
         </div>
+        {wunschCelebrationQueue.length>0 && (
+          <AchievementUnlockCelebration queue={wunschCelebrationQueue} eyebrow="💡 Vorschlag umgesetzt!" ctaLabel="🎉 Super!" onDone={()=>{
+            wunschCelebrationQueue.forEach(item=>clearWunschCelebration(item.id));
+            setWunschCelebrationQueue([]);
+          }}/>
+        )}
       </div>
     );
   }
