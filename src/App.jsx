@@ -233,6 +233,14 @@ const levenshtein = (a, b) => {
 };
 
 const TODAY = new Date().toISOString().split('T')[0];
+const timeGreeting = () => {
+  const h = new Date().getHours();
+  if (h < 6) return 'Gute Nacht';
+  if (h < 12) return 'Guten Morgen';
+  if (h < 18) return 'Guten Tag';
+  if (h < 22) return 'Guten Abend';
+  return 'Gute Nacht';
+};
 const calcAge = (geburtsdatum) => {
   if (!geburtsdatum) return null;
   const bd = new Date(geburtsdatum);
@@ -3603,6 +3611,7 @@ export default function TrainingsApp() {
             <h2 style={{margin:0,color:'white',fontWeight:'800',fontSize:'18px'}}>Hallo, {(userProfile?.name||'').split(' ')[0]||'Mitglied'} 👋</h2>
             <p style={{margin:0,color:'rgba(255,255,255,0.35)',fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>Passives Mitglied</p>
           </div>
+          {(()=>{const sel=(userProfile?.roles||[userRole]).filter(r=>r!=='pending');return sel.length>1?<button onClick={()=>setShowRolePicker(true)} style={{padding:'8px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'10px',color:'#86efac',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'👤':'👤 Rolle'}</button>:null;})()}
           <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{padding:'8px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.6)',fontSize:isMobile?'16px':'12px',fontWeight:'600',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'⚙️':'⚙️ Profil'}</button>
           <button onClick={handleLogout} style={{padding:'8px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',color:'#fca5a5',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'🚪':'Abmelden'}</button>
         </div>
@@ -4424,7 +4433,7 @@ export default function TrainingsApp() {
           {/* ── Greeting ─────────────────────────────────────────── */}
           <div style={{marginBottom:'36px'}}>
             <p style={{margin:'0 0 8px',color:'rgba(74,222,128,0.5)',fontSize:'12px',fontWeight:'700',letterSpacing:'1.5px',textTransform:'uppercase'}}>{dateLabel}</p>
-            <h1 style={{margin:0,color:'white',fontSize:isMobile?'20px':'24px',fontWeight:'800',letterSpacing:'-0.5px',lineHeight:1.1}}>🏓 Auf geht's, <span style={{color:'#4ade80'}}>{(userProfile?.name||'Trainer').split(' ')[0]}</span></h1>
+            <h1 style={{margin:0,color:'white',fontSize:isMobile?'20px':'24px',fontWeight:'800',letterSpacing:'-0.5px',lineHeight:1.1}}>🏓 {timeGreeting()}</h1>
           </div>
 
           {/* ── 1. Training nächste 14 Tage ──────────────────────────── */}
@@ -4640,7 +4649,7 @@ export default function TrainingsApp() {
               <div style={{marginBottom:'28px'}}>
                 <p style={{margin:'0 0 6px',color:accentMid,fontSize:'12px',fontWeight:'700',letterSpacing:'1.5px',textTransform:'uppercase'}}>{dateLabel}</p>
                 <h1 style={{margin:0,color:'white',fontSize:isMobile?'19px':'22px',fontWeight:'800',letterSpacing:'-0.5px',lineHeight:1.1}}>
-                  🏓 Auf geht's, <span style={{color:'#67e8f9'}}>{(userProfile?.name||'').split(' ')[0]||'Spieler'}</span>
+                  🏓 {timeGreeting()}
                 </h1>
                 {lastTtr&&<p style={{margin:'6px 0 0',fontSize:'14px',color:'rgba(255,255,255,0.45)',fontWeight:'500'}}>
                   Dein TTR: <span style={{color:'#38bdf8',fontWeight:'800'}}>{lastTtr.ttr}</span>
@@ -5054,7 +5063,7 @@ export default function TrainingsApp() {
           {/* ── Greeting (kompakt) ── */}
           <div style={{marginBottom:'16px',display:'flex',alignItems:'baseline',gap:'8px',flexWrap:'wrap'}}>
             <h1 style={{margin:0,color:'white',fontSize:'16px',fontWeight:'800',letterSpacing:'-0.4px'}}>
-              🏓 Auf geht's, <span style={{color:'#4ade80'}}>{myChild?myChild.name.split(' ')[0]:(userProfile?.name||'').split(' ')[0]||'Hallo'}</span>
+              🏓 {timeGreeting()}
             </h1>
             <span style={{color:'rgba(74,222,128,0.4)',fontSize:'11px',fontWeight:'600'}}>{dateLabel}</span>
           </div>
