@@ -9,12 +9,25 @@ service cloud.firestore {
 
     // ── Individuelle Nutzerprofile (/users/{uid}) ──────────────────
     // Jeder eingeloggte User darf sein eigenes Profil lesen & anlegen.
-    // Update: eigenes Profil oder Admin (über ttc/users-Dokument geprüft).
+    // Update: Admins dürfen jedes Profil vollständig ändern (Rollenverwaltung).
+    // Der Nutzer selbst darf sein Profil pflegen (Name, Benachrichtigungen etc.),
+    // aber NICHT die privilegierten Felder (roles/role/primaryRole/linkedChildIds/
+    // linkedChildId/linkedPlayerId/groupIds) selbst verändern — sonst könnte sich
+    // jeder eingeloggte Nutzer per direktem Firestore-Schreibzugriff (z.B. Browser-
+    // Konsole) selbst zum Admin machen und hätte damit Zugriff auf mitgliederListe/
+    // mitgliederFinanzen (Bankdaten!), da isAdmin() genau dieses Feld ausliest.
+    function unchangedPrivilegedFields() {
+      let protectedFields = ['roles','role','primaryRole','linkedChildIds','linkedChildId','linkedPlayerId','groupIds'];
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedFields) == false;
+    }
     match /users/{userId} {
       allow read:   if request.auth != null;
       allow create: if request.auth != null && request.auth.uid == userId;
-      allow update: if request.auth != null && request.auth.uid == userId;
-      allow delete: if false;
+      allow update: if request.auth != null && (
+        isAdmin() ||
+        (request.auth.uid == userId && unchangedPrivilegedFields())
+      );
+      allow delete: if isAdmin();
     }
 
     // ── App-Daten unter /ttc/* ─────────────────────────────────────
