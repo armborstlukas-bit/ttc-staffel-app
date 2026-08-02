@@ -2484,7 +2484,7 @@ export default function TrainingsApp() {
       // hinterlegt ist und dort bereits eine Rolle zugewiesen wurde ──────────
       // Läuft über eine serverseitige Funktion, da mitgliederListe seit der DSGVO-
       // Absicherung nur noch für Admins direkt lesbar ist (Firestore-Regeln).
-      let autoRoles = [], linkedMembers = [];
+      let autoRoles = [], linkedMembers = [], ownName = null;
       try {
         const idToken = await cred.user.getIdToken();
         const r = await fetch('/api/mitglieder?action=match-email', {
@@ -2495,6 +2495,7 @@ export default function TrainingsApp() {
         const d = await r.json();
         autoRoles = d.roles || [];
         linkedMembers = d.linkedMembers || [];
+        ownName = d.ownName || null;
       } catch { /* kein Treffer / Fehler -> bleibt pending, wie bisher ohne Match */ }
 
       let autoLinkedChildIds = [];
@@ -2506,8 +2507,15 @@ export default function TrainingsApp() {
           const foundChild = Object.values(children).find(c => (c.name||'').trim().toLowerCase() === fullName);
           if (foundChild) autoLinkedChildIds.push(foundChild.id);
         });
-        autoLinkedChildIds = [...new Set(autoLinkedChildIds)];
       }
+      if (autoRoles.includes('jugendlich') && ownName) {
+        // Jugendliche mit dem EIGENEN Kind-Datensatz verknüpfen (nicht nur Eltern) — sonst
+        // sehen sie beim ersten Login keine eigenen Trainings-/Errungenschaftsdaten.
+        const fullName = `${ownName.vorname} ${ownName.nachname}`.trim().toLowerCase();
+        const foundSelf = Object.values(children).find(c => (c.name||'').trim().toLowerCase() === fullName);
+        if (foundSelf) autoLinkedChildIds.push(foundSelf.id);
+      }
+      autoLinkedChildIds = [...new Set(autoLinkedChildIds)];
       const rolePriority = ['admin','trainer','aktiver','eltern','jugendlich'];
       const autoRole = autoRoles.length>0 ? [...autoRoles].sort((a,b)=>rolePriority.indexOf(a)-rolePriority.indexOf(b))[0] : null;
 

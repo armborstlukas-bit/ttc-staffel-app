@@ -96,16 +96,26 @@ async function handleSyncRoles(req, res) {
     // zugeordnete Kinder live angezeigt bekommt — bisher wurde das nur einmalig bei der
     // Registrierung gesetzt und danach nie wieder abgeglichen.
     let newLinkedChildIds = null;
-    if (mRoles.includes('eltern')) {
-      const linkedMemberIds = getMemberLinkedIds(m);
-      const mappedChildIds = [...new Set(linkedMemberIds
-        .map(lid => liste[lid])
-        .filter(Boolean)
-        .map(lm => childIdByName.get(normName(`${lm.vorname} ${lm.nachname}`)))
-        .filter(Boolean))];
+    if (mRoles.includes('eltern') || mRoles.includes('jugendlich')) {
+      const mappedChildIds = [];
+      if (mRoles.includes('eltern')) {
+        const linkedMemberIds = getMemberLinkedIds(m);
+        linkedMemberIds
+          .map(lid => liste[lid])
+          .filter(Boolean)
+          .forEach(lm => { const cid = childIdByName.get(normName(`${lm.vorname} ${lm.nachname}`)); if (cid) mappedChildIds.push(cid); });
+      }
+      if (mRoles.includes('jugendlich')) {
+        // Jugendliche sind mit ihrem EIGENEN Kind-Datensatz zu verknüpfen (nicht mit einem
+        // fremden Kind) — das wurde bisher nur bei "Eltern" gemacht, Jugendliche gingen leer aus
+        // und sahen dadurch nie ihre eigenen Trainings-/Errungenschaftsdaten.
+        const selfCid = childIdByName.get(normName(`${m.vorname} ${m.nachname}`));
+        if (selfCid) mappedChildIds.push(selfCid);
+      }
+      const mappedUnique = [...new Set(mappedChildIds)];
       const curLinkedChildIds = user.linkedChildIds?.length ? user.linkedChildIds : (user.linkedChildId ? [user.linkedChildId] : []);
-      const childrenSame = curLinkedChildIds.length === mappedChildIds.length && mappedChildIds.every(c => curLinkedChildIds.includes(c));
-      if (!childrenSame) newLinkedChildIds = mappedChildIds;
+      const childrenSame = curLinkedChildIds.length === mappedUnique.length && mappedUnique.every(c => curLinkedChildIds.includes(c));
+      if (!childrenSame) newLinkedChildIds = mappedUnique;
     }
 
     if (rolesSame && newLinkedChildIds === null) continue;
@@ -148,8 +158,15 @@ async function handleMatchEmail(req, res) {
     const linkedIds = [...new Set(matches.flatMap(getMemberLinkedIds))];
     linkedMembers = linkedIds.map(lid => list[lid]).filter(Boolean).map(m => ({ vorname: m.vorname, nachname: m.nachname }));
   }
+  // Jugendliche mit der EIGENEN Mitgliedschaft mitgeben, damit der Client sich selbst mit dem
+  // passenden children-Datensatz verknüpfen kann (Trainings-/Errungenschaftsdaten).
+  let ownName = null;
+  if (roles.includes('jugendlich')) {
+    const selfEntry = matches.find(m => getMemberRoles(m).includes('jugendlich'));
+    if (selfEntry) ownName = { vorname: selfEntry.vorname, nachname: selfEntry.nachname };
+  }
 
-  res.status(200).json({ roles, linkedMembers });
+  res.status(200).json({ roles, linkedMembers, ownName });
 }
 
 export default async function handler(req, res) {
