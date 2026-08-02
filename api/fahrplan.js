@@ -90,6 +90,9 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'POST' && req.query.action === 'set-fahrer') return handleSetFahrer(req, res);
     if (req.method === 'POST' && req.query.action === 'send-intro') return handleSendIntro(req, res);
+    // "fahrer" enthält personenbezogene Daten (E-Mail-Adressen von Fahrern/Betreuern) —
+    // dieser Endpunkt war bisher komplett unauthentifiziert abrufbar, daher jetzt Login-Pflicht.
+    if (!(await verifyRequestUser(req))) { res.status(401).json({ error: 'Nicht angemeldet' }); return; }
     const items = await getFahrplanItems();
     res.status(200).json({ items });
   } catch (e) {

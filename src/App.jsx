@@ -1777,9 +1777,10 @@ export default function TrainingsApp() {
       }).catch(()=>{}).finally(()=>setTtcNewsLoading(false));
   };
 
-  const fetchFahrplan = () => {
+  const fetchFahrplan = async () => {
     setFahrplanLoading(true);
-    fetch('/api/fahrplan?_='+Date.now())
+    const idToken = user ? await user.getIdToken().catch(()=>null) : null;
+    fetch('/api/fahrplan?_='+Date.now(), idToken ? { headers: { Authorization: `Bearer ${idToken}` } } : undefined)
       .then(r=>r.json()).then(d=>{
         setFahrplan(Array.isArray(d.items)?d.items:[]);
       }).catch(()=>{}).finally(()=>setFahrplanLoading(false));
