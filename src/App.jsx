@@ -3637,25 +3637,52 @@ export default function TrainingsApp() {
           </div>
         </div>
         <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'20px 14px 40px':'24px 24px 60px'}}>
-          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'12px'}}>
-            {[
-              {label:'TTC News', icon:'📰', desc:'Aktuelle Vereinsnachrichten', color:'#86efac', bg:'rgba(74,222,128,0.08)', border:'rgba(74,222,128,0.2)', action:()=>{navTo('ttcnews');fetchTtcNews();}},
-              {label:'Vereinskalender', icon:'📅', desc:'Termine & Hallenbelegungen', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.2)', action:()=>{navTo('kalender');fetchKalender();}},
-              {label:'TTC Tippspiel', icon:'🎱', desc:'Endplatzierungen tippen', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>{navTo('tippspiel');fetchTippspiel();}},
-              {label:'Spielplan', icon:'📆', desc:'Alle Vereinsspiele mit Ergebnissen', color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)', action:()=>navTo('spielplan')},
-              ...(canAccessTeams()?[{label:'TTC Mannschaften', icon:'🏆', desc:'Alle Mannschaften & nächste Spiele', color:'#2dd4bf', bg:'rgba(45,212,191,0.08)', border:'rgba(45,212,191,0.2)', action:()=>navTo('ttcMannschaften')}]:[]),
-              ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', desc:'Wetten, Zitate & Lessons Learned', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
-            ].map(t=>(
-              <button key={t.label} onClick={t.action} style={{position:'relative',background:t.bg,border:`1px solid ${t.border}`,borderRadius:'18px',padding:'22px 20px',cursor:'pointer',textAlign:'left',display:'flex',flexDirection:'column',gap:'8px',transition:'transform 0.15s'}}
-                onMouseEnter={e=>e.currentTarget.style.transform='translateY(-2px)'}
-                onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
-                {t.badge>0&&<span style={{position:'absolute',top:'10px',right:'10px',background:'#dc2626',color:'white',borderRadius:'50%',width:'20px',height:'20px',fontSize:'11px',fontWeight:'800',display:'flex',alignItems:'center',justifyContent:'center'}}>{t.badge>9?'9+':t.badge}</span>}
-                <span style={{fontSize:'32px'}}>{t.icon}</span>
-                <p style={{margin:0,fontWeight:'800',fontSize:'17px',color:t.color}}>{t.label}</p>
-                <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)',lineHeight:'1.5'}}>{t.desc}</p>
-              </button>
-            ))}
-          </div>
+          {(()=>{
+            const QL_STYLE_PA = (bg,border) => ({
+              position:'relative',padding:'15px 8px 13px',background:bg,border:'1px solid '+border,
+              borderRadius:'16px',cursor:'pointer',display:'flex',flexDirection:'column',
+              alignItems:'center',gap:'8px',transition:'transform 0.12s',textAlign:'center'
+            });
+            const paCategories = [
+              {
+                label:'Wettkampf & Leistung', color:'rgba(253,230,138,0.45)',
+                links:[
+                  ...(canAccessTeams()?[{label:'TTC Mannschaften', icon:'🏆', color:'#2dd4bf', bg:'rgba(45,212,191,0.08)', border:'rgba(45,212,191,0.2)', action:()=>navTo('ttcMannschaften')}]:[]),
+                  {label:'Spielplan', icon:'📆', color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)', action:()=>navTo('spielplan')},
+                ],
+              },
+              {
+                label:'Verein & Kommunikation', color:'rgba(147,197,253,0.45)',
+                links:[
+                  {label:'TTC News', icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.08)', border:'rgba(74,222,128,0.2)', action:()=>{navTo('ttcnews');fetchTtcNews();}},
+                  {label:'Vereinskalender', icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.2)', action:()=>{navTo('kalender');fetchKalender();}},
+                  ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
+                ],
+              },
+              {
+                label:'Freizeit', color:'rgba(244,114,182,0.45)',
+                links:[
+                  {label:'TTC Tippspiel', icon:'🎱', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>{navTo('tippspiel');fetchTippspiel();}},
+                ],
+              },
+            ];
+            return paCategories.map(cat=>(
+              <div key={cat.label} style={{marginBottom:'24px'}}>
+                <p style={{color:cat.color,fontSize:'10px',fontWeight:'800',textTransform:'uppercase',letterSpacing:'2px',margin:'0 0 10px'}}>⬡ {cat.label}</p>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(110px,1fr))',gap:'8px'}}>
+                  {cat.links.map((ql,i)=>(
+                    <button key={i} onClick={ql.action} style={QL_STYLE_PA(ql.bg,ql.border)}
+                      onMouseEnter={e=>e.currentTarget.style.transform='translateY(-2px)'}
+                      onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
+                      <span style={{fontSize:'24px',lineHeight:1}}>{ql.icon}</span>
+                      <span style={{fontSize:'11px',fontWeight:'700',color:ql.color,lineHeight:'1.3'}}>{ql.label}</span>
+                      {ql.badge>0&&<span style={{position:'absolute',top:'8px',right:'8px',background:'#dc2626',color:'white',borderRadius:'50%',width:'18px',height:'18px',fontSize:'10px',fontWeight:'800',display:'flex',alignItems:'center',justifyContent:'center'}}>{ql.badge>9?'9+':ql.badge}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ));
+          })()}
         </div>
         {/* Profil-Modal */}
         {showProfile&&(
@@ -4329,58 +4356,76 @@ export default function TrainingsApp() {
     });
     const quickCategories = [
       {
-        label: 'Training',
+        label: 'Training & Gruppen',
         color: 'rgba(134,239,172,0.45)',
         links: [
           {label:'Trainingsplan',    icon:'📅', color:'#86efac', bg:'rgba(134,239,172,0.1)',  border:'rgba(134,239,172,0.25)', action:()=>navTo('trainingsplan')},
-          {label:'Übungswettkämpfe',icon:'🎮', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)',  border:'rgba(196,181,253,0.25)', action:()=>navTo('practiceTournaments')},
           {label:'Meine Gruppen',    icon:'👥', color:'#6ee7b7', bg:'rgba(110,231,183,0.1)',  border:'rgba(110,231,183,0.25)', action:()=>navTo('meingruppen')},
-        ],
-      },
-      {
-        label: 'Wettkampf',
-        color: 'rgba(253,230,138,0.45)',
-        links: [
-          {label:'Errungenschaften', icon:'🏅', color:'#d9f99d', bg:'rgba(217,249,157,0.1)',  border:'rgba(217,249,157,0.25)', action:()=>navTo('achievements')},
-          {label:'Rangliste',        icon:'📊', color:'#fcd34d', bg:'rgba(252,211,77,0.1)',   border:'rgba(252,211,77,0.25)',  action:()=>navTo('rangliste')},
-          {label:'TTC Mannschaften', icon:'🏆', color:'#2dd4bf', bg:'rgba(45,212,191,0.1)',   border:'rgba(45,212,191,0.25)',  action:()=>navTo('ttcMannschaften')},
-          {label:'Gegnerlogbuch',    icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.08)',   border:'rgba(8,145,178,0.25)',   action:()=>navTo('gegnerlogbuch')},
-          {label:'TTR Werte',        icon:'📈', color:'#fbbf24', bg:'rgba(251,191,36,0.08)',  border:'rgba(251,191,36,0.25)',  action:()=>navTo('ttrWerte')},
-        ],
-      },
-      {
-        label: 'Sonstiges',
-        color: 'rgba(226,232,240,0.35)',
-        links: [
-          {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
-          {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>navTo('notifications'), badge: unreadCount},
-          {label:'TTC News',         icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',   action:()=>{navTo('ttcnews');fetchTtcNews();}},
-          {label:'Wer fährt wann',   icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
-          {label:'Vereinskalender',  icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)', action:()=>{navTo('kalender');fetchKalender();}},
-          {label: tippspielNeedsAttention&&tippspielConfig?.deadline ? `Tippspiel bis ${new Date(tippspielConfig.deadline+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}` : 'TTC Tippspiel', icon:'🎱', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.25)', blink: tippspielNeedsAttention, action:()=>{markTippspielSeen();navTo('tippspiel');fetchTippspiel();}},
-          {label:'Spielplan',        icon:'📆', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)', action:()=>navTo('spielplan')},
-          {label:'Materialverwaltung',icon:'🏓', color:'#fb923c', bg:'rgba(251,146,60,0.08)', border:'rgba(251,146,60,0.25)',  action:()=>navTo('materialverwaltung')},
-          ...(canAccessPinnwand()?[{label:'Pinnwand',  icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.2)',  action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
+          {label:'Übungswettkämpfe',icon:'🎮', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)',  border:'rgba(196,181,253,0.25)', action:()=>navTo('practiceTournaments')},
           ...(canEdit()?[
             {label:'Trikotgrößen', icon:'👕', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.2)', action:()=>navTo('trikotgroessen')},
           ]:[]),
+          {label:'Materialverwaltung',icon:'🏓', color:'#fb923c', bg:'rgba(251,146,60,0.08)', border:'rgba(251,146,60,0.25)',  action:()=>navTo('materialverwaltung')},
+        ],
+      },
+      {
+        label: 'Wettkampf & Leistung',
+        color: 'rgba(253,230,138,0.45)',
+        links: [
+          {label:'Rangliste',        icon:'📊', color:'#fcd34d', bg:'rgba(252,211,77,0.1)',   border:'rgba(252,211,77,0.25)',  action:()=>navTo('rangliste')},
+          {label:'Errungenschaften', icon:'🏅', color:'#d9f99d', bg:'rgba(217,249,157,0.1)',  border:'rgba(217,249,157,0.25)', action:()=>navTo('achievements')},
+          {label:'TTC Mannschaften', icon:'🏆', color:'#2dd4bf', bg:'rgba(45,212,191,0.1)',   border:'rgba(45,212,191,0.25)',  action:()=>navTo('ttcMannschaften')},
+          {label:'Spielplan',        icon:'📆', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)', action:()=>navTo('spielplan')},
+          {label:'TTR Werte',        icon:'📈', color:'#fbbf24', bg:'rgba(251,191,36,0.08)',  border:'rgba(251,191,36,0.25)',  action:()=>navTo('ttrWerte')},
+          {label:'Gegnerlogbuch',    icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.08)',   border:'rgba(8,145,178,0.25)',   action:()=>navTo('gegnerlogbuch')},
           ...(userRole==='admin'?[
-            {label:'Mitglieder', icon:'🗂️', color:'#c4b5fd', bg:'rgba(196,181,253,0.08)', border:'rgba(196,181,253,0.2)', action:()=>navTo('mitglieder')},
+            {label:'Trainingsmatches',icon:'⚔️', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.25)', action:()=>navTo('trainingsmatches')},
           ]:[]),
+        ],
+      },
+      {
+        label: 'Verein & Kommunikation',
+        color: 'rgba(147,197,253,0.45)',
+        links: [
+          {label:'TTC News',         icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',   action:()=>{navTo('ttcnews');fetchTtcNews();}},
+          {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>navTo('notifications'), badge: unreadCount},
+          {label:'Vereinskalender',  icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)', action:()=>{navTo('kalender');fetchKalender();}},
+          {label:'Wer fährt wann',   icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
+          ...(canAccessPinnwand()?[{label:'Pinnwand',  icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.2)',  action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
+          {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.08)', border:'rgba(196,181,253,0.25)', action:()=>navTo('verbesserungswuensche')},
+        ],
+      },
+      {
+        label: 'Freizeit',
+        color: 'rgba(244,114,182,0.45)',
+        links: [
+          {label: tippspielNeedsAttention&&tippspielConfig?.deadline ? `Tippspiel bis ${new Date(tippspielConfig.deadline+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}` : 'TTC Tippspiel', icon:'🎱', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.25)', blink: tippspielNeedsAttention, action:()=>{markTippspielSeen();navTo('tippspiel');fetchTippspiel();}},
           ...(canAccessRompel()?[
             {label:'Rompel Bereich', icon:{type:'img',src:'/rompel.jpg'}, color:'#fda4af', bg:'rgba(253,164,175,0.08)', border:'rgba(253,164,175,0.25)', action:()=>navTo('rompel')},
           ]:[]),
           ...(canAccessPfand()?[
             {label:'Pfandkasse', icon:'♻️', color:'#86efac', bg:'rgba(134,239,172,0.08)', border:'rgba(134,239,172,0.2)', action:()=>navTo('pfandkasse')},
           ]:[]),
-          ...(userRole==='admin'?[
-            {label:'Trainingsmatches',icon:'⚔️', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.25)', action:()=>navTo('trainingsmatches')},
-            {label:'Datenlöschen',   icon:'🗑️', color:'#fca5a5', bg:'rgba(220,38,38,0.08)', border:'rgba(220,38,38,0.25)', action:()=>navTo('datenloeschen')},
-            {label:'App-Statistik',  icon:'📈', color:'#7dd3fc', bg:'rgba(125,211,252,0.1)', border:'rgba(125,211,252,0.25)', action:()=>navTo('usageStats')},
-          ]:[]),
-          {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.08)', border:'rgba(196,181,253,0.25)', action:()=>navTo('verbesserungswuensche')},
         ],
       },
+      ...(userRole==='admin'?[{
+        label: 'Verwaltung',
+        color: 'rgba(196,181,253,0.45)',
+        links: [
+          {label:'Mitglieder', icon:'🗂️', color:'#c4b5fd', bg:'rgba(196,181,253,0.08)', border:'rgba(196,181,253,0.2)', action:()=>navTo('mitglieder')},
+          {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
+          {label:'Datenlöschen',   icon:'🗑️', color:'#fca5a5', bg:'rgba(220,38,38,0.08)', border:'rgba(220,38,38,0.25)', action:()=>navTo('datenloeschen')},
+          {label:'App-Statistik',  icon:'📈', color:'#7dd3fc', bg:'rgba(125,211,252,0.1)', border:'rgba(125,211,252,0.25)', action:()=>navTo('usageStats')},
+        ],
+      }]:[
+        {
+          label: 'Verwaltung',
+          color: 'rgba(196,181,253,0.45)',
+          links: [
+            {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
+          ],
+        },
+      ]),
     ];
     const groups = FIXED_GROUPS.filter(g=>canAccessGroup(g.id));
 
@@ -4680,33 +4725,57 @@ export default function TrainingsApp() {
             );
           })()}
 
-          {/* ── Hub-Kacheln ── */}
-          <span style={{display:'block',fontSize:'10px',fontWeight:'800',color:accentMid,textTransform:'uppercase',letterSpacing:'2px',marginBottom:'10px'}}>Bereiche</span>
-          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'12px',marginBottom:'0'}}>
-            {[
-              {label:'Gegnerlogbuch', icon:'🎯', desc:`${gegnerLogbuch.length} ${gegnerLogbuch.length===1?'Eintrag':'Einträge'} · Taktiken & Hinweise`, color:'#67e8f9', bg:'rgba(8,145,178,0.08)', border:'rgba(8,145,178,0.2)', action:()=>navTo('gegnerlogbuch')},
-              {label:'TTC News',        icon:'📰', desc:'Aktuelle Vereinsnachrichten',             color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',  action:()=>{navTo('ttcnews');fetchTtcNews();}},
-              {label:'Wer fährt wann',  icon:'🚗', desc:'Spielplan mit Fahrer je Spiel',            color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.2)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
-              {label:'Vereinskalender', icon:'📅', desc:'Termine & Hallenbelegungen',               color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.2)', action:()=>{navTo('kalender');fetchKalender();}},
-              {label:'TTC Tippspiel',  icon:'🎱', desc: tippspielNeedsAttention&&tippspielConfig?.deadline ? `Noch nicht abgegeben — Frist ${new Date(tippspielConfig.deadline+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}` : 'Endplatzierungen tippen', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', blink: tippspielNeedsAttention, action:()=>{markTippspielSeen();navTo('tippspiel');fetchTippspiel();}},
-              {label:'Trainingsmatches',icon:'⚔️', desc:'Duelle & Allzeittabelle',                  color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>navTo('trainingsmatches')},
-              ...(canAccessTeams()?[{label:'TTC Mannschaften', icon:'🏆', desc:'Alle Mannschaften & nächste Spiele', color:'#2dd4bf', bg:'rgba(45,212,191,0.08)', border:'rgba(45,212,191,0.2)', action:()=>navTo('ttcMannschaften')}]:[]),
-              ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', desc:'Wetten, Zitate & Lessons Learned', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
-              {label:'Spielplan', icon:'📆', desc:'Alle Vereinsspiele mit Ergebnissen', color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)', action:()=>navTo('spielplan')},
-              {label:'Verbesserungen', icon:'💡', desc:'Deine Ideen für die App', color:'#c4b5fd', bg:'rgba(196,181,253,0.07)', border:'rgba(196,181,253,0.2)', action:()=>navTo('verbesserungswuensche')},
-            ].map(t=>(
-              <button key={t.label} onClick={t.action} className={t.blink?'ttc-blink':''}
-                style={{position:'relative',background:t.bg,border:`1px solid ${t.border}`,borderRadius:'18px',padding:'22px 20px',cursor:'pointer',textAlign:'left',display:'flex',flexDirection:'column',gap:'8px',transition:'transform 0.15s'}}
-                onMouseEnter={e=>e.currentTarget.style.transform='translateY(-2px)'}
-                onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
-                {t.badge>0&&<span style={{position:'absolute',top:'10px',right:'10px',background:'#dc2626',color:'white',borderRadius:'50%',width:'20px',height:'20px',fontSize:'11px',fontWeight:'800',display:'flex',alignItems:'center',justifyContent:'center'}}>{t.badge>9?'9+':t.badge}</span>}
-                <span style={{fontSize:'32px'}}>{t.icon}</span>
-                <p style={{margin:0,fontWeight:'800',fontSize:'17px',color:t.color}}>{t.label}</p>
-                <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)',lineHeight:'1.5'}}>{t.desc}</p>
-              </button>
-            ))}
-          </div>
-
+          {/* ── Hub-Kacheln (nach Kategorien, kompakt) ── */}
+          {(()=>{
+            const QL_STYLE_AK = (bg,border) => ({
+              position:'relative',padding:'15px 8px 13px',background:bg,border:'1px solid '+border,
+              borderRadius:'16px',cursor:'pointer',display:'flex',flexDirection:'column',
+              alignItems:'center',gap:'8px',transition:'transform 0.12s',textAlign:'center'
+            });
+            const akCategories = [
+              {
+                label:'Wettkampf & Leistung', color:'rgba(253,230,138,0.45)',
+                links:[
+                  {label:'Gegnerlogbuch', icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.08)', border:'rgba(8,145,178,0.2)', action:()=>navTo('gegnerlogbuch')},
+                  {label:'Trainingsmatches',icon:'⚔️', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>navTo('trainingsmatches')},
+                  ...(canAccessTeams()?[{label:'TTC Mannschaften', icon:'🏆', color:'#2dd4bf', bg:'rgba(45,212,191,0.08)', border:'rgba(45,212,191,0.2)', action:()=>navTo('ttcMannschaften')}]:[]),
+                  {label:'Spielplan', icon:'📆', color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)', action:()=>navTo('spielplan')},
+                ],
+              },
+              {
+                label:'Verein & Kommunikation', color:'rgba(147,197,253,0.45)',
+                links:[
+                  {label:'TTC News',        icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',  action:()=>{navTo('ttcnews');fetchTtcNews();}},
+                  {label:'Vereinskalender', icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.2)', action:()=>{navTo('kalender');fetchKalender();}},
+                  {label:'Wer fährt wann',  icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.2)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
+                  ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
+                  {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.07)', border:'rgba(196,181,253,0.2)', action:()=>navTo('verbesserungswuensche')},
+                ],
+              },
+              {
+                label:'Freizeit', color:'rgba(244,114,182,0.45)',
+                links:[
+                  {label:'TTC Tippspiel',  icon:'🎱', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', blink: tippspielNeedsAttention, action:()=>{markTippspielSeen();navTo('tippspiel');fetchTippspiel();}},
+                ],
+              },
+            ];
+            return akCategories.map(cat=>(
+              <div key={cat.label} style={{marginBottom:'24px'}}>
+                <p style={{color:cat.color,fontSize:'10px',fontWeight:'800',textTransform:'uppercase',letterSpacing:'2px',margin:'0 0 10px'}}>⬡ {cat.label}</p>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(110px,1fr))',gap:'8px'}}>
+                  {cat.links.map((ql,i)=>(
+                    <button key={i} onClick={ql.action} className={ql.blink?'ttc-blink':''} style={QL_STYLE_AK(ql.bg,ql.border)}
+                      onMouseEnter={e=>e.currentTarget.style.transform='translateY(-2px)'}
+                      onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
+                      <span style={{fontSize:'24px',lineHeight:1}}>{ql.icon}</span>
+                      <span style={{fontSize:'11px',fontWeight:'700',color:ql.color,lineHeight:'1.3'}}>{ql.label}</span>
+                      {ql.badge>0&&<span style={{position:'absolute',top:'8px',right:'8px',background:'#dc2626',color:'white',borderRadius:'50%',width:'18px',height:'18px',fontSize:'10px',fontWeight:'800',display:'flex',alignItems:'center',justifyContent:'center'}}>{ql.badge>9?'9+':ql.badge}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ));
+          })()}
 
         </div>
       </div>
@@ -5176,31 +5245,36 @@ export default function TrainingsApp() {
             const QL = (bg,border) => ({position:'relative',padding:'15px 8px 13px',background:bg,border:'1px solid '+border,borderRadius:'16px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:'8px',transition:'transform 0.12s',textAlign:'center'});
             const menuCats = [
               {
-                label:'Training', color:'rgba(103,232,249,0.45)',
+                label:'Training & Gruppen', color:'rgba(103,232,249,0.45)',
                 links:[
                   {label:'Trainingsverlauf', icon:'📋', color:'#67e8f9', bg:'rgba(103,232,249,0.1)', border:'rgba(103,232,249,0.25)', action:()=>setElternSubView('trainingsverlauf')},
-                  ...(isJugend ? [{label:'Rangliste', icon:'📊', color:'#fbbf24', bg:'rgba(251,191,36,0.1)', border:'rgba(251,191,36,0.25)', action:()=>setElternSubView('rangliste')}] : []),
-                  {label:'Nachrichten', icon:'🔔', color:'#a78bfa', bg:'rgba(167,139,250,0.1)', border:'rgba(167,139,250,0.25)', action:()=>setElternSubView('benachrichtigungen'), badge: active.length>0?active.length:0},
                 ],
               },
               {
-                label:'Wettkampf', color:'rgba(253,230,138,0.45)',
+                label:'Wettkampf & Leistung', color:'rgba(253,230,138,0.45)',
                 links:[
+                  ...(isJugend ? [{label:'Rangliste', icon:'📊', color:'#fbbf24', bg:'rgba(251,191,36,0.1)', border:'rgba(251,191,36,0.25)', action:()=>setElternSubView('rangliste')}] : []),
+                  ...(isJugend ? [{label:'Errungenschaften', icon:'🏅', color:'#86efac', bg:'rgba(134,239,172,0.1)', border:'rgba(134,239,172,0.25)', action:()=>setElternSubView('errungenschaften')}] : []),
                   {label:'TTC Mannschaften', icon:'🏓', color:'#2dd4bf', bg:'rgba(45,212,191,0.1)',  border:'rgba(45,212,191,0.25)',  action:()=>navTo('ttcMannschaften')},
                   {label:'Spielplan',        icon:'📆', color:'#fcd34d', bg:'rgba(252,211,77,0.1)',   border:'rgba(252,211,77,0.25)',   action:()=>navTo('spielplan')},
-                  ...(isJugend ? [{label:'Errungenschaften', icon:'🏅', color:'#86efac', bg:'rgba(134,239,172,0.1)', border:'rgba(134,239,172,0.25)', action:()=>setElternSubView('errungenschaften')}] : []),
+                  ...(isJugend ? [{label:'Gegnerlogbuch', icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.1)', border:'rgba(8,145,178,0.25)', action:()=>navTo('gegnerlogbuch')}] : []),
                 ],
               },
               {
-                label:'Sonstiges', color:'rgba(226,232,240,0.35)',
+                label:'Verein & Kommunikation', color:'rgba(147,197,253,0.45)',
                 links:[
+                  {label:'Nachrichten', icon:'🔔', color:'#a78bfa', bg:'rgba(167,139,250,0.1)', border:'rgba(167,139,250,0.25)', action:()=>setElternSubView('benachrichtigungen'), badge: active.length>0?active.length:0},
                   {label:'TTC News', icon:'📰', color:'#86efac', bg:'rgba(134,239,172,0.1)', border:'rgba(134,239,172,0.25)', action:()=>{navTo('ttcnews');fetchTtcNews();}},
-                  {label:'Wer fährt wann', icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.1)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
                   {label:'Vereinskalender', icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.1)', border:'rgba(251,191,36,0.25)', action:()=>{navTo('kalender');fetchKalender();}},
-                  {label: tippspielNeedsAttention&&tippspielConfig?.deadline ? `Tipps bis ${new Date(tippspielConfig.deadline+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}!` : 'TTC Tippspiel', icon:'🎱', color:'#f9a8d4', bg:'rgba(244,114,182,0.1)', border:'rgba(244,114,182,0.25)', blink: tippspielNeedsAttention, action:()=>{markTippspielSeen();navTo('tippspiel');fetchTippspiel();}},
-                  ...(isJugend ? [{label:'Gegnerlogbuch', icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.1)', border:'rgba(8,145,178,0.25)', action:()=>navTo('gegnerlogbuch')}] : []),
+                  {label:'Wer fährt wann', icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.1)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
                   ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.1)', border:'rgba(253,230,138,0.25)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
                   {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>navTo('verbesserungswuensche')},
+                ],
+              },
+              {
+                label:'Freizeit', color:'rgba(244,114,182,0.45)',
+                links:[
+                  {label: tippspielNeedsAttention&&tippspielConfig?.deadline ? `Tipps bis ${new Date(tippspielConfig.deadline+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}!` : 'TTC Tippspiel', icon:'🎱', color:'#f9a8d4', bg:'rgba(244,114,182,0.1)', border:'rgba(244,114,182,0.25)', blink: tippspielNeedsAttention, action:()=>{markTippspielSeen();navTo('tippspiel');fetchTippspiel();}},
                 ],
               },
             ];
