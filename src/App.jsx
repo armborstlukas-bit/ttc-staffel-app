@@ -3637,6 +3637,10 @@ export default function TrainingsApp() {
           </div>
         </div>
         <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'20px 14px 40px':'24px 24px 60px'}}>
+          <div style={{marginBottom:'24px'}}>
+            <p style={{margin:'0 0 6px',color:'rgba(74,222,128,0.5)',fontSize:'12px',fontWeight:'700',letterSpacing:'1.5px',textTransform:'uppercase'}}>{new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>
+            <h1 style={{margin:0,color:'white',fontSize:isMobile?'19px':'22px',fontWeight:'800',letterSpacing:'-0.5px',lineHeight:1.1}}>🏓 {timeGreeting()}</h1>
+          </div>
           {(()=>{
             const QL_STYLE_PA = (bg,border) => ({
               position:'relative',padding:'15px 8px 13px',background:bg,border:'1px solid '+border,
