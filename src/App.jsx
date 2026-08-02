@@ -687,6 +687,7 @@ export default function TrainingsApp() {
   const [showGeburtstagExport, setShowGeburtstagExport] = useState(false);
   const [geburtstagJahr, setGeburtstagJahr] = useState(String(new Date().getFullYear()));
   const [showJubilaeumExport, setShowJubilaeumExport] = useState(false);
+  const [showBlockedUsers, setShowBlockedUsers] = useState(false);
   const [jubilaeumJahr, setJubilaeumJahr] = useState(String(new Date().getFullYear()));
   const [mitgliedAustrittEditId, setMitgliedAustrittEditId] = useState(null);
   const [mitgliedAustrittDatum, setMitgliedAustrittDatum] = useState('');
@@ -12216,20 +12217,6 @@ export default function TrainingsApp() {
               {ROLE_OPTIONS.map(o=><option key={o.key} value={o.key} style={{background:'#0a2210'}}>{o.label}</option>)}
             </select>
           </div>
-          {blockedUsers.length > 0 && (
-            <div style={{marginBottom:'16px',padding:'12px 14px',background:'rgba(153,27,27,0.1)',border:'1px solid rgba(153,27,27,0.4)',borderRadius:'12px'}}>
-              <p style={{margin:'0 0 10px',fontSize:'13px',fontWeight:'800',color:'#fca5a5'}}>⛔ {blockedUsers.length} blockierte Person{blockedUsers.length===1?'':'en'}</p>
-              <div style={{display:'grid',gap:'6px'}}>
-                {blockedUsers.map(u => (
-                  <div key={u.uid} style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',padding:'8px 10px',background:'rgba(0,0,0,0.15)',borderRadius:'8px'}}>
-                    <span style={{flex:1,minWidth:'150px',fontSize:'12px'}}><b>{u.name||'(ohne Name)'}</b> · <span style={{color:'rgba(255,255,255,0.5)'}}>{u.email}</span></span>
-                    <button onClick={()=>saveUserRoles(u.uid,['pending'])}
-                      style={{padding:'5px 10px',background:'rgba(74,222,128,0.15)',color:'#86efac',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>Entsperren</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
           <div style={{display:'flex',gap:'8px',marginBottom:'10px',flexWrap:'wrap'}}>
             <button onClick={()=>{ensureXlsxLoaded();setShowMitgliedExport(true);}}
               style={{padding:'8px 14px',background:'rgba(196,181,253,0.12)',border:'1px solid rgba(196,181,253,0.35)',borderRadius:'9px',color:'#c4b5fd',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:'700'}}>📤 Excel Export</button>
@@ -12338,7 +12325,31 @@ export default function TrainingsApp() {
                 exportRowsToXlsx(rows, 'Teileinzug', `Teileinzug_${jahr}.xlsx`, noteText);
               }}
               style={{padding:'8px 14px',background:'rgba(196,181,253,0.1)',border:'1px solid rgba(196,181,253,0.3)',borderRadius:'9px',color:'#c4b5fd',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:'700'}}>➗ Teileinzug</button>
+            <button onClick={()=>setShowBlockedUsers(true)}
+              style={{padding:'8px 14px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.3)',borderRadius:'9px',color:'#fca5a5',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',fontWeight:'700'}}>⛔ Blockierte Personen{blockedUsers.length>0?` (${blockedUsers.length})`:''}</button>
           </div>
+          {showBlockedUsers && (
+            <Modal>
+            <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
+              <div style={{background:'#0a2210',border:'1px solid rgba(220,38,38,0.35)',borderRadius:'16px',padding:'22px',maxWidth:'440px',width:'100%',maxHeight:'85vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.4)'}}>
+                <h3 style={{margin:'0 0 4px',color:'white',fontSize:'17px',fontWeight:'800'}}>⛔ Blockierte Personen</h3>
+                <p style={{margin:'0 0 16px',color:'rgba(255,255,255,0.4)',fontSize:'12px'}}>{blockedUsers.length===0?'Aktuell niemand blockiert.':`${blockedUsers.length} Account${blockedUsers.length===1?'':'s'} ohne Zugriff.`}</p>
+                <div style={{display:'grid',gap:'6px',marginBottom:'16px'}}>
+                  {blockedUsers.map(u => (
+                    <div key={u.uid} style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',padding:'8px 10px',background:'rgba(0,0,0,0.2)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'8px'}}>
+                      <span style={{flex:1,minWidth:'150px',fontSize:'12px'}}><b>{u.name||'(ohne Name)'}</b> · <span style={{color:'rgba(255,255,255,0.5)'}}>{u.email}</span></span>
+                      <button onClick={()=>saveUserRoles(u.uid,['pending'])}
+                        style={{padding:'5px 10px',background:'rgba(74,222,128,0.15)',color:'#86efac',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>Entsperren</button>
+                      <button onClick={()=>{if(!window.confirm(`"${u.name||u.email}" wirklich löschen? Der Account bleibt gesperrt, verschwindet aber aus dieser Liste.`))return;const updated={...allUsers};delete updated[u.uid];setDoc(doc(db,'ttc','users'),updated);setAllUsers(updated);}}
+                        style={{padding:'5px 10px',background:'rgba(220,38,38,0.15)',color:'#fca5a5',border:'1px solid rgba(220,38,38,0.4)',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>🗑️ Löschen</button>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={()=>setShowBlockedUsers(false)} style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.6)',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>Schließen</button>
+              </div>
+            </div>
+            </Modal>
+          )}
           <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
             <input value={mitgliederSearch} onChange={e=>setMitgliederSearch(e.target.value)} placeholder="Suche nach Name oder E-Mail…"
               style={{flex:'1 1 220px',boxSizing:'border-box',padding:'10px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(196,181,253,0.25)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none'}}/>
