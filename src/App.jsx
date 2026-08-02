@@ -3606,14 +3606,19 @@ export default function TrainingsApp() {
   if (userRole === 'passiv' && !['ttcnews','kalender','tippspiel','wettenZitate','ttcMannschaften'].includes(view)) {
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
-        <div className="ttc-sticky-hdr" style={{padding:'16px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
-          <div style={{flex:1,minWidth:0}}>
-            <h2 style={{margin:0,color:'white',fontWeight:'800',fontSize:'18px'}}>Hallo, {(userProfile?.name||'').split(' ')[0]||'Mitglied'} 👋</h2>
-            <p style={{margin:0,color:'rgba(255,255,255,0.35)',fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>Passives Mitglied</p>
+        <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+            <img src="/logo.png" alt="TTC Logo" style={{width:'55px',height:'55px',objectFit:'contain',borderRadius:'12px',flexShrink:0,filter:'drop-shadow(0 3px 12px rgba(0,0,0,0.5))'}}/>
+            <div>
+              <p style={{margin:0,color:'white',fontWeight:'800',fontSize:'16px',letterSpacing:'-0.3px'}}>TTC Grün-Weiß Staffel</p>
+              <p style={{margin:0,color:'rgba(74,222,128,0.55)',fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>Passives Mitglied</p>
+            </div>
           </div>
-          {(()=>{const sel=(userProfile?.roles||[userRole]).filter(r=>r!=='pending');return sel.length>1?<button onClick={()=>setShowRolePicker(true)} style={{padding:'8px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'10px',color:'#86efac',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'👤':'👤 Rolle'}</button>:null;})()}
-          <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{padding:'8px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.6)',fontSize:isMobile?'16px':'12px',fontWeight:'600',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'⚙️':'⚙️ Profil'}</button>
-          <button onClick={handleLogout} style={{padding:'8px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',color:'#fca5a5',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'🚪':'Abmelden'}</button>
+          <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
+            {(()=>{const sel=(userProfile?.roles||[userRole]).filter(r=>r!=='pending');return sel.length>1?<button onClick={()=>setShowRolePicker(true)} style={{padding:'8px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'10px',color:'#86efac',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'👤':'👤 Rolle'}</button>:null;})()}
+            <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{padding:'8px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.6)',fontSize:isMobile?'16px':'12px',fontWeight:'600',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'⚙️':'⚙️ Profil'}</button>
+            <button onClick={handleLogout} style={{padding:'8px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',color:'#fca5a5',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'🚪':'Abmelden'}</button>
+          </div>
         </div>
         <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'20px 14px 40px':'24px 24px 60px'}}>
           <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'12px'}}>
@@ -4257,7 +4262,7 @@ export default function TrainingsApp() {
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <div className="ttc-sticky-hdr" style={{background:'rgba(2,26,10,0.97)',borderBottom:'1px solid rgba(110,231,183,0.15)',padding:'18px 22px 14px',display:'flex',alignItems:'center',gap:'12px'}}>
-          <button onClick={()=>navTo('home')} style={{background:'rgba(110,231,183,0.1)',border:'1px solid rgba(110,231,183,0.25)',borderRadius:'12px',padding:'8px 14px',color:'#6ee7b7',cursor:'pointer',fontSize:'14px',fontWeight:'700',display:'flex',alignItems:'center',gap:'6px'}}><ArrowLeft size={18}/>Zurück</button>
+          <button onClick={()=>navTo('home')} style={{background:'rgba(110,231,183,0.1)',border:'1px solid rgba(110,231,183,0.25)',borderRadius:'12px',padding:'8px 12px',color:'#6ee7b7',cursor:'pointer',display:'flex',alignItems:'center'}}><Home size={18}/></button>
           <div style={{flex:1}}><h2 style={{margin:0,fontSize:'20px',fontWeight:'800',color:'white'}}>👥 Meine Gruppen</h2></div>
         </div>
         <div style={{maxWidth:'820px',margin:'0 auto',padding:'28px 16px'}}>
@@ -4412,23 +4417,23 @@ export default function TrainingsApp() {
           </Modal>
         )}
 
-        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 20px 60px'}}>
-
-          {/* ── Top-Bar ─────────────────────────────────────────── */}
-          <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 24px':'0 -24px 32px'}}>
-            <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
-              <img src="/logo.png" alt="TTC Logo" style={{width:'55px',height:'55px',objectFit:'contain',borderRadius:'12px',flexShrink:0,filter:'drop-shadow(0 3px 12px rgba(0,0,0,0.5))'}}/>
-              <div>
-                <p style={{margin:0,color:'white',fontWeight:'800',fontSize:'16px',letterSpacing:'-0.3px'}}>TTC Grün-Weiß Staffel</p>
-                <p style={{margin:0,color:'rgba(74,222,128,0.55)',fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>{userRole==='admin'?'Administrator':'Trainer'}</p>
-              </div>
-            </div>
-            <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
-              {(()=>{const sel=(userProfile?.roles||[userRole]).filter(r=>r!=='pending');return sel.length>1?<button onClick={()=>setShowRolePicker(true)} style={{padding:'8px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'10px',color:'#86efac',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'👤':'👤 Rolle'}</button>:null;})()}
-              <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{padding:'8px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.6)',fontSize:isMobile?'16px':'12px',fontWeight:'600',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'⚙️':'⚙️ Profil'}</button>
-              <button onClick={handleLogout} style={{padding:'8px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',color:'#fca5a5',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'🚪':'Abmelden'}</button>
+        {/* ── Top-Bar (volle Browserbreite) ──────────────────────── */}
+        <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+            <img src="/logo.png" alt="TTC Logo" style={{width:'55px',height:'55px',objectFit:'contain',borderRadius:'12px',flexShrink:0,filter:'drop-shadow(0 3px 12px rgba(0,0,0,0.5))'}}/>
+            <div>
+              <p style={{margin:0,color:'white',fontWeight:'800',fontSize:'16px',letterSpacing:'-0.3px'}}>TTC Grün-Weiß Staffel</p>
+              <p style={{margin:0,color:'rgba(74,222,128,0.55)',fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>{userRole==='admin'?'Administrator':'Trainer'}</p>
             </div>
           </div>
+          <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
+            {(()=>{const sel=(userProfile?.roles||[userRole]).filter(r=>r!=='pending');return sel.length>1?<button onClick={()=>setShowRolePicker(true)} style={{padding:'8px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'10px',color:'#86efac',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'👤':'👤 Rolle'}</button>:null;})()}
+            <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{padding:'8px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.6)',fontSize:isMobile?'16px':'12px',fontWeight:'600',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'⚙️':'⚙️ Profil'}</button>
+            <button onClick={handleLogout} style={{padding:'8px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',color:'#fca5a5',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'🚪':'Abmelden'}</button>
+          </div>
+        </div>
+
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 20px 60px'}}>
 
           {/* ── Greeting ─────────────────────────────────────────── */}
           <div style={{marginBottom:'36px'}}>
@@ -4621,23 +4626,23 @@ export default function TrainingsApp() {
           </Modal>
         )}
 
-        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 20px 60px'}}>
-
-          {/* Top-Bar */}
-          <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:`1px solid ${accentBorder}`,padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 22px':'0 -24px 28px'}}>
-            <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
-              <img src="/logo.png" alt="TTC Logo" style={{width:'55px',height:'55px',objectFit:'contain',borderRadius:'12px',flexShrink:0,filter:'drop-shadow(0 3px 12px rgba(0,0,0,0.5))'}}/>
-              <div>
-                <p style={{margin:0,color:'white',fontWeight:'800',fontSize:'16px',letterSpacing:'-0.3px'}}>TTC Grün-Weiß Staffel</p>
-                <p style={{margin:0,color:accentMid,fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>Aktiven-Portal</p>
-              </div>
-            </div>
-            <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
-              {(()=>{const sel=(userProfile?.roles||[userRole]).filter(r=>r!=='pending');return sel.length>1?<button onClick={()=>setShowRolePicker(true)} style={{padding:'8px',background:accentBg,border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'#67e8f9',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'👤':'👤 Rolle'}</button>:null;})()}
-              <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{padding:'8px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.6)',fontSize:isMobile?'16px':'12px',fontWeight:'600',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'⚙️':'⚙️ Profil'}</button>
-              <button onClick={handleLogout} style={{padding:'8px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',color:'#fca5a5',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'🚪':'Abmelden'}</button>
+        {/* Top-Bar (volle Browserbreite) */}
+        <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:`1px solid ${accentBorder}`,padding:isMobile?'12px 14px':'18px 24px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+            <img src="/logo.png" alt="TTC Logo" style={{width:'55px',height:'55px',objectFit:'contain',borderRadius:'12px',flexShrink:0,filter:'drop-shadow(0 3px 12px rgba(0,0,0,0.5))'}}/>
+            <div>
+              <p style={{margin:0,color:'white',fontWeight:'800',fontSize:'16px',letterSpacing:'-0.3px'}}>TTC Grün-Weiß Staffel</p>
+              <p style={{margin:0,color:accentMid,fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>Aktiven-Portal</p>
             </div>
           </div>
+          <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
+            {(()=>{const sel=(userProfile?.roles||[userRole]).filter(r=>r!=='pending');return sel.length>1?<button onClick={()=>setShowRolePicker(true)} style={{padding:'8px',background:accentBg,border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'#67e8f9',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'👤':'👤 Rolle'}</button>:null;})()}
+            <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{padding:'8px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.6)',fontSize:isMobile?'16px':'12px',fontWeight:'600',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'⚙️':'⚙️ Profil'}</button>
+            <button onClick={handleLogout} style={{padding:'8px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',color:'#fca5a5',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'🚪':'Abmelden'}</button>
+          </div>
+        </div>
+
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 20px 60px'}}>
 
           {/* Greeting */}
           {(()=>{
@@ -5041,24 +5046,24 @@ export default function TrainingsApp() {
           </Modal>
         )}
 
-        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 20px 60px'}}>
-
-          {/* ── Top-Bar ── */}
-          <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 22px':'0 -24px 28px'}}>
-            <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
-              <img src="/logo.png" alt="TTC Logo" style={{width:'55px',height:'55px',objectFit:'contain',borderRadius:'12px',flexShrink:0,filter:'drop-shadow(0 3px 12px rgba(0,0,0,0.5))'}}/>
-              <div>
-                <p style={{margin:0,color:'white',fontWeight:'800',fontSize:'16px',letterSpacing:'-0.3px'}}>TTC Grün-Weiß Staffel</p>
-                <p style={{margin:0,color:'rgba(74,222,128,0.55)',fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>{userRole==='eltern'?'Eltern-Portal':'Jugend-Portal'}</p>
-              </div>
-            </div>
-            <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
-              {(()=>{const sel=(userProfile?.roles||[userRole]).filter(r=>r!=='pending');return sel.length>1?<button onClick={()=>setShowRolePicker(true)} style={{padding:'8px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'10px',color:'#86efac',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'👤':'👤 Rolle'}</button>:null;})()}
-              {(()=>{const ids=getMyLinkedChildIds();if(ids.length<2)return null;const cur=activeChildId&&ids.includes(activeChildId)?activeChildId:ids[0];const curName=children[cur]?.name?.split(' ')[0]||'Kind';return <button onClick={()=>{const idx=ids.indexOf(cur);setActiveChildId(ids[(idx+1)%ids.length]);}} style={{padding:'8px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'10px',color:'#86efac',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'🔄':`🔄 ${curName}`}</button>;})()}
-              <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{padding:'8px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.6)',fontSize:isMobile?'16px':'12px',fontWeight:'600',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'⚙️':'⚙️ Profil'}</button>
-              <button onClick={handleLogout} style={{padding:'8px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',color:'#fca5a5',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'🚪':'Abmelden'}</button>
+        {/* ── Top-Bar (volle Browserbreite) ── */}
+        <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+            <img src="/logo.png" alt="TTC Logo" style={{width:'55px',height:'55px',objectFit:'contain',borderRadius:'12px',flexShrink:0,filter:'drop-shadow(0 3px 12px rgba(0,0,0,0.5))'}}/>
+            <div>
+              <p style={{margin:0,color:'white',fontWeight:'800',fontSize:'16px',letterSpacing:'-0.3px'}}>TTC Grün-Weiß Staffel</p>
+              <p style={{margin:0,color:'rgba(74,222,128,0.55)',fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>{userRole==='eltern'?'Eltern-Portal':'Jugend-Portal'}</p>
             </div>
           </div>
+          <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
+            {(()=>{const sel=(userProfile?.roles||[userRole]).filter(r=>r!=='pending');return sel.length>1?<button onClick={()=>setShowRolePicker(true)} style={{padding:'8px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'10px',color:'#86efac',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'👤':'👤 Rolle'}</button>:null;})()}
+            {(()=>{const ids=getMyLinkedChildIds();if(ids.length<2)return null;const cur=activeChildId&&ids.includes(activeChildId)?activeChildId:ids[0];const curName=children[cur]?.name?.split(' ')[0]||'Kind';return <button onClick={()=>{const idx=ids.indexOf(cur);setActiveChildId(ids[(idx+1)%ids.length]);}} style={{padding:'8px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'10px',color:'#86efac',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'🔄':`🔄 ${curName}`}</button>;})()}
+            <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{padding:'8px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.6)',fontSize:isMobile?'16px':'12px',fontWeight:'600',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'⚙️':'⚙️ Profil'}</button>
+            <button onClick={handleLogout} style={{padding:'8px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',color:'#fca5a5',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'🚪':'Abmelden'}</button>
+          </div>
+        </div>
+
+        <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 20px 60px'}}>
 
           {/* ── Greeting (kompakt) ── */}
           <div style={{marginBottom:'16px',display:'flex',alignItems:'baseline',gap:'8px',flexWrap:'wrap'}}>
