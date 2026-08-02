@@ -39,6 +39,24 @@ export default async function handler(req, res) {
       }
     });
 
+    if (req.method === 'POST' && req.query.action === 'fix-mismatches') {
+      const fixed = [];
+      for (const mm of mismatches) {
+        const userDoc = await db.collection('users').doc(mm.uid).get();
+        const user = userDoc.exists ? userDoc.data() : {};
+        const primaryRole = (user.primaryRole && mm.mitgliedRoles.includes(user.primaryRole)) ? user.primaryRole : mm.mitgliedRoles[0];
+        const updated = { ...user, roles: mm.mitgliedRoles, role: primaryRole, primaryRole };
+        await db.collection('users').doc(mm.uid).set(updated, { merge: true });
+        const ttcUsersSnap = await db.collection('ttc').doc('users').get();
+        const ttcUsers = ttcUsersSnap.exists ? ttcUsersSnap.data() : {};
+        ttcUsers[mm.uid] = updated;
+        await db.collection('ttc').doc('users').set(ttcUsers);
+        fixed.push({ uid: mm.uid, name: mm.name, newRoles: mm.mitgliedRoles });
+      }
+      res.status(200).json({ fixedCount: fixed.length, fixed });
+      return;
+    }
+
     res.status(200).json({ pendingCount: pendingUsers.length, pendingUsers, mismatchCount: mismatches.length, mismatches });
   } catch (e) {
     res.status(500).json({ error: String(e?.message || e) });
