@@ -760,7 +760,7 @@ export default function TrainingsApp() {
   const [editingChildNameVal, setEditingChildNameVal]       = useState('');
   const [stayLoggedIn, setStayLoggedIn]                     = useState(false);
   const [showLoginPassword, setShowLoginPassword]            = useState(false);
-  const [registerIsParent, setRegisterIsParent]             = useState(false);
+  const [registerPasswordConfirm, setRegisterPasswordConfirm] = useState('');
   // Practice Tournaments
   const [practiceTournaments, setPracticeTournaments]               = useState({});
   const [archivedPracticeTournaments, setArchivedPracticeTournaments] = useState({});
@@ -888,7 +888,6 @@ export default function TrainingsApp() {
   const [authMode, setAuthMode]           = useState('login');
   const [loginEmail, setLoginEmail]       = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  const [loginName, setLoginName]         = useState('');
   const [error, setError]                 = useState('');
   const [showRolePicker, setShowRolePicker] = useState(false);
   const [showResetScreen, setShowResetScreen] = useState(false);
@@ -2533,7 +2532,8 @@ export default function TrainingsApp() {
 
   const handleRegister = async (e) => {
     e.preventDefault(); setError('');
-    if (!loginName.trim()) { setError('Bitte Name eingeben!'); return; }
+    if (loginPassword !== registerPasswordConfirm) { setError('Die Passwörter stimmen nicht überein!'); return; }
+    const displayName = loginEmail.split('@')[0] || 'Neues Mitglied';
     try {
       const cred = await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
 
@@ -2569,10 +2569,9 @@ export default function TrainingsApp() {
       const autoRole = autoRoles.length>0 ? [...autoRoles].sort((a,b)=>rolePriority.indexOf(a)-rolePriority.indexOf(b))[0] : null;
 
       const profile = {
-        uid:cred.user.uid, email:loginEmail, name:loginName,
+        uid:cred.user.uid, email:loginEmail, name:displayName,
         role: autoRole || 'pending', roles: autoRoles.length>0 ? autoRoles : ['pending'],
         linkedChildId: autoLinkedChildIds[0] || null, linkedChildIds: autoLinkedChildIds,
-        isParent: registerIsParent,
       };
       await setDoc(doc(db,'users',cred.user.uid), profile);
       const snap = await getDoc(doc(db,'ttc','users'));
@@ -2585,7 +2584,6 @@ export default function TrainingsApp() {
       try {
         const now = new Date().toISOString();
         const dateStr = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
-        const userType = registerIsParent ? 'Elternteil' : 'Jugendlicher / Trainer';
         const notifId = 'notif_reg_' + cred.user.uid + '_' + Date.now();
         const regSnap = await getDoc(doc(db,'ttc','notifications'));
         const existing = regSnap.exists() ? regSnap.data() : {};
@@ -2597,11 +2595,10 @@ export default function TrainingsApp() {
             childId: null,
             toGroupId: null,
             fromUid: cred.user.uid,
-            fromName: loginName,
+            fromName: displayName,
             fromEmail: loginEmail,
-            userType,
-            title: `🆕 Neuer Nutzer: ${loginName}`,
-            message: `${loginName} (${loginEmail}) hat sich am ${dateStr} Uhr als ${userType} registriert und wartet auf Freischaltung.`,
+            title: `🆕 Neue Anmeldung: ${loginEmail}`,
+            message: `${loginEmail} hat sich am ${dateStr} Uhr registriert und wartet auf Freischaltung.`,
             createdAt: now,
             trashedAt: null,
             trainerTrashedAt: {},
@@ -3472,17 +3469,6 @@ export default function TrainingsApp() {
           {error&&<div style={{marginBottom:'16px',padding:'12px 14px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'12px',fontSize:'13px',color:'#fca5a5',fontWeight:'600',textAlign:'center'}}>{error}</div>}
 
           <form onSubmit={authMode==='login'?handleLogin:handleRegister} style={{display:'flex',flexDirection:'column',gap:'12px'}}>
-            {authMode==='register'&&(
-              <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
-                <input placeholder="Dein Name / Das meines Kindes" value={loginName} onChange={e=>setLoginName(e.target.value)} required
-                  style={{padding:'12px 16px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'12px',color:'white',fontSize:'15px',outline:'none',width:'100%',boxSizing:'border-box'}}/>
-                <label style={{display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',fontSize:'14px',color:'rgba(255,255,255,0.6)',userSelect:'none',padding:'8px 12px',background:'rgba(74,222,128,0.05)',border:'1px solid rgba(74,222,128,0.12)',borderRadius:'10px'}}>
-                  <input type="checkbox" checked={registerIsParent} onChange={e=>setRegisterIsParent(e.target.checked)}
-                    style={{width:'18px',height:'18px',cursor:'pointer',accentColor:'#4ade80',flexShrink:0}}/>
-                  <span style={{flexShrink:0,whiteSpace:'nowrap'}}>Ich bin ein Elternteil</span>
-                </label>
-              </div>
-            )}
             <input type="email" placeholder="E-Mail" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} required
               style={{padding:'12px 16px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'12px',color:'white',fontSize:'15px',outline:'none',width:'100%',boxSizing:'border-box'}}/>
             <div style={{position:'relative'}}>
@@ -3493,6 +3479,10 @@ export default function TrainingsApp() {
                 {showLoginPassword?'🙈':'👁️'}
               </button>
             </div>
+            {authMode==='register'&&(
+              <input type={showLoginPassword?'text':'password'} placeholder="Passwort bestätigen" value={registerPasswordConfirm} onChange={e=>setRegisterPasswordConfirm(e.target.value)} required
+                style={{padding:'12px 16px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'12px',color:'white',fontSize:'15px',outline:'none',width:'100%',boxSizing:'border-box'}}/>
+            )}
             {authMode==='login'&&(
               <label style={{display:'flex',alignItems:'center',gap:'9px',cursor:'pointer',fontSize:'14px',color:'rgba(255,255,255,0.5)',userSelect:'none',paddingLeft:'2px'}}>
                 <input type="checkbox" checked={stayLoggedIn} onChange={e=>setStayLoggedIn(e.target.checked)}
@@ -3508,7 +3498,7 @@ export default function TrainingsApp() {
 
           {authMode==='register'&&(
             <div style={{marginTop:'16px',padding:'12px 14px',background:'rgba(74,222,128,0.06)',border:'1px solid rgba(74,222,128,0.15)',borderRadius:'12px',fontSize:'13px',color:'rgba(74,222,128,0.7)',lineHeight:'1.5'}}>
-              Nach der Registrierung wird dein Account von einem Admin freigeschaltet.
+              🏓 Ist deine E-Mail-Adresse bei uns hinterlegt, geht's direkt los. Ansonsten schaut kurz ein Admin drüber.
             </div>
           )}
           {authMode==='login'&&(
@@ -4260,7 +4250,6 @@ export default function TrainingsApp() {
     const upcomingSess = allSess.filter(s=>s.date>=todayStr&&s.date<=in13Str);
     const unreadCount = getTrainerUnreadCount();
     const hour = new Date().getHours();
-    const greeting = hour<12?'Guten Morgen':hour<18?'Guten Tag':'Guten Abend';
     const dateLabel = new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
     const QL_STYLE = (bg,border) => ({
@@ -4395,7 +4384,7 @@ export default function TrainingsApp() {
           {/* ── Greeting ─────────────────────────────────────────── */}
           <div style={{marginBottom:'36px'}}>
             <p style={{margin:'0 0 8px',color:'rgba(74,222,128,0.5)',fontSize:'12px',fontWeight:'700',letterSpacing:'1.5px',textTransform:'uppercase'}}>{dateLabel}</p>
-            <h1 style={{margin:0,color:'white',fontSize:isMobile?'28px':'36px',fontWeight:'800',letterSpacing:'-1px',lineHeight:1.1}}>{greeting}, <span style={{color:'#4ade80'}}>{(userProfile?.name||'Trainer').split(' ')[0]}</span> 👋</h1>
+            <h1 style={{margin:0,color:'white',fontSize:isMobile?'20px':'24px',fontWeight:'800',letterSpacing:'-0.5px',lineHeight:1.1}}>🏓 Auf geht's, <span style={{color:'#4ade80'}}>{(userProfile?.name||'Trainer').split(' ')[0]}</span></h1>
           </div>
 
           {/* ── 1. Training nächste 14 Tage ──────────────────────────── */}
@@ -4498,7 +4487,6 @@ export default function TrainingsApp() {
   // ── AKTIVER DASHBOARD ────────────────────────────────────────────────────
   if (userRole === 'aktiver' && !['gegnerlogbuch','ttcnews','trainingsmatches','wettenZitate','fahrplan','tippspiel','kalender','verbesserungswuensche','ttcMannschaften'].includes(view)) {
     const dateLabel = new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
-    const greeting = new Date().getHours()<12?'Guten Morgen':new Date().getHours()<18?'Hallo':'Guten Abend';
 
     const submitGegner = () => {
       if (!gegnerForm.verein.trim() || !gegnerForm.date) return;
@@ -4611,8 +4599,8 @@ export default function TrainingsApp() {
             return (
               <div style={{marginBottom:'28px'}}>
                 <p style={{margin:'0 0 6px',color:accentMid,fontSize:'12px',fontWeight:'700',letterSpacing:'1.5px',textTransform:'uppercase'}}>{dateLabel}</p>
-                <h1 style={{margin:0,color:'white',fontSize:isMobile?'26px':'32px',fontWeight:'800',letterSpacing:'-1px',lineHeight:1.1}}>
-                  {greeting}, <span style={{color:'#67e8f9'}}>{(userProfile?.name||'').split(' ')[0]||'Spieler'}</span> 👋
+                <h1 style={{margin:0,color:'white',fontSize:isMobile?'19px':'22px',fontWeight:'800',letterSpacing:'-0.5px',lineHeight:1.1}}>
+                  🏓 Auf geht's, <span style={{color:'#67e8f9'}}>{(userProfile?.name||'').split(' ')[0]||'Spieler'}</span>
                 </h1>
                 {lastTtr&&<p style={{margin:'6px 0 0',fontSize:'14px',color:'rgba(255,255,255,0.45)',fontWeight:'500'}}>
                   Dein TTR: <span style={{color:'#38bdf8',fontWeight:'800'}}>{lastTtr.ttr}</span>
@@ -4669,7 +4657,6 @@ export default function TrainingsApp() {
     });
 
     const hour = new Date().getHours();
-    const greeting = hour<12?'Guten Morgen':hour<18?'Guten Tag':'Guten Abend';
     const dateLabel = new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
     const DARK_CARD = {
@@ -5026,8 +5013,8 @@ export default function TrainingsApp() {
 
           {/* ── Greeting (kompakt) ── */}
           <div style={{marginBottom:'16px',display:'flex',alignItems:'baseline',gap:'8px',flexWrap:'wrap'}}>
-            <h1 style={{margin:0,color:'white',fontSize:'18px',fontWeight:'800',letterSpacing:'-0.4px'}}>
-              {greeting}, <span style={{color:'#4ade80'}}>{myChild?myChild.name.split(' ')[0]:(userProfile?.name||'').split(' ')[0]||'Hallo'}</span> 👋
+            <h1 style={{margin:0,color:'white',fontSize:'16px',fontWeight:'800',letterSpacing:'-0.4px'}}>
+              🏓 Auf geht's, <span style={{color:'#4ade80'}}>{myChild?myChild.name.split(' ')[0]:(userProfile?.name||'').split(' ')[0]||'Hallo'}</span>
             </h1>
             <span style={{color:'rgba(74,222,128,0.4)',fontSize:'11px',fontWeight:'600'}}>{dateLabel}</span>
           </div>
