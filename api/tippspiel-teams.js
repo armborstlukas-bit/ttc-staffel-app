@@ -57,12 +57,19 @@ export default async function handler(req, res) {
           if (ownRow) currentRank = ownRow.table_rank;
         }
       } catch { /* Liga-Tabelle optional, Basisdaten reichen notfalls */ }
+      // Link zur mytischtennis-Mannschaftsseite (Spielplan/Kader) — direkt aus der HTML gezogen,
+      // da sich Liga-Slug/Gruppen-Pfad je Spielklasse unterscheiden und sich nicht selbst bauen lassen.
+      let url = null;
+      const linkRe = new RegExp(`href="(/click-tt/[^"]*/mannschaft/${t.team_id}/[^"]*)"`);
+      const linkMatch = html.match(linkRe);
+      if (linkMatch) url = BASE + linkMatch[1].replace(/&amp;/g, '&');
       return {
         teamId: t.team_id,
         name: t.team_name,
         league: (t.league_name || '').trim(),
         leagueSize,
         currentRank,
+        url,
       };
     }));
 
