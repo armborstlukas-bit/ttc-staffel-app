@@ -121,6 +121,15 @@ async function handleSyncRoles(req, res) {
       mappedUnique = [...new Set(mappedChildIds)];
     }
 
+    // Manuelle TTR-Zuordnung (aktiveSpieler) ebenfalls laufend abgleichen — bisher wurde
+    // users.linkedPlayerId nur beim manuellen Speichern von ttrRefId gesetzt, wenn zu dem
+    // Zeitpunkt schon ein Account existierte. Registrierte sich die Person erst SPÄTER (oder
+    // wurde ttrRefId vor der Registrierung gesetzt), blieb der TTR-Wert im Aktiven-Portal leer.
+    let targetLinkedPlayerId = undefined; // undefined = keine TTR-Rolle/kein Ref -> nicht anfassen
+    if (mRoles.includes('aktiver')) {
+      targetLinkedPlayerId = (m.ttrRefId||'').startsWith('aktiv:') ? m.ttrRefId.slice('aktiv:'.length) : null;
+    }
+
     for (const email of emails) {
       const uid = byEmail.get(email);
       if (!uid) continue;
@@ -136,7 +145,9 @@ async function handleSyncRoles(req, res) {
         if (!childrenSame) newLinkedChildIds = mappedUnique;
       }
 
-      if (rolesSame && newLinkedChildIds === null) continue;
+      const linkedPlayerSame = targetLinkedPlayerId === undefined || targetLinkedPlayerId === (user.linkedPlayerId || null);
+
+      if (rolesSame && newLinkedChildIds === null && linkedPlayerSame) continue;
 
       const primaryRole = (user.primaryRole && mRoles.includes(user.primaryRole)) ? user.primaryRole : mRoles[0];
       const updated = { ...user, roles: mRoles, role: primaryRole, primaryRole };
@@ -144,6 +155,7 @@ async function handleSyncRoles(req, res) {
         updated.linkedChildIds = newLinkedChildIds;
         updated.linkedChildId = newLinkedChildIds[0] || null;
       }
+      if (!linkedPlayerSame) updated.linkedPlayerId = targetLinkedPlayerId;
       writes.push(db.collection('users').doc(uid).set(updated, { merge: true }));
       ttcUsers[uid] = updated;
       fixed++;
@@ -184,8 +196,16 @@ async function handleMatchEmail(req, res) {
     const selfEntry = matches.find(m => getMemberRoles(m).includes('jugendlich'));
     if (selfEntry) ownName = { vorname: selfEntry.vorname, nachname: selfEntry.nachname };
   }
+  // Manuelle TTR-Zuordnung (aktiveSpieler) mitgeben, falls für diesen Aktiven schon vor der
+  // Registrierung ein TTR-Wert manuell zugeordnet wurde — sonst bleibt der TTR-Wert im
+  // Aktiven-Portal leer, bis die Zuordnung nach der Registrierung erneut gespeichert wird.
+  let linkedPlayerId = null;
+  if (roles.includes('aktiver')) {
+    const withTtrRef = matches.find(m => (m.ttrRefId||'').startsWith('aktiv:'));
+    if (withTtrRef) linkedPlayerId = withTtrRef.ttrRefId.slice('aktiv:'.length);
+  }
 
-  res.status(200).json({ roles, linkedMembers, ownName });
+  res.status(200).json({ roles, linkedMembers, ownName, linkedPlayerId });
 }
 
 export default async function handler(req, res) {

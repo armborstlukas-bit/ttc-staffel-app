@@ -1500,16 +1500,6 @@ export default function TrainingsApp() {
       .map(u => u.uid);
   };
 
-  const linkPlayerToUser = async (uid, spielerId) => {
-    const cur = allUsersRef.current;
-    const profile = cur[uid]||{};
-    const updatedProfile = {...profile, linkedPlayerId: spielerId||null};
-    const updated = {...cur, [uid]: updatedProfile};
-    allUsersRef.current = updated;
-    setAllUsers(updated);
-    await setDoc(doc(db,'ttc','users'), updated);
-    await setDoc(doc(db,'users',uid), updatedProfile);
-  };
   const saveRangliste = (entries) => {
     setRangliste(entries);
     setDoc(doc(db,'ttc','rangliste'),{entries});
@@ -2019,15 +2009,11 @@ export default function TrainingsApp() {
     // Falls diese Person bereits einen echten Account hat (E-Mail stimmt überein),
     // die Rollenänderung auch dort sofort live übernehmen — sonst wirkt die
     // Mitgliederverwaltung nur bei künftigen Neu-Registrierungen.
-    if (field === 'roles' || field === 'email' || field === 'zusatzEmails' || field === 'linkedMemberIds') {
+    // Manuelle TTR-Zuordnung (ttrRefId → aktiveSpieler) läuft über denselben Server-Abgleich
+    // wie Rollen/Kinder — deckt so auch Accounts ab, die erst NACH der ttrRefId-Zuordnung
+    // registriert wurden, und alle hinterlegten E-Mails (nicht nur die Haupt-E-Mail).
+    if (field === 'roles' || field === 'email' || field === 'zusatzEmails' || field === 'linkedMemberIds' || field === 'ttrRefId') {
       await syncMitgliedRoles(id);
-    }
-    // Manuelle TTR-Zuordnung (Aktiver → aktiveSpieler) auch am bestehenden Account spiegeln,
-    // damit die schon vorhandene Spieler-Verknüpfung (z.B. fürs Trainingsmatch-System) mitzieht.
-    if (field === 'ttrRefId' && (value||'').startsWith('aktiv:')) {
-      const email = (mitgliederListe[id]?.email || '').trim().toLowerCase();
-      const matchedUser = email ? Object.values(allUsers).find(u => (u.email||'').trim().toLowerCase() === email) : null;
-      if (matchedUser?.uid) linkPlayerToUser(matchedUser.uid, value.slice('aktiv:'.length));
     }
   };
 
@@ -2525,7 +2511,7 @@ export default function TrainingsApp() {
       // hinterlegt ist und dort bereits eine Rolle zugewiesen wurde ──────────
       // Läuft über eine serverseitige Funktion, da mitgliederListe seit der DSGVO-
       // Absicherung nur noch für Admins direkt lesbar ist (Firestore-Regeln).
-      let autoRoles = [], linkedMembers = [], ownName = null;
+      let autoRoles = [], linkedMembers = [], ownName = null, autoLinkedPlayerId = null;
       try {
         const idToken = await cred.user.getIdToken();
         const r = await fetch('/api/mitglieder?action=match-email', {
@@ -2537,6 +2523,7 @@ export default function TrainingsApp() {
         autoRoles = d.roles || [];
         linkedMembers = d.linkedMembers || [];
         ownName = d.ownName || null;
+        autoLinkedPlayerId = d.linkedPlayerId || null;
       } catch { /* kein Treffer / Fehler -> bleibt pending, wie bisher ohne Match */ }
 
       let autoLinkedChildIds = [];
@@ -2564,6 +2551,7 @@ export default function TrainingsApp() {
         uid:cred.user.uid, email:loginEmail, name:displayName,
         role: autoRole || 'pending', roles: autoRoles.length>0 ? autoRoles : ['pending'],
         linkedChildId: autoLinkedChildIds[0] || null, linkedChildIds: autoLinkedChildIds,
+        linkedPlayerId: autoLinkedPlayerId,
         // Bei nicht sofort erkannten E-Mail-Adressen (z.B. "m.mueller83@...") laesst sich aus der
         // Adresse kein brauchbarer Name ableiten — die Person wird beim Warten auf Freischaltung
         // noch explizit nach ihrem Namen gefragt (siehe Pending-Screen), damit der Admin einen
