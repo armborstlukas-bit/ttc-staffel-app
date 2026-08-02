@@ -699,6 +699,8 @@ export default function TrainingsApp() {
   const [jubilaeumJahr, setJubilaeumJahr] = useState(String(new Date().getFullYear()));
   const [mitgliedAustrittEditId, setMitgliedAustrittEditId] = useState(null);
   const [mitgliedAustrittDatum, setMitgliedAustrittDatum] = useState('');
+  const [wiedereintrittEditId, setWiedereintrittEditId] = useState(null);
+  const [wiedereintrittDatum, setWiedereintrittDatum] = useState('');
   const [ttrProTagGroupFilter, setTtrProTagGroupFilter] = useState(''); // '' = alle, sonst subgroupId
   const [ttrProTagYear, setTtrProTagYear] = useState(new Date().getFullYear());
   const [ttrProTagMonth, setTtrProTagMonth] = useState(new Date().getMonth()+1);
@@ -834,6 +836,7 @@ export default function TrainingsApp() {
   const [gegnerForm, setGegnerForm] = useState({date:'', verein:'', gegner:'', taktik:'', spielweise:''});
   const [gegnerTaktikDraft, setGegnerTaktikDraft] = useState({});
   const [gegnerSpielweiseDraft, setGegnerSpielweiseDraft] = useState({});
+  const [gegnerAppendDraft, setGegnerAppendDraft] = useState({});
   const [gegnerAdding, setGegnerAdding] = useState(false);
   const [gegnerEditId, setGegnerEditId] = useState(null);
   const [gegnerWeitereId, setGegnerWeitereId] = useState(null);
@@ -2070,6 +2073,25 @@ export default function TrainingsApp() {
   const saveFinanzField = async (id, field, value) => {
     setMitgliederFinanzen(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
     await updateDoc(doc(db,'ttc','mitgliederFinanzen'), { [`list.${id}.${field}`]: value });
+  };
+
+  // Wiedereintritt: die vorherige Mitgliedschaftsperiode (Eintritt/Austritt) wird in die
+  // Historie verschoben, statt einfach überschrieben zu werden — sonst sähe es so aus, als
+  // wäre die Person vorher nie Mitglied gewesen. Anschließend wird ein neues Eintrittsdatum
+  // gesetzt und der Austritt gelöscht, wodurch die Person automatisch wieder als aktiv gilt.
+  const reactivateMitglied = async (id, newEintritt) => {
+    const fin = mitgliederFinanzen[id] || {};
+    const historie = [...(fin.mitgliedschaftsHistorie || [])];
+    if (fin.eintrittsdatum || fin.austrittsdatum) {
+      historie.push({ eintritt: fin.eintrittsdatum || null, austritt: fin.austrittsdatum || null });
+    }
+    const updatedFin = { ...fin, eintrittsdatum: newEintritt, austrittsdatum: null, mitgliedschaftsHistorie: historie };
+    setMitgliederFinanzen(prev => ({ ...prev, [id]: updatedFin }));
+    await updateDoc(doc(db,'ttc','mitgliederFinanzen'), {
+      [`list.${id}.eintrittsdatum`]: newEintritt,
+      [`list.${id}.austrittsdatum`]: null,
+      [`list.${id}.mitgliedschaftsHistorie`]: historie,
+    });
   };
 
   // Sobald ein Kind mit Beitragsart "Kind unter 10" seinen 10. Geburtstag erreicht, automatisch
@@ -11344,10 +11366,13 @@ export default function TrainingsApp() {
         taktik: gegnerForm.taktik.trim(),
         spielweise: gegnerForm.spielweise.trim(),
         createdBy: userProfile?.name || user?.email || 'Admin',
+        createdByUid: user?.uid || null,
         createdAt: new Date().toISOString(),
       };
       if (gegnerEditId) {
-        saveGegnerLogbuch(gegnerLogbuch.map(e=>e.id===gegnerEditId?{...e,...entry,id:gegnerEditId}:e));
+        // Beim Bearbeiten darf createdBy/createdByUid des ursprünglichen Erstellers nicht
+        // überschrieben werden — sonst würde ein Eintrag durch Bearbeiten "gekapert".
+        saveGegnerLogbuch(gegnerLogbuch.map(e=>e.id===gegnerEditId?{...e,...entry,id:gegnerEditId,createdBy:e.createdBy,createdByUid:e.createdByUid}:e));
         setGegnerEditId(null);
       } else {
         saveGegnerLogbuch([entry, ...gegnerLogbuch]);
@@ -11356,10 +11381,34 @@ export default function TrainingsApp() {
       setGegnerAdding(false);
     };
 
-    const deleteGegnerAdmin = id => { if(!window.confirm('Eintrag löschen?'))return; saveGegnerLogbuch(gegnerLogbuch.filter(e=>e.id!==id)); };
+    // Nur der Ersteller (oder ein Admin) darf einen Eintrag komplett bearbeiten/löschen —
+    // alte Einträge ohne createdByUid (vor Einführung dieser Prüfung) gelten als "frei",
+    // damit historische Daten nicht plötzlich für alle gesperrt werden.
+    const canFullyEdit = e => userRole==='admin' || !e.createdByUid || e.createdByUid===user?.uid;
+
+    const deleteGegnerAdmin = id => {
+      const e = gegnerLogbuch.find(x=>x.id===id);
+      if (e && !canFullyEdit(e)) return;
+      if(!window.confirm('Eintrag löschen?'))return;
+      saveGegnerLogbuch(gegnerLogbuch.filter(e=>e.id!==id));
+    };
 
     const updateGegnerField = (id, field, value) => {
+      const e = gegnerLogbuch.find(x=>x.id===id);
+      if (e && !canFullyEdit(e)) return;
       saveGegnerLogbuch(gegnerLogbuch.map(x=>x.id===id?{...x,[field]:value}:x));
+    };
+
+    // Nicht-Ersteller dürfen ein Feld nur ERGÄNZEN (anhängen), nie den bestehenden Text
+    // eines anderen überschreiben oder entfernen — daher ein reiner Append, kein Direkt-Edit.
+    const appendGegnerField = (id, field, addition) => {
+      if (!addition.trim()) return;
+      const e = gegnerLogbuch.find(x=>x.id===id);
+      if (!e) return;
+      const authorLabel = userProfile?.name || user?.email || 'Unbekannt';
+      const existing = e[field] || '';
+      const merged = existing ? `${existing}\n— ${authorLabel}: ${addition.trim()}` : `— ${authorLabel}: ${addition.trim()}`;
+      saveGegnerLogbuch(gegnerLogbuch.map(x=>x.id===id?{...x,[field]:merged}:x));
     };
 
     // Automatische wöchentliche Sicherung: ab Montag 8 Uhr wird für die laufende ISO-Woche
@@ -11504,35 +11553,57 @@ export default function TrainingsApp() {
                         <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>
                           {[e.verein,dateStrGA].filter(Boolean).join(' · ')}
                         </p>
+                        {(()=>{ const mayEdit = canFullyEdit(e); return (
                         <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'10px',marginBottom:'10px'}}>
                           <div>
                             <label style={{display:'block',fontSize:'10px',fontWeight:'800',color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:'5px'}}>Taktikhinweise</label>
                             <textarea
                               value={gegnerTaktikDraft[e.id] !== undefined ? gegnerTaktikDraft[e.id] : (e.taktik||'')}
-                              onChange={ev=>setGegnerTaktikDraft(d=>({...d,[e.id]:ev.target.value}))}
-                              onBlur={ev=>{ updateGegnerField(e.id,'taktik',ev.target.value); setGegnerTaktikDraft(d=>{const n={...d}; delete n[e.id]; return n;}); }}
+                              onChange={ev=>mayEdit && setGegnerTaktikDraft(d=>({...d,[e.id]:ev.target.value}))}
+                              onBlur={ev=>{ if(!mayEdit) return; updateGegnerField(e.id,'taktik',ev.target.value); setGegnerTaktikDraft(d=>{const n={...d}; delete n[e.id]; return n;}); }}
+                              readOnly={!mayEdit}
                               placeholder="So spiele ich gegen ihn/sie..."
-                              rows={4} style={{width:'100%',boxSizing:'border-box',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'8px',padding:'8px 10px',color:'white',fontSize:'13px',lineHeight:'1.6',resize:'vertical',outline:'none',fontFamily:'inherit'}}/>
+                              rows={4} style={{width:'100%',boxSizing:'border-box',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'8px',padding:'8px 10px',color:'white',fontSize:'13px',lineHeight:'1.6',resize:'vertical',outline:'none',fontFamily:'inherit',cursor:mayEdit?'text':'default'}}/>
+                            {!mayEdit && (
+                              <div style={{marginTop:'6px',display:'flex',gap:'6px'}}>
+                                <input type="text" placeholder="Ergänzung hinzufügen..." value={gegnerAppendDraft[e.id+'_taktik']||''}
+                                  onChange={ev=>setGegnerAppendDraft(d=>({...d,[e.id+'_taktik']:ev.target.value}))}
+                                  style={{flex:1,boxSizing:'border-box',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'8px',padding:'6px 8px',color:'white',fontSize:'12px',outline:'none'}}/>
+                                <button onClick={()=>{ appendGegnerField(e.id,'taktik',gegnerAppendDraft[e.id+'_taktik']||''); setGegnerAppendDraft(d=>({...d,[e.id+'_taktik']:''})); }}
+                                  style={{padding:'6px 10px',background:accentBg,border:`1px solid ${accentBorder}`,borderRadius:'8px',color:'#67e8f9',cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>+ Ergänzen</button>
+                              </div>
+                            )}
                           </div>
                           <div>
                             <label style={{display:'block',fontSize:'10px',fontWeight:'800',color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:'5px'}}>Spielweise</label>
                             <textarea
                               value={gegnerSpielweiseDraft[e.id] !== undefined ? gegnerSpielweiseDraft[e.id] : (e.spielweise||'')}
-                              onChange={ev=>setGegnerSpielweiseDraft(d=>({...d,[e.id]:ev.target.value}))}
-                              onBlur={ev=>{ updateGegnerField(e.id,'spielweise',ev.target.value); setGegnerSpielweiseDraft(d=>{const n={...d}; delete n[e.id]; return n;}); }}
+                              onChange={ev=>mayEdit && setGegnerSpielweiseDraft(d=>({...d,[e.id]:ev.target.value}))}
+                              onBlur={ev=>{ if(!mayEdit) return; updateGegnerField(e.id,'spielweise',ev.target.value); setGegnerSpielweiseDraft(d=>{const n={...d}; delete n[e.id]; return n;}); }}
+                              readOnly={!mayEdit}
                               placeholder="So spielt er/sie..."
-                              rows={4} style={{width:'100%',boxSizing:'border-box',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'8px',padding:'8px 10px',color:'white',fontSize:'13px',lineHeight:'1.6',resize:'vertical',outline:'none',fontFamily:'inherit'}}/>
+                              rows={4} style={{width:'100%',boxSizing:'border-box',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'8px',padding:'8px 10px',color:'white',fontSize:'13px',lineHeight:'1.6',resize:'vertical',outline:'none',fontFamily:'inherit',cursor:mayEdit?'text':'default'}}/>
+                            {!mayEdit && (
+                              <div style={{marginTop:'6px',display:'flex',gap:'6px'}}>
+                                <input type="text" placeholder="Ergänzung hinzufügen..." value={gegnerAppendDraft[e.id+'_spielweise']||''}
+                                  onChange={ev=>setGegnerAppendDraft(d=>({...d,[e.id+'_spielweise']:ev.target.value}))}
+                                  style={{flex:1,boxSizing:'border-box',background:'rgba(255,255,255,0.05)',border:`1px solid ${accentBorder}`,borderRadius:'8px',padding:'6px 8px',color:'white',fontSize:'12px',outline:'none'}}/>
+                                <button onClick={()=>{ appendGegnerField(e.id,'spielweise',gegnerAppendDraft[e.id+'_spielweise']||''); setGegnerAppendDraft(d=>({...d,[e.id+'_spielweise']:''})); }}
+                                  style={{padding:'6px 10px',background:accentBg,border:`1px solid ${accentBorder}`,borderRadius:'8px',color:'#67e8f9',cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>+ Ergänzen</button>
+                              </div>
+                            )}
                           </div>
                         </div>
+                        ); })()}
                         <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                          <button onClick={()=>{setGegnerEditId(e.id);setGegnerForm({date:e.date,verein:e.verein,gegner:e.gegner||'',taktik:e.taktik||'',spielweise:e.spielweise||''});setGegnerAdding(true);setGegnerExpandedId(null);}}
+                          {canFullyEdit(e) && <button onClick={()=>{setGegnerEditId(e.id);setGegnerForm({date:e.date,verein:e.verein,gegner:e.gegner||'',taktik:e.taktik||'',spielweise:e.spielweise||''});setGegnerAdding(true);setGegnerExpandedId(null);}}
                             style={{display:'flex',alignItems:'center',gap:'5px',padding:'6px 12px',borderRadius:'8px',background:accentBg,border:`1px solid ${accentBorder}`,color:'#67e8f9',cursor:'pointer',fontSize:'12px',fontWeight:'600'}}>
                             <Pencil size={11}/> Verein/Gegner/Datum bearbeiten
-                          </button>
-                          <button onClick={()=>deleteGegnerAdmin(e.id)}
+                          </button>}
+                          {canFullyEdit(e) && <button onClick={()=>deleteGegnerAdmin(e.id)}
                             style={{display:'flex',alignItems:'center',gap:'5px',padding:'6px 12px',borderRadius:'8px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',fontSize:'12px',fontWeight:'600'}}>
                             <Trash2 size={11}/> Löschen
-                          </button>
+                          </button>}
                         </div>
                       </div>
                     )}
@@ -12657,10 +12728,22 @@ export default function TrainingsApp() {
                               <input value={fin.eintrittsdatum??''} onChange={e=>saveFinanzField(id,'eintrittsdatum',e.target.value)}
                                 style={{flex:1,minWidth:'140px',padding:'7px 10px',background:'#1a1206',border:'1px solid rgba(251,191,36,0.4)',borderRadius:'7px',color:'white',fontSize:'13px',fontWeight:'700',outline:'none'}}/>
                               {fin.austrittsdatum ? (
-                                <button onClick={()=>saveFinanzField(id,'austrittsdatum',null)}
-                                  style={{padding:'7px 12px',background:'rgba(220,38,38,0.15)',border:'1px solid #dc2626',borderRadius:'7px',color:'#fca5a5',cursor:'pointer',fontWeight:'800',fontSize:'12px',whiteSpace:'nowrap'}}>
-                                  🚪 Ausgetreten am {fin.austrittsdatum} — Zurückholen
-                                </button>
+                                wiedereintrittEditId === id ? (
+                                  <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
+                                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.6)'}}>Neues Eintrittsdatum:</span>
+                                    <input type="date" value={wiedereintrittDatum} onChange={e=>setWiedereintrittDatum(e.target.value)}
+                                      style={{padding:'7px 10px',background:'#1a1206',border:'1px solid #4ade80',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none'}}/>
+                                    <button onClick={()=>{ if(!wiedereintrittDatum) return; reactivateMitglied(id,wiedereintrittDatum); setWiedereintrittEditId(null); }}
+                                      style={{padding:'7px 12px',background:'#16a34a',color:'white',border:'none',borderRadius:'7px',cursor:'pointer',fontWeight:'800',fontSize:'12px'}}>✓ Bestätigen</button>
+                                    <button onClick={()=>setWiedereintrittEditId(null)}
+                                      style={{padding:'7px 10px',background:'transparent',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'7px',color:'rgba(255,255,255,0.6)',cursor:'pointer',fontSize:'12px'}}>Abbrechen</button>
+                                  </div>
+                                ) : (
+                                  <button onClick={()=>{setWiedereintrittEditId(id);setWiedereintrittDatum(TODAY);}}
+                                    style={{padding:'7px 12px',background:'rgba(220,38,38,0.15)',border:'1px solid #dc2626',borderRadius:'7px',color:'#fca5a5',cursor:'pointer',fontWeight:'800',fontSize:'12px',whiteSpace:'nowrap'}}>
+                                    🚪 Ausgetreten am {fin.austrittsdatum} — Wiedereintritt
+                                  </button>
+                                )
                               ) : mitgliedAustrittEditId === id ? (
                                 <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
                                   <input type="date" value={mitgliedAustrittDatum} onChange={e=>setMitgliedAustrittDatum(e.target.value)}
@@ -12677,6 +12760,16 @@ export default function TrainingsApp() {
                                 </button>
                               )}
                             </div>
+                            {(fin.mitgliedschaftsHistorie||[]).length > 0 && (
+                              <div style={{padding:'8px 12px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px'}}>
+                                <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'3px'}}>📜 Frühere Mitgliedschaft(en)</span>
+                                {fin.mitgliedschaftsHistorie.map((h,i)=>(
+                                  <p key={i} style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.55)'}}>
+                                    {h.eintritt||'?'} – {h.austritt||'?'}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
                             {(m.aemter||[]).length > 0 && (
                               <div style={{padding:'10px 12px',background:'rgba(251,191,36,0.06)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:'8px'}}>
                                 <span style={{fontSize:'11px',fontWeight:'800',color:'#fbbf24',display:'block',marginBottom:'4px'}}>🎖️ Ämter & Ehrentitel</span>
@@ -12849,9 +12942,31 @@ export default function TrainingsApp() {
                             </div>
                           )}
                         </div>
-                        <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-                          <button onClick={()=>{saveFinanzField(id,'austrittsdatum',null);setVergangeneExpandedId(null);}}
-                            style={{padding:'8px 14px',background:'rgba(74,222,128,0.15)',color:'#86efac',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>↩️ Zurückholen (wieder aktiv)</button>
+                        {(fin.mitgliedschaftsHistorie||[]).length > 0 && (
+                          <div style={{padding:'8px 12px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px'}}>
+                            <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'3px'}}>📜 Frühere Mitgliedschaft(en)</span>
+                            {fin.mitgliedschaftsHistorie.map((h,i)=>(
+                              <p key={i} style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.55)'}}>
+                                {h.eintritt||'?'} – {h.austritt||'?'}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                        <div style={{display:'flex',gap:'8px',flexWrap:'wrap',alignItems:'center'}}>
+                          {wiedereintrittEditId === id ? (
+                            <>
+                              <span style={{fontSize:'11px',color:'rgba(255,255,255,0.6)'}}>Neues Eintrittsdatum:</span>
+                              <input type="date" value={wiedereintrittDatum} onChange={e=>setWiedereintrittDatum(e.target.value)}
+                                style={{padding:'7px 10px',background:'#1a1206',border:'1px solid #4ade80',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none'}}/>
+                              <button onClick={()=>{ if(!wiedereintrittDatum) return; reactivateMitglied(id,wiedereintrittDatum); setWiedereintrittEditId(null); setVergangeneExpandedId(null); }}
+                                style={{padding:'8px 14px',background:'#16a34a',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>✓ Bestätigen</button>
+                              <button onClick={()=>setWiedereintrittEditId(null)}
+                                style={{padding:'8px 12px',background:'transparent',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'8px',color:'rgba(255,255,255,0.6)',cursor:'pointer',fontSize:'12px'}}>Abbrechen</button>
+                            </>
+                          ) : (
+                            <button onClick={()=>{setWiedereintrittEditId(id);setWiedereintrittDatum(TODAY);}}
+                              style={{padding:'8px 14px',background:'rgba(74,222,128,0.15)',color:'#86efac',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>↩️ Wiedereintritt eintragen</button>
+                          )}
                           <button onClick={()=>{ if(window.confirm(`"${m.vorname} ${m.nachname}" wirklich unwiderruflich löschen? Das kann nicht rückgängig gemacht werden.`)) { deleteMitgliedPermanently(id); setVergangeneExpandedId(null); } }}
                             style={{padding:'8px 14px',background:'rgba(220,38,38,0.15)',color:'#fca5a5',border:'1px solid rgba(220,38,38,0.4)',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>🗑️ Unwiderruflich löschen</button>
                         </div>
