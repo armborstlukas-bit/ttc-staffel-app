@@ -746,7 +746,6 @@ export default function TrainingsApp() {
   const [notifications, setNotifications]                   = useState({});
   const [notificationsLoaded, setNotificationsLoaded]       = useState(false);
   const notificationsRef = React.useRef({});  // immer aktueller Wert ohne Dep-Trigger
-  const [teams, setTeams]                                   = useState({});
   const [appSettings, setAppSettings]                       = useState({});
   const [leagueData, setLeagueData]                         = useState({ table: null, schedule: null, fetchedAt: null });
   const [leagueFetching, setLeagueFetching]                 = useState(false);
@@ -756,19 +755,12 @@ export default function TrainingsApp() {
   const [notifTab, setNotifTab]                             = useState('inbox'); // 'inbox' | 'trash'
   const [notifTrainerTab, setNotifTrainerTab]               = useState('sent'); // 'sent' | 'trash' | 'inbox'
   const [showTrainingHistory, setShowTrainingHistory]       = useState(false);
-  const [showMyTeam, setShowMyTeam]                         = useState(false);
   const [showAchievements, setShowAchievements]             = useState(false);
   const [editingChildName, setEditingChildName]             = useState(null); // childId being renamed
   const [editingChildNameVal, setEditingChildNameVal]       = useState('');
   const [stayLoggedIn, setStayLoggedIn]                     = useState(false);
   const [showLoginPassword, setShowLoginPassword]            = useState(false);
   const [registerIsParent, setRegisterIsParent]             = useState(false);
-  // Mannschaft form states
-  const [teamForm, setTeamForm]                             = useState({name:'', liga:'', tableUrl:'', scheduleUrl:'', trainerUids:[], childIds:[]});
-  const [editingTeam, setEditingTeam]                       = useState(null);
-  const [addingTeam, setAddingTeam]                         = useState(false);
-  const [teamExpanded, setTeamExpanded]                     = useState({});
-  const [teamFetching, setTeamFetching]                     = useState({});
   // Practice Tournaments
   const [practiceTournaments, setPracticeTournaments]               = useState({});
   const [archivedPracticeTournaments, setArchivedPracticeTournaments] = useState({});
@@ -1031,7 +1023,6 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','recurringTemplates'),  s => setRecurringTemplates(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','archivedSessions'),   s => setArchivedSessions(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','notifications'),      s => { setNotifications(s.exists()?s.data():{}); setNotificationsLoaded(true); }),
-      onSnapshot(doc(db,'ttc','teams'),              s => setTeams(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','appSettings'),        s => setAppSettings(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','rompel'),             s => setRompelData(s.exists()?s.data():{hours:[],expenses:[]})),
       onSnapshot(doc(db,'ttc','pfandkasse'),          s => setPfandDaten(s.exists()?s.data():{entries:[]})),
@@ -1255,19 +1246,6 @@ export default function TrainingsApp() {
   const saveRecurringTemplates = u => { setRecurringTemplates(u); setDoc(doc(db,'ttc','recurringTemplates'),  u); };
   const saveArchivedSessions   = u => { setArchivedSessions(u);   setDoc(doc(db,'ttc','archivedSessions'),   u); };
   const saveNotifications      = u => { setNotifications(u);      setDoc(doc(db,'ttc','notifications'),      u); };
-  const sanitizeTeams = (u) => {
-    const sanitizeRows = (rows) => (rows||[]).map(r => Array.isArray(r) ? {c:r} : r);
-    return Object.fromEntries(Object.entries(u).map(([id,t]) => {
-      if (!t.leagueData) return [id,t];
-      const ld = t.leagueData;
-      return [id, {...t, leagueData: {
-        ...ld,
-        table:    ld.table    ? {...ld.table,    rows: sanitizeRows(ld.table.rows)}    : ld.table,
-        schedule: ld.schedule ? {...ld.schedule, rows: sanitizeRows(ld.schedule.rows)} : ld.schedule,
-      }}];
-    }));
-  };
-  const saveTeams = u => { const s=sanitizeTeams(u); setTeams(s); setDoc(doc(db,'ttc','teams'), s).catch(e=>console.error('saveTeams failed:',e)); };
   const saveAppSettings                  = u => { setAppSettings(u);                  setDoc(doc(db,'ttc','appSettings'),                  u); };
   const saveRompelData                   = u => { setRompelData(u);                   setDoc(doc(db,'ttc','rompel'),                        u); };
   const savePfandDaten                   = u => { setPfandDaten(u);                   setDoc(doc(db,'ttc','pfandkasse'),                    u); };
@@ -1276,11 +1254,16 @@ export default function TrainingsApp() {
   const canAccessPfand     = () => userRole === 'admin' || (appSettings.pfandTrainers   || []).includes(user?.uid);
   const canAccessPinnwand  = () => !!user; // Pinnwand ist fuer alle eingeloggten Nutzer sichtbar; Sichtbarkeit einzelner Beitraege wird pro Beitrag geregelt
   const canAccessTeams = () => !!user; // TTC Mannschaften ist fuer alle eingeloggten Nutzer sichtbar (Admin, Trainer, Aktive, Eltern, Jugendliche, Passive)
+  const MAX_FAVORITE_TEAMS = 3;
   const toggleFavoriteTeam = async (teamId) => {
     if (!user?.uid) return;
-    const next = userProfile?.favoriteTeamId === teamId ? null : teamId;
-    setUserProfile(p => ({...(p||{}), favoriteTeamId: next}));
-    await setDoc(doc(db,'users',user.uid), { favoriteTeamId: next }, { merge:true });
+    const cur = userProfile?.favoriteTeamIds || [];
+    let next;
+    if (cur.includes(teamId)) next = cur.filter(id=>id!==teamId);
+    else if (cur.length >= MAX_FAVORITE_TEAMS) { alert(`Du kannst maximal ${MAX_FAVORITE_TEAMS} Mannschaften favorisieren.`); return; }
+    else next = [...cur, teamId];
+    setUserProfile(p => ({...(p||{}), favoriteTeamIds: next}));
+    await setDoc(doc(db,'users',user.uid), { favoriteTeamIds: next }, { merge:true });
   };
   // Schmale Admin-Zeile zur Zugangsverwaltung, direkt im jeweiligen Spezialbereich (statt zentral im Adminbereich).
   const renderAccessManagerRow = (settingsKey, label, accent) => {
@@ -1632,69 +1615,6 @@ export default function TrainingsApp() {
   const saveRanglistenspiele = (data) => { setRanglistenspiele(data); setDoc(doc(db,'ttc','ranglistenspiele'), data); };
   const saveRanglisteAch = (data) => { setRanglisteAch(data); setDoc(doc(db,'ttc','ranglisteAchievements'), data); };
 
-  // ── Pro-Team Liga-Daten laden ─────────────────────────────────────────────
-  const fetchTeamLeague = async (teamId) => {
-    const team = teams[teamId];
-    if (!team) return;
-    const tableUrl    = team.tableUrl?.trim();
-    const scheduleUrl = team.scheduleUrl?.trim();
-    if (!tableUrl && !scheduleUrl) { alert('Bitte zuerst URLs bei der Mannschaft eintragen.'); return; }
-    setTeamFetching(f => ({...f, [teamId]: true}));
-
-    const parseUrl = (url) => {
-      const m = url.match(/click-tt\/([^/]+)\/([^/]+)\/ligen\/([^/]+)\/gruppe\/(\d+)/);
-      return m ? { assoc: m[1], season: m[2], league: m[3], groupId: m[4] } : null;
-    };
-    const fmtDate = (iso) => {
-      if (!iso) return '';
-      const d = new Date(iso);
-      if (isNaN(d)) return iso;
-      return d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'})+', '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' Uhr';
-    };
-
-    try {
-      let table = null, schedule = null;
-
-      if (tableUrl) {
-        const p = parseUrl(tableUrl);
-        if (!p) throw new Error('Tabellen-URL nicht erkannt.');
-        const res = await fetch(`/api/league-proxy?assoc=${encodeURIComponent(p.assoc)}&groupId=${encodeURIComponent(p.groupId)}&season=${encodeURIComponent(p.season)}&league=${encodeURIComponent(p.league)}&type=tabelle&filter=gesamt`, { signal: AbortSignal.timeout(15000) });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
-        const leagueTable = json?.data?.league_table ?? json?.data ?? [];
-        if (!Array.isArray(leagueTable) || leagueTable.length === 0) throw new Error('Keine Tabellendaten.');
-        table = {
-          headers: ['#','Mannschaft','Sp','S','U','N','Sätze','Punkte'],
-          rows: leagueTable.map(t => ({ c:[String(t.table_rank??''), t.team_name??'', String((t.meetings_won??0)+(t.meetings_lost??0)+(t.meetings_tie??0)), String(t.meetings_won??''), String(t.meetings_tie??''), String(t.meetings_lost??''), `${t.sets_won??0}:${t.sets_lost??0}`, `${t.points_won??0}:${t.points_lost??0}`] })),
-        };
-        const meetings = json?.data?.meetings_excerpt?.meetings ?? [];
-        if (Array.isArray(meetings) && meetings.length > 0) {
-          schedule = { headers:['Datum','Heim','Gast','Ergebnis'], rows: meetings.map(m => ({ c:[fmtDate(m.date), m.team_home??'', m.team_away??'', m.state==='done'?`${m.matches_won??''}:${m.matches_lost??''}`:'–'] })) };
-        }
-      }
-      if (scheduleUrl && !schedule) {
-        const p = parseUrl(scheduleUrl);
-        if (p) {
-          try {
-            const res = await fetch(`/api/league-proxy?assoc=${encodeURIComponent(p.assoc)}&groupId=${encodeURIComponent(p.groupId)}&season=${encodeURIComponent(p.season)}&league=${encodeURIComponent(p.league)}&type=spielplan&filter=gesamt`, { signal: AbortSignal.timeout(15000) });
-            if (res.ok) {
-              const json = await res.json();
-              const meetings = json?.data?.meetings_excerpt?.meetings ?? [];
-              if (Array.isArray(meetings) && meetings.length > 0) {
-                schedule = { headers:['Datum','Heim','Gast','Ergebnis'], rows: meetings.map(m => ({ c:[fmtDate(m.date), m.team_home??'', m.team_away??'', m.state==='done'?`${m.matches_won??''}:${m.matches_lost??''}`:'–'] })) };
-              }
-            }
-          } catch {}
-        }
-      }
-      saveTeams({ ...teams, [teamId]: { ...team, leagueData: { table, schedule, fetchedAt: new Date().toISOString() } } });
-      alert(`✅ Liga-Daten für "${team.name}" geladen!`);
-    } catch (err) {
-      alert('❌ ' + (err.message || 'Fehler beim Laden.'));
-    } finally {
-      setTeamFetching(f => ({...f, [teamId]: false}));
-    }
-  };
 
   // Compute + save rangliste achievements for given children after rank change.
   // childUpdates: [{ childId, newRank }]  — newRank is 1-based (1=best), 0=not in list
@@ -3821,7 +3741,7 @@ export default function TrainingsApp() {
             {canEdit()&&<button onClick={()=>navTo('archiv')} style={s.btn('#374151')}><Archive size={16}/> Archiv</button>}
             {canEdit()&&<button onClick={()=>navTo('rangliste')} style={s.btn('#f59e0b')}>📊 Rangliste</button>}
             {canEdit()&&<button onClick={()=>navTo('achievements')} style={s.btn('#7c3aed')}>🏅 Errungenschaften</button>}
-            {canEdit()&&<button onClick={()=>navTo('mannschaften')} style={s.btn('#0f766e')}>🏓 Mannschaften</button>}
+            {canAccessTeams()&&<button onClick={()=>navTo('ttcMannschaften')} style={s.btn('#0f766e')}>🏓 TTC Mannschaften</button>}
             {canEdit()&&(()=>{
               const unreadCount = getTrainerUnreadCount();
               return (
@@ -4364,7 +4284,6 @@ export default function TrainingsApp() {
         links: [
           {label:'Errungenschaften', icon:'🏅', color:'#d9f99d', bg:'rgba(217,249,157,0.1)',  border:'rgba(217,249,157,0.25)', action:()=>navTo('achievements')},
           {label:'Rangliste',        icon:'📊', color:'#fcd34d', bg:'rgba(252,211,77,0.1)',   border:'rgba(252,211,77,0.25)',  action:()=>navTo('rangliste')},
-          {label:'Mannschaften',     icon:'🏓', color:'#6ee7b7', bg:'rgba(110,231,183,0.1)',  border:'rgba(110,231,183,0.25)', action:()=>navTo('mannschaften')},
           {label:'TTC Mannschaften', icon:'🏆', color:'#2dd4bf', bg:'rgba(45,212,191,0.1)',   border:'rgba(45,212,191,0.25)',  action:()=>navTo('ttcMannschaften')},
           {label:'Gegnerlogbuch',    icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.08)',   border:'rgba(8,145,178,0.25)',   action:()=>navTo('gegnerlogbuch')},
           {label:'TTR Werte',        icon:'📈', color:'#fbbf24', bg:'rgba(251,191,36,0.08)',  border:'rgba(251,191,36,0.25)',  action:()=>navTo('ttrWerte')},
@@ -5196,7 +5115,6 @@ export default function TrainingsApp() {
           {/* ── Menükacheln (Trainer-Stil) ── */}
           {myChild && !elternSubView && (()=>{
             const { active } = getCleanedNotifications(myChild.id);
-            const myTeam = Object.values(teams).find(t=>(t.childIds||[]).includes(myChild.id));
             const isJugend = grp?.id === 'jugend';
             const QL = (bg,border) => ({position:'relative',padding:'15px 8px 13px',background:bg,border:'1px solid '+border,borderRadius:'16px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:'8px',transition:'transform 0.12s',textAlign:'center'});
             const menuCats = [
@@ -5423,83 +5341,6 @@ export default function TrainingsApp() {
                 )}
               </div>
               )}
-
-              {/* ── Mannschaft & Liga ── */}
-              {elternSubView==='mannschaft' && (()=>{
-                const myTeam = Object.values(teams).find(t=>(t.childIds||[]).includes(myChild.id));
-                if (!myTeam) return null;
-                const ld = myTeam.leagueData || {};
-                const colSt = (i) => ({padding:'8px 10px',fontSize:'12px',color:i===0?'white':'rgba(255,255,255,0.7)',fontWeight:i<2?'700':'400',textAlign:i>1?'center':'left',whiteSpace:'nowrap',borderBottom:'1px solid rgba(255,255,255,0.05)'});
-                const hSt  = (i) => ({...colSt(i),color:'rgba(255,255,255,0.35)',fontWeight:'700',fontSize:'10px',textTransform:'uppercase',letterSpacing:'0.5px',background:'rgba(255,255,255,0.03)',borderBottom:'1px solid rgba(255,255,255,0.1)'});
-                const spSt = (i) => ({padding:'8px 10px',fontSize:'12px',color:i===3?'#86efac':'rgba(255,255,255,0.7)',fontWeight:i===3?'700':'400',textAlign:i===3?'center':'left',whiteSpace:'nowrap',borderBottom:'1px solid rgba(255,255,255,0.05)'});
-                const spH  = (i) => ({...spSt(i),color:'rgba(255,255,255,0.35)',fontWeight:'700',fontSize:'10px',textTransform:'uppercase',letterSpacing:'0.5px',background:'rgba(255,255,255,0.03)',borderBottom:'1px solid rgba(255,255,255,0.1)'});
-                const fetchedStr = ld.fetchedAt ? new Date(ld.fetchedAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : '';
-                return (
-                  <>
-                    <span style={SECTION_LABEL('rgba(20,184,166,0.5)')}>Mannschaft</span>
-                    <div style={{...DARK_CARD_TEAL,marginBottom:'28px',padding:0,overflow:'hidden'}}>
-                      {/* Kachel-Header — immer sichtbar */}
-                      <button onClick={()=>setShowMyTeam(v=>!v)}
-                        style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',background:'none',border:'none',cursor:'pointer',padding:'16px',gap:'12px'}}>
-                        <div style={{textAlign:'left',minWidth:0}}>
-                          <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(45,212,191,0.6)',textTransform:'uppercase',letterSpacing:'1.5px',display:'block',marginBottom:'4px'}}>Meine Mannschaft</span>
-                          <div style={{display:'flex',alignItems:'baseline',gap:'8px',flexWrap:'wrap'}}>
-                            <span style={{fontWeight:'800',color:'white',fontSize:'16px'}}>🏓 {myTeam.name}</span>
-                            {myTeam.liga&&<span style={{fontSize:'13px',color:'rgba(45,212,191,0.7)',fontWeight:'600'}}>{myTeam.liga}</span>}
-                          </div>
-                        </div>
-                        <span style={{fontSize:'20px',color:'rgba(45,212,191,0.6)',transform:showMyTeam?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s',flexShrink:0}}>▾</span>
-                      </button>
-
-                      {/* Ausgeklappter Inhalt */}
-                      {showMyTeam&&(
-                        <div style={{borderTop:'1px solid rgba(45,212,191,0.2)',padding:'16px'}}>
-                          {/* Mannschaftskollegen */}
-                          {(myTeam.childIds||[]).length>0&&(
-                            <div style={{marginBottom:'16px'}}>
-                              <p style={{margin:'0 0 8px',fontSize:'11px',fontWeight:'800',color:'rgba(45,212,191,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Mannschaftskollegen</p>
-                              <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
-                                {(myTeam.childIds||[]).map(id=>{
-                                  const c2=children[id];
-                                  return c2?<span key={id} style={{fontSize:'12px',background:'rgba(45,212,191,0.15)',border:'1px solid rgba(45,212,191,0.3)',color:'#2dd4bf',borderRadius:'20px',padding:'3px 10px',fontWeight:'600'}}>{c2.name}</span>:null;
-                                })}
-                              </div>
-                            </div>
-                          )}
-                          {/* Liga-Tabelle */}
-                          {ld.table&&(
-                            <div style={{marginBottom:'12px'}}>
-                              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'6px',flexWrap:'wrap',gap:'4px'}}>
-                                <p style={{margin:0,fontSize:'11px',fontWeight:'800',color:'rgba(45,212,191,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Tabelle</p>
-                                {fetchedStr&&<span style={{fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>Stand: {fetchedStr}</span>}
-                              </div>
-                              <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',borderRadius:'8px',background:'rgba(0,0,0,0.2)'}}>
-                                <table style={{borderCollapse:'collapse',minWidth:'420px'}}>
-                                  {ld.table.headers?.length>0&&<thead><tr>{ld.table.headers.map((h,i)=><th key={i} style={hSt(i)}>{h}</th>)}</tr></thead>}
-                                  <tbody>{(ld.table.rows||[]).map((row,ri)=>{const cells=row.c||row;return<tr key={ri} style={{background:ri%2===0?'transparent':'rgba(255,255,255,0.02)'}}>{cells.map((cell,ci)=><td key={ci} style={colSt(ci)}>{cell}</td>)}</tr>;})}</tbody>
-                                </table>
-                              </div>
-                            </div>
-                          )}
-                          {/* Spielplan */}
-                          {ld.schedule&&(
-                            <div>
-                              <p style={{margin:'0 0 6px',fontSize:'11px',fontWeight:'800',color:'rgba(45,212,191,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Spielplan</p>
-                              <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',borderRadius:'8px',background:'rgba(0,0,0,0.2)'}}>
-                                <table style={{borderCollapse:'collapse',minWidth:'520px'}}>
-                                  {ld.schedule.headers?.length>0&&<thead><tr>{ld.schedule.headers.map((h,i)=><th key={i} style={spH(i)}>{h}</th>)}</tr></thead>}
-                                  <tbody>{(ld.schedule.rows||[]).map((row,ri)=>{const cells=row.c||row;return<tr key={ri} style={{background:ri%2===0?'transparent':'rgba(255,255,255,0.02)'}}>{cells.map((cell,ci)=><td key={ci} style={spSt(ci)}>{cell}</td>)}</tr>;})}</tbody>
-                                </table>
-                              </div>
-                            </div>
-                          )}
-                          {!ld.table&&!ld.schedule&&<p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.3)',textAlign:'center',padding:'8px 0'}}>Noch keine Liga-Daten geladen.</p>}
-                        </div>
-                      )}
-                    </div>
-                  </>
-                );
-              })()}
 
         {/* PT Detail Modal */}
         {ptDetailModal&&(()=>{
@@ -7879,205 +7720,6 @@ export default function TrainingsApp() {
     );
   }
 
-  // ── MANNSCHAFTEN & LIGEN VIEW (Trainer/Admin) ───────────────────────────
-  if (view === 'mannschaften' && canEdit()) {
-    const myTeams = Object.values(teams).sort((a,b)=>a.name.localeCompare(b.name,'de'));
-    const isMyTeam = (t) => (t.trainerUids||[]).includes(user?.uid);
-
-    return (
-      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#0f4c3a 0%,#134e4a 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
-        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
-          <button onClick={()=>navTo('home')} style={s.btn('#0f766e')}><Home size={16}/></button>
-          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>⚽ Mannschaften {'&'} Ligen</h1>
-          <button onClick={()=>{setAddingTeam(v=>!v);setEditingTeam(null);}} style={{...s.btn(addingTeam?'#6b7280':'#0f766e')}}>
-            {addingTeam?'✕ Abbrechen':'➕ Mannschaft'}
-          </button>
-        </div>
-
-        <div style={{padding:'20px',maxWidth:'900px',margin:'0 auto'}}>
-          {/* ── Team-Formular (neu anlegen / bearbeiten) ── */}
-          {(addingTeam || editingTeam) && (()=>{
-            const isEdit = !!editingTeam;
-            const allTrainers = Object.entries(allUsers||{}).map(([uid,p])=>({...p,uid})).filter(p=>p.role==='trainer'||p.role==='admin');
-            const allKids = Object.values(children).sort((a,b)=>a.name.localeCompare(b.name,'de'));
-            const saveTeam = () => {
-              if (!teamForm.name.trim()) { alert('Name ist ein Pflichtfeld!'); return; }
-              const id = isEdit ? editingTeam : 'team_'+Date.now();
-              const existing = isEdit ? (teams[editingTeam]||{}) : {};
-              saveTeams({...teams,[id]:{...existing,...teamForm,id}});
-              setAddingTeam(false); setEditingTeam(null);
-              setTeamForm({name:'',liga:'',tableUrl:'',scheduleUrl:'',trainerUids:[],childIds:[]});
-            };
-            const toggleArr = (key,val) => setTeamForm(f=>{
-              const arr=f[key]||[];
-              return {...f,[key]:arr.includes(val)?arr.filter(x=>x!==val):[...arr,val]};
-            });
-            return (
-              <div style={{background:'white',borderRadius:'14px',padding:'20px',marginBottom:'20px',boxShadow:'0 4px 20px rgba(0,0,0,0.15)'}}>
-                <h3 style={{margin:'0 0 16px',color:'#0f766e',fontSize:'16px'}}>{isEdit?'✏️ Mannschaft bearbeiten':'➕ Neue Mannschaft'}</h3>
-                <div style={{display:'grid',gap:'12px'}}>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}}>
-                    <div>
-                      <label style={s.label}>Name *</label>
-                      <input value={teamForm.name} onChange={e=>setTeamForm(f=>({...f,name:e.target.value}))}
-                        placeholder="z.B. 1. Herren" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/>
-                    </div>
-                    <div>
-                      <label style={s.label}>Liga</label>
-                      <input value={teamForm.liga} onChange={e=>setTeamForm(f=>({...f,liga:e.target.value}))}
-                        placeholder="z.B. Kreisliga A" style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/>
-                    </div>
-                  </div>
-                  <div>
-                    <label style={s.label}>Tabellen-URL (mytischtennis)</label>
-                    <input value={teamForm.tableUrl} onChange={e=>setTeamForm(f=>({...f,tableUrl:e.target.value}))}
-                      placeholder="https://www.mytischtennis.de/click-tt/..." style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/>
-                  </div>
-                  <div>
-                    <label style={s.label}>Spielplan-URL (mytischtennis)</label>
-                    <input value={teamForm.scheduleUrl} onChange={e=>setTeamForm(f=>({...f,scheduleUrl:e.target.value}))}
-                      placeholder="https://www.mytischtennis.de/click-tt/..." style={{...s.input,flex:'none',width:'100%',boxSizing:'border-box'}}/>
-                  </div>
-                  {allTrainers.length>0&&<div>
-                    <label style={s.label}>Trainer</label>
-                    <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
-                      {allTrainers.map(p=>{
-                        const sel=(teamForm.trainerUids||[]).includes(p.uid);
-                        return <button key={p.uid} type="button" onClick={()=>toggleArr('trainerUids',p.uid)}
-                          style={{padding:'5px 12px',borderRadius:'20px',border:`2px solid ${sel?'#0f766e':'#e5e7eb'}`,background:sel?'#ccfbf1':'#f9fafb',color:sel?'#0f766e':'#6b7280',cursor:'pointer',fontSize:'13px',fontWeight:'600'}}>
-                          {p.name||p.email}
-                        </button>;
-                      })}
-                    </div>
-                  </div>}
-                  {allKids.length>0&&<div>
-                    <label style={s.label}>Spieler</label>
-                    <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
-                      {allKids.map(c=>{
-                        const sel=(teamForm.childIds||[]).includes(c.id);
-                        return <button key={c.id} type="button" onClick={()=>toggleArr('childIds',c.id)}
-                          style={{padding:'5px 12px',borderRadius:'20px',border:`2px solid ${sel?'#0f766e':'#e5e7eb'}`,background:sel?'#ccfbf1':'#f9fafb',color:sel?'#0f766e':'#6b7280',cursor:'pointer',fontSize:'13px',fontWeight:'600'}}>
-                          {c.name}
-                        </button>;
-                      })}
-                    </div>
-                  </div>}
-                  <div style={{display:'flex',gap:'8px'}}>
-                    <button onClick={saveTeam} style={{...s.btn('#0f766e'),flex:1,justifyContent:'center'}}>💾 Speichern</button>
-                    <button onClick={()=>{setAddingTeam(false);setEditingTeam(null);setTeamForm({name:'',liga:'',tableUrl:'',scheduleUrl:'',trainerUids:[],childIds:[]});}}
-                      style={{...s.btn('#6b7280'),flex:1,justifyContent:'center'}}>✕ Abbrechen</button>
-                    {isEdit&&<button onClick={()=>{if(!window.confirm('Mannschaft wirklich löschen?'))return;const u={...teams};delete u[editingTeam];saveTeams(u);setEditingTeam(null);setTeamForm({name:'',liga:'',tableUrl:'',scheduleUrl:'',trainerUids:[],childIds:[]});}}
-                      style={{...s.btn('#dc2626'),padding:'8px 14px'}}>🗑️</button>}
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* ── Keine Mannschaften ── */}
-          {myTeams.length===0&&!addingTeam&&(
-            <div style={{background:'rgba(255,255,255,0.1)',borderRadius:'12px',padding:'40px',textAlign:'center',color:'rgba(255,255,255,0.7)'}}>
-              {userRole==='admin'?'Noch keine Mannschaften angelegt. Klicke oben auf "➕ Mannschaft".':'Du bist keiner Mannschaft als Trainer zugewiesen.'}
-            </div>
-          )}
-
-          {/* ── Mannschafts-Kacheln ── */}
-          {myTeams.map(team=>{
-            const isOpen = !!teamExpanded[team.id];
-            const isFetching = !!teamFetching[team.id];
-            const isMine = isMyTeam(team);
-            const ld = team.leagueData||{};
-            const colSt=(i)=>({padding:'6px 10px',fontSize:'12px',whiteSpace:'nowrap',textAlign:i===0?'center':i<=2?'left':'right',color:i===0?'#0f766e':'#374151',fontWeight:i===0?'800':'400',borderRight:'1px solid #e5e7eb',minWidth:i===0?'32px':i<=2?'130px':'55px'});
-            const hSt=(i)=>({...colSt(i),background:'#f0fdfa',fontWeight:'700',color:'#0f766e',fontSize:'11px',textTransform:'uppercase',letterSpacing:'0.3px'});
-            const spSt=(i)=>({padding:'6px 10px',fontSize:'12px',whiteSpace:'nowrap',textAlign:'left',color:'#374151',borderRight:'1px solid #e5e7eb',minWidth:i===0?'160px':i<=2?'140px':'60px'});
-            const spH=(i)=>({...spSt(i),background:'#f0fdfa',fontWeight:'700',color:'#0f766e',fontSize:'11px',textTransform:'uppercase',letterSpacing:'0.3px'});
-            const fetchedStr = ld.fetchedAt ? new Date(ld.fetchedAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+new Date(ld.fetchedAt).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) : '';
-            return (
-              <div key={team.id} style={{background: isMine?'rgba(110,231,183,0.12)':'rgba(255,255,255,0.07)',borderRadius:'14px',marginBottom:'12px',overflow:'hidden',border:`1px solid ${isMine?'rgba(110,231,183,0.45)':'rgba(255,255,255,0.15)'}`}}>
-                {/* Collapsed header */}
-                <div style={{padding:'14px 16px',display:'flex',alignItems:'center',gap:'10px',cursor:'pointer'}} onClick={()=>setTeamExpanded(e=>({...e,[team.id]:!e[team.id]}))}>
-                  <span style={{fontSize:'20px'}}>{isOpen?'🔽':'▶️'}</span>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
-                      <p style={{margin:0,fontWeight:'800',fontSize:'15px',color:'white'}}>{team.name}</p>
-                      {isMine&&<span style={{fontSize:'11px',fontWeight:'700',background:'rgba(110,231,183,0.25)',color:'#6ee7b7',padding:'2px 8px',borderRadius:'20px',border:'1px solid rgba(110,231,183,0.4)'}}>Meine Mannschaft</span>}
-                    </div>
-                    <p style={{margin:'2px 0 0',fontSize:'12px',color:'rgba(255,255,255,0.6)'}}>{team.liga||'Keine Liga'} · {(team.childIds||[]).length} Spieler</p>
-                  </div>
-                  <div style={{display:'flex',gap:'6px',flexShrink:0}} onClick={e=>e.stopPropagation()}>
-                    {(team.tableUrl||team.scheduleUrl)&&(
-                      <button disabled={isFetching} onClick={()=>fetchTeamLeague(team.id)}
-                        style={{...s.btn('#0f766e'),padding:'6px 10px',fontSize:'12px',opacity:isFetching?0.6:1}}>
-                        {isFetching?'⏳':'🔄'} Daten
-                      </button>
-                    )}
-                    <button onClick={()=>{
-                      const t=teams[team.id];
-                      setTeamForm({name:t.name||'',liga:t.liga||'',tableUrl:t.tableUrl||'',scheduleUrl:t.scheduleUrl||'',trainerUids:t.trainerUids||[],childIds:t.childIds||[]});
-                      setEditingTeam(team.id); setAddingTeam(false);
-                    }} style={{...s.btn('#6b7280'),padding:'6px 10px',fontSize:'12px'}}>✏️</button>
-                  </div>
-                </div>
-
-                {/* Expanded body */}
-                {isOpen&&(
-                  <div style={{borderTop:'1px solid rgba(255,255,255,0.1)',padding:'16px',background:'rgba(0,0,0,0.15)'}}>
-
-                    {/* Aufstellung */}
-                    {(team.childIds||[]).length>0&&(
-                      <div style={{marginBottom:'16px'}}>
-                        <p style={{margin:'0 0 8px',fontSize:'11px',fontWeight:'800',color:'rgba(255,255,255,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Aufstellung</p>
-                        <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
-                          {(team.childIds||[]).map(id=>{
-                            const c=children[id];
-                            return c?<span key={id} style={{padding:'4px 10px',background:'rgba(255,255,255,0.15)',borderRadius:'20px',fontSize:'13px',color:'white',fontWeight:'600'}}>{c.name}</span>:null;
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Liga-Daten */}
-                    {ld.table&&(
-                      <div style={{marginBottom:'16px'}}>
-                        <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px',flexWrap:'wrap'}}>
-                          <p style={{margin:0,fontSize:'11px',fontWeight:'800',color:'rgba(255,255,255,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Tabelle</p>
-                          {fetchedStr&&<span style={{fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>Stand: {fetchedStr}</span>}
-                        </div>
-                        <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',borderRadius:'10px',background:'white'}}>
-                          <table style={{borderCollapse:'collapse',width:'100%',minWidth:'400px'}}>
-                            <thead><tr>{(ld.table.headers||[]).map((h,i)=><th key={i} style={hSt(i)}>{h}</th>)}</tr></thead>
-                            <tbody>{(ld.table.rows||[]).map((row,ri)=>{const cols=row.c||row;return <tr key={ri} style={{borderBottom:'1px solid #f3f4f6',background:ri%2===0?'white':'#fafafa'}}>{cols.map((cell,ci)=><td key={ci} style={colSt(ci)}>{cell}</td>)}</tr>;})}</tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-
-                    {ld.schedule&&(
-                      <div style={{marginBottom:'16px'}}>
-                        <p style={{margin:'0 0 8px',fontSize:'11px',fontWeight:'800',color:'rgba(255,255,255,0.5)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Spielplan</p>
-                        <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',borderRadius:'10px',background:'white'}}>
-                          <table style={{borderCollapse:'collapse',width:'100%',minWidth:'500px'}}>
-                            <thead><tr>{(ld.schedule.headers||[]).map((h,i)=><th key={i} style={spH(i)}>{h}</th>)}</tr></thead>
-                            <tbody>{(ld.schedule.rows||[]).map((row,ri)=>{const cols=row.c||row;return <tr key={ri} style={{borderBottom:'1px solid #f3f4f6',background:ri%2===0?'white':'#fafafa'}}>{cols.map((cell,ci)=><td key={ci} style={spSt(ci)}>{cell}</td>)}</tr>;})}</tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-
-                    {!ld.table&&!ld.schedule&&(team.tableUrl||team.scheduleUrl)&&(
-                      <div style={{marginBottom:'16px',padding:'12px',background:'rgba(255,255,255,0.07)',borderRadius:'10px',textAlign:'center',color:'rgba(255,255,255,0.5)',fontSize:'13px'}}>
-                        Noch keine Daten geladen. Klicke auf "🔄 Daten".
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
 
   // ── KO Runde Helpers ──────────────────────────────────────────────────────
   const buildKoBracketGraph = (B, doubleElim=true) => {
@@ -14444,11 +14086,11 @@ export default function TrainingsApp() {
   // ── TTC MANNSCHAFTEN ─────────────────────────────────────────────────────
   if (view === 'ttcMannschaften' && canAccessTeams()) {
     if (clubTeams === null && !clubTeamsLoading) fetchClubTeams();
-    const favId = userProfile?.favoriteTeamId || null;
+    const favIds = userProfile?.favoriteTeamIds || [];
     const groupLabel = name => /^Damen/i.test(name) ? 'Damen' : /^Erwachsene/i.test(name) ? 'Herren' : 'Jugend';
     const grouped = {};
-    (clubTeams||[]).filter(t=>t.teamId!==favId).forEach(t => { (grouped[groupLabel(t.name)] = grouped[groupLabel(t.name)]||[]).push(t); });
-    const favTeam = (clubTeams||[]).find(t=>t.teamId===favId) || null;
+    (clubTeams||[]).filter(t=>!favIds.includes(t.teamId)).forEach(t => { (grouped[groupLabel(t.name)] = grouped[groupLabel(t.name)]||[]).push(t); });
+    const favTeams = favIds.map(id=>(clubTeams||[]).find(t=>t.teamId===id)).filter(Boolean);
     const openTeam = t => { if (!t.url) return; const a=document.createElement('a'); a.href=t.url; a.target='_blank'; a.rel='noopener noreferrer'; document.body.appendChild(a); a.click(); document.body.removeChild(a); };
     const fmtNextMatch = nm => {
       if (!nm) return null;
@@ -14464,8 +14106,10 @@ export default function TrainingsApp() {
         <button onClick={()=>toggleFavoriteTeam(t.teamId)} title={isFav?'Favorit entfernen':'Als Favorit markieren'}
           style={{background:'none',border:'none',cursor:'pointer',fontSize:'20px',padding:0,flexShrink:0,lineHeight:1,opacity:isFav?1:0.35}}>{isFav?'⭐':'☆'}</button>
         <button onClick={()=>openTeam(t)} disabled={!t.url} style={{flex:1,minWidth:0,background:'none',border:'none',cursor:t.url?'pointer':'default',textAlign:'left',padding:0}}>
-          <p style={{margin:0,fontWeight:'800',color:'white',fontSize:'14px'}}>{t.name}</p>
-          <p style={{margin:'2px 0 0',fontSize:'12px',color:'rgba(45,212,191,0.7)'}}>{t.league}{t.currentRank&&t.leagueSize?` · Platz ${t.currentRank}/${t.leagueSize}`:''}</p>
+          <p style={{margin:0,display:'flex',alignItems:'baseline',gap:'6px',flexWrap:'wrap'}}>
+            <span style={{fontWeight:'800',color:'white',fontSize:'14px'}}>{t.name}</span>
+            <span style={{fontSize:'12px',color:'rgba(45,212,191,0.7)'}}>{t.league}{t.currentRank&&t.leagueSize?` · Platz ${t.currentRank}/${t.leagueSize}`:''}</span>
+          </p>
           <p style={{margin:'4px 0 0',fontSize:'12px',color:t.nextMatch?'#fbbf24':'rgba(255,255,255,0.3)',fontWeight:'700'}}>Nächstes Spiel: {fmtNextMatch(t.nextMatch)||'–'}</p>
         </button>
         {t.url && <span style={{fontSize:'12px',color:'rgba(255,255,255,0.3)',flexShrink:0}}>↗</span>}
@@ -14478,13 +14122,15 @@ export default function TrainingsApp() {
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🏓 TTC Mannschaften</h1>
         </div>
         <div style={{padding:'16px 14px',maxWidth:'700px',margin:'0 auto'}}>
-          <p style={{margin:'0 0 16px',fontSize:'12px',color:'rgba(255,255,255,0.4)',lineHeight:'1.5'}}>Alle Mannschaften des TTC Grün-Weiß Staffel, live von mytischtennis.de. ⭐ markiert deine Favoritenmannschaft — die steht dann immer ganz oben. Antippen führt direkt zur jeweiligen Mannschaftsseite (Kader, Tabelle, Spielplan).</p>
+          <p style={{margin:'0 0 16px',fontSize:'12px',color:'rgba(255,255,255,0.4)',lineHeight:'1.5'}}>Alle Mannschaften des TTC Grün-Weiß Staffel, live von mytischtennis.de. ⭐ markiert bis zu {MAX_FAVORITE_TEAMS} Favoritenmannschaften — die stehen dann immer ganz oben. Antippen führt direkt zur jeweiligen Mannschaftsseite (Kader, Tabelle, Spielplan).</p>
           {clubTeamsLoading && clubTeams===null && <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.3)'}}>⏳ Lade Mannschaften…</div>}
           {clubTeams!==null && clubTeams.length===0 && !clubTeamsLoading && <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.3)'}}>Mannschaften konnten nicht geladen werden.</div>}
-          {favTeam && (
+          {favTeams.length>0 && (
             <div style={{marginBottom:'18px'}}>
-              <p style={{margin:'0 0 8px',fontSize:'11px',fontWeight:'800',color:'rgba(251,191,36,0.7)',textTransform:'uppercase',letterSpacing:'1px'}}>⭐ Favorit</p>
-              <TeamTile t={favTeam} isFav={true}/>
+              <p style={{margin:'0 0 8px',fontSize:'11px',fontWeight:'800',color:'rgba(251,191,36,0.7)',textTransform:'uppercase',letterSpacing:'1px'}}>⭐ Favoriten</p>
+              <div style={{display:'grid',gap:'6px'}}>
+                {favTeams.map(t=><TeamTile key={t.teamId} t={t} isFav={true}/>)}
+              </div>
             </div>
           )}
           {['Damen','Herren','Jugend'].filter(g=>grouped[g]?.length).map(g=>(
