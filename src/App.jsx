@@ -669,7 +669,7 @@ export default function TrainingsApp() {
 
   const [trainingDate, setTrainingDate]         = useState(new Date().toISOString().split('T')[0]);
   const [newSubgroupName, setNewSubgroupName]   = useState('');
-  const [newChildName, setNewChildName]         = useState('');
+  const [addChildSearch, setAddChildSearch]      = useState('');
   const [moveChildId, setMoveChildId]           = useState(null);
   const [newSession, setNewSession]             = useState(emptySession);
   const [recurringTemplates, setRecurringTemplates] = useState({});
@@ -3347,12 +3347,6 @@ export default function TrainingsApp() {
     if (!window.confirm('Untergruppe löschen?')) return;
     const u={...subgroups}; delete u[sid]; saveSubgroups(u);
   }
-  function addChild() {
-    if (!newChildName.trim()) return;
-    const id='child_'+Date.now();
-    saveChildren({...children,[id]:{id,name:newChildName,subgroupId:activeSubgroup.id,attendance:{}}});
-    setNewChildName('');
-  }
   // Legt ein Kind direkt aus einem bestehenden Mitgliederlisten-Eintrag (Rolle "jugendlich")
   // an, statt den Namen nochmal per Hand zu tippen — Name wird 1:1 aus der Mitgliedsdatei
   // übernommen, damit spätere Namensabgleiche (z.B. Eltern-Kind-Zuordnung) sauber greifen.
@@ -5889,28 +5883,33 @@ export default function TrainingsApp() {
             ))}
           </div>
 
-          {/* Kind hinzufügen */}
+          {/* Kind aus Mitgliedsdatei hinzufügen — nur Mitglieder (Rolle "jugendlich") können in
+              eine Trainingsgruppe aufgenommen werden, kein manuelles Freitext-Anlegen mehr. */}
           {canEdit()&&(
             <div style={{display:'grid',gap:'8px',marginBottom:'24px',paddingBottom:'24px',borderBottom:'1px solid rgba(74,222,128,0.08)'}}>
-              <div style={{display:'flex',gap:'8px'}}>
-                <input style={{...DI,flex:1,padding:'11px 14px'}} placeholder="Kind hinzufügen..." value={newChildName} onChange={e=>setNewChildName(e.target.value)} onKeyPress={e=>e.key==='Enter'&&addChild()}/>
-                <button onClick={addChild} style={{padding:'11px 18px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',gap:'6px',whiteSpace:'nowrap'}}>
-                  <Plus size={16}/> Kind
-                </button>
+              <div style={{position:'relative'}}>
+                <input style={{...DI,width:'100%',boxSizing:'border-box',padding:'11px 14px'}} placeholder="👤 Kind aus Mitgliedsdatei suchen…" value={addChildSearch} onChange={e=>setAddChildSearch(e.target.value)}/>
+                {addChildSearch.trim() && (() => {
+                  const existingNames = new Set(Object.values(children).map(c=>(c.name||'').trim().toLowerCase()));
+                  const q = addChildSearch.trim().toLowerCase();
+                  const mitgliedOptions = (jugendlicheFuerKinder||[])
+                    .filter(m => !existingNames.has(`${m.vorname} ${m.nachname}`.trim().toLowerCase()))
+                    .filter(m => `${m.vorname} ${m.nachname}`.toLowerCase().includes(q))
+                    .sort((a,b)=>`${a.nachname}${a.vorname}`.localeCompare(`${b.nachname}${b.vorname}`,'de'));
+                  return (
+                    <div style={{position:'absolute',top:'100%',left:0,right:0,marginTop:'4px',background:'#04220f',border:'1px solid rgba(74,222,128,0.3)',borderRadius:'10px',overflow:'hidden',zIndex:10,maxHeight:'240px',overflowY:'auto',boxShadow:'0 8px 24px rgba(0,0,0,0.4)'}}>
+                      {mitgliedOptions.length===0
+                        ? <div style={{padding:'10px 14px',fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>Kein passendes Mitglied gefunden.</div>
+                        : mitgliedOptions.map(m=>(
+                          <button key={m.id} onClick={()=>{addChildFromMitglied(m.id);setAddChildSearch('');}}
+                            style={{display:'block',width:'100%',textAlign:'left',padding:'10px 14px',background:'none',border:'none',borderBottom:'1px solid rgba(255,255,255,0.06)',color:'white',fontSize:'13px',cursor:'pointer'}}>
+                            {m.vorname} {m.nachname}
+                          </button>
+                        ))}
+                    </div>
+                  );
+                })()}
               </div>
-              {(() => {
-                const existingNames = new Set(Object.values(children).map(c=>(c.name||'').trim().toLowerCase()));
-                const mitgliedOptions = (jugendlicheFuerKinder||[])
-                  .filter(m => !existingNames.has(`${m.vorname} ${m.nachname}`.trim().toLowerCase()))
-                  .sort((a,b)=>`${a.nachname}${a.vorname}`.localeCompare(`${b.nachname}${b.vorname}`,'de'));
-                return (
-                  <select value="" onChange={e=>{ if (e.target.value) addChildFromMitglied(e.target.value); }}
-                    style={{...DI,padding:'11px 14px',cursor:'pointer'}}>
-                    <option value="" style={{background:'#04220f'}}>👤 Kind aus Mitgliedsdatei auswählen…</option>
-                    {mitgliedOptions.map(m=><option key={m.id} value={m.id} style={{background:'#04220f'}}>{m.vorname} {m.nachname}</option>)}
-                  </select>
-                );
-              })()}
             </div>
           )}
 
