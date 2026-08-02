@@ -243,6 +243,15 @@ const calcAge = (geburtsdatum) => {
   if (m < 0 || (m === 0 && now.getDate() < bd.getDate())) age--;
   return age;
 };
+// Formatiert ein ISO-Datum (YYYY-MM-DD) als deutsches Datum (TT.MM.JJJJ) für Excel-Exporte —
+// als reiner Text, damit Excel es nicht je nach Windows-Ländereinstellung als US-Datum
+// (Monat/Tag/Jahr) fehlinterpretiert und umformatiert.
+const fmtDateDE = (iso) => {
+  if (!iso) return '';
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return iso;
+  return `${m[3]}.${m[2]}.${m[1]}`;
+};
 const ZAHLART_LABELS = { b: 'Barzahler', s: 'SEPA-Lastschrift' };
 const GESCHLECHT_LABELS = { m: 'Männlich', w: 'Weiblich', d: 'Divers' };
 
@@ -12218,12 +12227,14 @@ export default function TrainingsApp() {
                 else if (f.key==='nachname') row[f.label]=m.nachname||'';
                 else if (f.key==='excelMitgliedId') row[f.label]=m.excelMitgliedId??'';
                 else if (f.key==='rollen') row[f.label]=getRoles(m).map(r=>ROLE_OPTIONS.find(o=>o.key===r)?.label||r).join(', ');
-                else if (f.key==='geburtsdatum') row[f.label]=m.geburtsdatum||'';
+                else if (f.key==='geburtsdatum') row[f.label]=fmtDateDE(m.geburtsdatum);
                 else if (f.key==='alter') row[f.label]=calcAge(m.geburtsdatum)??'';
                 else if (f.key==='geschlecht') row[f.label]=GESCHLECHT_LABELS[fin.geschlecht]||'';
                 else if (f.key==='email') row[f.label]=m.email||'';
                 else if (f.key==='zahlart') row[f.label]=ZAHLART_LABELS[fin.zahlart]||'';
                 else if (f.key==='beitragsart') row[f.label]=BEITRAGSARTEN.find(a=>a.key===fin.beitragsart)?.label||'';
+                else if (f.key==='eintrittsdatum') row[f.label]=fmtDateDE(fin.eintrittsdatum);
+                else if (f.key==='sepaMandatsDatum') row[f.label]=fmtDateDE(fin.sepaMandatsDatum);
                 else if (f.key==='aemterUndEhrentitel') row[f.label]=formatAemter(m);
                 else row[f.label]=fin[f.key]??'';
               });
@@ -12272,7 +12283,7 @@ export default function TrainingsApp() {
               if (!gy) return;
               const alter = jahr - gy;
               if (alter > 0 && alter % 5 === 0) {
-                rows.push({ Vorname: m.vorname||'', Nachname: m.nachname||'', Geburtsdatum: m.geburtsdatum, [`Wird ${jahr} Jahre alt`]: alter, 'E-Mail': m.email||'' });
+                rows.push({ Vorname: m.vorname||'', Nachname: m.nachname||'', Geburtsdatum: fmtDateDE(m.geburtsdatum), [`Wird ${jahr} Jahre alt`]: alter, 'E-Mail': m.email||'' });
               }
             });
             rows.sort((a,b)=>a.Nachname.localeCompare(b.Nachname,'de'));
@@ -12311,7 +12322,7 @@ export default function TrainingsApp() {
               if (jahre > 0 && jahre % 5 === 0) {
                 // Fester Spaltenname (nicht mit der Jahreszahl im Key mischen!) — sonst
                 // landet jede unterschiedliche Jahreszahl in einer eigenen Spalte.
-                rows.push({ Vorname: m.vorname||'', Nachname: m.nachname||'', Eintrittsdatum: eintritt, 'Mitgliedsjahre': jahre, 'E-Mail': m.email||'' });
+                rows.push({ Vorname: m.vorname||'', Nachname: m.nachname||'', Eintrittsdatum: fmtDateDE(eintritt), 'Mitgliedsjahre': jahre, 'E-Mail': m.email||'' });
               }
             });
             rows.sort((a,b)=>a.Nachname.localeCompare(b.Nachname,'de'));
@@ -12464,7 +12475,10 @@ export default function TrainingsApp() {
         <div className="ttc-sticky-hdr" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
           <button onClick={()=>navTo('home')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'9px',color:'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:'600'}}><Home size={15}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🗂️ Mitgliederverwaltung</h1>
-          <span style={{fontSize:'12px',color:'rgba(196,181,253,0.7)',fontWeight:'600'}}>{assignedCount}/{entries.length} zugeordnet</span>
+          <span title="Rollen zugeordnet = Anzahl der aktiven Mitglieder, denen mindestens eine Rolle (Admin/Trainer/Aktiver/Eltern/Jugendlicher/Passiv) zugewiesen wurde" style={{fontSize:'12px',color:'rgba(196,181,253,0.7)',fontWeight:'600',textAlign:'right',lineHeight:'1.4',cursor:'help'}}>
+            {activeEntries.length} aktive Mitglieder · {exitedEntries.length} ausgetreten<br/>
+            {assignedCount}/{activeEntries.length} Rollen zugeordnet
+          </span>
         </div>
         <div style={{padding:'16px 14px',maxWidth:'900px',margin:'0 auto'}}>
           {!userProfile?.hakenHinweisGelesen && (
@@ -12571,7 +12585,7 @@ export default function TrainingsApp() {
                   rows.push({
                     Vorname: bm.vorname||'', Nachname: bm.nachname||'',
                     IBAN: fin.iban||'⚠️ fehlt', BIC: fin.bic||'⚠️ fehlt',
-                    'SEPA-Mandatsreferenz': fin.sepaMandatsRef||'⚠️ fehlt', 'SEPA-Mandatsdatum': fin.sepaMandatsDatum||'',
+                    'SEPA-Mandatsreferenz': fin.sepaMandatsRef||'⚠️ fehlt', 'SEPA-Mandatsdatum': fmtDateDE(fin.sepaMandatsDatum),
                     Beitragsart: BEITRAGSARTEN.find(a=>a.key===fin.beitragsart)?.label||'',
                     'Betrag (€)': betrag,
                   });
@@ -12619,7 +12633,7 @@ export default function TrainingsApp() {
                   if (!fin.iban) missingIban++; if (!fin.bic) missingBic++; if (!fin.sepaMandatsRef) missingMandat++;
                   rows.push({
                     Vorname: bm.vorname||'', Nachname: bm.nachname||'',
-                    Grund: `Eintritt ${fin.eintrittsdatum} (${monateOffen}/12)`,
+                    Grund: `Eintritt ${fmtDateDE(fin.eintrittsdatum)} (${monateOffen}/12)`,
                     'Jahresbeitrag (€)': betrag, 'Anteiliger Beitrag (€)': anteilig,
                     IBAN: fin.iban||'⚠️ fehlt', BIC: fin.bic||'⚠️ fehlt', 'SEPA-Mandatsreferenz': fin.sepaMandatsRef||'⚠️ fehlt',
                   });
@@ -12637,7 +12651,7 @@ export default function TrainingsApp() {
                   if (!fin.iban) missingIban++; if (!fin.bic) missingBic++; if (!fin.sepaMandatsRef) missingMandat++;
                   rows.push({
                     Vorname: bm.vorname||'', Nachname: bm.nachname||'',
-                    Grund: `Austritt ${fin.austrittsdatum} (6/12, Jahresmitte)`,
+                    Grund: `Austritt ${fmtDateDE(fin.austrittsdatum)} (6/12, Jahresmitte)`,
                     'Jahresbeitrag (€)': betrag, 'Anteiliger Beitrag (€)': anteilig,
                     IBAN: fin.iban||'⚠️ fehlt', BIC: fin.bic||'⚠️ fehlt', 'SEPA-Mandatsreferenz': fin.sepaMandatsRef||'⚠️ fehlt',
                   });
