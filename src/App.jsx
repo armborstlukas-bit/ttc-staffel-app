@@ -3520,7 +3520,7 @@ export default function TrainingsApp() {
   }
 
   // ── PASSIVES MITGLIED: stark eingeschränkter Bereich ──────────────────────
-  if (userRole === 'passiv' && !['ttcnews','kalender','tippspiel','wettenZitate','ttcMannschaften','spielplan'].includes(view)) {
+  if (userRole === 'passiv' && !['ttcnews','kalender','tippspiel','wettenZitate','ttcMannschaften','spielplan','verbesserungswuensche'].includes(view)) {
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px'}}>
@@ -3562,6 +3562,7 @@ export default function TrainingsApp() {
                   {label:'TTC News', icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.08)', border:'rgba(74,222,128,0.2)', action:()=>{navTo('ttcnews');fetchTtcNews();}},
                   {label:'Vereinskalender', icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.2)', action:()=>{navTo('kalender');fetchKalender();}},
                   ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
+                  {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.07)', border:'rgba(196,181,253,0.2)', blink: verbesserungenNeedsAttention, action:openVerbesserungen},
                 ],
               },
               {
@@ -3576,7 +3577,7 @@ export default function TrainingsApp() {
                 <p style={{color:cat.color,fontSize:'10px',fontWeight:'800',textTransform:'uppercase',letterSpacing:'2px',margin:'0 0 10px'}}>⬡ {cat.label}</p>
                 <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(110px,1fr))',gap:'8px'}}>
                   {cat.links.map((ql,i)=>(
-                    <button key={i} onClick={ql.action} style={QL_STYLE_PA(ql.bg,ql.border)}
+                    <button key={i} onClick={ql.action} className={ql.blink?'ttc-blink':''} style={QL_STYLE_PA(ql.bg,ql.border)}
                       onMouseEnter={e=>e.currentTarget.style.transform='translateY(-2px)'}
                       onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
                       <span style={{fontSize:'24px',lineHeight:1}}>{ql.icon}</span>
