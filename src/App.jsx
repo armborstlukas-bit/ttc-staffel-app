@@ -2586,7 +2586,12 @@ export default function TrainingsApp() {
     const updated = {...currentSessions};
     let changed = false;
     Object.values(templates).forEach(tmpl => {
-      const start = new Date(today);
+      // Nie vor dem gewählten Startdatum der Dauereinheit materialisieren — vorher wurde hier
+      // immer ab "heute" gesucht, auch wenn der Admin einen Start in der Zukunft ausgewählt
+      // hatte, wodurch Termine vor dem gewünschten Startzeitpunkt entstanden sind.
+      const templateStart = new Date(tmpl.startDate ? tmpl.startDate+'T12:00:00' : today);
+      templateStart.setHours(0,0,0,0);
+      const start = new Date(today > templateStart ? today : templateStart);
       const diff = (tmpl.dayOfWeek - start.getDay() + 7) % 7;
       start.setDate(start.getDate() + diff);
       const cur = new Date(start);
