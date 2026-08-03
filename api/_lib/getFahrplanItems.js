@@ -1,10 +1,46 @@
 // Liest den offiziellen Spielplan von mytischtennis.de (click-tt) fuer Termine/Teams/Halle.
 // Fahrer/Betreuer und Treffpunkt werden weiterhin nur im Google-Sheet manuell gepflegt —
-// die werden hier per Datum+Liga (Fallback: Datum+Teams) automatisch aus dem Sheet
-// zugeordnet, bei jedem Aufruf neu. Manuelle Zuweisungen ueber die App (fahrplanOverrides)
-// haben Vorrang vor dem Sheet-Abgleich.
+// die werden hier automatisch aus dem Sheet zugeordnet, bei jedem Aufruf neu. Manuelle
+// Zuweisungen ueber die App (fahrplanOverrides) haben Vorrang vor dem Sheet-Abgleich.
 import { fetchFahrplanSheetItems } from './fetchFahrplanSheet.js';
 import { adminDb } from './firebaseAdmin.js';
+
+// Ordnet ein echtes Spiel (aus dem offiziellen Spielplan) genau EINER Sheet-Zeile zu.
+// Frueher wurde nur nach Datum+Liga gesucht (Fallback Datum+Teams) — das kollidierte, sobald
+// zwei Spiele am selben Tag in derselben Liga stattfanden (z.B. zwei J15KL-Spiele am selben
+// Tag): beide Spiele bekamen dieselbe Sheet-Zeile und damit denselben Fahrer zugewiesen, ohne
+// dass das auffiel (genau das ist Benjamin Blech im Dezember passiert).
+//
+// Jetzt wird von der EINDEUTIGSTEN zur ungenauesten Ebene durchprobiert, und auf jeder Ebene
+// nur zugeschlagen, wenn dort GENAU EIN Kandidat übrig bleibt:
+//   1) Datum + Heim + Gast + Anpfiffzeit  — eindeutig, auch bei einem Doppelspieltag mit
+//      identischer Paarung am selben Tag, solange die Anpfiffzeiten sich unterscheiden
+//      (was bei echten Doppelspieltagen praktisch immer der Fall ist).
+//   2) Datum + Heim + Gast (ohne Zeit)    — greift, falls im Sheet die Uhrzeit fehlt/abweicht.
+//   3) Datum + Liga                        — nur als letzter Rueckfall, und auch nur, wenn es
+//      an dem Tag in der Liga wirklich nur EIN Spiel gibt.
+// Bleiben auf KEINER Ebene eindeutig, wird lieber gar kein automatischer Fahrer gezeigt als
+// versehentlich der falsche — ein leeres Feld faellt sofort auf, ein falscher Name nicht.
+function buildFahrplanMatcher(sheetItems) {
+  const addTo = (map, key, row) => { (map.get(key) || map.set(key, []).get(key)).push(row); };
+  const byExact = new Map();
+  const byTeams = new Map();
+  const byLiga = new Map();
+  sheetItems.forEach(s => {
+    addTo(byExact, `${s.datum}|${s.heim}|${s.gast}|${s.zeit}`, s);
+    addTo(byTeams, `${s.datum}|${s.heim}|${s.gast}`, s);
+    addTo(byLiga, `${s.datum}|${s.liga}`, s);
+  });
+  return (datum, heim, gast, zeit, liga) => {
+    let cands = byExact.get(`${datum}|${heim}|${gast}|${zeit}`);
+    if (cands?.length === 1) return cands[0];
+    cands = byTeams.get(`${datum}|${heim}|${gast}`);
+    if (cands?.length === 1) return cands[0];
+    cands = byLiga.get(`${datum}|${liga}`);
+    if (cands?.length === 1) return cands[0];
+    return null;
+  };
+}
 
 const SPIELPLAN_URL = 'https://www.mytischtennis.de/click-tt/HeTTV/26--27/verein/33066/TTC_G.-W._Staffel_1953/spielplan?date_start=2026-08-01&date_end=2027-05-31';
 
@@ -26,12 +62,7 @@ export async function getFahrplanItems() {
 
   let sheetItems = [];
   try { sheetItems = await fetchFahrplanSheetItems(); } catch { /* Sheet optional, ohne Abgleich weitermachen */ }
-  const byLiga = new Map();
-  const byTeams = new Map();
-  sheetItems.forEach(s => {
-    byLiga.set(`${s.datum}|${s.liga}`, s);
-    byTeams.set(`${s.datum}|${s.heim}|${s.gast}`, s);
-  });
+  const findSheetMatch = buildFahrplanMatcher(sheetItems);
 
   let overrides = {};
   try {
@@ -57,7 +88,7 @@ export async function getFahrplanItems() {
       const isHeimspiel = /TTC G\.?-?W\.? Staffel/i.test(heim);
       const ourTeam = isHeimspiel ? heim : (/TTC G\.?-?W\.? Staffel/i.test(gast) ? gast : '');
       const ourTeamId = isHeimspiel ? (g.team_home_id || '') : (g.team_away_id || '');
-      const match = byLiga.get(`${datum}|${ligaCode}`) || byTeams.get(`${datum}|${heim}|${gast}`);
+      const match = findSheetMatch(datum, heim, gast, g.formattedTime || '', ligaCode);
       const meetingId = g.meeting_id || '';
       const override = meetingId ? overrides[meetingId] : null;
 
