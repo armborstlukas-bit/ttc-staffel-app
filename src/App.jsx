@@ -386,6 +386,73 @@ function AchievementUnlockCelebration({ queue, onDone, eyebrow, ctaLabel }) {
   );
 }
 
+// ── Feier-/Aufmunterungs-Animation nach dem monatlichen TTR-Import ──────────────
+// Zeigt jedem Spieler beim nächsten App-Öffnen, wie sich sein TTR-Wert seit dem letzten
+// Monat verändert hat — bei einem Plus etwas Lobendes mit Konfetti, bei einem Minus etwas
+// Aufbauendes ohne Konfetti (kein Grund zum Feiern, aber auch kein Grund zum Frust).
+function TtrMonthlyChangeCelebration({ queue, onDone }) {
+  const [idx, setIdx] = useState(0);
+  const confetti = React.useMemo(() => Array.from({ length: 36 }, (_, i) => ({
+    left: Math.random() * 100,
+    delay: Math.random() * 1.4,
+    duration: 2.6 + Math.random() * 1.8,
+    color: ['#fbbf24', '#f59e0b', '#ffffff', '#fde68a', '#b45309'][i % 5],
+    rotate: Math.random() * 360,
+    size: 7 + Math.random() * 6,
+  })), []);
+  if (!queue || queue.length === 0) return null;
+  const item = queue[idx];
+  const positive = item.delta > 0;
+  const isLast = idx >= queue.length - 1;
+  const next = () => { if (isLast) onDone(); else setIdx(i => i + 1); };
+  const theme = positive
+    ? { bg:'radial-gradient(circle at 50% 38%, rgba(146,64,14,0.55), rgba(0,0,0,0.88) 70%)', ring:'#fbbf24', ring2:'#fde68a', badge:'radial-gradient(circle at 35% 30%, #fbbf24, #b45309 70%)', badgeGlow:'rgba(251,191,36,0.25)', eyebrow:'#fde68a', cta:'linear-gradient(135deg,#fbbf24,#b45309)', ctaGlow:'rgba(180,83,9,0.5)' }
+    : { bg:'radial-gradient(circle at 50% 38%, rgba(30,58,138,0.5), rgba(0,0,0,0.88) 70%)', ring:'#60a5fa', ring2:'#93c5fd', badge:'radial-gradient(circle at 35% 30%, #60a5fa, #1d4ed8 70%)', badgeGlow:'rgba(96,165,250,0.25)', eyebrow:'#93c5fd', cta:'linear-gradient(135deg,#60a5fa,#1d4ed8)', ctaGlow:'rgba(29,78,216,0.5)' };
+  const deltaLabel = `${positive?'+':''}${item.delta}`;
+  return (
+    <Modal>
+      <div onClick={next} style={{position:'fixed',inset:0,zIndex:99999,cursor:'pointer',overflow:'hidden',
+        background:theme.bg, display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
+        {positive && confetti.map((c,i) => (
+          <span key={i} className="ttc-confetti-piece" style={{
+            left:`${c.left}%`, background:c.color, borderRadius: i%3===0?'50%':'2px',
+            width:`${c.size}px`, height:`${c.size*1.5}px`,
+            animationDuration:`${c.duration}s`, animationDelay:`${c.delay}s`,
+            transform:`rotate(${c.rotate}deg)`,
+          }}/>
+        ))}
+        <div onClick={e=>e.stopPropagation()} style={{position:'relative',textAlign:'center',maxWidth:'380px',width:'100%'}}>
+          <div style={{position:'relative',width:'170px',height:'170px',margin:'0 auto 18px',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            {positive && <span className="ttc-unlock-ring" style={{position:'absolute',inset:0,borderRadius:'50%',border:`3px solid ${theme.ring}`}}/>}
+            {positive && <span className="ttc-unlock-ring" style={{position:'absolute',inset:0,borderRadius:'50%',border:`3px solid ${theme.ring2}`,animationDelay:'0.4s'}}/>}
+            <div style={{position:'relative',width:'150px',height:'150px',borderRadius:'50%',
+              background:theme.badge, border:'5px solid white',display:'flex',alignItems:'center',justifyContent:'center',
+              boxShadow:`0 0 0 6px ${theme.badgeGlow}`}}>
+              <span style={{fontSize:'42px',fontWeight:'900',color:'white',textShadow:'0 2px 6px rgba(0,0,0,0.4)'}}>{deltaLabel}</span>
+            </div>
+          </div>
+          <img src="/logo.png" alt="TTC Logo" style={{width:'34px',height:'34px',objectFit:'contain',opacity:0.9,marginBottom:'10px',filter:'drop-shadow(0 2px 6px rgba(0,0,0,0.5))'}}/>
+          <p style={{margin:'0 0 6px',fontSize:'12px',fontWeight:'900',letterSpacing:'2px',textTransform:'uppercase',color:theme.eyebrow}}>{positive ? '🏓 TTR-Update' : '🏓 TTR-Update'}</p>
+          <h2 style={{margin:'0 0 10px',fontSize:'25px',fontWeight:'900',color:'white',textShadow:'0 2px 10px rgba(0,0,0,0.5)',lineHeight:1.2}}>
+            {positive ? 'Stark, weiter so! 🚀' : 'Dranbleiben lohnt sich! 💪'}
+          </h2>
+          <p style={{margin:'0 0 22px',fontSize:'14px',color:'rgba(255,255,255,0.75)',lineHeight:'1.5'}}>
+            {positive
+              ? `Dein TTR-Wert ist von ${item.oldTtr} auf ${item.newTtr} gestiegen (${deltaLabel} seit letztem Monat) — richtig gute Leistung!`
+              : `Dein TTR-Wert ist von ${item.oldTtr} auf ${item.newTtr} gesunken (${deltaLabel} seit letztem Monat) — das gehört dazu, das hat jeder mal. Weiter fleißig trainieren, der nächste Aufschwung kommt bestimmt!`}
+          </p>
+          {queue.length > 1 && (
+            <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.4)',fontWeight:'700'}}>{idx+1} / {queue.length}</p>
+          )}
+          <button onClick={next} style={{padding:'13px 34px',background:theme.cta,color:'white',border:'none',borderRadius:'99px',cursor:'pointer',fontWeight:'800',fontSize:'15px',boxShadow:`0 8px 24px ${theme.ctaGlow}`}}>
+            {isLast ? (positive ? '🎉 Danke!' : '💪 Alles klar') : 'Weiter →'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 // ── Spieler des Monats/Jahres: individuell gestaltete Auszeichnungs-Kachel je Monat ──
 const MONTH_THEMES = [
   { name:'Januar',    grad:'linear-gradient(150deg,#38bdf8 0%,#0369a1 100%)', icon:'❄️' },
@@ -3088,6 +3155,53 @@ export default function TrainingsApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userRole, children, ranglisteAch, userProfile]);
 
+  // Prüft einmal pro App-Start, ob sich der EIGENE TTR-Wert (als Aktiver: der eigene verlinkte
+  // Spieler; als Eltern/Jugendlicher: das/die eigene(n) verknüpfte(n) Kind(er)) seit dem
+  // letzten TTR-Import verändert hat, und queued dafür die Lob-/Aufmunterungs-Animation.
+  // "Gesehen" wird pro Person+Monat in localStorage gemerkt, damit es nicht bei jedem
+  // Öffnen erneut erscheint, aber bei einem neuen Import-Monat wieder auslöst.
+  const [ttrChangeQueue, setTtrChangeQueue] = useState([]);
+  const ttrChangeCheckDone = useRef(false);
+  const ttrChangeCheckUid = useRef(null);
+  useEffect(() => {
+    if (ttrChangeCheckUid.current !== (user?.uid || null)) {
+      ttrChangeCheckUid.current = user?.uid || null;
+      ttrChangeCheckDone.current = false;
+      setTtrChangeQueue([]);
+    }
+  }, [user?.uid]);
+  useEffect(() => {
+    if (ttrChangeCheckDone.current) return;
+    if (!user?.uid) return;
+    if (Object.keys(ttrHistory).length === 0) return;
+    ttrChangeCheckDone.current = true;
+
+    const targets = []; // { refId, name }
+    if (userProfile?.linkedPlayerId) {
+      const sp = aktiveSpieler[userProfile.linkedPlayerId];
+      if (sp) targets.push({ refId: userProfile.linkedPlayerId, name: sp.name });
+    }
+    getMyLinkedChildIds().forEach(cid => {
+      const c = children[cid];
+      if (c) targets.push({ refId: cid, name: c.name });
+    });
+
+    const items = [];
+    targets.forEach(({ refId, name }) => {
+      const hist = (ttrHistory[refId]?.entries || []).slice().sort((a,b)=>a.month.localeCompare(b.month));
+      if (hist.length < 2) return;
+      const latest = hist[hist.length-1];
+      const prev = hist[hist.length-2];
+      const delta = latest.ttr - prev.ttr;
+      if (delta === 0) return;
+      const seenKey = `ttrChangeSeen_${user.uid}_${refId}_${latest.month}`;
+      if (localStorage.getItem(seenKey)) return;
+      items.push({ refId, name, delta, oldTtr: prev.ttr, newTtr: latest.ttr, month: latest.month, seenKey });
+    });
+    if (items.length > 0) setTtrChangeQueue(items);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ttrHistory, userProfile, aktiveSpieler, children, user?.uid]);
+
   const deleteArchivedSession = (id) => {
     if (!window.confirm('Eintrag wirklich endgültig aus dem Archiv löschen? Das kann nicht rückgängig gemacht werden.')) return;
     const u = {...archivedSessions}; delete u[id]; saveArchivedSessions(u);
@@ -4546,6 +4660,11 @@ export default function TrainingsApp() {
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#0c1a2e 0%,#0e2a3a 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
 
+        {ttrChangeQueue.length>0 && <TtrMonthlyChangeCelebration queue={ttrChangeQueue} onDone={()=>{
+            ttrChangeQueue.forEach(it => localStorage.setItem(it.seenKey, '1'));
+            setTtrChangeQueue([]);
+          }}/>}
+
         {/* Rollenwechsel-Modal */}
         {showRolePicker&&(
           <Modal>
@@ -4977,6 +5096,10 @@ export default function TrainingsApp() {
             Object.entries(byChild).forEach(([cid,keys]) => markAchievementsSeen(cid, keys));
             setUnlockCelebrationQueue([]);
           }}/>}
+          {unlockCelebrationQueue.length===0 && ttrChangeQueue.length>0 && <TtrMonthlyChangeCelebration queue={ttrChangeQueue} onDone={()=>{
+            ttrChangeQueue.forEach(it => localStorage.setItem(it.seenKey, '1'));
+            setTtrChangeQueue([]);
+          }}/>}
           {ptDetailModal&&(()=>{
             const mpt=ptDetailModal;const mPlayers=mpt.players||[];const mMatches=mpt.matches||[];const isArchived=!!mpt.archivedAt;
             const placeEmojiM=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
@@ -5016,6 +5139,10 @@ export default function TrainingsApp() {
             unlockCelebrationQueue.forEach(a => { (byChild[a.childId] = byChild[a.childId]||[]).push(a.key); });
             Object.entries(byChild).forEach(([cid,keys]) => markAchievementsSeen(cid, keys));
             setUnlockCelebrationQueue([]);
+          }}/>}
+        {unlockCelebrationQueue.length===0 && ttrChangeQueue.length>0 && <TtrMonthlyChangeCelebration queue={ttrChangeQueue} onDone={()=>{
+            ttrChangeQueue.forEach(it => localStorage.setItem(it.seenKey, '1'));
+            setTtrChangeQueue([]);
           }}/>}
 
         {/* Profil-Modal */}
