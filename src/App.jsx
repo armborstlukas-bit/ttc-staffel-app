@@ -375,7 +375,7 @@ function AchievementUnlockCelebration({ queue, onDone, eyebrow, ctaLabel }) {
           <h2 style={{margin:'0 0 10px',fontSize:'25px',fontWeight:'900',color:'white',textShadow:'0 2px 10px rgba(0,0,0,0.5)',lineHeight:1.2}}>{item.title}</h2>
           <p style={{margin:'0 0 22px',fontSize:'14px',color:'rgba(255,255,255,0.75)',lineHeight:'1.5'}}>{item.desc}</p>
           {queue.length > 1 && (
-            <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.4)',fontWeight:'700'}}>{idx+1} / {queue.length}</p>
+            <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.58)',fontWeight:'700'}}>{idx+1} / {queue.length}</p>
           )}
           <button onClick={next} style={{padding:'13px 34px',background:'linear-gradient(135deg,#4ade80,#16a34a)',color:'white',border:'none',borderRadius:'99px',cursor:'pointer',fontWeight:'800',fontSize:'15px',boxShadow:'0 8px 24px rgba(22,163,74,0.5)'}}>
             {isLast ? (ctaLabel || '🎊 Klasse!') : 'Weiter →'}
@@ -442,7 +442,7 @@ function TtrMonthlyChangeCelebration({ queue, onDone }) {
               : `Dein TTR-Wert ist von ${item.oldTtr} auf ${item.newTtr} gesunken (${deltaLabel} seit letztem Monat) — das gehört dazu, das hat jeder mal. Weiter fleißig trainieren, der nächste Aufschwung kommt bestimmt!`}
           </p>
           {queue.length > 1 && (
-            <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.4)',fontWeight:'700'}}>{idx+1} / {queue.length}</p>
+            <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.58)',fontWeight:'700'}}>{idx+1} / {queue.length}</p>
           )}
           <button onClick={next} style={{padding:'13px 34px',background:theme.cta,color:'white',border:'none',borderRadius:'99px',cursor:'pointer',fontWeight:'800',fontSize:'15px',boxShadow:`0 8px 24px ${theme.ctaGlow}`}}>
             {isLast ? (positive ? '🎉 Danke!' : '💪 Alles klar') : 'Weiter →'}
@@ -1274,7 +1274,7 @@ export default function TrainingsApp() {
           {available.map(u=><option key={u.uid} value={u.uid} style={{color:'#111'}}>{u.name||u.email}</option>)}
         </select>
         {currentList.length===0
-          ? <span style={{color:'rgba(255,255,255,0.4)',fontStyle:'italic'}}>niemand zusätzlich freigeschaltet</span>
+          ? <span style={{color:'rgba(255,255,255,0.58)',fontStyle:'italic'}}>niemand zusätzlich freigeschaltet</span>
           : currentList.map(uid=>{
             const u=allUsers[uid];
             return (
@@ -3505,7 +3505,7 @@ export default function TrainingsApp() {
                 {resetStatus==='sending'?'⏳ Sende…':'📧 Reset-Link senden'}
               </button>
               <button type="button" onClick={()=>{setShowResetScreen(false);setResetStatus(null);}}
-                style={{padding:'11px',background:'transparent',color:'rgba(255,255,255,0.4)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',fontSize:'14px',fontWeight:'600',cursor:'pointer'}}>
+                style={{padding:'11px',background:'transparent',color:'rgba(255,255,255,0.58)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',fontSize:'14px',fontWeight:'600',cursor:'pointer'}}>
                 ← Zurück zum Login
               </button>
             </form>
@@ -3546,7 +3546,7 @@ export default function TrainingsApp() {
               <input type={showLoginPassword?'text':'password'} placeholder="Passwort (min. 6 Zeichen)" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} required
                 style={{padding:'12px 44px 12px 16px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'12px',color:'white',fontSize:'15px',outline:'none',width:'100%',boxSizing:'border-box'}}/>
               <button type="button" onClick={()=>setShowLoginPassword(v=>!v)}
-                style={{position:'absolute',right:'12px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.35)',fontSize:'18px',lineHeight:1,padding:'2px'}}>
+                style={{position:'absolute',right:'12px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.52)',fontSize:'18px',lineHeight:1,padding:'2px'}}>
                 {showLoginPassword?'🙈':'👁️'}
               </button>
             </div>
@@ -3555,7 +3555,7 @@ export default function TrainingsApp() {
                 style={{padding:'12px 16px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'12px',color:'white',fontSize:'15px',outline:'none',width:'100%',boxSizing:'border-box'}}/>
             )}
             {authMode==='login'&&(
-              <label style={{display:'flex',alignItems:'center',gap:'9px',cursor:'pointer',fontSize:'14px',color:'rgba(255,255,255,0.5)',userSelect:'none',paddingLeft:'2px'}}>
+              <label style={{display:'flex',alignItems:'center',gap:'9px',cursor:'pointer',fontSize:'14px',color:'rgba(255,255,255,0.65)',userSelect:'none',paddingLeft:'2px'}}>
                 <input type="checkbox" checked={stayLoggedIn} onChange={e=>setStayLoggedIn(e.target.checked)}
                   style={{width:'16px',height:'16px',cursor:'pointer',accentColor:'#4ade80'}}/>
                 Eingeloggt bleiben
@@ -3608,7 +3608,7 @@ export default function TrainingsApp() {
 
           {/* Card */}
           <div style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(74,222,128,0.15)',borderRadius:'24px',padding:'28px',boxShadow:'0 32px 80px rgba(0,0,0,0.5)'}}>
-            <p style={{margin:'0 0 20px',color:'rgba(255,255,255,0.4)',fontSize:'14px',textAlign:'center',fontWeight:'500'}}>Mit welcher Rolle möchtest du fortfahren?</p>
+            <p style={{margin:'0 0 20px',color:'rgba(255,255,255,0.58)',fontSize:'14px',textAlign:'center',fontWeight:'500'}}>Mit welcher Rolle möchtest du fortfahren?</p>
             <div style={{display:'grid',gap:'10px'}}>
               {selectableRoles.map(role => {
                 const ra = roleAccents[role] || {icon:'👤',accent:'rgba(255,255,255,0.7)',accentBg:'rgba(255,255,255,0.05)',accentBorder:'rgba(255,255,255,0.15)',desc:''};
@@ -3620,7 +3620,7 @@ export default function TrainingsApp() {
                     <div style={{width:'48px',height:'48px',borderRadius:'13px',background:`rgba(0,0,0,0.2)`,border:`1px solid ${ra.accentBorder}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'24px',flexShrink:0}}>{ra.icon}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <p style={{margin:'0 0 3px',fontWeight:'800',fontSize:'16px',color:ra.accent}}>{ROLE_CONFIG[role]?.label||role}</p>
-                      <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)',lineHeight:'1.4'}}>{ra.desc}</p>
+                      <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.52)',lineHeight:'1.4'}}>{ra.desc}</p>
                     </div>
                     <span style={{color:ra.accentBorder,fontSize:'18px',flexShrink:0}}>›</span>
                   </button>
@@ -3628,7 +3628,7 @@ export default function TrainingsApp() {
               })}
             </div>
             <div style={{marginTop:'20px',paddingTop:'16px',borderTop:'1px solid rgba(255,255,255,0.06)',textAlign:'center'}}>
-              <button onClick={handleLogout} style={{background:'none',border:'none',color:'rgba(255,255,255,0.25)',cursor:'pointer',fontSize:'13px',fontWeight:'600'}}>
+              <button onClick={handleLogout} style={{background:'none',border:'none',color:'rgba(255,255,255,0.42)',cursor:'pointer',fontSize:'13px',fontWeight:'600'}}>
                 Abmelden
               </button>
             </div>
@@ -3715,7 +3715,7 @@ export default function TrainingsApp() {
           <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
             <div style={{background:'#0a2210',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'20px',padding:'28px',maxWidth:'400px',width:'100%',boxShadow:'0 32px 80px rgba(0,0,0,0.7)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
               <h3 style={{margin:'0 0 2px',color:'white',fontSize:'20px',fontWeight:'800'}}>Mein Profil</h3>
-              <p style={{margin:'0 0 22px',color:'rgba(255,255,255,0.35)',fontSize:'13px'}}>{user?.email}</p>
+              <p style={{margin:'0 0 22px',color:'rgba(255,255,255,0.52)',fontSize:'13px'}}>{user?.email}</p>
               <h4 style={{margin:'0 0 10px',color:'#4ade80',fontSize:'13px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.5px'}}>Passwort ändern</h4>
               {pwSuccess&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(74,222,128,0.12)',border:'1px solid rgba(74,222,128,0.25)',borderRadius:'10px',fontSize:'13px',color:'#4ade80',fontWeight:'600'}}>✅ Passwort erfolgreich geändert!</div>}
               {pwError&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',fontSize:'13px',color:'#fca5a5'}}>{pwError}</div>}
@@ -3727,7 +3727,7 @@ export default function TrainingsApp() {
               </div>
               {renderNotifSettings()}
               <button onClick={()=>{setShowProfile(false);setPwError('');setPwSuccess(false);setPwCurrent('');setPwNew('');setPwConfirm('');}}
-                style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.5)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button>
+                style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.65)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button>
             </div>
           </div>
           </Modal>
@@ -3743,7 +3743,7 @@ export default function TrainingsApp() {
         <h2 style={{margin:'0 0 10px',color:'white',fontSize:'24px',fontWeight:'800',letterSpacing:'-0.3px'}}>Account wird freigeschaltet</h2>
         {userProfile?.nameConfirmed===false ? (
           <>
-            <p style={{margin:'0 0 16px',color:'rgba(255,255,255,0.45)',fontSize:'15px',lineHeight:'1.6'}}>
+            <p style={{margin:'0 0 16px',color:'rgba(255,255,255,0.6)',fontSize:'15px',lineHeight:'1.6'}}>
               Gib deinen Namen an, damit wir wissen, wer du bist:
             </p>
             <form onSubmit={e=>{e.preventDefault();submitPendingName(pendingNameInput);}} style={{display:'flex',gap:'8px',marginBottom:'32px'}}>
@@ -3753,7 +3753,7 @@ export default function TrainingsApp() {
             </form>
           </>
         ) : (
-          <p style={{margin:'0 0 32px',color:'rgba(255,255,255,0.45)',fontSize:'15px',lineHeight:'1.6'}}>
+          <p style={{margin:'0 0 32px',color:'rgba(255,255,255,0.6)',fontSize:'15px',lineHeight:'1.6'}}>
             Hallo <strong style={{color:'#4ade80'}}>{userProfile?.name}</strong>!<br/>Ein Admin schaltet deinen Account bald frei.
           </p>
         )}
@@ -3780,7 +3780,7 @@ export default function TrainingsApp() {
       <div style={{width:'100%',maxWidth:'400px',textAlign:'center'}}>
         <div style={{width:'80px',height:'80px',borderRadius:'22px',background:'linear-gradient(135deg,#991b1b,#dc2626)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'38px',margin:'0 auto 20px',boxShadow:'0 8px 32px rgba(220,38,38,0.35)'}}>🚫</div>
         <h2 style={{margin:'0 0 10px',color:'white',fontSize:'24px',fontWeight:'800',letterSpacing:'-0.3px'}}>Kein Zugriff</h2>
-        <p style={{margin:'0 0 32px',color:'rgba(255,255,255,0.5)',fontSize:'15px',lineHeight:'1.6'}}>
+        <p style={{margin:'0 0 32px',color:'rgba(255,255,255,0.65)',fontSize:'15px',lineHeight:'1.6'}}>
           Hallo <strong style={{color:'#fca5a5'}}>{userProfile?.name}</strong>, diese App steht nur Vereinsmitgliedern des TTC Grün-Weiß zur Verfügung. Falls das ein Irrtum ist, wende dich bitte an den Verein.
         </p>
         <button onClick={handleLogout}
@@ -4464,7 +4464,7 @@ export default function TrainingsApp() {
           <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
             <div style={{background:'#0a2210',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'20px',padding:'28px',maxWidth:'400px',width:'100%',boxShadow:'0 32px 80px rgba(0,0,0,0.7)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
               <h3 style={{margin:'0 0 2px',color:'white',fontSize:'20px',fontWeight:'800'}}>Mein Profil</h3>
-              <p style={{margin:'0 0 22px',color:'rgba(255,255,255,0.35)',fontSize:'13px'}}>{user?.email}</p>
+              <p style={{margin:'0 0 22px',color:'rgba(255,255,255,0.52)',fontSize:'13px'}}>{user?.email}</p>
               <h4 style={{margin:'0 0 10px',color:'#4ade80',fontSize:'13px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.5px'}}>Passwort ändern</h4>
               {pwSuccess&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(74,222,128,0.12)',border:'1px solid rgba(74,222,128,0.25)',borderRadius:'10px',fontSize:'13px',color:'#4ade80',fontWeight:'600'}}>✅ Passwort erfolgreich geändert!</div>}
               {pwError&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',fontSize:'13px',color:'#fca5a5'}}>{pwError}</div>}
@@ -4476,7 +4476,7 @@ export default function TrainingsApp() {
               </div>
               {renderNotifSettings()}
               <button onClick={()=>{setShowProfile(false);setPwError('');setPwSuccess(false);setPwCurrent('');setPwNew('');setPwConfirm('');}}
-                style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.5)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button>
+                style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.65)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button>
             </div>
           </div>
           </Modal>
@@ -4497,7 +4497,7 @@ export default function TrainingsApp() {
                   </button>
                 );
               })}
-              <button onClick={()=>setShowRolePicker(false)} style={{width:'100%',padding:'9px',background:'transparent',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',color:'rgba(255,255,255,0.4)',fontSize:'13px',marginTop:'4px'}}>Abbrechen</button>
+              <button onClick={()=>setShowRolePicker(false)} style={{width:'100%',padding:'9px',background:'transparent',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',color:'rgba(255,255,255,0.58)',fontSize:'13px',marginTop:'4px'}}>Abbrechen</button>
             </div>
           </div>
           </Modal>
@@ -4536,7 +4536,7 @@ export default function TrainingsApp() {
             </div>
             <div style={{padding:'14px 18px',display:'flex',flexDirection:'column',gap:'8px'}}>
               {pastSess.length===0&&upcomingSess.length===0
-                ? <p style={{color:'rgba(255,255,255,0.2)',fontSize:'13px',textAlign:'center',padding:'32px 0',margin:0}}>Keine Einheiten in den nächsten 14 Tagen.</p>
+                ? <p style={{color:'rgba(255,255,255,0.4)',fontSize:'13px',textAlign:'center',padding:'32px 0',margin:0}}>Keine Einheiten in den nächsten 14 Tagen.</p>
                 : <>
                   {pastSess.length>0&&<p style={{margin:'0 0 6px',fontSize:'11px',fontWeight:'700',color:'rgba(252,165,165,0.55)',textTransform:'uppercase',letterSpacing:'1px'}}>Vergangen – Anwesenheit eintragen</p>}
                   {pastSess.map(session=>{
@@ -4557,11 +4557,11 @@ export default function TrainingsApp() {
                             {archivable&&<span style={{fontSize:'10px',background:'rgba(55,65,81,0.6)',color:'#9ca3af',padding:'1px 7px',borderRadius:'20px',fontWeight:'600'}}>📦 Archivierbar</span>}
                             {session.excludeFromQuota&&<span style={{fontSize:'10px',background:'rgba(251,191,36,0.15)',color:'#fbbf24',padding:'1px 7px',borderRadius:'20px',fontWeight:'600',border:'1px solid rgba(251,191,36,0.3)'}}>⚠️ Zählt nicht zur Quote</span>}
                           </div>
-                          <span style={{fontSize:'13px',color:'rgba(255,255,255,0.5)',fontWeight:'500'}}>{new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'})} · {formatSessionTime(session)} Uhr</span>
+                          <span style={{fontSize:'13px',color:'rgba(255,255,255,0.65)',fontWeight:'500'}}>{new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'})} · {formatSessionTime(session)} Uhr</span>
                         </div>
                         {allKids2.length>0&&<div style={{textAlign:'right',flexShrink:0}}>
                           <p style={{margin:'0 0 2px',fontSize:'15px',fontWeight:'800',color:allDone?'#4ade80':'#fca5a5'}}>{recorded}/{allKids2.length}</p>
-                          <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.3)',fontWeight:'600'}}>erfasst</p>
+                          <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.48)',fontWeight:'600'}}>erfasst</p>
                         </div>}
                         <ChevronRight size={16} color="rgba(220,38,38,0.45)"/>
                       </div>
@@ -4584,7 +4584,7 @@ export default function TrainingsApp() {
                             {isToday&&<span style={{fontSize:'10px',background:'rgba(74,222,128,0.2)',color:'#4ade80',padding:'2px 9px',borderRadius:'20px',fontWeight:'800'}}>Heute</span>}
                             {session.excludeFromQuota&&<span style={{fontSize:'10px',background:'rgba(251,191,36,0.15)',color:'#fbbf24',padding:'1px 7px',borderRadius:'20px',fontWeight:'600',border:'1px solid rgba(251,191,36,0.3)'}}>⚠️ Zählt nicht zur Quote</span>}
                           </div>
-                          <span style={{fontSize:'13px',color:'rgba(255,255,255,0.5)',fontWeight:'500'}}>{new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'})} · {formatSessionTime(session)} Uhr</span>
+                          <span style={{fontSize:'13px',color:'rgba(255,255,255,0.65)',fontWeight:'500'}}>{new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'})} · {formatSessionTime(session)} Uhr</span>
                         </div>
                         <ChevronRight size={16} color={isToday?'rgba(74,222,128,0.45)':'rgba(255,255,255,0.18)'}/>
                       </div>
@@ -4670,7 +4670,7 @@ export default function TrainingsApp() {
           <Modal>
           <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.8)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
             <div style={{background:'#071520',border:`1px solid ${accentBorder}`,borderRadius:'20px',padding:'28px',maxWidth:'400px',width:'100%',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
-              <p style={{margin:'0 0 20px',color:'rgba(255,255,255,0.4)',fontSize:'14px',textAlign:'center',fontWeight:'500'}}>Mit welcher Rolle möchtest du fortfahren?</p>
+              <p style={{margin:'0 0 20px',color:'rgba(255,255,255,0.58)',fontSize:'14px',textAlign:'center',fontWeight:'500'}}>Mit welcher Rolle möchtest du fortfahren?</p>
               <div style={{display:'grid',gap:'10px'}}>
                 {(userProfile?.roles||[userRole]).filter(r=>r!=='pending').map(role=>{
                   const ra={admin:{icon:'🛡️',accent:'rgba(196,181,253,0.9)',accentBg:'rgba(196,181,253,0.1)',accentBorder:'rgba(196,181,253,0.3)',desc:'Vollzugriff auf alle Bereiche'},trainer:{icon:'🏓',accent:'rgba(134,239,172,0.9)',accentBg:'rgba(134,239,172,0.1)',accentBorder:'rgba(134,239,172,0.3)',desc:'Trainingsplanung & Gruppen'},eltern:{icon:'👨‍👩‍👧',accent:'rgba(253,230,138,0.9)',accentBg:'rgba(253,230,138,0.08)',accentBorder:'rgba(253,230,138,0.25)',desc:'Übersicht & An-/Abmeldung für dein Kind'},jugendlich:{icon:'🧒',accent:'rgba(110,231,183,0.9)',accentBg:'rgba(110,231,183,0.08)',accentBorder:'rgba(110,231,183,0.25)',desc:'Eigene Übersicht & Errungenschaften'},aktiver:{icon:'🏓',accent:'rgba(103,232,249,0.9)',accentBg:'rgba(8,145,178,0.08)',accentBorder:'rgba(8,145,178,0.3)',desc:'Aktiven-Portal & Gegnerlogbuch'}}[role]||{icon:'👤',accent:'rgba(255,255,255,0.7)',accentBg:'rgba(255,255,255,0.05)',accentBorder:'rgba(255,255,255,0.15)',desc:''};
@@ -4680,14 +4680,14 @@ export default function TrainingsApp() {
                       <div style={{width:'44px',height:'44px',borderRadius:'12px',background:'rgba(0,0,0,0.2)',border:`1px solid ${ra.accentBorder}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'22px',flexShrink:0}}>{ra.icon}</div>
                       <div style={{flex:1}}>
                         <p style={{margin:'0 0 2px',fontWeight:'800',fontSize:'15px',color:ra.accent}}>{ROLE_CONFIG[role]?.label||role}</p>
-                        <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>{ra.desc}</p>
+                        <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.52)'}}>{ra.desc}</p>
                       </div>
                       <span style={{color:ra.accentBorder,fontSize:'18px'}}>›</span>
                     </button>
                   );
                 })}
               </div>
-              <button onClick={()=>setShowRolePicker(false)} style={{marginTop:'14px',width:'100%',padding:'10px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
+              <button onClick={()=>setShowRolePicker(false)} style={{marginTop:'14px',width:'100%',padding:'10px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.58)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
             </div>
           </div>
           </Modal>
@@ -4699,7 +4699,7 @@ export default function TrainingsApp() {
           <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
             <div style={{background:'#071520',border:'1px solid rgba(8,145,178,0.2)',borderRadius:'20px',padding:'28px',maxWidth:'400px',width:'100%',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
               <h3 style={{margin:'0 0 2px',color:'white',fontSize:'20px',fontWeight:'800'}}>Mein Profil</h3>
-              <p style={{margin:'0 0 22px',color:'rgba(255,255,255,0.35)',fontSize:'13px'}}>{user?.email}</p>
+              <p style={{margin:'0 0 22px',color:'rgba(255,255,255,0.52)',fontSize:'13px'}}>{user?.email}</p>
               <h4 style={{margin:'0 0 10px',color:accentColor,fontSize:'13px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.5px'}}>Passwort ändern</h4>
               {pwSuccess&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(8,145,178,0.12)',border:'1px solid rgba(8,145,178,0.25)',borderRadius:'10px',fontSize:'13px',color:'#67e8f9',fontWeight:'600'}}>✅ Passwort geändert!</div>}
               {pwError&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',fontSize:'13px',color:'#fca5a5'}}>{pwError}</div>}
@@ -4711,7 +4711,7 @@ export default function TrainingsApp() {
               </div>
               {renderNotifSettings()}
               <button onClick={()=>{setShowProfile(false);setPwError('');setPwSuccess(false);setPwCurrent('');setPwNew('');setPwConfirm('');}}
-                style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.5)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button>
+                style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.65)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button>
             </div>
           </div>
           </Modal>
@@ -4747,9 +4747,9 @@ export default function TrainingsApp() {
                 <h1 style={{margin:0,color:'white',fontSize:isMobile?'19px':'22px',fontWeight:'800',letterSpacing:'-0.5px',lineHeight:1.1}}>
                   🏓 {timeGreeting()}
                 </h1>
-                {lastTtr&&<p style={{margin:'6px 0 0',fontSize:'14px',color:'rgba(255,255,255,0.45)',fontWeight:'500'}}>
+                {lastTtr&&<p style={{margin:'6px 0 0',fontSize:'14px',color:'rgba(255,255,255,0.6)',fontWeight:'500'}}>
                   Dein TTR: <span style={{color:'#38bdf8',fontWeight:'800'}}>{lastTtr.ttr}</span>
-                  <span style={{color:'rgba(255,255,255,0.25)',fontSize:'12px',marginLeft:'6px'}}>({lastTtr.month})</span>
+                  <span style={{color:'rgba(255,255,255,0.42)',fontSize:'12px',marginLeft:'6px'}}>({lastTtr.month})</span>
                 </p>}
               </div>
             );
@@ -4878,12 +4878,12 @@ export default function TrainingsApp() {
                   <textarea value={parentMsgText} onChange={e=>setParentMsgText(e.target.value)} placeholder="Ihre Nachricht..." rows={3} style={{...inputStyle,resize:'vertical'}}/>
                   <div style={{display:'flex',gap:'8px'}}>
                     <button onClick={sendParentMessage} style={{flex:1,padding:'10px',background:'linear-gradient(135deg,#7c3aed,#6d28d9)',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}><Send size={14}/> Senden</button>
-                    <button onClick={()=>{setShowParentCompose(false);setParentMsgTitle('');setParentMsgText('');}} style={{flex:1,padding:'10px',background:'rgba(255,255,255,0.07)',color:'rgba(255,255,255,0.5)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Abbrechen</button>
+                    <button onClick={()=>{setShowParentCompose(false);setParentMsgTitle('');setParentMsgText('');}} style={{flex:1,padding:'10px',background:'rgba(255,255,255,0.07)',color:'rgba(255,255,255,0.65)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Abbrechen</button>
                   </div>
                 </div>
               )}
               {items.length === 0
-                ? <div style={{...DARK_CARD,textAlign:'center',padding:'40px'}}><p style={{color:'rgba(255,255,255,0.2)',margin:0}}>{showTrash?'Papierkorb ist leer.':'Keine Nachrichten.'}</p></div>
+                ? <div style={{...DARK_CARD,textAlign:'center',padding:'40px'}}><p style={{color:'rgba(255,255,255,0.4)',margin:0}}>{showTrash?'Papierkorb ist leer.':'Keine Nachrichten.'}</p></div>
                 : <div style={{display:'grid',gap:'8px'}}>
                     {items.map(n=>{
                       const typeColors={achievement:{bg:'rgba(74,222,128,0.08)',border:'rgba(74,222,128,0.25)',icon:'🏅'},tournament_reminder:{bg:'rgba(253,230,138,0.08)',border:'rgba(253,230,138,0.25)',icon:'🏆'},training_reminder:{bg:'rgba(96,165,250,0.08)',border:'rgba(96,165,250,0.25)',icon:'📅'},unexcused_absences:{bg:'rgba(248,113,113,0.08)',border:'rgba(248,113,113,0.25)',icon:'❗'},trainer_message:{bg:'rgba(196,181,253,0.08)',border:'rgba(196,181,253,0.25)',icon:'💬'}};
@@ -4894,15 +4894,15 @@ export default function TrainingsApp() {
                           <span style={{fontSize:'20px',flexShrink:0,marginTop:'1px'}}>{cfg2.icon}</span>
                           <div style={{flex:1,minWidth:0}}>
                             <p style={{margin:'0 0 3px',fontWeight:'700',fontSize:'14px',color:'white'}}>{n.title}</p>
-                            <p style={{margin:'0 0 5px',fontSize:'13px',color:'rgba(255,255,255,0.55)',lineHeight:'1.4'}}>{n.message}</p>
-                            <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>{dateStr}</p>
+                            <p style={{margin:'0 0 5px',fontSize:'13px',color:'rgba(255,255,255,0.68)',lineHeight:'1.4'}}>{n.message}</p>
+                            <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.42)'}}>{dateStr}</p>
                           </div>
                           {showTrash
                             ?<div style={{display:'flex',gap:'4px',flexShrink:0}}>
                                 <button onClick={()=>restoreNotification(n.id)} style={{padding:'5px 9px',background:'rgba(74,222,128,0.12)',border:'none',borderRadius:'8px',cursor:'pointer',color:'#4ade80',fontSize:'13px',fontWeight:'700'}}>↩</button>
                                 <button onClick={()=>deleteNotificationPermanently(n.id)} style={{padding:'5px',background:'rgba(220,38,38,0.12)',border:'none',borderRadius:'8px',cursor:'pointer',color:'#f87171'}}><Trash2 size={14}/></button>
                               </div>
-                            :<button onClick={()=>trashNotification(n.id)} style={{padding:'5px',background:'rgba(255,255,255,0.06)',border:'none',borderRadius:'8px',cursor:'pointer',color:'rgba(255,255,255,0.3)',flexShrink:0}}><X size={16}/></button>
+                            :<button onClick={()=>trashNotification(n.id)} style={{padding:'5px',background:'rgba(255,255,255,0.06)',border:'none',borderRadius:'8px',cursor:'pointer',color:'rgba(255,255,255,0.48)',flexShrink:0}}><X size={16}/></button>
                           }
                         </div>
                       );
@@ -4919,7 +4919,7 @@ export default function TrainingsApp() {
               <h3 style={{margin:'0 0 12px',color:'white',fontWeight:'800',fontSize:'16px'}}>📋 Verlauf ({dates.length} Einträge)</h3>
               <div style={{display:'grid',gap:'8px',marginBottom:'24px'}}>
                 {dates.length===0
-                  ? <div style={{...DARK_CARD,textAlign:'center',padding:'32px'}}><p style={{color:'rgba(255,255,255,0.2)',margin:0}}>Noch keine Trainings erfasst.</p></div>
+                  ? <div style={{...DARK_CARD,textAlign:'center',padding:'32px'}}><p style={{color:'rgba(255,255,255,0.4)',margin:0}}>Noch keine Trainings erfasst.</p></div>
                   : dates.map(date=>{
                     const status=(myChild.attendance||{})[date];
                     const cfg=STATUS_CONFIG[status];
@@ -4931,7 +4931,7 @@ export default function TrainingsApp() {
                       <div key={date} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:statusBg,borderRadius:'10px',border:`1px solid ${statusBorder}`,gap:'8px',flexWrap:'wrap'}}>
                         <div>
                           <span style={{fontSize:'14px',color:'rgba(255,255,255,0.7)',fontWeight:'600'}}>{new Date(date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}</span>
-                          {grpNames.length>0&&<span style={{display:'block',fontSize:'11px',color:'rgba(255,255,255,0.3)',marginTop:'1px'}}>📂 {grpNames.join(', ')}</span>}
+                          {grpNames.length>0&&<span style={{display:'block',fontSize:'11px',color:'rgba(255,255,255,0.48)',marginTop:'1px'}}>📂 {grpNames.join(', ')}</span>}
                         </div>
                         <div style={{display:'flex',gap:'8px',alignItems:'center',flexShrink:0}}>
                           <span style={{fontSize:'13px',fontWeight:'700',color:cfg?.color||'rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.06)',padding:'4px 12px',borderRadius:'20px',border:'1px solid rgba(255,255,255,0.1)'}}>{cfg?.symbol||'–'} {cfg?.label||'Nicht erfasst'}</span>
@@ -4949,14 +4949,14 @@ export default function TrainingsApp() {
           return (
             <>
               {rangliste.length===0
-                ? <div style={{...DARK_CARD,textAlign:'center',padding:'40px'}}><p style={{color:'rgba(255,255,255,0.3)',margin:0}}>Noch keine Ranglisten-Daten vorhanden.</p></div>
+                ? <div style={{...DARK_CARD,textAlign:'center',padding:'40px'}}><p style={{color:'rgba(255,255,255,0.48)',margin:0}}>Noch keine Ranglisten-Daten vorhanden.</p></div>
                 : <RanglisteTile rangliste={rangliste} myChildId={myChild?.id} children={children} subgroups={subgroups} alwaysOpen={true}/>
               }
             </>
           );
         }
         if (elternSubView === 'errungenschaften') {
-          if (!myChild||grp?.id!=='jugend') return <div style={{...DARK_CARD,textAlign:'center',padding:'40px'}}><p style={{color:'rgba(255,255,255,0.3)',margin:0}}>Nicht verfügbar.</p></div>;
+          if (!myChild||grp?.id!=='jugend') return <div style={{...DARK_CARD,textAlign:'center',padding:'40px'}}><p style={{color:'rgba(255,255,255,0.48)',margin:0}}>Nicht verfügbar.</p></div>;
           const ach=getAchievements(myChild.id);
           const ttrUnlocked=ach.ttrUnlocked||[];
           const currentMonth=new Date().toISOString().slice(0,7);
@@ -4971,7 +4971,7 @@ export default function TrainingsApp() {
           const SH=({icon,title,mt=true})=>(
             <div style={{display:'flex',alignItems:'center',gap:'8px',margin:`${mt?'24px':0} 0 10px`}}>
               <div style={{height:'1px',width:'16px',background:'rgba(255,255,255,0.12)'}}/>
-              <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.35)',textTransform:'uppercase',letterSpacing:'1.5px',whiteSpace:'nowrap'}}>{icon} {title}</span>
+              <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.52)',textTransform:'uppercase',letterSpacing:'1.5px',whiteSpace:'nowrap'}}>{icon} {title}</span>
               <div style={{flex:1,height:'1px',background:'rgba(255,255,255,0.06)'}}/>
             </div>
           );
@@ -4987,10 +4987,10 @@ export default function TrainingsApp() {
               <div style={{flex:1,minWidth:0}}>
                 <p style={{margin:'0 0 1px',fontWeight:'800',fontSize:'14px',color:has?'white':'rgba(255,255,255,0.3)',lineHeight:'1.2'}}>{title}</p>
                 {sub&&<p style={{margin:0,fontSize:'12px',color:has?accent:'rgba(255,255,255,0.2)',fontWeight:'600'}}>{sub}</p>}
-                {note&&!has&&<p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.18)'}}>{note}</p>}
+                {note&&!has&&<p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{note}</p>}
               </div>
               {has&&<span style={{fontSize:'18px',flexShrink:0,color:accent}}>✓</span>}
-              {!has&&<span style={{fontSize:'13px',flexShrink:0,color:'rgba(255,255,255,0.15)'}}>🔒</span>}
+              {!has&&<span style={{fontSize:'13px',flexShrink:0,color:'rgba(255,255,255,0.35)'}}>🔒</span>}
             </button>
           );
 
@@ -5014,7 +5014,7 @@ export default function TrainingsApp() {
               <div style={{position:'relative',overflow:'hidden',borderRadius:'20px',padding:'22px 20px',marginBottom:'22px',background:'linear-gradient(135deg,#1e0a3c 0%,#4c1d95 55%,#7c3aed 100%)',border:'1px solid rgba(196,181,253,0.3)',boxShadow:'0 10px 30px rgba(124,58,237,0.25)'}}>
                 <span style={{position:'absolute',top:'-24px',right:'-16px',fontSize:'110px',opacity:0.12,transform:'rotate(12deg)',pointerEvents:'none'}}>🏆</span>
                 <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'900',letterSpacing:'1.5px',textTransform:'uppercase',color:'rgba(255,255,255,0.6)'}}>Deine Errungenschaften</p>
-                <p style={{margin:'0 0 14px',fontSize:'28px',fontWeight:'900',color:'white',textShadow:'0 2px 8px rgba(0,0,0,0.3)'}}>{unlockedCount} <span style={{fontSize:'16px',fontWeight:'700',color:'rgba(255,255,255,0.55)'}}>von {totalCount} freigeschaltet</span></p>
+                <p style={{margin:'0 0 14px',fontSize:'28px',fontWeight:'900',color:'white',textShadow:'0 2px 8px rgba(0,0,0,0.3)'}}>{unlockedCount} <span style={{fontSize:'16px',fontWeight:'700',color:'rgba(255,255,255,0.68)'}}>von {totalCount} freigeschaltet</span></p>
                 <div style={{height:'10px',borderRadius:'6px',background:'rgba(255,255,255,0.12)',overflow:'hidden',marginBottom:'10px'}}>
                   <div style={{height:'100%',width:`${progressPct}%`,borderRadius:'6px',background:'linear-gradient(90deg,#fbbf24,#f97316)',transition:'width 0.4s ease'}}/>
                 </div>
@@ -5108,7 +5108,7 @@ export default function TrainingsApp() {
             const mStandings=(mpt.finalStandings||(()=>[...mStats].sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:(b.setsWon-b.setsLost)-(a.setsWon-a.setsLost)).map((s,place)=>({place:place+1,childId:mPlayers[s.idx]?.childId,name:mPlayers[s.idx]?.name||'?',wins:s.wins,losses:s.losses,setsWon:s.setsWon,setsLost:s.setsLost})))());
             const numRoundsM=mPlayers.length%2===0?mPlayers.length-1:mPlayers.length;
             const roundsM=Array.from({length:numRoundsM},(_,i)=>i+1);
-            return(<div onClick={()=>setPtDetailModal(null)} style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',zIndex:9000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}><div onClick={e=>e.stopPropagation()} style={{background:'linear-gradient(170deg,#021a0a 0%,#042d12 100%)',borderRadius:'24px 24px 0 0',width:'100%',maxWidth:'520px',maxHeight:'85vh',overflowY:'auto',padding:'20px 16px 36px',border:'1px solid rgba(167,139,250,0.2)',borderBottom:'none'}}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px'}}><span style={{fontWeight:'800',color:'white',fontSize:'17px'}}>{mPlayers.length}er Gruppe</span><button onClick={()=>setPtDetailModal(null)} style={{width:'32px',height:'32px',borderRadius:'8px',background:'rgba(255,255,255,0.08)',border:'none',color:'rgba(255,255,255,0.7)',cursor:'pointer',fontSize:'18px',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button></div><div style={{display:'grid',gap:'4px',marginBottom:'20px'}}>{mStandings.map(s=>(<div key={s.childId||s.name} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',background:'rgba(255,255,255,0.04)',borderRadius:'10px'}}><span style={{fontSize:'18px',flexShrink:0}}>{placeEmojiM[s.place-1]||(s.place+'.')}</span><div><p style={{margin:0,fontWeight:'800',color:'white',fontSize:'13px'}}>{s.name}</p><p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{s.wins}S {s.losses}N</p></div></div>))}</div></div></div>);
+            return(<div onClick={()=>setPtDetailModal(null)} style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',zIndex:9000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}><div onClick={e=>e.stopPropagation()} style={{background:'linear-gradient(170deg,#021a0a 0%,#042d12 100%)',borderRadius:'24px 24px 0 0',width:'100%',maxWidth:'520px',maxHeight:'85vh',overflowY:'auto',padding:'20px 16px 36px',border:'1px solid rgba(167,139,250,0.2)',borderBottom:'none'}}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px'}}><span style={{fontWeight:'800',color:'white',fontSize:'17px'}}>{mPlayers.length}er Gruppe</span><button onClick={()=>setPtDetailModal(null)} style={{width:'32px',height:'32px',borderRadius:'8px',background:'rgba(255,255,255,0.08)',border:'none',color:'rgba(255,255,255,0.7)',cursor:'pointer',fontSize:'18px',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button></div><div style={{display:'grid',gap:'4px',marginBottom:'20px'}}>{mStandings.map(s=>(<div key={s.childId||s.name} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',background:'rgba(255,255,255,0.04)',borderRadius:'10px'}}><span style={{fontSize:'18px',flexShrink:0}}>{placeEmojiM[s.place-1]||(s.place+'.')}</span><div><p style={{margin:0,fontWeight:'800',color:'white',fontSize:'13px'}}>{s.name}</p><p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.52)'}}>{s.wins}S {s.losses}N</p></div></div>))}</div></div></div>);
           })()}
           {/* ── Top-Bar (volle Breite, farbig sticky) ── */}
           <div className="ttc-sticky-hdr" style={{background:meta.hdrBg,borderBottom:`1px solid ${meta.border}`,padding:isMobile?'12px 16px':'16px 28px',display:'flex',alignItems:'center',gap:'12px'}}>
@@ -5119,14 +5119,14 @@ export default function TrainingsApp() {
               <h2 style={{margin:0,color:'white',fontWeight:'800',fontSize:'18px',letterSpacing:'-0.3px'}}>{meta.icon} {meta.label}</h2>
               <p style={{margin:0,color:meta.colorFaint,fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>{myChild?.name||''} · {userRole==='eltern'?'Eltern-Portal':'Jugend-Portal'}</p>
             </div>
-            <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{padding:'8px',background:'rgba(255,255,255,0.06)',border:`1px solid ${meta.border}`,borderRadius:'10px',color:'rgba(255,255,255,0.5)',fontSize:isMobile?'16px':'12px',fontWeight:'600',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'⚙️':'⚙️ Profil'}</button>
+            <button onClick={()=>{setShowProfile(true);setPwSuccess(false);}} style={{padding:'8px',background:'rgba(255,255,255,0.06)',border:`1px solid ${meta.border}`,borderRadius:'10px',color:'rgba(255,255,255,0.65)',fontSize:isMobile?'16px':'12px',fontWeight:'600',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'⚙️':'⚙️ Profil'}</button>
             <button onClick={handleLogout} style={{padding:'8px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',color:'#fca5a5',fontSize:isMobile?'16px':'12px',fontWeight:'700',cursor:'pointer',minWidth:'36px',textAlign:'center'}}>{isMobile?'🚪':'Abmelden'}</button>
           </div>
           <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'20px 14px 40px':'24px 24px 60px'}}>
             {renderSubContent()}
           </div>
           {/* Profil-Modal */}
-          {showProfile&&(<Modal><div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}><div style={{background:'#0a2210',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'20px',padding:'28px',maxWidth:'400px',width:'100%',boxShadow:'0 32px 80px rgba(0,0,0,0.7)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}><h3 style={{margin:'0 0 2px',color:'white',fontSize:'20px',fontWeight:'800'}}>Mein Profil</h3><p style={{margin:'0 0 22px',color:'rgba(255,255,255,0.35)',fontSize:'13px'}}>{user?.email}</p><h4 style={{margin:'0 0 10px',color:'#4ade80',fontSize:'13px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.5px'}}>Passwort ändern</h4>{pwSuccess&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(74,222,128,0.12)',border:'1px solid rgba(74,222,128,0.25)',borderRadius:'10px',fontSize:'13px',color:'#4ade80',fontWeight:'600'}}>✅ Passwort erfolgreich geändert!</div>}{pwError&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',fontSize:'13px',color:'#fca5a5'}}>{pwError}</div>}<div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'18px'}}><input type="password" placeholder="Aktuelles Passwort" value={pwCurrent} onChange={e=>setPwCurrent(e.target.value)} style={inputStyle}/><input type="password" placeholder="Neues Passwort (min. 6 Zeichen)" value={pwNew} onChange={e=>setPwNew(e.target.value)} style={inputStyle}/><input type="password" placeholder="Neues Passwort bestätigen" value={pwConfirm} onChange={e=>setPwConfirm(e.target.value)} onKeyPress={e=>e.key==='Enter'&&handleChangePassword()} style={inputStyle}/><button onClick={handleChangePassword} style={{padding:'11px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>Passwort ändern</button></div>{renderNotifSettings()}<button onClick={()=>{setShowProfile(false);setPwError('');setPwSuccess(false);setPwCurrent('');setPwNew('');setPwConfirm('');}} style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.5)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button></div></div></Modal>)}
+          {showProfile&&(<Modal><div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}><div style={{background:'#0a2210',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'20px',padding:'28px',maxWidth:'400px',width:'100%',boxShadow:'0 32px 80px rgba(0,0,0,0.7)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}><h3 style={{margin:'0 0 2px',color:'white',fontSize:'20px',fontWeight:'800'}}>Mein Profil</h3><p style={{margin:'0 0 22px',color:'rgba(255,255,255,0.52)',fontSize:'13px'}}>{user?.email}</p><h4 style={{margin:'0 0 10px',color:'#4ade80',fontSize:'13px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.5px'}}>Passwort ändern</h4>{pwSuccess&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(74,222,128,0.12)',border:'1px solid rgba(74,222,128,0.25)',borderRadius:'10px',fontSize:'13px',color:'#4ade80',fontWeight:'600'}}>✅ Passwort erfolgreich geändert!</div>}{pwError&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',fontSize:'13px',color:'#fca5a5'}}>{pwError}</div>}<div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'18px'}}><input type="password" placeholder="Aktuelles Passwort" value={pwCurrent} onChange={e=>setPwCurrent(e.target.value)} style={inputStyle}/><input type="password" placeholder="Neues Passwort (min. 6 Zeichen)" value={pwNew} onChange={e=>setPwNew(e.target.value)} style={inputStyle}/><input type="password" placeholder="Neues Passwort bestätigen" value={pwConfirm} onChange={e=>setPwConfirm(e.target.value)} onKeyPress={e=>e.key==='Enter'&&handleChangePassword()} style={inputStyle}/><button onClick={handleChangePassword} style={{padding:'11px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>Passwort ändern</button></div>{renderNotifSettings()}<button onClick={()=>{setShowProfile(false);setPwError('');setPwSuccess(false);setPwCurrent('');setPwNew('');setPwConfirm('');}} style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.65)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button></div></div></Modal>)}
         </div>
       );
     }
@@ -5151,7 +5151,7 @@ export default function TrainingsApp() {
           <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
             <div style={{background:'#0a2210',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'20px',padding:'28px',maxWidth:'400px',width:'100%',boxShadow:'0 32px 80px rgba(0,0,0,0.7)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif"}}>
               <h3 style={{margin:'0 0 2px',color:'white',fontSize:'20px',fontWeight:'800'}}>Mein Profil</h3>
-              <p style={{margin:'0 0 22px',color:'rgba(255,255,255,0.35)',fontSize:'13px'}}>{user?.email}</p>
+              <p style={{margin:'0 0 22px',color:'rgba(255,255,255,0.52)',fontSize:'13px'}}>{user?.email}</p>
               <h4 style={{margin:'0 0 10px',color:'#4ade80',fontSize:'13px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.5px'}}>Passwort ändern</h4>
               {pwSuccess&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(74,222,128,0.12)',border:'1px solid rgba(74,222,128,0.25)',borderRadius:'10px',fontSize:'13px',color:'#4ade80',fontWeight:'600'}}>✅ Passwort erfolgreich geändert!</div>}
               {pwError&&<div style={{marginBottom:'12px',padding:'10px 14px',background:'rgba(220,38,38,0.12)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'10px',fontSize:'13px',color:'#fca5a5'}}>{pwError}</div>}
@@ -5163,7 +5163,7 @@ export default function TrainingsApp() {
               </div>
               {renderNotifSettings()}
               <button onClick={()=>{setShowProfile(false);setPwError('');setPwSuccess(false);setPwCurrent('');setPwNew('');setPwConfirm('');}}
-                style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.5)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button>
+                style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.65)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button>
             </div>
           </div>
           </Modal>
@@ -5210,7 +5210,7 @@ export default function TrainingsApp() {
               {/* Zeile 1: Name + Gruppe + TTR */}
               <div style={{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
                 <span style={{fontWeight:'800',fontSize:'15px',color:grp?.color||'#4ade80'}}>{myChild.name}</span>
-                <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>{grp?.emoji} {sub?.name}</span>
+                <span style={{fontSize:'12px',color:'rgba(255,255,255,0.52)'}}>{grp?.emoji} {sub?.name}</span>
                 <div style={{flex:1}}/>
                 {(()=>{const hist=ttrHistory[myChild.id]?.entries;if(!hist||hist.length===0)return null;
                   const last=hist[hist.length-1];const prev=hist.length>1?hist[hist.length-2]:null;
@@ -5231,7 +5231,7 @@ export default function TrainingsApp() {
                     <div style={{width:`${stats.percent}%`,height:'100%',background:stats.percent>=80?'linear-gradient(90deg,#16a34a,#4ade80)':stats.percent>=60?'linear-gradient(90deg,#d97706,#fde68a)':'linear-gradient(90deg,#dc2626,#f87171)',borderRadius:'99px'}}/>
                   </div>
                   <span style={{fontSize:'11px',fontWeight:'800',color:stats.percent>=80?'#4ade80':stats.percent>=60?'#fde68a':'#f87171',flexShrink:0}}>{stats.percent}%</span>
-                  <span style={{fontSize:'10px',color:'rgba(255,255,255,0.25)',flexShrink:0}}>({stats.present}/{stats.total})</span>
+                  <span style={{fontSize:'10px',color:'rgba(255,255,255,0.42)',flexShrink:0}}>({stats.present}/{stats.total})</span>
                 </div>
               )}
             </div>
@@ -5263,7 +5263,7 @@ export default function TrainingsApp() {
                           <span style={{fontWeight:'700',color:'rgba(74,222,128,0.8)',fontSize:'14px'}}>{formatSessionTime(session)} Uhr</span>
                           {isToday&&<span style={{fontSize:'10px',background:'rgba(74,222,128,0.2)',color:'#4ade80',padding:'2px 8px',borderRadius:'20px',fontWeight:'800'}}>Heute</span>}
                         </div>
-                        {getTrainerNames(session)&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>👤 {getTrainerNames(session)}</p>}
+                        {getTrainerNames(session)&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.52)'}}>👤 {getTrainerNames(session)}</p>}
                       </div>
                       <button onClick={()=>respondToSession(session.id,'missing')}
                         style={{flexShrink:0,padding:'12px 20px',border:`2px solid ${isMissing?'#dc2626':'rgba(248,113,113,0.5)'}`,background:isMissing?'#dc2626':'rgba(220,38,38,0.08)',color:isMissing?'white':'#f87171',borderRadius:'12px',cursor:'pointer',fontWeight:'800',fontSize:'15px',whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:'6px'}}>
@@ -5367,13 +5367,13 @@ export default function TrainingsApp() {
                       <textarea value={parentMsgText} onChange={e=>setParentMsgText(e.target.value)} placeholder="Ihre Nachricht..." rows={3} style={{...inputStyle,resize:'vertical'}}/>
                       <div style={{display:'flex',gap:'8px'}}>
                         <button onClick={sendParentMessage} style={{flex:1,padding:'10px',background:'linear-gradient(135deg,#7c3aed,#6d28d9)',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}><Send size={14}/> Senden</button>
-                        <button onClick={()=>{setShowParentCompose(false);setParentMsgTitle('');setParentMsgText('');}} style={{flex:1,padding:'10px',background:'rgba(255,255,255,0.07)',color:'rgba(255,255,255,0.5)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Abbrechen</button>
+                        <button onClick={()=>{setShowParentCompose(false);setParentMsgTitle('');setParentMsgText('');}} style={{flex:1,padding:'10px',background:'rgba(255,255,255,0.07)',color:'rgba(255,255,255,0.65)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Abbrechen</button>
                       </div>
                     </div>
                   )}
 
                   {items.length === 0
-                    ? <p style={{color:'rgba(255,255,255,0.2)',fontSize:'13px',margin:0,textAlign:'center',padding:'20px 0'}}>{showTrash?'Papierkorb ist leer.':'Keine Nachrichten.'}</p>
+                    ? <p style={{color:'rgba(255,255,255,0.4)',fontSize:'13px',margin:0,textAlign:'center',padding:'20px 0'}}>{showTrash?'Papierkorb ist leer.':'Keine Nachrichten.'}</p>
                     : <div style={{display:'grid',gap:'8px'}}>
                         {items.map(n=>{
                           const typeColors = {
@@ -5390,15 +5390,15 @@ export default function TrainingsApp() {
                               <span style={{fontSize:'20px',flexShrink:0,marginTop:'1px'}}>{cfg2.icon}</span>
                               <div style={{flex:1,minWidth:0}}>
                                 <p style={{margin:'0 0 3px',fontWeight:'700',fontSize:'14px',color:'white'}}>{n.title}</p>
-                                <p style={{margin:'0 0 5px',fontSize:'13px',color:'rgba(255,255,255,0.55)',lineHeight:'1.4'}}>{n.message}</p>
-                                <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>{dateStr}</p>
+                                <p style={{margin:'0 0 5px',fontSize:'13px',color:'rgba(255,255,255,0.68)',lineHeight:'1.4'}}>{n.message}</p>
+                                <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.42)'}}>{dateStr}</p>
                               </div>
                               {showTrash
                                 ? <div style={{display:'flex',gap:'4px',flexShrink:0}}>
                                     <button onClick={()=>restoreNotification(n.id)} title="Wiederherstellen" style={{padding:'5px 9px',background:'rgba(74,222,128,0.12)',border:'none',borderRadius:'8px',cursor:'pointer',color:'#4ade80',fontSize:'13px',fontWeight:'700'}}>↩</button>
                                     <button onClick={()=>deleteNotificationPermanently(n.id)} title="Endgültig löschen" style={{padding:'5px',background:'rgba(220,38,38,0.12)',border:'none',borderRadius:'8px',cursor:'pointer',color:'#f87171'}}><Trash2 size={14}/></button>
                                   </div>
-                                : <button onClick={()=>trashNotification(n.id)} title="In Papierkorb" style={{padding:'5px',background:'rgba(255,255,255,0.06)',border:'none',borderRadius:'8px',cursor:'pointer',color:'rgba(255,255,255,0.3)',flexShrink:0}}><X size={16}/></button>
+                                : <button onClick={()=>trashNotification(n.id)} title="In Papierkorb" style={{padding:'5px',background:'rgba(255,255,255,0.06)',border:'none',borderRadius:'8px',cursor:'pointer',color:'rgba(255,255,255,0.48)',flexShrink:0}}><X size={16}/></button>
                               }
                             </div>
                           );
@@ -5412,8 +5412,8 @@ export default function TrainingsApp() {
 
           {!myChild
             ? <div style={{...DARK_CARD,textAlign:'center',padding:'40px'}}>
-                <p style={{fontSize:'18px',color:'rgba(255,255,255,0.5)',margin:'0 0 8px'}}>Dein Account ist noch keinem Kind zugeordnet.</p>
-                <p style={{color:'rgba(255,255,255,0.3)',fontSize:'14px',margin:0}}>Bitte wende dich an den Trainer oder Admin.</p>
+                <p style={{fontSize:'18px',color:'rgba(255,255,255,0.65)',margin:'0 0 8px'}}>Dein Account ist noch keinem Kind zugeordnet.</p>
+                <p style={{color:'rgba(255,255,255,0.48)',fontSize:'14px',margin:0}}>Bitte wende dich an den Trainer oder Admin.</p>
               </div>
             : <>
 
@@ -5423,7 +5423,7 @@ export default function TrainingsApp() {
               <div style={{...DARK_CARD,marginBottom:'28px',border:'1px solid rgba(74,222,128,0.18)'}}>
                 <h3 style={{margin:'0 0 16px',color:'#4ade80',display:'flex',alignItems:'center',gap:'8px',fontWeight:'800',fontSize:'16px'}}><Calendar size={18}/> Trainings diese Woche</h3>
                 {mySessions.length===0
-                  ? <p style={{color:'rgba(255,255,255,0.2)',fontSize:'13px',margin:0,textAlign:'center',padding:'20px 0'}}>Kein Training in den nächsten 7 Tagen.</p>
+                  ? <p style={{color:'rgba(255,255,255,0.4)',fontSize:'13px',margin:0,textAlign:'center',padding:'20px 0'}}>Kein Training in den nächsten 7 Tagen.</p>
                   : <div style={{display:'grid',gap:'10px'}}>
                     {mySessions.map(session=>{
                       const childId=myChild.id;
@@ -5442,8 +5442,8 @@ export default function TrainingsApp() {
                             <p style={{margin:'0 0 3px',fontWeight:'700',color:'white',fontSize:'15px'}}>
                               {new Date(session.date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})} · {formatSessionTime(session)} Uhr
                             </p>
-                            {sessGrpNames.length>0&&<p style={{margin:'0 0 2px',fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>📂 {sessGrpNames.join(', ')}</p>}
-                            {getTrainerNames(session)&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>👤 {getTrainerNames(session)}</p>}
+                            {sessGrpNames.length>0&&<p style={{margin:'0 0 2px',fontSize:'12px',color:'rgba(255,255,255,0.52)'}}>📂 {sessGrpNames.join(', ')}</p>}
+                            {getTrainerNames(session)&&<p style={{margin:'0 0 2px',fontSize:'13px',color:'rgba(255,255,255,0.58)'}}>👤 {getTrainerNames(session)}</p>}
                             {session.info&&<div style={{display:'flex',alignItems:'flex-start',gap:'6px',marginTop:'8px',padding:'8px 10px',background:'rgba(96,165,250,0.08)',border:'1px solid rgba(96,165,250,0.2)',borderRadius:'8px'}}><Info size={14} color="#93c5fd" style={{marginTop:'2px',flexShrink:0}}/><p style={{margin:0,fontSize:'13px',color:'#93c5fd'}}>{session.info}</p></div>}
                           </div>
                           <div style={{display:'flex'}}>
@@ -5467,14 +5467,14 @@ export default function TrainingsApp() {
                 <button onClick={()=>setShowTrainingHistory(v=>!v)}
                   style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',background:'none',border:'none',cursor:'pointer',padding:0,margin:0}}>
                   <h3 style={{margin:0,color:'white',display:'flex',alignItems:'center',gap:'8px',fontWeight:'800',fontSize:'16px'}}>📋 Trainings-Verlauf
-                    {dates.length>0&&<span style={{fontSize:'12px',fontWeight:'500',color:'rgba(255,255,255,0.35)',fontFamily:'sans-serif'}}>({dates.length} Einträge)</span>}
+                    {dates.length>0&&<span style={{fontSize:'12px',fontWeight:'500',color:'rgba(255,255,255,0.52)',fontFamily:'sans-serif'}}>({dates.length} Einträge)</span>}
                   </h3>
                   <span style={{fontSize:'18px',color:'rgba(74,222,128,0.5)',transform:showTrainingHistory?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s',lineHeight:1}}>▾</span>
                 </button>
                 {showTrainingHistory&&(
                   <div style={{display:'grid',gap:'8px',marginTop:'16px'}}>
                     {dates.length===0
-                      ? <p style={{color:'rgba(255,255,255,0.2)',textAlign:'center',padding:'20px',margin:0}}>Noch keine Trainings erfasst.</p>
+                      ? <p style={{color:'rgba(255,255,255,0.4)',textAlign:'center',padding:'20px',margin:0}}>Noch keine Trainings erfasst.</p>
                       : dates.map(date=>{
                         const status=(myChild.attendance||{})[date];
                         const cfg=STATUS_CONFIG[status];
@@ -5492,7 +5492,7 @@ export default function TrainingsApp() {
                               <span style={{fontSize:'14px',color:'rgba(255,255,255,0.7)',fontWeight:'600'}}>
                                 {new Date(date+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}
                               </span>
-                              {grpNames.length>0&&<span style={{display:'block',fontSize:'11px',color:'rgba(255,255,255,0.3)',marginTop:'1px'}}>📂 {grpNames.join(', ')}</span>}
+                              {grpNames.length>0&&<span style={{display:'block',fontSize:'11px',color:'rgba(255,255,255,0.48)',marginTop:'1px'}}>📂 {grpNames.join(', ')}</span>}
                             </div>
                             <div style={{display:'flex',gap:'8px',alignItems:'center',flexShrink:0}}>
                               <span style={{fontSize:'13px',fontWeight:'700',color:cfg?.color||'rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.06)',padding:'4px 12px',borderRadius:'20px',border:`1px solid rgba(255,255,255,0.1)`}}>
@@ -5533,7 +5533,7 @@ export default function TrainingsApp() {
                       <span style={{fontWeight:'800',color:'white',fontSize:'17px'}}>{mPlayers.length}er Gruppe</span>
                       <span style={{fontSize:'11px',fontWeight:'700',padding:'2px 8px',borderRadius:'10px',color:isArchived?'#4ade80':'#fde68a',background:isArchived?'rgba(74,222,128,0.1)':'rgba(253,230,138,0.08)',border:`1px solid ${isArchived?'rgba(74,222,128,0.25)':'rgba(253,230,138,0.25)'}`}}>{isArchived?'✓ Abgeschlossen':'● Laufend'}</span>
                     </div>
-                    <p style={{margin:'3px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{new Date(mpt.archivedAt||mpt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}</p>
+                    <p style={{margin:'3px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.52)'}}>{new Date(mpt.archivedAt||mpt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}</p>
                   </div>
                   <button onClick={()=>setPtDetailModal(null)} style={{width:'32px',height:'32px',borderRadius:'8px',background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.12)',color:'rgba(255,255,255,0.7)',cursor:'pointer',fontSize:'18px',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>×</button>
                 </div>
@@ -5544,7 +5544,7 @@ export default function TrainingsApp() {
                       <span style={{fontSize:'18px',flexShrink:0}}>{placeEmojiM[s.place-1]||(s.place+'.')}</span>
                       <div style={{flex:1}}>
                         <p style={{margin:0,fontWeight:'800',color:'white',fontSize:'13px'}}>{s.name}</p>
-                        <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{s.wins}S {s.losses}N · Sätze {s.setsWon}:{s.setsLost}</p>
+                        <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.52)'}}>{s.wins}S {s.losses}N · Sätze {s.setsWon}:{s.setsLost}</p>
                       </div>
                     </div>
                   ))}
@@ -5552,7 +5552,7 @@ export default function TrainingsApp() {
                 <p style={{margin:'0 0 8px',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.5)',textTransform:'uppercase',letterSpacing:'2px'}}>Spielplan</p>
                 {roundsM.map(round=>(
                   <div key={round} style={{marginBottom:'12px'}}>
-                    <p style={{margin:'0 0 5px',fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'1px'}}>Runde {round}</p>
+                    <p style={{margin:'0 0 5px',fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.48)',textTransform:'uppercase',letterSpacing:'1px'}}>Runde {round}</p>
                     <div style={{display:'grid',gap:'3px'}}>
                       {mMatches.filter(m=>m.round===round).map((m,mi)=>{
                         const p1=mPlayers[m.p1Idx];const p2=mPlayers[m.p2Idx];const res=m.result;
@@ -5612,9 +5612,9 @@ export default function TrainingsApp() {
                             ?<span style={{fontWeight:'800',color:'white',fontSize:'13px'}}>Platz {myEntry?.place}</span>
                             :<span style={{fontWeight:'800',color:'#fde68a',fontSize:'13px'}}>Laufend {done}/{total}</span>}
                           <span style={{fontSize:'10px',color:'rgba(167,139,250,0.6)',fontWeight:'600'}}>{pt.players.length}er Gruppe</span>
-                          <span style={{fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>{dateStr}</span>
+                          <span style={{fontSize:'10px',color:'rgba(255,255,255,0.42)'}}>{dateStr}</span>
                         </div>
-                        {myEntry&&<p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{myEntry.wins}S {myEntry.losses}N · Sätze {myEntry.setsWon}:{myEntry.setsLost}</p>}
+                        {myEntry&&<p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.52)'}}>{myEntry.wins}S {myEntry.losses}N · Sätze {myEntry.setsWon}:{myEntry.setsLost}</p>}
                       </div>
                       <span style={{fontSize:'14px',color:'rgba(167,139,250,0.3)',flexShrink:0}}>›</span>
                     </div>
@@ -5633,7 +5633,7 @@ export default function TrainingsApp() {
               )}
               {elternSubView==='rangliste' && grp?.id === 'jugend' && rangliste.length === 0 && (
                 <div style={{...DARK_CARD,textAlign:'center',padding:'40px'}}>
-                  <p style={{color:'rgba(255,255,255,0.3)',margin:0}}>Noch keine Ranglisten-Daten vorhanden.</p>
+                  <p style={{color:'rgba(255,255,255,0.48)',margin:0}}>Noch keine Ranglisten-Daten vorhanden.</p>
                 </div>
               )}
               {/* ── Errungenschaften (nur Jugend) ── */}
@@ -5649,7 +5649,7 @@ export default function TrainingsApp() {
 
                 const Sec = ({title,children:ch,mb=true}) => (
                   <div style={{marginBottom:mb?'18px':0}}>
-                    <p style={{margin:'0 0 8px',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.35)',textTransform:'uppercase',letterSpacing:'0.5px',borderBottom:'1px solid rgba(255,255,255,0.06)',paddingBottom:'5px'}}>{title}</p>
+                    <p style={{margin:'0 0 8px',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.52)',textTransform:'uppercase',letterSpacing:'0.5px',borderBottom:'1px solid rgba(255,255,255,0.06)',paddingBottom:'5px'}}>{title}</p>
                     <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>{ch}</div>
                   </div>
                 );
@@ -5738,7 +5738,7 @@ export default function TrainingsApp() {
                               onMouseEnter={e=>e.currentTarget.style.transform='scale(1.05)'}
                               onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
                               <div style={{fontSize:'26px'}}>{cfg3?cfg3.icon:'⬜'}</div>
-                              <div style={{fontSize:'12px',fontWeight:'700',color:cfg3?cfg3.color:'rgba(255,255,255,0.2)',marginTop:'2px'}}>{cfg3?cfg3.label:'Kein Rang'}</div>
+                              <div style={{fontSize:'12px',fontWeight:'700',color:cfg3?cfg3.color:'rgba(255,255,255,0.4)',marginTop:'2px'}}>{cfg3?cfg3.label:'Kein Rang'}</div>
                             </button>
                           );
                         })()}
@@ -5842,7 +5842,7 @@ export default function TrainingsApp() {
           {/* Gruppen-Liste */}
           <div style={{display:'grid',gap:'10px'}}>
             {subs.length===0
-              ? <div style={{textAlign:'center',padding:'48px 20px',color:'rgba(255,255,255,0.2)',fontSize:'15px'}}>Noch keine Trainingsgruppen.</div>
+              ? <div style={{textAlign:'center',padding:'48px 20px',color:'rgba(255,255,255,0.4)',fontSize:'15px'}}>Noch keine Trainingsgruppen.</div>
               : subs.map(sub=>{
                 const kids=getChildrenForSubgroup(sub.id);
                 const presentToday=kids.filter(c=>(c.attendance||{})[trainingDate]==='present').length;
@@ -5857,8 +5857,8 @@ export default function TrainingsApp() {
                       <div style={{flex:1,minWidth:0}}>
                         <h3 style={{margin:'0 0 4px',color:'white',fontSize:'17px',fontWeight:'700'}}>{sub.name}</h3>
                         <div style={{display:'flex',gap:'14px',flexWrap:'wrap'}}>
-                          <span style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',fontWeight:'500'}}>{kids.length} Kinder</span>
-                          <span style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',fontWeight:'500'}}>{totalSess} Trainings</span>
+                          <span style={{fontSize:'12px',color:'rgba(255,255,255,0.58)',fontWeight:'500'}}>{kids.length} Kinder</span>
+                          <span style={{fontSize:'12px',color:'rgba(255,255,255,0.58)',fontWeight:'500'}}>{totalSess} Trainings</span>
                           {avgPct!==null&&<span style={{fontSize:'12px',fontWeight:'700',color:avgPct>=80?'#4ade80':avgPct>=60?'#fde68a':'#f87171'}}>Ø {avgPct}%</span>}
                           <span style={{fontSize:'12px',color:'rgba(74,222,128,0.6)',fontWeight:'600'}}>Heute: {presentToday} anwesend</span>
                         </div>
@@ -5949,7 +5949,7 @@ export default function TrainingsApp() {
             ].map(({label,value,color,bg,border})=>(
               <div key={label} style={{background:bg,border:`1px solid ${border}`,borderRadius:'14px',padding:'14px 10px',textAlign:'center'}}>
                 <p style={{margin:0,fontSize:'26px',fontWeight:'800',color,letterSpacing:'-0.5px'}}>{value}</p>
-                <p style={{margin:'3px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.35)',fontWeight:'600'}}>{label}</p>
+                <p style={{margin:'3px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.52)',fontWeight:'600'}}>{label}</p>
               </div>
             ))}
           </div>
@@ -5970,7 +5970,7 @@ export default function TrainingsApp() {
                   return (
                     <div style={{position:'absolute',top:'100%',left:0,right:0,marginTop:'4px',background:'#04220f',border:'1px solid rgba(74,222,128,0.3)',borderRadius:'10px',overflow:'hidden',zIndex:10,maxHeight:'240px',overflowY:'auto',boxShadow:'0 8px 24px rgba(0,0,0,0.4)'}}>
                       {mitgliedOptions.length===0
-                        ? <div style={{padding:'10px 14px',fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>Kein passendes Mitglied gefunden.</div>
+                        ? <div style={{padding:'10px 14px',fontSize:'13px',color:'rgba(255,255,255,0.58)'}}>Kein passendes Mitglied gefunden.</div>
                         : mitgliedOptions.map(m=>(
                           <button key={m.id} onClick={()=>{addChildFromMitglied(m.id);setAddChildSearch('');}}
                             style={{display:'block',width:'100%',textAlign:'left',padding:'10px 14px',background:'none',border:'none',borderBottom:'1px solid rgba(255,255,255,0.06)',color:'white',fontSize:'13px',cursor:'pointer'}}>
@@ -5987,7 +5987,7 @@ export default function TrainingsApp() {
           {/* Kinderliste */}
           <div style={{display:'grid',gap:'8px'}}>
             {activeKids.length===0 && retiredKids.length===0
-              ? <div style={{textAlign:'center',padding:'48px 20px',color:'rgba(255,255,255,0.2)',fontSize:'15px'}}>Noch keine Kinder. Oben hinzufügen!</div>
+              ? <div style={{textAlign:'center',padding:'48px 20px',color:'rgba(255,255,255,0.4)',fontSize:'15px'}}>Noch keine Kinder. Oben hinzufügen!</div>
               : activeKids.map(child=>{
                 const stats=getAttendanceStats(child.id,sub.id);
                 const pct=stats.percent;
@@ -6014,7 +6014,7 @@ export default function TrainingsApp() {
                         </div>
                         <span style={{fontSize:'13px',fontWeight:'800',color:pct>=80?'#4ade80':pct>=60?'#fde68a':'#f87171',minWidth:'36px',textAlign:'right'}}>{pct}%</span>
                       </div>
-                      <p style={{margin:'5px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>
+                      <p style={{margin:'5px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.48)'}}>
                         {stats.present}/{stats.total} · {stats.excused}x entsch. · {stats.unexcused}x unentsch.
                       </p>
                     </div>
@@ -6043,10 +6043,10 @@ export default function TrainingsApp() {
                       style={{display:'flex',alignItems:'center',gap:'12px',padding:'10px 14px',background:'rgba(148,163,184,0.04)',border:'1px solid rgba(148,163,184,0.1)',borderRadius:'12px',cursor:'pointer',opacity:0.7}}>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                          <p style={{margin:0,fontWeight:'600',color:'rgba(255,255,255,0.5)',fontSize:'14px'}}>{child.name}</p>
+                          <p style={{margin:0,fontWeight:'600',color:'rgba(255,255,255,0.65)',fontSize:'14px'}}>{child.name}</p>
                           <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(148,163,184,0.6)',background:'rgba(148,163,184,0.1)',border:'1px solid rgba(148,163,184,0.2)',borderRadius:'5px',padding:'1px 6px'}}>🏁 Karriere beendet</span>
                         </div>
-                        {child.karriereBeendetAm&&<p style={{margin:'3px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>Beendet am {new Date(child.karriereBeendetAm+'T12:00:00').toLocaleDateString('de-DE')}</p>}
+                        {child.karriereBeendetAm&&<p style={{margin:'3px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.42)'}}>Beendet am {new Date(child.karriereBeendetAm+'T12:00:00').toLocaleDateString('de-DE')}</p>}
                       </div>
                       <ChevronRight size={14} color="rgba(148,163,184,0.2)"/>
                     </div>
@@ -6136,7 +6136,7 @@ export default function TrainingsApp() {
                 return <span key={sub.id} style={{fontSize:'12px',fontWeight:'700',color:grp?.color||'#4ade80',background:'rgba(74,222,128,0.08)',padding:'4px 12px',borderRadius:'20px',border:`1px solid rgba(74,222,128,0.2)`}}>{grp?.emoji} {sub.name}</span>;
               })}
             </div>
-            {getTrainerNames(session)&&<p style={{margin:'0 0 4px',fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>👤 Trainer: {getTrainerNames(session)}</p>}
+            {getTrainerNames(session)&&<p style={{margin:'0 0 4px',fontSize:'13px',color:'rgba(255,255,255,0.58)'}}>👤 Trainer: {getTrainerNames(session)}</p>}
             {session?.info&&<div style={{display:'flex',gap:'6px',padding:'10px 12px',background:'rgba(96,165,250,0.08)',border:'1px solid rgba(96,165,250,0.2)',borderRadius:'10px',marginTop:'8px'}}>
               <Info size={14} color="#93c5fd" style={{flexShrink:0,marginTop:'2px'}}/>
               <p style={{margin:0,fontSize:'13px',color:'#93c5fd'}}>{session.info}</p>
@@ -6149,7 +6149,7 @@ export default function TrainingsApp() {
                 </div>
                 <div>
                   <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:session.excludeFromQuota?'#fbbf24':'rgba(255,255,255,0.7)'}}>Zählt nicht zur Anwesenheitsquote</p>
-                  <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{session.excludeFromQuota?'Dieses Training wird bei Quote, Gold/Silber/Bronze und Streak nicht mitgezählt':'z.B. bei Sondertrainings, Feriencamps o.ä.'}</p>
+                  <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.48)'}}>{session.excludeFromQuota?'Dieses Training wird bei Quote, Gold/Silber/Bronze und Streak nicht mitgezählt':'z.B. bei Sondertrainings, Feriencamps o.ä.'}</p>
                 </div>
               </button>
             )}
@@ -6161,11 +6161,11 @@ export default function TrainingsApp() {
               {label:'Anwesend',value:presentCount,color:'#4ade80',bg:'rgba(74,222,128,0.1)',border:'rgba(74,222,128,0.25)'},
               {label:'Unentsch.',value:absentCount,color:'#f87171',bg:'rgba(239,68,68,0.09)',border:'rgba(239,68,68,0.22)'},
               {label:'Entsch.',value:excusedCount,color:'#94a3b8',bg:'rgba(148,163,184,0.08)',border:'rgba(148,163,184,0.2)'},
-              {label:'Offen',value:openCount2,color:'rgba(255,255,255,0.3)',bg:'rgba(255,255,255,0.03)',border:'rgba(255,255,255,0.07)'},
+              {label:'Offen',value:openCount2,color:'rgba(255,255,255,0.48)',bg:'rgba(255,255,255,0.03)',border:'rgba(255,255,255,0.07)'},
             ].map(({label,value,color,bg,border})=>(
               <div key={label} style={{background:bg,border:`1px solid ${border}`,borderRadius:'12px',padding:'12px 8px',textAlign:'center'}}>
                 <p style={{margin:0,fontSize:'24px',fontWeight:'800',color,letterSpacing:'-0.5px'}}>{value}</p>
-                <p style={{margin:'2px 0 0',fontSize:'10px',color:'rgba(255,255,255,0.35)',fontWeight:'600'}}>{label}</p>
+                <p style={{margin:'2px 0 0',fontSize:'10px',color:'rgba(255,255,255,0.52)',fontWeight:'600'}}>{label}</p>
               </div>
             ))}
           </div>
@@ -6173,7 +6173,7 @@ export default function TrainingsApp() {
           {/* Fortschritts-Leiste */}
           <div style={{marginBottom:'24px'}}>
             <div style={{display:'flex',justifyContent:'space-between',marginBottom:'6px'}}>
-              <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)',fontWeight:'600'}}>Erfassungsfortschritt</span>
+              <span style={{fontSize:'12px',color:'rgba(255,255,255,0.52)',fontWeight:'600'}}>Erfassungsfortschritt</span>
               <span style={{fontSize:'12px',fontWeight:'800',color:openCount2===0?'#4ade80':'rgba(255,255,255,0.5)'}}>{presentCount+absentCount+excusedCount}/{allKids.length}</span>
             </div>
             <div style={{background:'rgba(255,255,255,0.08)',borderRadius:'99px',height:'6px',overflow:'hidden'}}>
@@ -6184,7 +6184,7 @@ export default function TrainingsApp() {
           {/* Kinderliste */}
           <div style={{display:'grid',gap:'8px',marginBottom:'24px'}}>
             {allKids.length===0
-              ? <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.2)'}}>Keine Kinder in den zugewiesenen Gruppen.</div>
+              ? <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.4)'}}>Keine Kinder in den zugewiesenen Gruppen.</div>
               : allKids.map(child=>{
                 const currentChild = children[child.id] || child;
                 const status = (currentChild.attendance||{})[sessionDate];
@@ -6203,7 +6203,7 @@ export default function TrainingsApp() {
                           <p style={{margin:0,fontWeight:'700',color:'white',fontSize:'15px'}}>{child.name}</p>
                           {parentExcused&&<span style={{fontSize:'10px',fontWeight:'700',color:'#94a3b8',background:'rgba(148,163,184,0.12)',padding:'2px 8px',borderRadius:'20px',border:'1px solid rgba(148,163,184,0.25)'}}>{responseBy==='self'?'Selbst abgemeldet':'Eltern: abgemeldet'}</span>}
                         </div>
-                        {sub&&<p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{sub.name}</p>}
+                        {sub&&<p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.48)'}}>{sub.name}</p>}
                         {extraPlayers.some(ep=>ep.id===child.id)&&<p style={{margin:0,fontSize:'10px',fontWeight:'700',color:'#fbbf24'}}>⭐ Einzelspieler</p>}
                       </div>
                       {/* 3 Anwesenheits-Buttons */}
@@ -6277,11 +6277,11 @@ export default function TrainingsApp() {
             const archivable = isSessionArchivable(session);
             return archivable ? (
               <button onClick={()=>{if(window.confirm('Dieses Training archivieren? Es verschwindet aus der Übersicht, die Anwesenheitsdaten bleiben erhalten.')) { archiveSession(session); navTo('home'); }}}
-                style={{width:'100%',padding:'13px',background:'rgba(55,65,81,0.4)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',cursor:'pointer',color:'rgba(255,255,255,0.5)',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px'}}>
+                style={{width:'100%',padding:'13px',background:'rgba(55,65,81,0.4)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',cursor:'pointer',color:'rgba(255,255,255,0.65)',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px'}}>
                 <Archive size={16}/> Training archivieren
               </button>
             ) : (
-              <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.2)',textAlign:'center',padding:'12px'}}>
+              <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.4)',textAlign:'center',padding:'12px'}}>
                 ⏳ Archivieren möglich sobald alle {allKids.length} Kinder erfasst sind ({presentCount+absentCount+excusedCount}/{allKids.length})
               </p>
             );
@@ -6381,7 +6381,7 @@ export default function TrainingsApp() {
                     if(editingChildNameVal.trim()) saveChildren({...children,[child.id]:{...child,name:editingChildNameVal.trim()}});
                     setEditingChildName(null);
                   }} style={{background:'rgba(74,222,128,0.2)',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'6px',color:'#4ade80',cursor:'pointer',padding:'3px 8px',fontSize:'13px',fontWeight:'700'}}>✓</button>
-                  <button onClick={()=>setEditingChildName(null)} style={{background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'6px',color:'rgba(255,255,255,0.5)',cursor:'pointer',padding:'3px 8px',fontSize:'13px'}}>✕</button>
+                  <button onClick={()=>setEditingChildName(null)} style={{background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'6px',color:'rgba(255,255,255,0.65)',cursor:'pointer',padding:'3px 8px',fontSize:'13px'}}>✕</button>
                 </div>
               ) : (
                 <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
@@ -6389,7 +6389,7 @@ export default function TrainingsApp() {
                   {canEdit()&&(
                     <button onClick={()=>{setEditingChildName(child.id);setEditingChildNameVal(child.name);}}
                       title="Name bearbeiten"
-                      style={{background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.35)',padding:'2px',display:'flex',alignItems:'center',lineHeight:1}}>
+                      style={{background:'none',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.52)',padding:'2px',display:'flex',alignItems:'center',lineHeight:1}}>
                       <Pencil size={14}/>
                     </button>
                   )}
@@ -6436,7 +6436,7 @@ export default function TrainingsApp() {
             ].map(({label,value,color,bg,border})=>(
               <div key={label} style={{background:bg,border:`1px solid ${border}`,borderRadius:'12px',padding:'12px 6px',textAlign:'center'}}>
                 <p style={{margin:0,fontSize:'22px',fontWeight:'800',color,letterSpacing:'-0.5px'}}>{value}</p>
-                <p style={{margin:'2px 0 0',fontSize:'10px',color:'rgba(255,255,255,0.3)',fontWeight:'600'}}>{label}</p>
+                <p style={{margin:'2px 0 0',fontSize:'10px',color:'rgba(255,255,255,0.48)',fontWeight:'600'}}>{label}</p>
               </div>
             ))}
           </div>
@@ -6444,7 +6444,7 @@ export default function TrainingsApp() {
           {/* Quote */}
           <div style={{marginBottom:'24px',padding:'14px 16px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(74,222,128,0.1)',borderRadius:'14px'}}>
             <div style={{display:'flex',justifyContent:'space-between',marginBottom:'8px'}}>
-              <span style={{fontSize:'13px',fontWeight:'700',color:'rgba(255,255,255,0.5)'}}>Anwesenheitsquote</span>
+              <span style={{fontSize:'13px',fontWeight:'700',color:'rgba(255,255,255,0.65)'}}>Anwesenheitsquote</span>
               <span style={{fontSize:'15px',fontWeight:'800',color:stats.percent>=80?'#4ade80':stats.percent>=60?'#fde68a':'#f87171'}}>{stats.percent}%</span>
             </div>
             <div style={{background:'rgba(255,255,255,0.08)',borderRadius:'99px',height:'10px',overflow:'hidden'}}>
@@ -6464,7 +6464,7 @@ export default function TrainingsApp() {
 
             const Sec2 = ({title, children: ch}) => (
               <div style={{marginBottom:'12px'}}>
-                <p style={{margin:'0 0 6px',fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'0.5px'}}>{title}</p>
+                <p style={{margin:'0 0 6px',fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.48)',textTransform:'uppercase',letterSpacing:'0.5px'}}>{title}</p>
                 <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>{ch}</div>
               </div>
             );
@@ -6528,7 +6528,7 @@ export default function TrainingsApp() {
           </div>
           <div style={{display:'grid',gap:'7px',marginBottom:'20px'}}>
             {dates.length===0
-              ? <div style={{textAlign:'center',padding:'28px',color:'rgba(255,255,255,0.2)'}}>Noch keine Trainings erfasst.</div>
+              ? <div style={{textAlign:'center',padding:'28px',color:'rgba(255,255,255,0.4)'}}>Noch keine Trainings erfasst.</div>
               : dates.map(date=>{
                 const status=(child.attendance||{})[date];
                 const cfg=STATUS_CONFIG[status];
@@ -6602,7 +6602,7 @@ export default function TrainingsApp() {
                             <span style={{fontWeight:'800',color:'white',fontSize:'17px'}}>{mPlayers.length}er Gruppe</span>
                             <span style={{fontSize:'11px',fontWeight:'700',padding:'2px 8px',borderRadius:'10px',color:isArchived?'#4ade80':'#fde68a',background:isArchived?'rgba(74,222,128,0.1)':'rgba(253,230,138,0.08)',border:`1px solid ${isArchived?'rgba(74,222,128,0.25)':'rgba(253,230,138,0.25)'}`}}>{isArchived?'✓ Abgeschlossen':'● Laufend'}</span>
                           </div>
-                          <p style={{margin:'3px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{new Date(mpt.archivedAt||mpt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}</p>
+                          <p style={{margin:'3px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.52)'}}>{new Date(mpt.archivedAt||mpt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}</p>
                         </div>
                         <button onClick={()=>setPtDetailModal(null)} style={{width:'32px',height:'32px',borderRadius:'8px',background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.12)',color:'rgba(255,255,255,0.7)',cursor:'pointer',fontSize:'18px',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>×</button>
                       </div>
@@ -6613,7 +6613,7 @@ export default function TrainingsApp() {
                             <span style={{fontSize:'18px',flexShrink:0}}>{placeEmojiM[s.place-1]||(s.place+'.')}</span>
                             <div style={{flex:1}}>
                               <p style={{margin:0,fontWeight:'800',color:'white',fontSize:'13px'}}>{s.name}</p>
-                              <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{s.wins}S {s.losses}N · Sätze {s.setsWon}:{s.setsLost}</p>
+                              <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.52)'}}>{s.wins}S {s.losses}N · Sätze {s.setsWon}:{s.setsLost}</p>
                             </div>
                           </div>
                         ))}
@@ -6621,7 +6621,7 @@ export default function TrainingsApp() {
                       <p style={{margin:'0 0 8px',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.5)',textTransform:'uppercase',letterSpacing:'2px'}}>Spielplan</p>
                       {roundsM.map(round=>(
                         <div key={round} style={{marginBottom:'12px'}}>
-                          <p style={{margin:'0 0 5px',fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'1px'}}>Runde {round}</p>
+                          <p style={{margin:'0 0 5px',fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.48)',textTransform:'uppercase',letterSpacing:'1px'}}>Runde {round}</p>
                           <div style={{display:'grid',gap:'3px'}}>
                             {mMatches.filter(m=>m.round===round).map((m,mi)=>{
                               const p1=mPlayers[m.p1Idx];const p2=mPlayers[m.p2Idx];const res=m.result;
@@ -6677,11 +6677,11 @@ export default function TrainingsApp() {
                             ?<span style={{fontWeight:'800',color:'white',fontSize:'14px'}}>Platz {fs3?.place}</span>
                             :<span style={{fontWeight:'800',color:'#fde68a',fontSize:'14px'}}>Laufend {done}/{total}</span>}
                           <span style={{fontSize:'11px',color:isArc?'rgba(167,139,250,0.7)':'rgba(253,230,138,0.6)',fontWeight:'600'}}>{pt.players?pt.players.length+'er Gruppe':'4er Gruppe'}</span>
-                          <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{new Date(pt.archivedAt||pt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}</span>
+                          <span style={{fontSize:'11px',color:'rgba(255,255,255,0.48)'}}>{new Date(pt.archivedAt||pt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}</span>
                         </div>
-                        {fs3&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>vs. {opps.join(', ')} · {fs3.wins}S {fs3.losses}N</p>}
+                        {fs3&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.52)'}}>vs. {opps.join(', ')} · {fs3.wins}S {fs3.losses}N</p>}
                       </div>
-                      <span style={{fontSize:'16px',color:'rgba(255,255,255,0.2)',flexShrink:0}}>›</span>
+                      <span style={{fontSize:'16px',color:'rgba(255,255,255,0.4)',flexShrink:0}}>›</span>
                     </div>);
                   })}
                 </div>
@@ -6692,7 +6692,7 @@ export default function TrainingsApp() {
           {/* Manuell hinzufügen */}
           {canEdit()&&(
             <div style={{padding:'16px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'14px'}}>
-              <p style={{margin:'0 0 10px',fontSize:'13px',fontWeight:'700',color:'rgba(255,255,255,0.4)'}}>Training manuell hinzufügen:</p>
+              <p style={{margin:'0 0 10px',fontSize:'13px',fontWeight:'700',color:'rgba(255,255,255,0.58)'}}>Training manuell hinzufügen:</p>
               <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
                 <input type="date" value={trainingDate} onChange={e=>setTrainingDate(e.target.value)} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'10px',fontSize:'14px',color:'white',outline:'none'}}/>
                 <div style={{display:'flex',gap:'5px'}}>
@@ -6736,7 +6736,7 @@ export default function TrainingsApp() {
           <div style={{background:'#1a1a2e',border:'1.5px solid rgba(148,163,184,0.2)',borderRadius:'20px',padding:'28px 24px',maxWidth:'380px',width:'100%',textAlign:'center'}}>
             <div style={{fontSize:'40px',marginBottom:'12px'}}>🏁</div>
             <h3 style={{margin:'0 0 12px',color:'white',fontSize:'18px',fontWeight:'800'}}>Nachwuchskarriere beenden</h3>
-            <p style={{margin:'0 0 20px',color:'rgba(255,255,255,0.5)',fontSize:'13px',lineHeight:'1.6'}}>
+            <p style={{margin:'0 0 20px',color:'rgba(255,255,255,0.65)',fontSize:'13px',lineHeight:'1.6'}}>
               Diese Aktion friert alle Daten von <strong style={{color:'white'}}>{children[karriereConfirmChild]?.name}</strong> ein. Das Kind wird aus aktiven Listen entfernt, bleibt aber dauerhaft in der Datenbank gespeichert.<br/><br/>
               <span style={{color:'#f87171',fontWeight:'700'}}>Diese Aktion kann nur von einem Admin rückgängig gemacht werden.</span>
             </p>
@@ -6848,7 +6848,7 @@ export default function TrainingsApp() {
               ? <span style={{fontSize:'13px',color:'rgba(255,255,255,0.6)',flex:1}}>Wähle 1. Spieler…</span>
               : <span style={{fontSize:'13px',color:'white',flex:1,fontWeight:'600'}}>
                   <span style={{background:'rgba(251,146,60,0.35)',padding:'2px 8px',borderRadius:'6px',marginRight:'6px'}}>{children[rangSelection[0]]?.name}</span>
-                  vs <span style={{color:'rgba(255,255,255,0.5)',marginLeft:'6px'}}>Wähle 2. Spieler…</span>
+                  vs <span style={{color:'rgba(255,255,255,0.65)',marginLeft:'6px'}}>Wähle 2. Spieler…</span>
                 </span>
             }
             <button onClick={()=>{ setRangSelectionMode(false); setRangSelection([]); }}
@@ -7281,7 +7281,7 @@ export default function TrainingsApp() {
             </div>
           </div>
           {rangliste.length===0 ? (
-            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.3)'}}>
+            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.48)'}}>
               <div style={{fontSize:'48px',marginBottom:'12px'}}>📊</div>
               <p style={{fontSize:'15px',fontWeight:'700',margin:'0 0 6px'}}>Noch keine Rangliste vorhanden</p>
               <p style={{fontSize:'13px',margin:0}}>Der Trainer pflegt die Rangliste demnächst ein.</p>
@@ -7301,7 +7301,7 @@ export default function TrainingsApp() {
                     </div>
                     <div style={{flex:1,minWidth:0}}>
                       <p style={{margin:0,fontWeight:isMe?'800':'600',color:isMe?'#fcd34d':'white',fontSize:'15px'}}>{child.name}{isMe&&<span style={{fontSize:'11px',fontWeight:'700',color:'#fcd34d',marginLeft:'8px',background:'rgba(252,211,77,0.15)',padding:'1px 8px',borderRadius:'10px',border:'1px solid rgba(252,211,77,0.3)'}}>Du</span>}</p>
-                      {sub&&<p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{sub.name}</p>}
+                      {sub&&<p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.52)'}}>{sub.name}</p>}
                     </div>
                   </div>
                 );
@@ -7356,7 +7356,7 @@ export default function TrainingsApp() {
               placeholder="Kind suchen…"
               style={{width:'100%',boxSizing:'border-box',padding:'11px 12px 11px 38px',borderRadius:'12px',border:'1.5px solid rgba(255,255,255,0.15)',background:'rgba(255,255,255,0.1)',color:'white',fontSize:'14px',fontWeight:'600',outline:'none'}}
             />
-            {achSearch&&<button onClick={()=>setAchSearch('')} style={{position:'absolute',right:'10px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'rgba(255,255,255,0.5)',fontSize:'18px',cursor:'pointer',lineHeight:1}}>×</button>}
+            {achSearch&&<button onClick={()=>setAchSearch('')} style={{position:'absolute',right:'10px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'rgba(255,255,255,0.65)',fontSize:'18px',cursor:'pointer',lineHeight:1}}>×</button>}
           </div>
 
           {/* ── Errungenschaftsstatistiken ──────────── */}
@@ -7431,7 +7431,7 @@ export default function TrainingsApp() {
                   <div onClick={e=>e.stopPropagation()} style={{background:'#1a0b3a',border:'1px solid rgba(196,181,253,0.3)',borderRadius:'18px',padding:'20px',maxWidth:'560px',width:'100%',maxHeight:'85vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.5)'}}>
                     <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'14px'}}>
                       <p style={{margin:0,fontWeight:'800',color:'white',fontSize:'16px',flex:1}}>📊 Errungenschaftsstatistiken</p>
-                      <button onClick={()=>setAchStatsOpen(false)} style={{background:'none',border:'none',color:'rgba(255,255,255,0.5)',fontSize:'20px',cursor:'pointer',lineHeight:1}}>×</button>
+                      <button onClick={()=>setAchStatsOpen(false)} style={{background:'none',border:'none',color:'rgba(255,255,255,0.65)',fontSize:'20px',cursor:'pointer',lineHeight:1}}>×</button>
                     </div>
 
                     <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'12px'}}>
@@ -7456,7 +7456,7 @@ export default function TrainingsApp() {
 
                     {achStatsTab==='rangliste' && (
                       rangRows.length===0
-                        ? <div style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.35)',fontSize:'13px'}}>Keine Errungenschaften in diesem Zeitraum.</div>
+                        ? <div style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.52)',fontSize:'13px'}}>Keine Errungenschaften in diesem Zeitraum.</div>
                         : <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
                             {rangRows.map((r,idx)=>barRow(`${idx+1}. ${r.child.name}`, r.count, rangRows[0].count, r.childId))}
                           </div>
@@ -7464,7 +7464,7 @@ export default function TrainingsApp() {
 
                     {achStatsTab==='nachart' && (
                       artRows.length===0
-                        ? <div style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.35)',fontSize:'13px'}}>Keine Errungenschaften in diesem Zeitraum.</div>
+                        ? <div style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.52)',fontSize:'13px'}}>Keine Errungenschaften in diesem Zeitraum.</div>
                         : <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
                             {artRows.map(r=>barRow(r.label, r.count, artRows[0].count, r.key))}
                           </div>
@@ -7480,14 +7480,14 @@ export default function TrainingsApp() {
                         <div style={{display:'flex',alignItems:'flex-end',gap:'4px',height:'140px',padding:'0 2px'}}>
                           {trendMonths.map((mk,i)=>(
                             <div key={mk} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',height:'100%',justifyContent:'flex-end'}} title={`${mk}: ${trendCounts[i]}`}>
-                              <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.5)'}}>{trendCounts[i]||''}</span>
+                              <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.65)'}}>{trendCounts[i]||''}</span>
                               <div style={{width:'100%',height:`${Math.max(2,(trendCounts[i]/trendMax)*100)}%`,background:'linear-gradient(180deg,#c4b5fd,#7c3aed)',borderRadius:'4px 4px 0 0'}}/>
                             </div>
                           ))}
                         </div>
                         <div style={{display:'flex',gap:'4px',padding:'6px 2px 0',marginTop:'4px',borderTop:'1px solid rgba(255,255,255,0.1)'}}>
                           {trendMonths.map(mk=>(
-                            <span key={mk} style={{flex:1,textAlign:'center',fontSize:'9px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>{mk.slice(5)}</span>
+                            <span key={mk} style={{flex:1,textAlign:'center',fontSize:'9px',color:'rgba(255,255,255,0.58)',fontWeight:'600'}}>{mk.slice(5)}</span>
                           ))}
                         </div>
                       </div>
@@ -7571,7 +7571,7 @@ export default function TrainingsApp() {
                 // nur kompakter (schmalere Trennlinie statt volle SH-Kachel).
                 const SecLbl = ({children:ch})=>(
                   <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'7px'}}>
-                    <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',letterSpacing:'1.2px',whiteSpace:'nowrap'}}>{ch}</span>
+                    <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.58)',textTransform:'uppercase',letterSpacing:'1.2px',whiteSpace:'nowrap'}}>{ch}</span>
                     <div style={{flex:1,height:'1px',background:'rgba(255,255,255,0.08)'}}/>
                   </div>
                 );
@@ -7586,7 +7586,7 @@ export default function TrainingsApp() {
                       </div>
                       <div style={{flex:1,minWidth:0}}>
                         <p style={{margin:'0 0 2px',fontWeight:'800',fontSize:'15px',color:'white'}}>{child.name}</p>
-                        <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>{sg?.name||'–'}</p>
+                        <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.58)'}}>{sg?.name||'–'}</p>
                       </div>
                       <div style={{display:'flex',alignItems:'center',gap:'10px',flexShrink:0}}>
                         <div style={{textAlign:'right'}}>
@@ -7594,7 +7594,7 @@ export default function TrainingsApp() {
                             🏅 {totalAch}
                           </span>
                         </div>
-                        <span style={{fontSize:'16px',color:'rgba(255,255,255,0.3)',transform:isOpen?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s'}}>▾</span>
+                        <span style={{fontSize:'16px',color:'rgba(255,255,255,0.48)',transform:isOpen?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s'}}>▾</span>
                       </div>
                     </button>
 
@@ -7608,7 +7608,7 @@ export default function TrainingsApp() {
                             <SecLbl>🏓 TTR Meilensteine</SecLbl>
                             {personalMax!==null
                               ? <span style={{fontSize:'10px',fontWeight:'700',color:'#fbbf24',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'6px',padding:'1px 7px'}}>⚡ Auto · Bestwert {personalMax}</span>
-                              : <span style={{fontSize:'10px',fontWeight:'600',color:'rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.06)',borderRadius:'6px',padding:'1px 7px'}}>manuell</span>}
+                              : <span style={{fontSize:'10px',fontWeight:'600',color:'rgba(255,255,255,0.48)',background:'rgba(255,255,255,0.06)',borderRadius:'6px',padding:'1px 7px'}}>manuell</span>}
                           </div>
                           <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
                             {TTR_MILESTONES.map(val=>{
@@ -7666,7 +7666,7 @@ export default function TrainingsApp() {
                             <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'10px',padding:'8px 12px'}}>
                               {sdmCount>0
                                 ? <p style={{margin:0,fontSize:'12px',color:'#fcd34d',fontWeight:'700',lineHeight:'1.5'}}>{(spielerDesMonatsWins[child.id]||[]).map(w=>w.type==='year'?`👑 J.${w.period}`:`⭐ ${fmtYM(w.period)}`).join(' · ')}</p>
-                                : <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.25)'}}>– noch keine –</p>}
+                                : <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.42)'}}>– noch keine –</p>}
                             </div>
                           </div>
                         </div>
@@ -7686,7 +7686,7 @@ export default function TrainingsApp() {
                                     <div key={t.key} style={{padding:'6px 10px',borderRadius:'10px',border:`1.5px solid ${has?'rgba(74,222,128,0.35)':'rgba(255,255,255,0.07)'}`,background:has?'rgba(74,222,128,0.08)':'rgba(255,255,255,0.02)',textAlign:'center',minWidth:'58px'}}>
                                       <div style={{fontSize:'16px'}}>{has?t.icon:'🔒'}</div>
                                       <div style={{fontSize:'10px',fontWeight:'800',color:has?'#4ade80':'rgba(255,255,255,0.2)',marginTop:'2px'}}>{t.label}</div>
-                                      <div style={{fontSize:'10px',color:'rgba(255,255,255,0.35)',fontWeight:'600'}}>{wk}W{frozen?' ❄️':''}</div>
+                                      <div style={{fontSize:'10px',color:'rgba(255,255,255,0.52)',fontWeight:'600'}}>{wk}W{frozen?' ❄️':''}</div>
                                     </div>
                                   );
                                 })}
@@ -8996,7 +8996,7 @@ export default function TrainingsApp() {
                     <div style={{display:'grid',gap:'8px'}}>
                       {recentDonePTs.map(pt=><PTCard key={pt.id} pt={pt}/>)}
                     </div>
-                    <p style={{margin:'8px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.5)',textAlign:'right'}}>⏱ Werden nach 7 Tagen automatisch archiviert</p>
+                    <p style={{margin:'8px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.65)',textAlign:'right'}}>⏱ Werden nach 7 Tagen automatisch archiviert</p>
                   </div>
                 )}
               </>
@@ -9012,7 +9012,7 @@ export default function TrainingsApp() {
     const pt = practiceTournaments[activePracticeId];
     if (!pt) return (
       <div style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'16px',color:'white'}}>
-        <p style={{fontSize:'16px',color:'rgba(255,255,255,0.4)'}}>Wettkampf nicht gefunden (möglicherweise archiviert).</p>
+        <p style={{fontSize:'16px',color:'rgba(255,255,255,0.58)'}}>Wettkampf nicht gefunden (möglicherweise archiviert).</p>
         <button onClick={()=>navTo('practiceTournaments')} style={{padding:'10px 20px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.25)',borderRadius:'10px',color:'#4ade80',cursor:'pointer',fontWeight:'700'}}>← Zurück</button>
       </div>
     );
@@ -9188,17 +9188,17 @@ export default function TrainingsApp() {
             <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'11px 14px'}}>
               <div style={{flex:1,textAlign:'right',minWidth:0}}>
                 <p style={{margin:0,fontWeight:'800',fontSize:isMobile?'12px':'14px',color:p1Won?'#4ade80':res&&!p1Won?'rgba(255,255,255,0.3)':p1===undefined?'rgba(255,255,255,0.25)':'white',overflowWrap:'break-word',wordBreak:'break-word',whiteSpace:'normal',lineHeight:'1.25'}}>{p1Name}</p>
-                {p1!=null&&p1!==undefined&&<p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.2)'}}>#{players[p1]?.seed}{hcap?.b==='p1'?<span style={{color:'#fde68a',fontWeight:'700'}}> +{hcap.pts}P</span>:null}</p>}
+                {p1!=null&&p1!==undefined&&<p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.4)'}}>#{players[p1]?.seed}{hcap?.b==='p1'?<span style={{color:'#fde68a',fontWeight:'700'}}> +{hcap.pts}P</span>:null}</p>}
               </div>
               <div style={{minWidth:'60px',textAlign:'center',flexShrink:0}}>
                 {isBye?<span style={{fontSize:'11px',color:'rgba(251,191,36,0.6)',fontWeight:'700'}}>Freilos</span>
                   :res?<span style={{fontSize:'19px',fontWeight:'900',color:'white',letterSpacing:'2px'}}>{res.sets1}:{res.sets2}</span>
-                  :<span style={{fontSize:'12px',color:'rgba(255,255,255,0.2)',fontWeight:'600'}}>vs</span>}
+                  :<span style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>vs</span>}
                 {hcap&&!isBye&&<p style={{margin:'2px 0 0',fontSize:'10px',color:'rgba(253,230,138,0.6)',fontWeight:'600'}}>{hcap.pts}P Vorgabe</p>}
               </div>
               <div style={{flex:1,minWidth:0}}>
                 <p style={{margin:0,fontWeight:'800',fontSize:isMobile?'12px':'14px',color:p2Won?'#4ade80':res&&!p2Won?'rgba(255,255,255,0.3)':p2===undefined?'rgba(255,255,255,0.25)':'white',overflowWrap:'break-word',wordBreak:'break-word',whiteSpace:'normal',lineHeight:'1.25'}}>{p2Name}</p>
-                {p2!=null&&p2!==undefined&&<p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.2)'}}>#{players[p2]?.seed}{hcap?.b==='p2'?<span style={{color:'#fde68a',fontWeight:'700'}}> +{hcap.pts}P</span>:null}</p>}
+                {p2!=null&&p2!==undefined&&<p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.4)'}}>#{players[p2]?.seed}{hcap?.b==='p2'?<span style={{color:'#fde68a',fontWeight:'700'}}> +{hcap.pts}P</span>:null}</p>}
               </div>
               {canPlay&&!isEditing&&(
                 <button onClick={()=>initKoDraft(matchId)} style={{flexShrink:0,padding:'6px 10px',background:res?'rgba(255,255,255,0.06)':'rgba(167,139,250,0.12)',border:`1px solid ${res?'rgba(255,255,255,0.1)':'rgba(167,139,250,0.3)'}`,borderRadius:'8px',cursor:'pointer',color:res?'rgba(255,255,255,0.45)':'#c4b5fd',fontSize:'12px',fontWeight:'700'}}>
@@ -9208,7 +9208,7 @@ export default function TrainingsApp() {
             </div>
             {!isEditing&&res?.scores?.length>0&&(
               <div style={{padding:'4px 14px 10px',display:'flex',gap:'10px',flexWrap:'wrap'}}>
-                {res.scores.map((sc,si)=><span key={si} style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',fontWeight:'700'}}>{si===maxSets-1?'⚡':''}S{si+1}: {sc.s1}:{sc.s2}</span>)}
+                {res.scores.map((sc,si)=><span key={si} style={{fontSize:'11px',color:'rgba(255,255,255,0.48)',fontWeight:'700'}}>{si===maxSets-1?'⚡':''}S{si+1}: {sc.s1}:{sc.s2}</span>)}
               </div>
             )}
             {isEditing&&ptMatchDraft&&(
@@ -9222,7 +9222,7 @@ export default function TrainingsApp() {
                         return (<div key={si} style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
                           <span style={{fontSize:'11px',fontWeight:'700',color:isD?'#fde68a':'rgba(255,255,255,0.3)',minWidth:'68px'}}>{isD?'⚡ Entscheid.':`Satz ${si+1}`}</span>
                           <input type="number" min="0" max="99" value={row.s1} onChange={e=>{const sc=[...ptMatchDraft.scores];sc[si]={...sc[si],s1:e.target.value===''?'':e.target.value};setPtMatchDraft(d=>({...d,scores:sc}));}} style={inpStyleKo} placeholder="0"/>
-                          <span style={{color:'rgba(255,255,255,0.3)',fontWeight:'900',fontSize:'18px'}}>:</span>
+                          <span style={{color:'rgba(255,255,255,0.48)',fontWeight:'900',fontSize:'18px'}}>:</span>
                           <input type="number" min="0" max="99" value={row.s2} onChange={e=>{const sc=[...ptMatchDraft.scores];sc[si]={...sc[si],s2:e.target.value===''?'':e.target.value};setPtMatchDraft(d=>({...d,scores:sc}));}} style={inpStyleKo} placeholder="0"/>
                           {ptMatchDraft.scores.length>1&&<button onClick={()=>setPtMatchDraft(d=>({...d,scores:d.scores.filter((_,j)=>j!==si)}))} style={{width:'28px',height:'28px',borderRadius:'6px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',fontSize:'16px',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>}
                         </div>);
@@ -9252,7 +9252,7 @@ export default function TrainingsApp() {
                 )}
                 <div style={{display:'flex',gap:'8px',marginTop:'4px'}}>
                   {res&&<button onClick={()=>{deleteKoResult(matchId);setPtMatchEditing(null);setPtMatchDraft(null);}} style={{padding:'8px 10px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',borderRadius:'8px',cursor:'pointer',color:'#f87171',fontWeight:'700',fontSize:'12px'}}>🗑️</button>}
-                  <button onClick={()=>{setPtMatchEditing(null);setPtMatchDraft(null);}} style={{flex:1,padding:'9px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>Abbrechen</button>
+                  <button onClick={()=>{setPtMatchEditing(null);setPtMatchDraft(null);}} style={{flex:1,padding:'9px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.65)',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>Abbrechen</button>
                   <button onClick={saveKoDraft} disabled={!isDraftValidKo()} style={{flex:2,padding:'9px',background:isDraftValidKo()?'linear-gradient(135deg,#7c3aed,#6d28d9)':'rgba(255,255,255,0.06)',border:'none',borderRadius:'8px',color:'white',cursor:isDraftValidKo()?'pointer':'not-allowed',fontWeight:'800',fontSize:'13px',opacity:isDraftValidKo()?1:0.45}}>✓ Speichern</button>
                 </div>
               </div>
@@ -9297,14 +9297,14 @@ export default function TrainingsApp() {
             </div>
 
             {/* Spiele */}
-            <p style={{margin:'0 0 12px',fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'2px'}}>Spiele</p>
+            <p style={{margin:'0 0 12px',fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.48)',textTransform:'uppercase',letterSpacing:'2px'}}>Spiele</p>
 
             {/* Winners Bracket */}
             <div style={{marginBottom:'24px'}}>
               {pt.doubleElim&&<p style={{margin:'0 0 10px',fontSize:'10px',fontWeight:'800',color:'rgba(74,222,128,0.5)',textTransform:'uppercase',letterSpacing:'2px'}}>🏆 Winners Bracket</p>}
               {wbRoundsNums.map(r=>(
                 <div key={r} style={{marginBottom:'12px'}}>
-                  <p style={{margin:'0 0 6px',fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.25)',textTransform:'uppercase',letterSpacing:'1px'}}>{wbRoundLabel(r)}</p>
+                  <p style={{margin:'0 0 6px',fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.42)',textTransform:'uppercase',letterSpacing:'1px'}}>{wbRoundLabel(r)}</p>
                   <div style={{display:'grid',gap:'8px'}}>
                     {graph.wbMatches.filter(m=>m.round===r).map(m=><KoMatchCard key={m.id} matchId={m.id} isFinal={r===wbTotalRounds&&!hasGF}/>)}
                   </div>
@@ -9318,7 +9318,7 @@ export default function TrainingsApp() {
                 <p style={{margin:'0 0 10px',fontSize:'10px',fontWeight:'800',color:'rgba(248,113,113,0.5)',textTransform:'uppercase',letterSpacing:'2px'}}>📉 Verlierer Bracket</p>
                 {lbRoundsNums.map(r=>(
                   <div key={r} style={{marginBottom:'12px'}}>
-                    <p style={{margin:'0 0 6px',fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.25)',textTransform:'uppercase',letterSpacing:'1px'}}>VB Runde {r}</p>
+                    <p style={{margin:'0 0 6px',fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.42)',textTransform:'uppercase',letterSpacing:'1px'}}>VB Runde {r}</p>
                     <div style={{display:'grid',gap:'8px'}}>
                       {graph.lbMatches.filter(m=>m.round===r).map(m=><KoMatchCard key={m.id} matchId={m.id}/>)}
                     </div>
@@ -9339,7 +9339,7 @@ export default function TrainingsApp() {
             {gfDone&&(
               <div style={{padding:'18px 20px',background:'rgba(74,222,128,0.07)',border:'1px solid rgba(74,222,128,0.22)',borderRadius:'16px',textAlign:'center'}}>
                 <p style={{margin:'0 0 6px',fontSize:'17px',fontWeight:'900',color:'#4ade80'}}>🏆 KO Turnier abgeschlossen!</p>
-                {(()=>{const gfR=resolved[finalMatchId];const wIdx=gfR?.result?.sets1>gfR?.result?.sets2?gfR.p1:gfR?.p2;return wIdx!=null&&<p style={{margin:'0 0 14px',fontSize:'13px',color:'rgba(255,255,255,0.45)'}}>Sieger: <strong style={{color:'#fde68a'}}>{players[wIdx]?.name}</strong></p>;})()}
+                {(()=>{const gfR=resolved[finalMatchId];const wIdx=gfR?.result?.sets1>gfR?.result?.sets2?gfR.p1:gfR?.p2;return wIdx!=null&&<p style={{margin:'0 0 14px',fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>Sieger: <strong style={{color:'#fde68a'}}>{players[wIdx]?.name}</strong></p>;})()}
                 <button onClick={archiveKo} style={{padding:'12px 28px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'800',fontSize:'14px',display:'inline-flex',alignItems:'center',gap:'8px'}}><Archive size={16}/> Archivieren</button>
               </div>
             )}
@@ -9448,7 +9448,7 @@ export default function TrainingsApp() {
                 <p style={{margin:'0 0 6px',fontWeight:'900',fontSize:isMobile?'14px':'17px',color:teamWinner==='A'?'#4ade80':'white'}}>{teamA.name}</p>
                 <div style={{display:'flex',flexDirection:'column',gap:'2px',alignItems:'flex-end'}}>
                   {teamA.players.map((p,i)=>(
-                    <span key={p.childId+i} style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'flex',alignItems:'center',gap:'5px'}}>
+                    <span key={p.childId+i} style={{fontSize:'10px',color:'rgba(255,255,255,0.58)',display:'flex',alignItems:'center',gap:'5px'}}>
                       {p.name}<span style={{width:'15px',height:'15px',borderRadius:'50%',background:'rgba(124,58,237,0.3)',color:'#c4b5fd',fontSize:'9px',fontWeight:'900',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{i+1}</span>
                     </span>
                   ))}
@@ -9461,7 +9461,7 @@ export default function TrainingsApp() {
                 <p style={{margin:'0 0 6px',fontWeight:'900',fontSize:isMobile?'14px':'17px',color:teamWinner==='B'?'#4ade80':'white'}}>{teamB.name}</p>
                 <div style={{display:'flex',flexDirection:'column',gap:'2px'}}>
                   {teamB.players.map((p,i)=>(
-                    <span key={p.childId+i} style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'flex',alignItems:'center',gap:'5px'}}>
+                    <span key={p.childId+i} style={{fontSize:'10px',color:'rgba(255,255,255,0.58)',display:'flex',alignItems:'center',gap:'5px'}}>
                       <span style={{width:'15px',height:'15px',borderRadius:'50%',background:'rgba(219,39,119,0.3)',color:'#f9a8d4',fontSize:'9px',fontWeight:'900',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{i+1}</span>{p.name}
                     </span>
                   ))}
@@ -9487,7 +9487,7 @@ export default function TrainingsApp() {
                         {match.handicap?.beneficiary==='a'&&<p style={{margin:0,fontSize:'10px',color:'#fde68a',fontWeight:'700'}}>+{match.handicap.points}P</p>}
                       </div>
                       <div style={{minWidth:'64px',textAlign:'center',flexShrink:0}}>
-                        {res ? <span style={{fontSize:'20px',fontWeight:'900',color:'white',letterSpacing:'2px'}}>{res.sets1}:{res.sets2}</span> : <span style={{fontSize:'13px',color:'rgba(255,255,255,0.2)',fontWeight:'600'}}>vs</span>}
+                        {res ? <span style={{fontSize:'20px',fontWeight:'900',color:'white',letterSpacing:'2px'}}>{res.sets1}:{res.sets2}</span> : <span style={{fontSize:'13px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>vs</span>}
                         {match.handicap&&<p style={{margin:'2px 0 0',fontSize:'10px',color:'rgba(253,230,138,0.6)',fontWeight:'600'}}>Vorgabe {match.handicap.points}P</p>}
                       </div>
                       <div style={{flex:1,minWidth:0}}>
@@ -9505,7 +9505,7 @@ export default function TrainingsApp() {
                     {!isEditing&&res&&res.scores&&res.scores.length>0&&(
                       <div style={{padding:'0 14px 10px',display:'flex',gap:'10px',flexWrap:'wrap'}}>
                         {res.scores.map((sc,si)=>(
-                          <span key={si} style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',fontWeight:'700'}}>{si===maxSets-1?'⚡':''} S{si+1}: {sc.s1}:{sc.s2}</span>
+                          <span key={si} style={{fontSize:'11px',color:'rgba(255,255,255,0.48)',fontWeight:'700'}}>{si===maxSets-1?'⚡':''} S{si+1}: {sc.s1}:{sc.s2}</span>
                         ))}
                       </div>
                     )}
@@ -9523,7 +9523,7 @@ export default function TrainingsApp() {
                                   <div key={si} style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
                                     <span style={{fontSize:'11px',fontWeight:'700',color:isDecider?'#fde68a':'rgba(255,255,255,0.3)',minWidth:'68px'}}>{isDecider?'⚡ Entscheid.':` Satz ${si+1}`}</span>
                                     <input type="number" min="0" max="99" value={row.s1} onChange={e=>updateRow('s1',e.target.value===''?'':e.target.value)} style={inpStyle} placeholder="0"/>
-                                    <span style={{color:'rgba(255,255,255,0.3)',fontWeight:'900',fontSize:'18px'}}>:</span>
+                                    <span style={{color:'rgba(255,255,255,0.48)',fontWeight:'900',fontSize:'18px'}}>:</span>
                                     <input type="number" min="0" max="99" value={row.s2} onChange={e=>updateRow('s2',e.target.value===''?'':e.target.value)} style={inpStyle} placeholder="0"/>
                                     {ptMatchDraft.scores.length>1&&(
                                       <button onClick={()=>setPtMatchDraft(d=>({...d,scores:d.scores.filter((_,j)=>j!==si)}))}
@@ -9551,7 +9551,7 @@ export default function TrainingsApp() {
                                   ))}
                                 </div>
                               </div>
-                              <span style={{fontWeight:'900',color:'rgba(255,255,255,0.2)',fontSize:'22px',flexShrink:0}}>:</span>
+                              <span style={{fontWeight:'900',color:'rgba(255,255,255,0.4)',fontSize:'22px',flexShrink:0}}>:</span>
                               <div style={{flex:1,minWidth:'130px',textAlign:'center'}}>
                                 <p style={{margin:'0 0 7px',fontSize:'13px',fontWeight:'800',color:'white'}}>{nameB}</p>
                                 <div style={{display:'flex',gap:'5px',justifyContent:'center'}}>
@@ -9568,7 +9568,7 @@ export default function TrainingsApp() {
                           {res&&<button onClick={()=>{deleteResult(matchIdx);setPtMatchEditing(null);setPtMatchDraft(null);}}
                             style={{padding:'9px 14px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',borderRadius:'9px',color:'#f87171',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>Löschen</button>}
                           <button onClick={()=>{setPtMatchEditing(null);setPtMatchDraft(null);}}
-                            style={{padding:'9px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'9px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>Abbrechen</button>
+                            style={{padding:'9px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'9px',color:'rgba(255,255,255,0.65)',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>Abbrechen</button>
                           <button onClick={saveDraft} disabled={!isDraftValid()}
                             style={{padding:'9px 20px',background:isDraftValid()?'linear-gradient(135deg,#7c3aed,#6d28d9)':'rgba(255,255,255,0.06)',border:'none',borderRadius:'9px',color:isDraftValid()?'white':'rgba(255,255,255,0.3)',cursor:isDraftValid()?'pointer':'not-allowed',fontWeight:'800',fontSize:'13px'}}>Speichern</button>
                         </div>
@@ -9583,7 +9583,7 @@ export default function TrainingsApp() {
             {allDone&&(
               <div style={{padding:'18px 20px',background:'rgba(74,222,128,0.07)',border:'1px solid rgba(74,222,128,0.22)',borderRadius:'16px',textAlign:'center'}}>
                 <p style={{margin:'0 0 6px',fontSize:'17px',fontWeight:'900',color:'#4ade80'}}>🤝 Mannschaftsspiel abgeschlossen!</p>
-                <p style={{margin:'0 0 14px',fontSize:'13px',color:'rgba(255,255,255,0.45)'}}>
+                <p style={{margin:'0 0 14px',fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>
                   {teamWinner ? <>Sieger: <strong style={{color:'#fde68a'}}>{teamWinner==='A'?teamA.name:teamB.name}</strong></> : 'Unentschieden'}
                 </p>
                 <button onClick={archiveTeamTournament} style={{padding:'12px 28px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'800',fontSize:'14px',display:'inline-flex',alignItems:'center',gap:'8px'}}><Archive size={16}/> Archivieren</button>
@@ -9736,7 +9736,7 @@ export default function TrainingsApp() {
               {/* Header */}
               <div style={{display:'grid',gridTemplateColumns:'36px 1fr 44px 70px'+(settings.trackSetScores?' 80px':''),padding:'10px 16px',borderBottom:'1px solid rgba(255,255,255,0.05)',gap:'4px',alignItems:'center'}}>
                 {['Pl.','Name','S','Sätze',...(settings.trackSetScores?['Punkte']:[])].map(h=>(
-                  <span key={h} style={{fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'0.3px',textAlign:h==='Name'?'left':'center'}}>{h}</span>
+                  <span key={h} style={{fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.48)',textTransform:'uppercase',letterSpacing:'0.3px',textAlign:h==='Name'?'left':'center'}}>{h}</span>
                 ))}
               </div>
               {standings.map((s,place)=>{
@@ -9746,16 +9746,16 @@ export default function TrainingsApp() {
                     <div style={{fontSize:'18px',textAlign:'center'}}>{placeEmoji[place]}</div>
                     <div>
                       <p style={{margin:0,fontWeight:'800',color:placeColor[place],fontSize:'14px'}}>{p.name}</p>
-                      <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>Setzung {p.seed}</p>
+                      <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.42)'}}>Setzung {p.seed}</p>
                     </div>
                     <div style={{textAlign:'center',fontSize:'18px',fontWeight:'900',color:s.wins>=2?'#4ade80':s.wins===1?'rgba(255,255,255,0.6)':'rgba(255,255,255,0.3)'}}>{s.wins}</div>
-                    <div style={{textAlign:'center',fontSize:'13px',fontWeight:'700',color:'rgba(255,255,255,0.45)'}}>{s.setsWon}:{s.setsLost}</div>
-                    {settings.trackSetScores&&<div style={{textAlign:'center',fontSize:'11px',color:'rgba(255,255,255,0.3)',fontWeight:'600'}}>{s.ptsWon}:{s.ptsLost}</div>}
+                    <div style={{textAlign:'center',fontSize:'13px',fontWeight:'700',color:'rgba(255,255,255,0.6)'}}>{s.setsWon}:{s.setsLost}</div>
+                    {settings.trackSetScores&&<div style={{textAlign:'center',fontSize:'11px',color:'rgba(255,255,255,0.48)',fontWeight:'600'}}>{s.ptsWon}:{s.ptsLost}</div>}
                   </div>
                 );
               })}
             </div>
-            <p style={{margin:'5px 0 0',fontSize:'10px',color:'rgba(255,255,255,0.2)',textAlign:'right'}}>S = Siege · sortiert nach: Siege → Satzbilanz{settings.trackSetScores?' → Punktbilanz':''} → Direktvergleich</p>
+            <p style={{margin:'5px 0 0',fontSize:'10px',color:'rgba(255,255,255,0.4)',textAlign:'right'}}>S = Siege · sortiert nach: Siege → Satzbilanz{settings.trackSetScores?' → Punktbilanz':''} → Direktvergleich</p>
           </div>
 
           {/* ── Runden & Partien ────────────────────────────────── */}
@@ -9785,14 +9785,14 @@ export default function TrainingsApp() {
                         {/* Spieler 1 */}
                         <div style={{flex:1,textAlign:'right',minWidth:0}}>
                           <p style={{margin:0,fontWeight:'800',fontSize:isMobile?'12px':'15px',color:p1Won?'#4ade80':res?'rgba(255,255,255,0.35)':'white',overflowWrap:'break-word',wordBreak:'break-word',whiteSpace:'normal',lineHeight:'1.25'}}>{p1.name}</p>
-                          <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>#{p1.seed}{match.handicap?.beneficiary===match.p1Idx?<span style={{color:'#fde68a',fontWeight:'700'}}> +{match.handicap.points}P</span>:null}</p>
+                          <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.42)'}}>#{p1.seed}{match.handicap?.beneficiary===match.p1Idx?<span style={{color:'#fde68a',fontWeight:'700'}}> +{match.handicap.points}P</span>:null}</p>
                         </div>
 
                         {/* Ergebnis */}
                         <div style={{minWidth:'64px',textAlign:'center',flexShrink:0}}>
                           {res
                             ? <span style={{fontSize:'20px',fontWeight:'900',color:'white',letterSpacing:'2px'}}>{res.sets1}:{res.sets2}</span>
-                            : <span style={{fontSize:'13px',color:'rgba(255,255,255,0.2)',fontWeight:'600'}}>vs</span>
+                            : <span style={{fontSize:'13px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>vs</span>
                           }
                           {match.handicap&&<p style={{margin:'2px 0 0',fontSize:'10px',color:'rgba(253,230,138,0.6)',fontWeight:'600'}}>Vorgabe {match.handicap.points}P</p>}
                         </div>
@@ -9800,7 +9800,7 @@ export default function TrainingsApp() {
                         {/* Spieler 2 */}
                         <div style={{flex:1,minWidth:0}}>
                           <p style={{margin:0,fontWeight:'800',fontSize:isMobile?'12px':'15px',color:p2Won?'#4ade80':res?'rgba(255,255,255,0.35)':'white',overflowWrap:'break-word',wordBreak:'break-word',whiteSpace:'normal',lineHeight:'1.25'}}>{p2.name}</p>
-                          <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.25)'}}>#{p2.seed}{match.handicap?.beneficiary===match.p2Idx?<span style={{color:'#fde68a',fontWeight:'700'}}> +{match.handicap.points}P</span>:null}</p>
+                          <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.42)'}}>#{p2.seed}{match.handicap?.beneficiary===match.p2Idx?<span style={{color:'#fde68a',fontWeight:'700'}}> +{match.handicap.points}P</span>:null}</p>
                         </div>
 
                         {/* Eintragen-Button */}
@@ -9816,7 +9816,7 @@ export default function TrainingsApp() {
                       {!isEditing&&res&&res.scores&&res.scores.length>0&&(
                         <div style={{padding:'4px 14px 10px',display:'flex',gap:'10px',flexWrap:'wrap'}}>
                           {res.scores.map((sc,si)=>(
-                            <span key={si} style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',fontWeight:'700'}}>
+                            <span key={si} style={{fontSize:'11px',color:'rgba(255,255,255,0.48)',fontWeight:'700'}}>
                               {si===maxSets-1?'⚡':''} S{si+1}: {sc.s1}:{sc.s2}
                             </span>
                           ))}
@@ -9847,7 +9847,7 @@ export default function TrainingsApp() {
                                       <input type="number" min="0" max="99" value={row.s1}
                                         onChange={e=>updateRow('s1',e.target.value===''?'':e.target.value)}
                                         style={inpStyle} placeholder="0"/>
-                                      <span style={{color:'rgba(255,255,255,0.3)',fontWeight:'900',fontSize:'18px'}}>:</span>
+                                      <span style={{color:'rgba(255,255,255,0.48)',fontWeight:'900',fontSize:'18px'}}>:</span>
                                       <input type="number" min="0" max="99" value={row.s2}
                                         onChange={e=>updateRow('s2',e.target.value===''?'':e.target.value)}
                                         style={inpStyle} placeholder="0"/>
@@ -9881,7 +9881,7 @@ export default function TrainingsApp() {
                                     ))}
                                   </div>
                                 </div>
-                                <span style={{fontWeight:'900',color:'rgba(255,255,255,0.2)',fontSize:'22px',flexShrink:0}}>:</span>
+                                <span style={{fontWeight:'900',color:'rgba(255,255,255,0.4)',fontSize:'22px',flexShrink:0}}>:</span>
                                 <div style={{flex:1,minWidth:'130px',textAlign:'center'}}>
                                   <p style={{margin:'0 0 7px',fontSize:'13px',fontWeight:'800',color:'white'}}>{p2.name}</p>
                                   <div style={{display:'flex',gap:'5px',justifyContent:'center'}}>
@@ -9902,7 +9902,7 @@ export default function TrainingsApp() {
                               style={{padding:'8px 10px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',borderRadius:'8px',cursor:'pointer',color:'#f87171',fontWeight:'700',fontSize:'12px'}}>
                               🗑️ Löschen
                             </button>}
-                            <button onClick={()=>{setPtMatchEditing(null);setPtMatchDraft(null);}} style={{flex:1,padding:'9px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>Abbrechen</button>
+                            <button onClick={()=>{setPtMatchEditing(null);setPtMatchDraft(null);}} style={{flex:1,padding:'9px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.65)',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>Abbrechen</button>
                             <button onClick={saveDraft} disabled={!isDraftValid()}
                               style={{flex:2,padding:'9px',background:isDraftValid()?'linear-gradient(135deg,#7c3aed,#6d28d9)':'rgba(255,255,255,0.06)',border:'none',borderRadius:'8px',color:'white',cursor:isDraftValid()?'pointer':'not-allowed',fontWeight:'800',fontSize:'13px',opacity:isDraftValid()?1:0.45}}>
                               ✓ Speichern
@@ -9921,7 +9921,7 @@ export default function TrainingsApp() {
           {allDone&&(
             <div style={{padding:'18px 20px',background:'rgba(74,222,128,0.07)',border:'1px solid rgba(74,222,128,0.22)',borderRadius:'16px',textAlign:'center',marginTop:'8px'}}>
               <p style={{margin:'0 0 6px',fontSize:'17px',fontWeight:'900',color:'#4ade80'}}>🏆 Alle Partien abgeschlossen!</p>
-              <p style={{margin:'0 0 14px',fontSize:'13px',color:'rgba(255,255,255,0.45)'}}>Sieger: <strong style={{color:'#fde68a'}}>{players[standings[0].idx].name}</strong></p>
+              <p style={{margin:'0 0 14px',fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>Sieger: <strong style={{color:'#fde68a'}}>{players[standings[0].idx].name}</strong></p>
               <button onClick={archiveTournament}
                 style={{padding:'12px 28px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'800',fontSize:'14px',display:'inline-flex',alignItems:'center',gap:'8px'}}>
                 <Archive size={16}/> Wettkampf archivieren
@@ -10129,11 +10129,11 @@ export default function TrainingsApp() {
                         onMouseEnter={e=>e.currentTarget.style.background='rgba(167,139,250,0.07)'}
                         onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                         <span style={{fontSize:'13px',color:'rgba(167,139,250,0.5)',flexShrink:0,whiteSpace:'nowrap'}}>{dateStr}</span>
-                        <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',flexShrink:0}}>{pt.type==='team'?groupSize:groupSize+'er'}</span>
+                        <span style={{fontSize:'11px',color:'rgba(255,255,255,0.48)',flexShrink:0}}>{pt.type==='team'?groupSize:groupSize+'er'}</span>
                         <div style={{flex:1,display:'flex',gap:'5px',flexWrap:'wrap',overflow:'hidden',minWidth:0}}>
                           {fs2.map((s,i)=>(
                             <span key={s.childId} style={{fontSize:'12px',color:i===0?'#fde68a':i===1?'#e2e8f0':i===2?'#fdba74':'rgba(255,255,255,0.4)',fontWeight:i<3?'800':'600',whiteSpace:'nowrap'}}>
-                              {i>0&&<span style={{color:'rgba(255,255,255,0.15)',margin:'0 2px'}}>·</span>}{s.name}
+                              {i>0&&<span style={{color:'rgba(255,255,255,0.35)',margin:'0 2px'}}>·</span>}{s.name}
                             </span>
                           ))}
                         </div>
@@ -10147,8 +10147,8 @@ export default function TrainingsApp() {
                         <div style={{borderTop:'1px solid rgba(167,139,250,0.12)',padding:'12px 14px'}}>
                           <div style={{display:'flex',gap:'10px',marginBottom:'10px',flexWrap:'wrap'}}>
                             <span style={{fontSize:'11px',color:'rgba(167,139,250,0.6)'}}>{new Date(pt.archivedAt||pt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
-                            <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>von {pt.createdBy}</span>
-                            <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{pt.settings.winSets} Gewinnsätze</span>
+                            <span style={{fontSize:'11px',color:'rgba(255,255,255,0.48)'}}>von {pt.createdBy}</span>
+                            <span style={{fontSize:'11px',color:'rgba(255,255,255,0.48)'}}>{pt.settings.winSets} Gewinnsätze</span>
                           </div>
                           <p style={{margin:'0 0 6px',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.45)',textTransform:'uppercase',letterSpacing:'1.5px'}}>Tabelle</p>
                           <div style={{display:'grid',gap:'4px',marginBottom:'14px'}}>
@@ -10157,7 +10157,7 @@ export default function TrainingsApp() {
                                 <span style={{fontSize:'18px',flexShrink:0}}>{placeEmoji[s.place-1]||`${s.place}.`}</span>
                                 <div style={{flex:1}}>
                                   <p style={{margin:0,fontWeight:'800',color:'white',fontSize:'13px'}}>{s.name}</p>
-                                  <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{s.wins}S {s.losses}N · Sätze {s.setsWon}:{s.setsLost}{pt.settings.trackSetScores?` · Punkte ${s.ptsWon}:${s.ptsLost}`:''}</p>
+                                  <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.52)'}}>{s.wins}S {s.losses}N · Sätze {s.setsWon}:{s.setsLost}{pt.settings.trackSetScores?` · Punkte ${s.ptsWon}:${s.ptsLost}`:''}</p>
                                 </div>
                               </div>
                             ))}
@@ -10195,7 +10195,7 @@ export default function TrainingsApp() {
                               <p style={{margin:'0 0 6px',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.45)',textTransform:'uppercase',letterSpacing:'1.5px'}}>Spielplan</p>
                               {roundsA.map(round=>(
                                 <div key={round} style={{marginBottom:'8px'}}>
-                                  <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.25)',textTransform:'uppercase',letterSpacing:'1px'}}>Runde {round}</p>
+                                  <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.42)',textTransform:'uppercase',letterSpacing:'1px'}}>Runde {round}</p>
                                   <div style={{display:'grid',gap:'3px'}}>
                                     {ptMatches.filter(m=>m.round===round).map((m,mi)=>{
                                       const p1=ptPlayers[m.p1Idx];const p2=ptPlayers[m.p2Idx];const res=m.result;
@@ -10261,7 +10261,7 @@ export default function TrainingsApp() {
                               ? `${chal?.name||'?'} fordert ${def?.name||'?'} heraus & gewinnt`
                               : `${def?.name||'?'} verteidigt gegen ${chal?.name||'?'}`}
                           </p>
-                          <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{date}</p>
+                          <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.52)'}}>{date}</p>
                         </div>
                         <button onClick={()=>{if(!window.confirm('Ranglistenspiel löschen?'))return;saveRanglistenspiele({...ranglistenspiele,archived:ranglistenspiele.archived.filter((_,j)=>j!==i)});}}
                           style={{width:'30px',height:'30px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
@@ -10269,7 +10269,7 @@ export default function TrainingsApp() {
                         </button>
                         <div style={{background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'10px',padding:'6px 12px',flexShrink:0,textAlign:'center'}}>
                           <span style={{fontWeight:'900',fontSize:'20px',color:won?'#4ade80':'rgba(255,255,255,0.5)'}}>{spiel.sets1??spiel.challengerScore??'?'}</span>
-                          <span style={{fontWeight:'700',color:'rgba(255,255,255,0.3)',fontSize:'14px',margin:'0 3px'}}>:</span>
+                          <span style={{fontWeight:'700',color:'rgba(255,255,255,0.48)',fontSize:'14px',margin:'0 3px'}}>:</span>
                           <span style={{fontWeight:'900',fontSize:'20px',color:won?'rgba(255,255,255,0.5)':'#93c5fd'}}>{spiel.sets2??spiel.defenderScore??'?'}</span>
                         </div>
                       </div>
@@ -10338,7 +10338,7 @@ export default function TrainingsApp() {
                     <span style={{fontSize:'22px',flexShrink:0}}>{backup.manual?'✋':'🗓️'}</span>
                     <div style={{flex:1,minWidth:0}}>
                       <p style={{margin:0,fontSize:'14px',fontWeight:'700',color:'white'}}>{backup.entries.length} {backup.entries.length===1?'Eintrag':'Einträge'}{backup.manual?' · Manuell':''}</p>
-                      <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>Gesichert am {new Date(backup.savedAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</p>
+                      <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.58)'}}>Gesichert am {new Date(backup.savedAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</p>
                     </div>
                     {userRole==='admin' && (<>
                       <button onClick={()=>restoreGegnerBackup(weekKey)}
@@ -10395,7 +10395,7 @@ export default function TrainingsApp() {
         <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
           <button onClick={()=>navTo('home')} style={s.btn('#fb923c')}><Home size={16}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>🏓 Materialverwaltung</h1>
-          <span style={{fontSize:'12px',color:'rgba(255,255,255,0.25)',fontWeight:'600'}}>{allChildren.length} Kinder</span>
+          <span style={{fontSize:'12px',color:'rgba(255,255,255,0.42)',fontWeight:'600'}}>{allChildren.length} Kinder</span>
         </div>
         <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
 
@@ -10404,11 +10404,11 @@ export default function TrainingsApp() {
             <span style={{position:'absolute',left:'13px',top:'50%',transform:'translateY(-50%)',fontSize:'15px',pointerEvents:'none'}}>🔍</span>
             <input type="text" placeholder="Kind suchen…" value={materialSearch} onChange={e=>setMaterialSearch(e.target.value)}
               style={{...fldStyle,paddingLeft:'38px',border:'1px solid rgba(251,146,60,0.22)'}}/>
-            {materialSearch&&<button onClick={()=>setMaterialSearch('')} style={{position:'absolute',right:'12px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'rgba(255,255,255,0.35)',cursor:'pointer',fontSize:'16px',lineHeight:1,padding:0}}>✕</button>}
+            {materialSearch&&<button onClick={()=>setMaterialSearch('')} style={{position:'absolute',right:'12px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'rgba(255,255,255,0.52)',cursor:'pointer',fontSize:'16px',lineHeight:1,padding:0}}>✕</button>}
           </div>
 
           {visChildren.length===0&&(
-            <p style={{color:'rgba(255,255,255,0.35)',textAlign:'center',marginTop:'60px'}}>{q?`Kein Kind gefunden für „${materialSearch}"`:'Keine Kinder vorhanden.'}</p>
+            <p style={{color:'rgba(255,255,255,0.52)',textAlign:'center',marginTop:'60px'}}>{q?`Kein Kind gefunden für „${materialSearch}"`:'Keine Kinder vorhanden.'}</p>
           )}
 
           {/* Accordion-Liste */}
@@ -10427,12 +10427,12 @@ export default function TrainingsApp() {
                   {/* Kopfzeile — immer sichtbar, klickbar */}
                   <button onClick={()=>setMaterialExpanded(isOpen?null:child.id)}
                     style={{width:'100%',display:'flex',alignItems:'center',gap:'12px',padding:'13px 16px',background:'none',border:'none',cursor:'pointer',textAlign:'left'}}>
-                    <span style={{fontSize:'14px',color:'rgba(255,255,255,0.3)',transition:'transform 0.2s',transform:isOpen?'rotate(90deg)':'rotate(0deg)',flexShrink:0}}>▶</span>
+                    <span style={{fontSize:'14px',color:'rgba(255,255,255,0.48)',transition:'transform 0.2s',transform:isOpen?'rotate(90deg)':'rotate(0deg)',flexShrink:0}}>▶</span>
                     <div style={{flex:1,minWidth:0}}>
                       <p style={{margin:0,fontWeight:'800',fontSize:'14px',color:'white'}}>{child.name}</p>
                       {!isOpen&&(summary
-                        ? <p style={{margin:'2px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.35)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{summary}</p>
-                        : <p style={{margin:'2px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.18)',fontStyle:'italic'}}>kein Material eingetragen</p>
+                        ? <p style={{margin:'2px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.52)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{summary}</p>
+                        : <p style={{margin:'2px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.35)',fontStyle:'italic'}}>kein Material eingetragen</p>
                       )}
                     </div>
                     {hasWarn&&!isOpen&&<span style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 8px',background:'rgba(251,191,36,0.15)',border:'1px solid rgba(251,191,36,0.35)',borderRadius:'20px',color:'#fbbf24',fontSize:'11px',fontWeight:'800',flexShrink:0,whiteSpace:'nowrap'}}>⚠️ Fehlt: {missing.join(', ')}</span>}
@@ -10448,7 +10448,7 @@ export default function TrainingsApp() {
                         <p style={{margin:'0 0 10px',fontSize:'10px',fontWeight:'800',color:'#67e8f9',textTransform:'uppercase',letterSpacing:'1px'}}>🏓 Vorhand</p>
                         <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
                           <div>
-                            <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>Belag</p>
+                            <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.58)',fontWeight:'600'}}>Belag</p>
                             <input list={`dl_vh_${child.id}`} value={mat.vh||''}
                               onChange={e=>saveMat(child.id,'vh',e.target.value)}
                               placeholder="z. B. Butterfly Tenergy 05"
@@ -10457,14 +10457,14 @@ export default function TrainingsApp() {
                           </div>
                           <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
                             <div style={{flex:1,minWidth:'140px'}}>
-                              <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>Dicke</p>
+                              <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.58)',fontWeight:'600'}}>Dicke</p>
                               <select className="dark-select" value={mat.vh_dicke||''} onChange={e=>saveMat(child.id,'vh_dicke',e.target.value)} style={{...fldStyle,cursor:'pointer'}}>
                                 <option value="">– keine Angabe –</option>
                                 {DICKEN_OPTS.map(d=><option key={d} value={d}>{d}</option>)}
                               </select>
                             </div>
                             <div style={{flex:1,minWidth:'140px'}}>
-                              <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>Gewechselt am</p>
+                              <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.58)',fontWeight:'600'}}>Gewechselt am</p>
                               <input type="date" value={mat.vh_datum||''} onChange={e=>saveMat(child.id,'vh_datum',e.target.value)} style={fldStyle}/>
                             </div>
                           </div>
@@ -10476,7 +10476,7 @@ export default function TrainingsApp() {
                         <p style={{margin:'0 0 10px',fontSize:'10px',fontWeight:'800',color:'#a78bfa',textTransform:'uppercase',letterSpacing:'1px'}}>🏓 Rückhand</p>
                         <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
                           <div>
-                            <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>Belag</p>
+                            <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.58)',fontWeight:'600'}}>Belag</p>
                             <input list={`dl_rh_${child.id}`} value={mat.rh||''}
                               onChange={e=>saveMat(child.id,'rh',e.target.value)}
                               placeholder="z. B. DHS Hurricane 3"
@@ -10485,14 +10485,14 @@ export default function TrainingsApp() {
                           </div>
                           <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
                             <div style={{flex:1,minWidth:'140px'}}>
-                              <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>Dicke</p>
+                              <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.58)',fontWeight:'600'}}>Dicke</p>
                               <select className="dark-select" value={mat.rh_dicke||''} onChange={e=>saveMat(child.id,'rh_dicke',e.target.value)} style={{...fldStyle,cursor:'pointer'}}>
                                 <option value="">– keine Angabe –</option>
                                 {DICKEN_OPTS.map(d=><option key={d} value={d}>{d}</option>)}
                               </select>
                             </div>
                             <div style={{flex:1,minWidth:'140px'}}>
-                              <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>Gewechselt am</p>
+                              <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.58)',fontWeight:'600'}}>Gewechselt am</p>
                               <input type="date" value={mat.rh_datum||''} onChange={e=>saveMat(child.id,'rh_datum',e.target.value)} style={fldStyle}/>
                             </div>
                           </div>
@@ -10555,8 +10555,8 @@ export default function TrainingsApp() {
           {hist.length===0?(
             <div style={{textAlign:'center',padding:'60px 20px'}}>
               <p style={{fontSize:'40px',margin:'0 0 12px'}}>📊</p>
-              <p style={{color:'rgba(255,255,255,0.35)',fontSize:'15px'}}>Noch keine TTR-Daten vorhanden.</p>
-              {canEdit()&&<p style={{color:'rgba(255,255,255,0.2)',fontSize:'12px',marginTop:'8px'}}>Über TTR-Import → Admin importieren.</p>}
+              <p style={{color:'rgba(255,255,255,0.52)',fontSize:'15px'}}>Noch keine TTR-Daten vorhanden.</p>
+              {canEdit()&&<p style={{color:'rgba(255,255,255,0.4)',fontSize:'12px',marginTop:'8px'}}>Über TTR-Import → Admin importieren.</p>}
             </div>
           ):(
             <>
@@ -10569,15 +10569,15 @@ export default function TrainingsApp() {
                 ].map(({label,value,sub,color,bg,border})=>(
                   <div key={label} style={{background:bg,border:`1px solid ${border}`,borderRadius:'14px',padding:'14px 10px',textAlign:'center'}}>
                     <p style={{margin:'0 0 2px',fontSize:'22px',fontWeight:'900',color,letterSpacing:'-0.5px'}}>{value}</p>
-                    <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.35)',fontWeight:'700',textTransform:'uppercase'}}>{label}</p>
-                    {sub&&<p style={{margin:'2px 0 0',fontSize:'10px',color:'rgba(255,255,255,0.2)'}}>{sub}</p>}
+                    <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.52)',fontWeight:'700',textTransform:'uppercase'}}>{label}</p>
+                    {sub&&<p style={{margin:'2px 0 0',fontSize:'10px',color:'rgba(255,255,255,0.4)'}}>{sub}</p>}
                   </div>
                 ))}
               </div>
 
               {/* Chart */}
               <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(251,191,36,0.1)',borderRadius:'16px',padding:'16px',marginBottom:'24px'}}>
-                <p style={{margin:'0 0 12px',fontSize:'12px',color:'rgba(255,255,255,0.35)',fontWeight:'600'}}>{hist.length} Monate · {first?.month} – {last?.month}</p>
+                <p style={{margin:'0 0 12px',fontSize:'12px',color:'rgba(255,255,255,0.52)',fontWeight:'600'}}>{hist.length} Monate · {first?.month} – {last?.month}</p>
                 <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block'}}>
                   <defs>
                     <linearGradient id="ttrGrad2" x1="0" y1="0" x2="0" y2="1">
@@ -10610,8 +10610,8 @@ export default function TrainingsApp() {
               {/* Tabelle */}
               <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'14px',overflow:'hidden'}}>
                 <div style={{padding:'12px 16px',borderBottom:'1px solid rgba(255,255,255,0.06)',display:'flex',justifyContent:'space-between'}}>
-                  <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.3)',textTransform:'uppercase'}}>Monat</span>
-                  <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.3)',textTransform:'uppercase'}}>TTR</span>
+                  <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.48)',textTransform:'uppercase'}}>Monat</span>
+                  <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.48)',textTransform:'uppercase'}}>TTR</span>
                 </div>
                 <div style={{maxHeight:'260px',overflowY:'auto'}}>
                   {[...hist].reverse().map((e,i,arr)=>{
@@ -10658,7 +10658,7 @@ export default function TrainingsApp() {
         </div>
         <div>
           <p style={{margin:0,fontWeight:'900',fontSize:large?'19px':'14px',color:'white',letterSpacing:large?'-0.3px':'0'}}>{w.child.name}</p>
-          <p style={{margin:'2px 0 0',fontSize:large?'12px':'11px',color:'rgba(255,255,255,0.4)'}}>
+          <p style={{margin:'2px 0 0',fontSize:large?'12px':'11px',color:'rgba(255,255,255,0.58)'}}>
             {w.prevTtr} → {w.currTtr} <span style={{color:'#4ade80',fontWeight:'800'}}>+{w.diff}</span>
           </p>
         </div>
@@ -10720,7 +10720,7 @@ export default function TrainingsApp() {
                   style={{width:'100%',padding:'14px 18px',display:'flex',alignItems:'center',gap:'10px',background:'none',border:'none',color:'white',cursor:'pointer',textAlign:'left'}}>
                   <span style={{fontSize:'18px'}}>📊</span>
                   <span style={{flex:1,fontWeight:'800',fontSize:'14px',color:'rgba(255,255,255,0.85)'}}>Individuelle Zeitraumauswertung</span>
-                  <span style={{fontSize:'14px',color:'rgba(255,255,255,0.3)',transform:sdmCustomOpen?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s'}}>▼</span>
+                  <span style={{fontSize:'14px',color:'rgba(255,255,255,0.48)',transform:sdmCustomOpen?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s'}}>▼</span>
                 </button>
 
                 {sdmCustomOpen && (
@@ -10745,32 +10745,32 @@ export default function TrainingsApp() {
                     <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'16px',alignItems:'center'}}>
                       <input type="month" value={sdmCustomStart} onChange={e=>setSdmCustomStart(e.target.value)}
                         style={{flex:'1 1 130px',padding:'8px 10px',borderRadius:'9px',border:'1px solid rgba(252,211,77,0.2)',background:'rgba(255,255,255,0.05)',color:'white',fontSize:'13px',outline:'none',colorScheme:'dark'}}/>
-                      <span style={{color:'rgba(255,255,255,0.3)',fontSize:'13px',flexShrink:0}}>bis</span>
+                      <span style={{color:'rgba(255,255,255,0.48)',fontSize:'13px',flexShrink:0}}>bis</span>
                       <input type="month" value={sdmCustomEnd} onChange={e=>setSdmCustomEnd(e.target.value)}
                         style={{flex:'1 1 130px',padding:'8px 10px',borderRadius:'9px',border:'1px solid rgba(252,211,77,0.2)',background:'rgba(255,255,255,0.05)',color:'white',fontSize:'13px',outline:'none',colorScheme:'dark'}}/>
                     </div>
 
                     {/* Ergebnis */}
                     {!startYM || !endYM
-                      ? <p style={{color:'rgba(255,255,255,0.25)',fontSize:'13px',textAlign:'center',padding:'12px 0'}}>Zeitraum wählen, um die Auswertung zu sehen.</p>
+                      ? <p style={{color:'rgba(255,255,255,0.42)',fontSize:'13px',textAlign:'center',padding:'12px 0'}}>Zeitraum wählen, um die Auswertung zu sehen.</p>
                       : startYM > endYM
                       ? <p style={{color:'#f87171',fontSize:'13px',textAlign:'center',padding:'8px 0'}}>Startmonat muss vor dem Endmonat liegen.</p>
                       : results && (<>
                           {/* Info-Zeile */}
-                          <div style={{padding:'9px 12px',background:'rgba(252,211,77,0.06)',border:'1px solid rgba(252,211,77,0.15)',borderRadius:'10px',marginBottom:'12px',fontSize:'12px',color:'rgba(255,255,255,0.5)'}}>
+                          <div style={{padding:'9px 12px',background:'rgba(252,211,77,0.06)',border:'1px solid rgba(252,211,77,0.15)',borderRadius:'10px',marginBottom:'12px',fontSize:'12px',color:'rgba(255,255,255,0.65)'}}>
                             Auswertung: <span style={{color:'rgba(252,211,77,0.8)',fontWeight:'700'}}>{fmtYMlong(startYM)} – {fmtYMlong(endYM)}</span>
                             {' · '}<span style={{color:'#4ade80',fontWeight:'700'}}>{results.rows.length} Spieler gewertet</span>
-                            {results.excluded>0&&<span style={{color:'rgba(255,255,255,0.3)'}}> · {results.excluded} ausgeschlossen</span>}
+                            {results.excluded>0&&<span style={{color:'rgba(255,255,255,0.48)'}}> · {results.excluded} ausgeschlossen</span>}
                           </div>
 
                           {results.rows.length===0
-                            ? <p style={{color:'rgba(255,255,255,0.3)',fontSize:'13px',textAlign:'center',padding:'12px 0'}}>Keine qualifizierten Spieler im gewählten Zeitraum.</p>
+                            ? <p style={{color:'rgba(255,255,255,0.48)',fontSize:'13px',textAlign:'center',padding:'12px 0'}}>Keine qualifizierten Spieler im gewählten Zeitraum.</p>
                             : <div style={{display:'flex',flexDirection:'column',gap:'5px'}}>
                                 {results.rows.map((r,i)=>(
                                   <div key={r.name} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 12px',borderRadius:'10px',background:i===0?'rgba(252,211,77,0.06)':'rgba(255,255,255,0.02)',border:`1px solid ${i===0?'rgba(252,211,77,0.2)':'rgba(255,255,255,0.05)'}` }}>
                                     <span style={{fontSize:'13px',fontWeight:'900',color:i===0?'#fcd34d':'rgba(255,255,255,0.3)',minWidth:'22px',textAlign:'center'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`}</span>
                                     <span style={{flex:1,fontWeight:'700',fontSize:'13px',color:'white'}}>{r.name}</span>
-                                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.35)',flexShrink:0}}>{r.startTtr} → {r.endTtr}</span>
+                                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.52)',flexShrink:0}}>{r.startTtr} → {r.endTtr}</span>
                                     <span style={{fontSize:'13px',fontWeight:'900',minWidth:'46px',textAlign:'right',flexShrink:0,color:r.diff>0?'#4ade80':r.diff<0?'#f87171':'rgba(255,255,255,0.3)'}}>
                                       {r.diff>0?'+':''}{r.diff}
                                     </span>
@@ -10799,7 +10799,7 @@ export default function TrainingsApp() {
                 {sdmCurrentMonthWinners.map((w,i)=><WinnerBadge key={i} w={w} large/>)}
               </div>
             ) : (
-              <p style={{margin:0,fontSize:'14px',color:'rgba(255,255,255,0.3)'}}>Noch keine Daten für diesen Monat.</p>
+              <p style={{margin:0,fontSize:'14px',color:'rgba(255,255,255,0.48)'}}>Noch keine Daten für diesen Monat.</p>
             )}
           </div>
 
@@ -10827,23 +10827,23 @@ export default function TrainingsApp() {
                 ))}
               </div>
             ) : (
-              <p style={{margin:0,fontSize:'14px',color:'rgba(255,255,255,0.3)'}}>Noch keine Daten für dieses Jahr.</p>
+              <p style={{margin:0,fontSize:'14px',color:'rgba(255,255,255,0.48)'}}>Noch keine Daten für dieses Jahr.</p>
             )}
           </div>
 
           {/* Statistik-Kachel */}
           {(winRanking.length>0||top3Gains.length>0)&&(
             <div style={{background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'18px',padding:'18px 20px'}}>
-              <p style={{margin:'0 0 16px',fontSize:'10px',fontWeight:'900',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'1.5px'}}>📊 Statistiken</p>
+              <p style={{margin:'0 0 16px',fontSize:'10px',fontWeight:'900',color:'rgba(255,255,255,0.48)',textTransform:'uppercase',letterSpacing:'1.5px'}}>📊 Statistiken</p>
 
               {/* Balkendiagramm Monatssieger */}
               {winRanking.length>0&&(
                 <div style={{marginBottom:'20px'}}>
-                  <p style={{margin:'0 0 10px',fontSize:'12px',fontWeight:'800',color:'rgba(255,255,255,0.5)'}}>Anzahl Monatssiege</p>
+                  <p style={{margin:'0 0 10px',fontSize:'12px',fontWeight:'800',color:'rgba(255,255,255,0.65)'}}>Anzahl Monatssiege</p>
                   <div style={{display:'flex',flexDirection:'column',gap:'7px'}}>
                     {winRanking.map((p,i)=>(
                       <div key={p.name} style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                        <span style={{fontSize:'11px',color:'rgba(255,255,255,0.45)',minWidth:'96px',textAlign:'right',fontWeight:'600',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</span>
+                        <span style={{fontSize:'11px',color:'rgba(255,255,255,0.6)',minWidth:'96px',textAlign:'right',fontWeight:'600',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</span>
                         <div style={{flex:1,height:'20px',background:'rgba(255,255,255,0.04)',borderRadius:'6px',overflow:'hidden'}}>
                           <div style={{height:'100%',width:`${(p.count/maxWinCount)*100}%`,background:i===0?'linear-gradient(90deg,#fbbf24,#f59e0b)':i===1?'linear-gradient(90deg,rgba(251,191,36,0.55),rgba(245,158,11,0.55))':'linear-gradient(90deg,rgba(251,191,36,0.3),rgba(245,158,11,0.3))',borderRadius:'6px',transition:'width 0.3s',display:'flex',alignItems:'center',paddingLeft:'6px'}}>
                             <span style={{fontSize:'10px',fontWeight:'800',color:i===0?'#1a1000':'rgba(255,255,255,0.6)',whiteSpace:'nowrap'}}>{p.count}×</span>
@@ -10858,13 +10858,13 @@ export default function TrainingsApp() {
               {/* Top 3 Höchste Monatsverbesserung */}
               {top3Gains.length>0&&(
                 <div>
-                  <p style={{margin:'0 0 10px',fontSize:'12px',fontWeight:'800',color:'rgba(255,255,255,0.5)'}}>Top 3 – Höchste TTR-Verbesserung in einem Monat</p>
+                  <p style={{margin:'0 0 10px',fontSize:'12px',fontWeight:'800',color:'rgba(255,255,255,0.65)'}}>Top 3 – Höchste TTR-Verbesserung in einem Monat</p>
                   <div style={{display:'flex',flexDirection:'column',gap:'7px'}}>
                     {top3Gains.map((g,i)=>(
                       <div key={i} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',background:`rgba(74,222,128,${0.06-i*0.015})`,border:`1px solid rgba(74,222,128,${0.2-i*0.05})`,borderRadius:'10px'}}>
                         <span style={{fontSize:'16px'}}>{['🥇','🥈','🥉'][i]}</span>
                         <span style={{flex:1,fontWeight:'700',fontSize:'13px',color:'white'}}>{g.name}</span>
-                        <span style={{fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>{fmtMonth(g.period)}</span>
+                        <span style={{fontSize:'12px',color:'rgba(255,255,255,0.58)'}}>{fmtMonth(g.period)}</span>
                         <span style={{fontWeight:'900',fontSize:'14px',color:'#4ade80'}}>+{g.diff}</span>
                       </div>
                     ))}
@@ -10877,11 +10877,11 @@ export default function TrainingsApp() {
           {/* Historische Monatsübersicht */}
           {historicMonths.length>0&&(
             <div style={{background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'16px',overflow:'hidden'}}>
-              <p style={{margin:0,padding:'13px 16px',fontSize:'10px',fontWeight:'900',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'1.5px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Historische Monatssieger</p>
+              <p style={{margin:0,padding:'13px 16px',fontSize:'10px',fontWeight:'900',color:'rgba(255,255,255,0.48)',textTransform:'uppercase',letterSpacing:'1.5px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Historische Monatssieger</p>
               <div style={{maxHeight:'320px',overflowY:'auto'}}>
                 {historicMonths.map(({period,winners})=>(
                   <div key={period} style={{display:'flex',alignItems:'center',gap:'12px',padding:'9px 16px',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',fontWeight:'700',minWidth:'56px'}}>{fmtMonth(period)}</span>
+                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.48)',fontWeight:'700',minWidth:'56px'}}>{fmtMonth(period)}</span>
                     <div style={{flex:1}}>{winners.map((w,i)=><span key={i} style={{display:'block',fontWeight:'700',color:'white',fontSize:'13px'}}>{w.child.name}</span>)}</div>
                     <span style={{fontSize:'12px',fontWeight:'800',color:'#4ade80'}}>+{winners[0].diff}</span>
                   </div>
@@ -10893,10 +10893,10 @@ export default function TrainingsApp() {
           {/* Historische Jahresübersicht */}
           {historicYears.length>0&&(
             <div style={{background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'16px',overflow:'hidden'}}>
-              <p style={{margin:0,padding:'13px 16px',fontSize:'10px',fontWeight:'900',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'1.5px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Historische Jahressieger</p>
+              <p style={{margin:0,padding:'13px 16px',fontSize:'10px',fontWeight:'900',color:'rgba(255,255,255,0.48)',textTransform:'uppercase',letterSpacing:'1.5px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Historische Jahressieger</p>
               {historicYears.map(({period,winners})=>(
                 <div key={period} style={{display:'flex',alignItems:'center',gap:'12px',padding:'9px 16px',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-                  <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',fontWeight:'700',minWidth:'40px'}}>{period}</span>
+                  <span style={{fontSize:'11px',color:'rgba(255,255,255,0.48)',fontWeight:'700',minWidth:'40px'}}>{period}</span>
                   <div style={{flex:1}}>{winners.map((w,i)=><span key={i} style={{display:'block',fontWeight:'700',color:'#fbbf24',fontSize:'13px'}}>{w.child.name}</span>)}</div>
                   <span style={{fontSize:'12px',fontWeight:'800',color:'#4ade80'}}>+{winners[0].diff}</span>
                 </div>
@@ -10905,7 +10905,7 @@ export default function TrainingsApp() {
           )}
 
           {sdmHistoricMonths.length===0&&sdmHistoricYears.length===0&&(
-            <div style={{textAlign:'center',padding:'48px 20px',color:'rgba(255,255,255,0.25)',fontSize:'14px'}}>
+            <div style={{textAlign:'center',padding:'48px 20px',color:'rgba(255,255,255,0.42)',fontSize:'14px'}}>
               <p style={{fontSize:'36px',margin:'0 0 12px'}}>📊</p>
               Noch nicht genug TTR-Daten für eine Auswertung.
             </div>
@@ -11004,7 +11004,7 @@ export default function TrainingsApp() {
           {displayList.length===0&&(
             <div style={{textAlign:'center',padding:'60px 20px'}}>
               <p style={{fontSize:'40px',margin:'0 0 12px'}}>📊</p>
-              <p style={{color:'rgba(255,255,255,0.35)',fontSize:'15px'}}>Noch keine TTR-Daten importiert.</p>
+              <p style={{color:'rgba(255,255,255,0.52)',fontSize:'15px'}}>Noch keine TTR-Daten importiert.</p>
               <button onClick={()=>navTo('ttrImport')} style={{marginTop:'16px',padding:'11px 22px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'12px',color:'#fbbf24',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>→ TTR-Import öffnen</button>
             </div>
           )}
@@ -11032,7 +11032,7 @@ export default function TrainingsApp() {
                       {!isEhemalig&&c.diff!==null&&(
                         <span style={{display:'inline-flex',alignItems:'center',gap:'2px',fontSize:'11px',fontWeight:'700',color:c.diff>=0?'#4ade80':'#f87171',background:c.diff>=0?'rgba(74,222,128,0.08)':'rgba(248,113,113,0.08)',borderRadius:'6px',padding:'1px 5px'}}>
                           {c.diff>=0?'+':''}{c.diff}
-                          <span style={{fontSize:'9px',fontWeight:'500',color:'rgba(255,255,255,0.3)',marginLeft:'1px'}}>Vormonat</span>
+                          <span style={{fontSize:'9px',fontWeight:'500',color:'rgba(255,255,255,0.48)',marginLeft:'1px'}}>Vormonat</span>
                         </span>
                       )}
                     </div>
@@ -11042,7 +11042,7 @@ export default function TrainingsApp() {
                   </div>
                   <div style={{textAlign:'right',flexShrink:0}}>
                     <p style={{margin:0,fontWeight:'900',fontSize:'20px',color:accentCol}}>{c.last?.ttr}</p>
-                    {isEhemalig&&c.last?.month&&<p style={{margin:'2px 0 0',fontSize:'10px',color:'rgba(255,255,255,0.2)'}}>zuletzt {c.last.month}</p>}
+                    {isEhemalig&&c.last?.month&&<p style={{margin:'2px 0 0',fontSize:'10px',color:'rgba(255,255,255,0.4)'}}>zuletzt {c.last.month}</p>}
                   </div>
                 </div>
               );})}
@@ -11051,10 +11051,10 @@ export default function TrainingsApp() {
 
           {(ttrFilter==='all'||ttrFilter==='jugend')&&withoutData.length>0&&(
             <div>
-              <p style={{margin:'0 0 12px',fontSize:'12px',fontWeight:'700',color:'rgba(255,255,255,0.25)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Ohne TTR-Daten ({withoutData.length})</p>
+              <p style={{margin:'0 0 12px',fontSize:'12px',fontWeight:'700',color:'rgba(255,255,255,0.42)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Ohne TTR-Daten ({withoutData.length})</p>
               <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
                 {withoutData.map(c=>(
-                  <span key={c.id} style={{fontSize:'12px',color:'rgba(255,255,255,0.25)',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'8px',padding:'4px 10px'}}>{c.name}</span>
+                  <span key={c.id} style={{fontSize:'12px',color:'rgba(255,255,255,0.42)',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'8px',padding:'4px 10px'}}>{c.name}</span>
                 ))}
               </div>
             </div>
@@ -11143,7 +11143,7 @@ export default function TrainingsApp() {
           <span style={{fontSize:'12px',color:'rgba(103,232,249,0.7)',fontWeight:'600'}}>{rows.length} Spieler</span>
         </div>
         <div style={{maxWidth:'820px',margin:'0 auto',padding:'16px'}}>
-          <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
+          <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.58)'}}>
             TTR-Wert geteilt durch die Anzahl gelebter Tage (aus dem Geburtsdatum in der Mitgliederverwaltung berechnet, Stand: 1. des gewählten Monats). Nur Spieler mit bekanntem TTR-Wert UND Geburtsdatum erscheinen hier.
           </p>
 
@@ -11174,7 +11174,7 @@ export default function TrainingsApp() {
                   </span>
                 );
               })}
-              <button onClick={()=>setTtrProTagSelected([])} style={{padding:'4px 10px',background:'transparent',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'20px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'11px'}}>Auswahl zurücksetzen</button>
+              <button onClick={()=>setTtrProTagSelected([])} style={{padding:'4px 10px',background:'transparent',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'20px',color:'rgba(255,255,255,0.65)',cursor:'pointer',fontSize:'11px'}}>Auswahl zurücksetzen</button>
             </div>
           )}
 
@@ -11212,12 +11212,12 @@ export default function TrainingsApp() {
                 <span style={{width:'26px',textAlign:'center',fontSize:'12px',fontWeight:'800',color:'rgba(103,232,249,0.6)'}}>{i+1}</span>
                 <div style={{flex:1,minWidth:0}}>
                   <p style={{margin:0,fontSize:'13px',fontWeight:'700'}}>{r.name}</p>
-                  <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>TTR {r.ttr} · {r.lebenstage.toLocaleString('de-DE')} Lebenstage{r.subgroupId&&subgroups[r.subgroupId]?` · ${subgroups[r.subgroupId].name}`:''}</p>
+                  <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.58)'}}>TTR {r.ttr} · {r.lebenstage.toLocaleString('de-DE')} Lebenstage{r.subgroupId&&subgroups[r.subgroupId]?` · ${subgroups[r.subgroupId].name}`:''}</p>
                 </div>
                 <span style={{fontSize:'15px',fontWeight:'800',color:accent}}>{r.quotient.toFixed(4)}</span>
               </div>
             ))}
-            {rows.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.3)',fontSize:'13px'}}>Für {monthNames[ttrProTagMonth-1]} {ttrProTagYear} keine passenden Spieler gefunden.</p>}
+            {rows.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.48)',fontSize:'13px'}}>Für {monthNames[ttrProTagMonth-1]} {ttrProTagYear} keine passenden Spieler gefunden.</p>}
           </div>
         </div>
       </div>
@@ -11395,9 +11395,9 @@ export default function TrainingsApp() {
           {/* Info */}
           <div style={{padding:'14px 16px',background:'rgba(110,231,183,0.05)',border:'1px solid rgba(110,231,183,0.15)',borderRadius:'14px',marginBottom:'24px'}}>
             <p style={{margin:'0 0 6px',fontWeight:'700',fontSize:'13px',color:accent}}>So funktioniert der Import</p>
-            <p style={{margin:'0 0 4px',fontSize:'12px',color:'rgba(255,255,255,0.5)',lineHeight:1.6}}>1. Excel-Datei „Spieler des Monats.xlsx" auswählen</p>
-            <p style={{margin:'0 0 4px',fontSize:'12px',color:'rgba(255,255,255,0.5)',lineHeight:1.6}}>2. App erkennt automatisch alle Kinder die in App <strong style={{color:'rgba(255,255,255,0.7)'}}>und</strong> Excel vorhanden sind</p>
-            <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.5)',lineHeight:1.6}}>3. Vorschau prüfen → Importieren</p>
+            <p style={{margin:'0 0 4px',fontSize:'12px',color:'rgba(255,255,255,0.65)',lineHeight:1.6}}>1. Excel-Datei „Spieler des Monats.xlsx" auswählen</p>
+            <p style={{margin:'0 0 4px',fontSize:'12px',color:'rgba(255,255,255,0.65)',lineHeight:1.6}}>2. App erkennt automatisch alle Kinder die in App <strong style={{color:'rgba(255,255,255,0.7)'}}>und</strong> Excel vorhanden sind</p>
+            <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.65)',lineHeight:1.6}}>3. Vorschau prüfen → Importieren</p>
           </div>
 
           {/* File Picker */}
@@ -11405,7 +11405,7 @@ export default function TrainingsApp() {
             <label style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'12px',padding:'40px 24px',background:'rgba(255,255,255,0.03)',border:'2px dashed rgba(110,231,183,0.3)',borderRadius:'16px',cursor:'pointer',textAlign:'center'}}>
               <span style={{fontSize:'40px'}}>📂</span>
               <span style={{fontWeight:'700',fontSize:'15px',color:'white'}}>Excel-Datei auswählen</span>
-              <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>Spieler des Monats.xlsx</span>
+              <span style={{fontSize:'12px',color:'rgba(255,255,255,0.52)'}}>Spieler des Monats.xlsx</span>
               <input type="file" accept=".xlsx,.xls" style={{display:'none'}} onChange={e=>{if(e.target.files[0]) parseExcel(e.target.files[0]);}}/>
             </label>
           )}
@@ -11418,7 +11418,7 @@ export default function TrainingsApp() {
                   <p style={{margin:'0 0 2px',fontWeight:'800',fontSize:'16px',color:'white'}}>
                     {ttrImportState.matches.length} Kinder erkannt
                   </p>
-                  <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
+                  <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.58)'}}>
                     von {ttrImportState.total} Excel-Einträgen · Datei neu wählen?
                     <label style={{marginLeft:'6px',color:accent,cursor:'pointer',fontWeight:'700'}}>
                       Andere Datei<input type="file" accept=".xlsx,.xls" style={{display:'none'}} onChange={e=>{setTtrImportState(null);if(e.target.files[0])setTimeout(()=>parseExcel(e.target.files[0]),50);}}/>
@@ -11442,7 +11442,7 @@ export default function TrainingsApp() {
                 <p style={{margin:'0 0 4px',fontSize:'11px',fontWeight:'700',color:(ttrImportState.detectedMonths?.length||0)>2?accent:'#f87171',textTransform:'uppercase'}}>
                   {ttrImportState.detectedMonths?.length||0} Monatsspalten erkannt
                 </p>
-                <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.5)',lineHeight:1.5,wordBreak:'break-word'}}>
+                <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.65)',lineHeight:1.5,wordBreak:'break-word'}}>
                   {ttrImportState.detectedMonths?.join(' · ')||'—'}
                 </p>
               </div>
@@ -11461,7 +11461,7 @@ export default function TrainingsApp() {
                       <div style={{flex:1,minWidth:0}}>
                         <p style={{margin:'0 0 1px',fontWeight:'800',fontSize:'13px',color:'white'}}>{m.appName}</p>
                         {nameDiffers&&<p style={{margin:'0 0 2px',fontSize:'10px',color:'rgba(251,191,36,0.6)'}}>Excel: „{m.excelName}"</p>}
-                        <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>
+                        <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.58)'}}>
                           {m.entries.length} Monate · {first} bis {last}
                         </p>
                       </div>
@@ -11487,7 +11487,7 @@ export default function TrainingsApp() {
                           <span style={{fontSize:'16px'}}>⚡</span>
                           <div style={{flex:1,minWidth:0}}>
                             <p style={{margin:0,fontWeight:'700',fontSize:'13px',color:'white'}}>{m.name}</p>
-                            <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>{m.entries.length} Monate</p>
+                            <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.58)'}}>{m.entries.length} Monate</p>
                           </div>
                           {latestEntry&&<p style={{margin:0,fontWeight:'800',fontSize:'14px',color:'#38bdf8'}}>{latestEntry.ttr}</p>}
                         </div>
@@ -11517,7 +11517,7 @@ export default function TrainingsApp() {
             <div style={{textAlign:'center',padding:'40px 24px'}}>
               <p style={{fontSize:'48px',margin:'0 0 16px'}}>🎉</p>
               <p style={{margin:'0 0 8px',fontWeight:'800',fontSize:'20px',color:'#4ade80'}}>Import erfolgreich!</p>
-              <p style={{margin:'0 0 28px',fontSize:'13px',color:'rgba(255,255,255,0.45)'}}>
+              <p style={{margin:'0 0 28px',fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>
                 {ttrImportState?.matches.length} Jugend-Kinder · {ttrImportState?.aktivMatches?.length||0} Aktive · TTR-Verlauf gespeichert
               </p>
               <button onClick={()=>{setTtrImportState(null);setTtrImportDone(false);}} style={{padding:'12px 28px',background:'rgba(74,222,128,0.15)',border:'1px solid rgba(74,222,128,0.3)',borderRadius:'12px',color:'#4ade80',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>
@@ -11559,10 +11559,10 @@ export default function TrainingsApp() {
             return(
             <div style={{marginTop:'32px',paddingTop:'28px',borderTop:'1px solid rgba(255,255,255,0.07)'}}>
               <p style={{margin:'0 0 4px',fontSize:'14px',fontWeight:'800',color:'white'}}>✏️ Manuelle Monatseingabe</p>
-              <p style={{margin:'0 0 18px',fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>Einzelne TTR-Werte nachträglich eintragen oder korrigieren.</p>
+              <p style={{margin:'0 0 18px',fontSize:'12px',color:'rgba(255,255,255,0.52)'}}>Einzelne TTR-Werte nachträglich eintragen oder korrigieren.</p>
               <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'2fr 1fr 1fr auto',gap:'10px',alignItems:'end'}}>
                 <div>
-                  <p style={{margin:'0 0 5px',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.4)',textTransform:'uppercase'}}>Kind</p>
+                  <p style={{margin:'0 0 5px',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.58)',textTransform:'uppercase'}}>Kind</p>
                   <select value={ttrManChild} onChange={e=>setTtrManChild(e.target.value)} className="dark-select"
                     style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(110,231,183,0.2)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none'}}>
                     <option value="">— Kind wählen —</option>
@@ -11570,12 +11570,12 @@ export default function TrainingsApp() {
                   </select>
                 </div>
                 <div>
-                  <p style={{margin:'0 0 5px',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.4)',textTransform:'uppercase'}}>Monat</p>
+                  <p style={{margin:'0 0 5px',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.58)',textTransform:'uppercase'}}>Monat</p>
                   <input type="month" value={ttrManMonth} onChange={e=>setTtrManMonth(e.target.value)}
                     style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(110,231,183,0.2)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box',colorScheme:'dark'}}/>
                 </div>
                 <div>
-                  <p style={{margin:'0 0 5px',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.4)',textTransform:'uppercase'}}>TTR-Wert</p>
+                  <p style={{margin:'0 0 5px',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.58)',textTransform:'uppercase'}}>TTR-Wert</p>
                   <input type="number" min="100" max="3000" placeholder="z.B. 1050" value={ttrManTtr} onChange={e=>setTtrManTtr(e.target.value)}
                     onKeyDown={e=>e.key==='Enter'&&doManual()}
                     style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(110,231,183,0.2)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
@@ -11590,10 +11590,10 @@ export default function TrainingsApp() {
               </div>
               {ttrManChild&&ttrHistory[ttrManChild]?.entries?.length>0&&(
                 <div style={{marginTop:'14px',padding:'10px 14px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'10px'}}>
-                  <p style={{margin:'0 0 6px',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.3)',textTransform:'uppercase'}}>Vorhandene Einträge</p>
+                  <p style={{margin:'0 0 6px',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.48)',textTransform:'uppercase'}}>Vorhandene Einträge</p>
                   <div style={{display:'flex',flexWrap:'wrap',gap:'5px'}}>
                     {ttrHistory[ttrManChild].entries.map(e=>(
-                      <span key={e.month} style={{fontSize:'11px',color:'rgba(255,255,255,0.5)',background:'rgba(255,255,255,0.05)',borderRadius:'6px',padding:'2px 7px'}}>{e.month}: <strong style={{color:'#fbbf24'}}>{e.ttr}</strong></span>
+                      <span key={e.month} style={{fontSize:'11px',color:'rgba(255,255,255,0.65)',background:'rgba(255,255,255,0.05)',borderRadius:'6px',padding:'2px 7px'}}>{e.month}: <strong style={{color:'#fbbf24'}}>{e.ttr}</strong></span>
                     ))}
                   </div>
                 </div>
@@ -11694,7 +11694,7 @@ export default function TrainingsApp() {
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🎯 Gegnerlogbuch</h1>
         </div>
         <div style={{padding:'20px',maxWidth:'820px',margin:'0 auto'}}>
-          <p style={{margin:'0 0 14px',fontSize:'13px',color:'rgba(255,255,255,0.35)'}}>Kollaborative Taktikdatenbank aller Aktiven · {gegnerLogbuch.length} {gegnerLogbuch.length===1?'Eintrag':'Einträge'}</p>
+          <p style={{margin:'0 0 14px',fontSize:'13px',color:'rgba(255,255,255,0.52)'}}>Kollaborative Taktikdatenbank aller Aktiven · {gegnerLogbuch.length} {gegnerLogbuch.length===1?'Eintrag':'Einträge'}</p>
 
           {/* Neuer Eintrag Button */}
           {!gegnerAdding&&<button onClick={()=>{setGegnerAdding(true);setGegnerEditId(null);setGegnerForm({date:TODAY,verein:'',gegner:'',taktik:'',spielweise:''}); }}
@@ -11708,12 +11708,12 @@ export default function TrainingsApp() {
               <div style={{display:'grid',gap:'10px'}}>
                 <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'10px'}}>
                   <div>
-                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Datum</label>
+                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Datum</label>
                     <input type="date" value={gegnerForm.date} onChange={e=>setGegnerForm(f=>({...f,date:e.target.value}))}
                       style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
                   </div>
                   <div style={{position:'relative'}}>
-                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Verein des Gegners</label>
+                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Verein des Gegners</label>
                     <input type="text" placeholder="z.B. TTC Musterstadt" value={gegnerForm.verein}
                       onChange={e=>{setGegnerForm(f=>({...f,verein:e.target.value}));setGegnerVereinSuggestOpen(true);}}
                       onFocus={()=>setGegnerVereinSuggestOpen(true)}
@@ -11739,7 +11739,7 @@ export default function TrainingsApp() {
                     })()}
                   </div>
                   <div>
-                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Name des Gegners</label>
+                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Name des Gegners</label>
                     <input type="text" placeholder="z.B. Max Mustermann" value={gegnerForm.gegner} onChange={e=>setGegnerForm(f=>({...f,gegner:e.target.value}))}
                       style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
                     {gegnerForm.gegner.trim()&&(()=>{
@@ -11757,19 +11757,19 @@ export default function TrainingsApp() {
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'10px'}}>
                   <div>
-                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Taktikhinweise</label>
+                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Taktikhinweise</label>
                     <textarea placeholder="So spiele ich gegen ihn/sie..." value={gegnerForm.taktik} onChange={e=>setGegnerForm(f=>({...f,taktik:e.target.value}))}
                       rows={4} style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',resize:'vertical',boxSizing:'border-box',fontFamily:'inherit'}}/>
                   </div>
                   <div>
-                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Spielweise</label>
+                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Spielweise</label>
                     <textarea placeholder="So spielt er/sie..." value={gegnerForm.spielweise} onChange={e=>setGegnerForm(f=>({...f,spielweise:e.target.value}))}
                       rows={4} style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',resize:'vertical',boxSizing:'border-box',fontFamily:'inherit'}}/>
                   </div>
                 </div>
                 <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>
                   <button onClick={()=>{setGegnerAdding(false);setGegnerEditId(null);setGegnerForm({date:'',verein:'',gegner:'',taktik:'',spielweise:''}); }}
-                    style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
+                    style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.65)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
                   <button onClick={submitGegnerAdmin} disabled={!gegnerForm.verein.trim()||!gegnerForm.date}
                     style={{padding:'9px 20px',background:gegnerForm.verein.trim()&&gegnerForm.date?`linear-gradient(135deg,${accentColor},#0e7490)`:'rgba(255,255,255,0.1)',color:'white',border:'none',borderRadius:'10px',cursor:gegnerForm.verein.trim()&&gegnerForm.date?'pointer':'not-allowed',fontWeight:'700',fontSize:'13px',opacity:gegnerForm.verein.trim()&&gegnerForm.date?1:0.5}}>
                     Eintrag speichern
@@ -11795,7 +11795,7 @@ export default function TrainingsApp() {
           )}
 
           {gegnerLogbuch.length===0&&!gegnerAdding?(
-            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.2)'}}>
+            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.4)'}}>
               <div style={{fontSize:'48px',marginBottom:'12px'}}>📋</div>
               <p style={{margin:0,fontWeight:'600',fontSize:'16px'}}>Noch keine Einträge</p>
               <p style={{margin:'6px 0 0',fontSize:'13px'}}>Füge den ersten Gegner hinzu!</p>
@@ -11810,7 +11810,7 @@ export default function TrainingsApp() {
                     <button onClick={()=>{setGegnerExpandedId(expandedA?null:e.id);setGegnerEditId(null);}}
                       style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'13px 16px',background:'none',border:'none',cursor:'pointer',gap:'10px'}}>
                       <span style={{fontWeight:'700',color:'white',fontSize:'14px',textAlign:'left'}}>{e.gegner||e.verein||'—'}</span>
-                      <span style={{color:'rgba(255,255,255,0.3)',fontSize:'12px',display:'inline-block',transform:expandedA?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s'}}>▼</span>
+                      <span style={{color:'rgba(255,255,255,0.48)',fontSize:'12px',display:'inline-block',transform:expandedA?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s'}}>▼</span>
                     </button>
                     {expandedA&&(
                       <div style={{padding:'0 16px 14px'}}>
@@ -11818,17 +11818,17 @@ export default function TrainingsApp() {
                           <div style={{display:'grid',gap:'8px',marginBottom:'10px',padding:'10px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'10px'}}>
                             <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr 1fr',gap:'8px'}}>
                               <div>
-                                <label style={{display:'block',fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'4px',textTransform:'uppercase'}}>Datum</label>
+                                <label style={{display:'block',fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.65)',marginBottom:'4px',textTransform:'uppercase'}}>Datum</label>
                                 <input type="date" value={gegnerMetaDraft.date} onChange={ev=>setGegnerMetaDraft(d=>({...d,date:ev.target.value}))}
                                   style={{width:'100%',boxSizing:'border-box',padding:'7px 9px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'8px',color:'white',fontSize:'13px',outline:'none'}}/>
                               </div>
                               <div>
-                                <label style={{display:'block',fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'4px',textTransform:'uppercase'}}>Verein</label>
+                                <label style={{display:'block',fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.65)',marginBottom:'4px',textTransform:'uppercase'}}>Verein</label>
                                 <input type="text" value={gegnerMetaDraft.verein} onChange={ev=>setGegnerMetaDraft(d=>({...d,verein:ev.target.value}))}
                                   style={{width:'100%',boxSizing:'border-box',padding:'7px 9px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'8px',color:'white',fontSize:'13px',outline:'none'}}/>
                               </div>
                               <div>
-                                <label style={{display:'block',fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'4px',textTransform:'uppercase'}}>Gegner</label>
+                                <label style={{display:'block',fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.65)',marginBottom:'4px',textTransform:'uppercase'}}>Gegner</label>
                                 <input type="text" value={gegnerMetaDraft.gegner} onChange={ev=>setGegnerMetaDraft(d=>({...d,gegner:ev.target.value}))}
                                   style={{width:'100%',boxSizing:'border-box',padding:'7px 9px',background:'rgba(255,255,255,0.07)',border:`1px solid ${accentBorder}`,borderRadius:'8px',color:'white',fontSize:'13px',outline:'none'}}/>
                               </div>
@@ -11841,7 +11841,7 @@ export default function TrainingsApp() {
                             </div>
                           </div>
                         ) : (
-                          <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>
+                          <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.52)'}}>
                             {[e.verein,dateStrGA].filter(Boolean).join(' · ')}
                           </p>
                         )}
@@ -11930,7 +11930,7 @@ export default function TrainingsApp() {
           {isAdminView && <span style={{fontSize:'12px',color:'rgba(196,181,253,0.7)',fontWeight:'600'}}>{entries.length} gesamt</span>}
         </div>
         <div style={{maxWidth:'700px',margin:'0 auto',padding:'16px'}}>
-          <p style={{margin:'0 0 16px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
+          <p style={{margin:'0 0 16px',fontSize:'12px',color:'rgba(255,255,255,0.58)'}}>
             {isAdminView
               ? 'Als Admin siehst du alle eingereichten Vorschläge (anonym, ohne Namen). Du kannst sie löschen, sobald sie umgesetzt sind.'
               : 'Trag hier ein, was an der App verbessert werden könnte. Deine Vorschläge werden anonym an die Admins weitergegeben — nur du selbst siehst und bearbeitest deine eigenen Einträge.'}
@@ -11969,7 +11969,7 @@ export default function TrainingsApp() {
                         </span>
                       )}
                       <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
-                        <span style={{fontSize:'10px',color:'rgba(255,255,255,0.3)'}}>{w.updatedAt?'bearbeitet':'eingereicht'} {new Date(w.updatedAt||w.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}</span>
+                        <span style={{fontSize:'10px',color:'rgba(255,255,255,0.48)'}}>{w.updatedAt?'bearbeitet':'eingereicht'} {new Date(w.updatedAt||w.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}</span>
                         <div style={{flex:1}}/>
                         {isOwn && (
                           <button onClick={()=>{setWunschEditId(id);setWunschEditText(w.text);}}
@@ -11993,7 +11993,7 @@ export default function TrainingsApp() {
                 </div>
               );
             })}
-            {entries.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.3)',fontSize:'13px'}}>Noch keine Vorschläge{isAdminView?'':' von dir'}.</p>}
+            {entries.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.48)',fontSize:'13px'}}>Noch keine Vorschläge{isAdminView?'':' von dir'}.</p>}
           </div>
         </div>
         {wunschCelebrationQueue.length>0 && (
@@ -12019,14 +12019,14 @@ export default function TrainingsApp() {
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>📰 TTC News</h1>
         </div>
         <div style={{padding:'20px',maxWidth:'760px',margin:'0 auto'}}>
-          <p style={{margin:'0 0 20px',fontSize:'13px',color:'rgba(255,255,255,0.35)'}}>Aktuelle Beiträge von ttc-staffel.de</p>
+          <p style={{margin:'0 0 20px',fontSize:'13px',color:'rgba(255,255,255,0.52)'}}>Aktuelle Beiträge von ttc-staffel.de</p>
           {ttcNewsLoading?(
-            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.3)'}}>
+            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.48)'}}>
               <div style={{fontSize:'36px',marginBottom:'12px'}}>⏳</div>
               <p style={{margin:0}}>Nachrichten werden geladen…</p>
             </div>
           ):ttcNews.length===0?(
-            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.2)'}}>
+            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.4)'}}>
               <div style={{fontSize:'36px',marginBottom:'12px'}}>📭</div>
               <p style={{margin:0,fontWeight:'600'}}>Keine Nachrichten verfügbar</p>
             </div>
@@ -12039,9 +12039,9 @@ export default function TrainingsApp() {
                     style={{display:'block',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'16px',padding:'20px',textDecoration:'none',color:'inherit',transition:'transform 0.15s,border-color 0.15s'}}
                     onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.borderColor=accentColor;}}
                     onMouseLeave={e=>{e.currentTarget.style.transform='translateY(0)';e.currentTarget.style.borderColor=accentBorder;}}>
-                    <p style={{margin:'0 0 6px',fontSize:'11px',color:'rgba(255,255,255,0.35)',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>{pubDate}</p>
+                    <p style={{margin:'0 0 6px',fontSize:'11px',color:'rgba(255,255,255,0.52)',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>{pubDate}</p>
                     <h3 style={{margin:'0 0 10px',color:'white',fontSize:'16px',fontWeight:'800',lineHeight:'1.3'}}>{item.title}</h3>
-                    {item.desc&&<p style={{margin:'0 0 12px',fontSize:'13px',color:'rgba(255,255,255,0.55)',lineHeight:'1.6'}}>{item.desc}{item.desc.length>=200?'…':''}</p>}
+                    {item.desc&&<p style={{margin:'0 0 12px',fontSize:'13px',color:'rgba(255,255,255,0.68)',lineHeight:'1.6'}}>{item.desc}{item.desc.length>=200?'…':''}</p>}
                     <span style={{fontSize:'12px',color:accentColor,fontWeight:'700'}}>Weiterlesen →</span>
                   </a>
                 );
@@ -12089,7 +12089,7 @@ export default function TrainingsApp() {
 
           <h2 style={{fontSize:'15px',fontWeight:'800',margin:'0 0 10px',color:'rgba(255,255,255,0.85)'}}>Meistgenutzte Bereiche</h2>
           <div style={{display:'flex',flexDirection:'column',gap:'6px',marginBottom:'26px'}}>
-            {sortedViews.length === 0 && <div style={{fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>Noch keine Daten.</div>}
+            {sortedViews.length === 0 && <div style={{fontSize:'13px',color:'rgba(255,255,255,0.58)'}}>Noch keine Daten.</div>}
             {sortedViews.map(([key,count]) => (
               <div key={key} style={{display:'flex',alignItems:'center',gap:'10px'}}>
                 <div style={{width:'110px',fontSize:'12px',color:'rgba(255,255,255,0.7)',flexShrink:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{key}</div>
@@ -12102,9 +12102,9 @@ export default function TrainingsApp() {
           </div>
 
           <h2 style={{fontSize:'15px',fontWeight:'800',margin:'0 0 10px',color:'rgba(255,255,255,0.85)'}}>Aktive Nutzer pro Tag</h2>
-          <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>Auf einen Tag klicken, um zu sehen, wer die App an dem Tag genutzt hat.</p>
+          <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.58)'}}>Auf einen Tag klicken, um zu sehen, wer die App an dem Tag genutzt hat.</p>
           <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
-            {sortedDays.length === 0 && <div style={{fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>Noch keine Daten.</div>}
+            {sortedDays.length === 0 && <div style={{fontSize:'13px',color:'rgba(255,255,255,0.58)'}}>Noch keine Daten.</div>}
             {sortedDays.map(day => {
               const uidsToday = dailyActive[day] || [];
               const isOpen = usageDayExpanded === day;
@@ -12115,12 +12115,12 @@ export default function TrainingsApp() {
                     <span style={{color:'rgba(255,255,255,0.7)'}}>{day.split('-').reverse().join('.')}</span>
                     <span style={{display:'flex',alignItems:'center',gap:'8px'}}>
                       <span style={{fontWeight:'700',color:'#7dd3fc'}}>{uidsToday.length}</span>
-                      <span style={{color:'rgba(255,255,255,0.3)',fontSize:'11px',display:'inline-block',transform:isOpen?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s'}}>▼</span>
+                      <span style={{color:'rgba(255,255,255,0.48)',fontSize:'11px',display:'inline-block',transform:isOpen?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s'}}>▼</span>
                     </span>
                   </button>
                   {isOpen && (
                     <div style={{padding:'0 12px 10px',display:'flex',flexWrap:'wrap',gap:'6px'}}>
-                      {uidsToday.length===0 && <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>Niemand.</span>}
+                      {uidsToday.length===0 && <span style={{fontSize:'12px',color:'rgba(255,255,255,0.52)'}}>Niemand.</span>}
                       {uidsToday.map(uid => {
                         const u = allUsers[uid];
                         return (
@@ -12333,7 +12333,7 @@ export default function TrainingsApp() {
             <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
               <div style={{background:'#0a2210',border:'1px solid rgba(196,181,253,0.3)',borderRadius:'16px',padding:'22px',maxWidth:'440px',width:'100%',maxHeight:'85vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.4)'}}>
                 <h3 style={{margin:'0 0 4px',color:'white',fontSize:'17px',fontWeight:'800'}}>📤 Excel-Export</h3>
-                <p style={{margin:'0 0 14px',color:'rgba(255,255,255,0.4)',fontSize:'12px'}}>Wähle aus, welche Spalten exportiert werden sollen ({filtered.length} Person{filtered.length===1?'':'en'} gemäß aktueller Suche/Filter).</p>
+                <p style={{margin:'0 0 14px',color:'rgba(255,255,255,0.58)',fontSize:'12px'}}>Wähle aus, welche Spalten exportiert werden sollen ({filtered.length} Person{filtered.length===1?'':'en'} gemäß aktueller Suche/Filter).</p>
                 <button onClick={()=>toggleAll(!allOn)} style={{marginBottom:'14px',padding:'6px 12px',background:'rgba(196,181,253,0.1)',border:'1px solid rgba(196,181,253,0.3)',borderRadius:'8px',color:'#c4b5fd',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>{allOn?'Alle abwählen':'Alle auswählen'}</button>
                 {groups.map(g=>(
                   <div key={g} style={{marginBottom:'14px'}}>
@@ -12380,8 +12380,8 @@ export default function TrainingsApp() {
             <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
               <div style={{background:'#0a2210',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'16px',padding:'22px',maxWidth:'360px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.4)'}}>
                 <h3 style={{margin:'0 0 4px',color:'white',fontSize:'17px',fontWeight:'800'}}>🎂 Geburtstagsliste</h3>
-                <p style={{margin:'0 0 14px',color:'rgba(255,255,255,0.4)',fontSize:'12px'}}>Exportiert alle Mitglieder, die im gewählten Jahr einen runden Geburtstag (5er-Schritte: 10, 15, 20, 25 …) haben.</p>
-                <span style={{fontSize:'11px',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'4px'}}>Bezugsjahr</span>
+                <p style={{margin:'0 0 14px',color:'rgba(255,255,255,0.58)',fontSize:'12px'}}>Exportiert alle Mitglieder, die im gewählten Jahr einen runden Geburtstag (5er-Schritte: 10, 15, 20, 25 …) haben.</p>
+                <span style={{fontSize:'11px',color:'rgba(255,255,255,0.65)',display:'block',marginBottom:'4px'}}>Bezugsjahr</span>
                 <input value={geburtstagJahr} onChange={e=>setGeburtstagJahr(e.target.value)} type="number"
                   style={{width:'100%',boxSizing:'border-box',padding:'10px 12px',background:'#1a1206',border:'1px solid rgba(251,191,36,0.4)',borderRadius:'9px',color:'white',fontSize:'14px',outline:'none',marginBottom:'16px'}}/>
                 <div style={{display:'grid',gap:'8px'}}>
@@ -12419,8 +12419,8 @@ export default function TrainingsApp() {
             <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
               <div style={{background:'#0a2210',border:'1px solid rgba(134,239,172,0.3)',borderRadius:'16px',padding:'22px',maxWidth:'360px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.4)'}}>
                 <h3 style={{margin:'0 0 4px',color:'white',fontSize:'17px',fontWeight:'800'}}>🏅 Jubiläumsjahre</h3>
-                <p style={{margin:'0 0 14px',color:'rgba(255,255,255,0.4)',fontSize:'12px'}}>Exportiert alle Mitglieder, die im gewählten Jahr seit 5, 10, 15, 20 … Jahren Mitglied sind (Basis: Eintrittsdatum).</p>
-                <span style={{fontSize:'11px',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'4px'}}>Bezugsjahr</span>
+                <p style={{margin:'0 0 14px',color:'rgba(255,255,255,0.58)',fontSize:'12px'}}>Exportiert alle Mitglieder, die im gewählten Jahr seit 5, 10, 15, 20 … Jahren Mitglied sind (Basis: Eintrittsdatum).</p>
+                <span style={{fontSize:'11px',color:'rgba(255,255,255,0.65)',display:'block',marginBottom:'4px'}}>Bezugsjahr</span>
                 <input value={jubilaeumJahr} onChange={e=>setJubilaeumJahr(e.target.value)} type="number"
                   style={{width:'100%',boxSizing:'border-box',padding:'10px 12px',background:'#1a1206',border:'1px solid rgba(134,239,172,0.4)',borderRadius:'9px',color:'white',fontSize:'14px',outline:'none',marginBottom:'16px'}}/>
                 <div style={{display:'grid',gap:'8px'}}>
@@ -12437,7 +12437,7 @@ export default function TrainingsApp() {
           const set = (key,val) => setNewMitgliedForm(p=>({...p,[key]:val}));
           const canSave = f.vorname.trim() && f.nachname.trim();
           const inS = {width:'100%',boxSizing:'border-box',padding:'7px 9px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none'};
-          const lbl = {fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'};
+          const lbl = {fontSize:'10px',color:'rgba(255,255,255,0.58)',display:'block',marginBottom:'3px'};
           const fld = (key,label,opts={}) => (
             <div style={{minWidth:0}}>
               <span style={lbl}>{label}</span>
@@ -12456,7 +12456,7 @@ export default function TrainingsApp() {
             <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
               <div style={{background:'#0a2210',border:'1px solid rgba(74,222,128,0.35)',borderRadius:'16px',padding:'22px',maxWidth:'460px',width:'100%',maxHeight:'85vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.4)'}}>
                 <h3 style={{margin:'0 0 4px',color:'white',fontSize:'17px',fontWeight:'800'}}>+ Neues Mitglied anlegen</h3>
-                <p style={{margin:'0 0 16px',color:'rgba(255,255,255,0.4)',fontSize:'12px'}}>Vorname und Nachname sind Pflicht, alles andere kann auch später noch ergänzt werden.</p>
+                <p style={{margin:'0 0 16px',color:'rgba(255,255,255,0.58)',fontSize:'12px'}}>Vorname und Nachname sind Pflicht, alles andere kann auch später noch ergänzt werden.</p>
 
                 <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'10px',padding:'10px',display:'grid',gap:'10px',marginBottom:'14px'}}>
                   <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(196,181,253,0.6)',textTransform:'uppercase',letterSpacing:'0.5px'}}>⚙️ App-Steuerung</span>
@@ -12470,7 +12470,7 @@ export default function TrainingsApp() {
                         const on = f.roles.includes(o.key);
                         const rc = ROLE_COLORS[o.key];
                         return <button key={o.key} onClick={()=>set('roles', on?f.roles.filter(r=>r!==o.key):[...f.roles,o.key])}
-                          style={{padding:'5px 12px',borderRadius:'20px',border:`1px solid ${on?rc.border:'rgba(255,255,255,0.15)'}`,background:on?rc.bg:'rgba(255,255,255,0.03)',color:on?rc.color:'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>{o.label}</button>;
+                          style={{padding:'5px 12px',borderRadius:'20px',border:`1px solid ${on?rc.border:'rgba(255,255,255,0.15)'}`,background:on?rc.bg:'rgba(255,255,255,0.03)',color:on?rc.color:'rgba(255,255,255,0.58)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>{o.label}</button>;
                       })}
                     </div>
                   </div>
@@ -12480,7 +12480,7 @@ export default function TrainingsApp() {
                   <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(251,191,36,0.6)',textTransform:'uppercase',letterSpacing:'0.5px'}}>🗂️ Mitgliedsdaten</span>
 
                   <div style={{display:'grid',gap:'8px'}}>
-                    <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.35)'}}>Persönliche Daten</span>
+                    <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.52)'}}>Persönliche Daten</span>
                     <div style={{display:'grid',gridTemplateColumns:'1fr 1.4fr',gap:'6px'}}>
                       {fld('geburtsdatum','Geburtsdatum',{type:'date'})}{fld('email','E-Mail',{type:'email'})}
                     </div>
@@ -12493,7 +12493,7 @@ export default function TrainingsApp() {
                   </div>
 
                   <div style={{display:'grid',gap:'8px',paddingTop:'12px',borderTop:'1px solid rgba(251,191,36,0.15)'}}>
-                    <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.35)'}}>Zahlungsdaten</span>
+                    <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.52)'}}>Zahlungsdaten</span>
                     <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:'6px'}}>
                       {fld('iban','IBAN')}{fld('bic','BIC')}
                     </div>
@@ -12568,7 +12568,7 @@ export default function TrainingsApp() {
         <div style={{padding:'6px 20px 8px',display:'flex',gap:'6px',flexWrap:'wrap',borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
           {BEITRAGSARTEN.map(a=>{
             const count = activeEntries.filter(([id])=>mitgliederFinanzen[id]?.beitragsart===a.key).length;
-            return <span key={a.key} style={{fontSize:'10px',fontWeight:'700',padding:'2px 8px',borderRadius:'20px',background:'rgba(255,255,255,0.05)',color:'rgba(255,255,255,0.5)',whiteSpace:'nowrap'}}>{a.label} <b style={{color:'rgba(255,255,255,0.8)'}}>{count}</b></span>;
+            return <span key={a.key} style={{fontSize:'10px',fontWeight:'700',padding:'2px 8px',borderRadius:'20px',background:'rgba(255,255,255,0.05)',color:'rgba(255,255,255,0.65)',whiteSpace:'nowrap'}}>{a.label} <b style={{color:'rgba(255,255,255,0.8)'}}>{count}</b></span>;
           })}
           {(() => { const oc = activeEntries.filter(([id])=>!mitgliederFinanzen[id]?.beitragsart).length; return oc>0 && <span style={{fontSize:'10px',fontWeight:'700',padding:'2px 8px',borderRadius:'20px',background:'rgba(220,38,38,0.1)',color:'#fca5a5',whiteSpace:'nowrap'}}>Ohne Beitragsart <b>{oc}</b></span>; })()}
         </div>
@@ -12584,7 +12584,7 @@ export default function TrainingsApp() {
           {unmatchedPending.length > 0 && (
             <div style={{marginBottom:'16px',padding:'14px 16px',background:'rgba(220,38,38,0.12)',border:'2px solid #dc2626',borderRadius:'12px',boxShadow:'0 0 0 1px rgba(220,38,38,0.3)'}}>
               <p style={{margin:'0 0 10px',fontSize:'14px',fontWeight:'800',color:'#fca5a5'}}>🚫 {unmatchedPending.length} Anmeldung{unmatchedPending.length===1?'':'en'} — Nicht Mitglied</p>
-              <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.5)'}}>Diese Accounts haben aktuell <b>keinen Zugriff</b>. Ordne sie einem Mitglied zu, oder blockiere sie dauerhaft.</p>
+              <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.65)'}}>Diese Accounts haben aktuell <b>keinen Zugriff</b>. Ordne sie einem Mitglied zu, oder blockiere sie dauerhaft.</p>
               <div style={{display:'grid',gap:'8px'}}>
                 {unmatchedPending.map(u => (
                   <div key={u.uid} style={{padding:'10px 12px',background:'rgba(0,0,0,0.2)',border:'1px solid rgba(220,38,38,0.4)',borderRadius:'8px'}}>
@@ -12600,7 +12600,7 @@ export default function TrainingsApp() {
                             .map(([mid,m])=>(
                               <button key={mid} onClick={()=>{ linkPendingUserToMitglied(mid, u.email); setMitgliedLinkUid(null); setMitgliedLinkSearch(''); }}
                                 style={{textAlign:'left',padding:'6px 8px',borderRadius:'6px',background:'transparent',border:'none',cursor:'pointer',color:'white',fontSize:'12px'}}>
-                                {m.vorname} {m.nachname} {m.email && <span style={{color:'rgba(255,255,255,0.4)'}}>({m.email})</span>}
+                                {m.vorname} {m.nachname} {m.email && <span style={{color:'rgba(255,255,255,0.58)'}}>({m.email})</span>}
                               </button>
                           ))}
                         </div>
@@ -12621,7 +12621,7 @@ export default function TrainingsApp() {
               </div>
             </div>
           )}
-          <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
+          <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.58)'}}>
             Importierte Mitgliederliste. Klicke auf eine Person, um Rollen (Mehrfachauswahl möglich) und bei "Eltern" die zugehörigen Kinder/Jugendlichen zuzuordnen (auch mehrere möglich). Meldet sich jemand mit einer hier hinterlegten E-Mail-Adresse und zugewiesener Rolle an, wird der Account automatisch freigeschaltet.
           </p>
           <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
@@ -12754,11 +12754,11 @@ export default function TrainingsApp() {
             <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
               <div style={{background:'#0a2210',border:'1px solid rgba(220,38,38,0.35)',borderRadius:'16px',padding:'22px',maxWidth:'440px',width:'100%',maxHeight:'85vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.4)'}}>
                 <h3 style={{margin:'0 0 4px',color:'white',fontSize:'17px',fontWeight:'800'}}>⛔ Blockierte Personen</h3>
-                <p style={{margin:'0 0 16px',color:'rgba(255,255,255,0.4)',fontSize:'12px'}}>{blockedUsers.length===0?'Aktuell niemand blockiert.':`${blockedUsers.length} Account${blockedUsers.length===1?'':'s'} ohne Zugriff.`}</p>
+                <p style={{margin:'0 0 16px',color:'rgba(255,255,255,0.58)',fontSize:'12px'}}>{blockedUsers.length===0?'Aktuell niemand blockiert.':`${blockedUsers.length} Account${blockedUsers.length===1?'':'s'} ohne Zugriff.`}</p>
                 <div style={{display:'grid',gap:'6px',marginBottom:'16px'}}>
                   {blockedUsers.map(u => (
                     <div key={u.uid} style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',padding:'8px 10px',background:'rgba(0,0,0,0.2)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:'8px'}}>
-                      <span style={{flex:1,minWidth:'150px',fontSize:'12px'}}><b>{u.name||'(ohne Name)'}</b> · <span style={{color:'rgba(255,255,255,0.5)'}}>{u.email}</span></span>
+                      <span style={{flex:1,minWidth:'150px',fontSize:'12px'}}><b>{u.name||'(ohne Name)'}</b> · <span style={{color:'rgba(255,255,255,0.65)'}}>{u.email}</span></span>
                       <button onClick={()=>saveUserRoles(u.uid,['pending'])}
                         style={{padding:'5px 10px',background:'rgba(74,222,128,0.15)',color:'#86efac',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>Entsperren</button>
                       <button onClick={()=>{if(!window.confirm(`"${u.name||u.email}" wirklich löschen? Der Account bleibt gesperrt, verschwindet aber aus dieser Liste.`))return;const updated={...allUsers};delete updated[u.uid];setDoc(doc(db,'ttc','users'),updated);setAllUsers(updated);}}
@@ -12804,7 +12804,7 @@ export default function TrainingsApp() {
                     <div style={{flex:'1 1 200px',minWidth:0}}>
                       <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'white',display:'flex',alignItems:'center',gap:'6px'}}>
                         {m.nachname}, {m.vorname}
-                        {m.excelMitgliedId&&<span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.35)'}}>#{m.excelMitgliedId}</span>}
+                        {m.excelMitgliedId&&<span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.52)'}}>#{m.excelMitgliedId}</span>}
                         {matchedUser&&<span title="App-Account zugeordnet" style={{fontSize:'11px',fontWeight:'800',color:'#4ade80',background:'rgba(74,222,128,0.15)',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'50%',width:'16px',height:'16px',display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>✓</span>}
                       </p>
                       {elternOhneKind&&<p style={{margin:0,fontSize:'10px',color:'#fca5a5',fontWeight:'700'}}>⚠️ Kein Kind zugeordnet</p>}
@@ -12813,29 +12813,29 @@ export default function TrainingsApp() {
                       {beitragOffen&&<p style={{margin:0,fontSize:'10px',color:'#fca5a5',fontWeight:'700'}}>⚠️ Keine Beitragsart zugeordnet</p>}
                     </div>
                     <div style={{display:'flex',gap:'4px',flexWrap:'wrap',justifyContent:'flex-end',flex:'0 1 auto'}}>
-                      {roles.length===0?<span style={{fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>keine Rolle</span>:
+                      {roles.length===0?<span style={{fontSize:'11px',color:'rgba(255,255,255,0.42)'}}>keine Rolle</span>:
                         roles.map(r=><span key={r} style={{fontSize:'10px',fontWeight:'700',padding:'2px 7px',borderRadius:'20px',background:ROLE_COLORS[r]?.bg||'rgba(196,181,253,0.15)',color:ROLE_COLORS[r]?.color||'#c4b5fd',border:`1px solid ${ROLE_COLORS[r]?.border||'transparent'}`}}>{ROLE_OPTIONS.find(o=>o.key===r)?.label||r}</span>)}
                     </div>
-                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',flexShrink:0}}>{isExpanded?'▲':'▼'}</span>
+                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.48)',flexShrink:0}}>{isExpanded?'▲':'▼'}</span>
                   </button>
                   {isExpanded&&(
                     <div style={{padding:'0 12px 14px',display:'grid',gap:'12px'}}>
                     <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'10px',padding:'10px',display:'grid',gap:'10px'}}>
                       <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(196,181,253,0.6)',textTransform:'uppercase',letterSpacing:'0.5px'}}>⚙️ App-Steuerung</span>
                       <div>
-                        <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'6px'}}>Rollen</span>
+                        <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',display:'block',marginBottom:'6px'}}>Rollen</span>
                         <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
                           {ROLE_OPTIONS.map(o=>{
                             const on = roles.includes(o.key);
                             const rc = ROLE_COLORS[o.key];
                             return <button key={o.key} onClick={()=>toggleRole(id,m,o.key)}
-                              style={{padding:'5px 12px',borderRadius:'20px',border:`1px solid ${on?rc.border:'rgba(255,255,255,0.15)'}`,background:on?rc.bg:'rgba(255,255,255,0.03)',color:on?rc.color:'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>{o.label}</button>;
+                              style={{padding:'5px 12px',borderRadius:'20px',border:`1px solid ${on?rc.border:'rgba(255,255,255,0.15)'}`,background:on?rc.bg:'rgba(255,255,255,0.03)',color:on?rc.color:'rgba(255,255,255,0.58)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>{o.label}</button>;
                           })}
                         </div>
                       </div>
                       {roles.includes('eltern')&&(
                         <div>
-                          <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'6px'}}>Kinder/Jugendliche ({linkedIds.length} ausgewählt)</span>
+                          <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',display:'block',marginBottom:'6px'}}>Kinder/Jugendliche ({linkedIds.length} ausgewählt)</span>
                           <input value={mitgliedChildSearch} onChange={e=>setMitgliedChildSearch(e.target.value)} placeholder="Kind suchen…"
                             style={{width:'100%',boxSizing:'border-box',padding:'7px 10px',background:'#0a2210',border:'1px solid rgba(74,222,128,0.3)',borderRadius:'8px',color:'white',fontSize:'12px',outline:'none',marginBottom:'6px'}}/>
                           <div style={{display:'grid',gap:'2px',maxHeight:'160px',overflowY:'auto',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'8px',padding:'4px'}}>
@@ -12848,18 +12848,18 @@ export default function TrainingsApp() {
                                 </label>
                               );
                             })}
-                            {jugendOptions.length===0&&<p style={{margin:'4px',fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>Noch niemand als "Jugendlicher" markiert.</p>}
+                            {jugendOptions.length===0&&<p style={{margin:'4px',fontSize:'11px',color:'rgba(255,255,255,0.48)'}}>Noch niemand als "Jugendlicher" markiert.</p>}
                           </div>
                         </div>
                       )}
                       {roles.includes('trainer') && (
                         !matchedUser ? (
-                          <div><span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'6px'}}>Gruppen</span>
-                            <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>Noch kein App-Account vorhanden — Gruppen können erst nach der ersten Anmeldung zugeordnet werden.</p>
+                          <div><span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',display:'block',marginBottom:'6px'}}>Gruppen</span>
+                            <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.48)'}}>Noch kein App-Account vorhanden — Gruppen können erst nach der ersten Anmeldung zugeordnet werden.</p>
                           </div>
                         ) : (
                           <div>
-                            <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'6px'}}>Gruppen (als Trainer)</span>
+                            <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',display:'block',marginBottom:'6px'}}>Gruppen (als Trainer)</span>
                             <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
                               {FIXED_GROUPS.map(g=>{
                                 const assigned = (matchedUser.groupIds||[]).includes(g.id);
@@ -12882,13 +12882,13 @@ export default function TrainingsApp() {
                         };
                         return (
                           <div>
-                            <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'6px'}}>⚡ TTR-Wert</span>
+                            <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',display:'block',marginBottom:'6px'}}>⚡ TTR-Wert</span>
                             {status==='exact' || status==='linked' ? (
                               <p style={{margin:0,fontSize:'12px',color:'#86efac'}}>✅ {label}{ttr?` — TTR ${ttr}`:' — kein TTR-Wert hinterlegt'}{status==='linked'?' (manuell zugeordnet)':''}</p>
                             ) : status==='similar' ? (
                               <p style={{margin:0,fontSize:'12px',color:'#fbbf24'}}>⚠️ Ähnlicher Name gefunden: {label}{ttr?` (TTR ${ttr})`:''} — bitte prüfen (ggf. nicht dieselbe Person)</p>
                             ) : status==='confirmed-none' ? (
-                              <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.5)'}}>➖ Aktuell kein TTR-Wert (bestätigt)</p>
+                              <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.65)'}}>➖ Aktuell kein TTR-Wert (bestätigt)</p>
                             ) : (
                               <p style={{margin:0,fontSize:'12px',color:'#fca5a5'}}>❌ Kein TTR-Wert auffindbar</p>
                             )}
@@ -12929,7 +12929,7 @@ export default function TrainingsApp() {
                         const childGroup = childSub ? FIXED_GROUPS.find(g=>g.id===childSub.groupId) : null;
                         return (
                           <div>
-                            <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'6px'}}>🏓 Trainingsgruppe</span>
+                            <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',display:'block',marginBottom:'6px'}}>🏓 Trainingsgruppe</span>
                             {!matchedChild ? (
                               <p style={{margin:0,fontSize:'12px',color:'#fca5a5'}}>❌ Kein passendes Kind in der Gruppenverwaltung gefunden</p>
                             ) : childSub ? (
@@ -12944,7 +12944,7 @@ export default function TrainingsApp() {
                         const primary = roles.includes(matchedUser.primaryRole) ? matchedUser.primaryRole : roles[0];
                         return (
                           <div>
-                            <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'6px'}}>Oberrolle (Standard-Rolle beim Login)</span>
+                            <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',display:'block',marginBottom:'6px'}}>Oberrolle (Standard-Rolle beim Login)</span>
                             <select value={primary} onChange={e=>saveUserPrimaryRole(matchedUser.uid,e.target.value)}
                               style={{padding:'6px 10px',border:'1px solid rgba(196,181,253,0.4)',borderRadius:'8px',fontSize:'12px',cursor:'pointer',color:'#c4b5fd',background:'#0a2210',width:'100%'}}>
                               {roles.map(r=><option key={r} value={r} style={{background:'#0a2210'}}>{ROLE_OPTIONS.find(o=>o.key===r)?.label||r}</option>)}
@@ -12977,14 +12977,14 @@ export default function TrainingsApp() {
                         const fin = mitgliederFinanzen[id] || {};
                         const fld = (key, label, opts={}) => (
                           <div key={key} style={{minWidth:0}}>
-                            <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>{label}</span>
+                            <span style={{fontSize:'10px',color:'rgba(255,255,255,0.58)',display:'block',marginBottom:'3px'}}>{label}</span>
                             <input value={fin[key]??''} type={opts.type||'text'} onChange={e=>saveFinanzField(id,key,e.target.value)}
                               style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',fontFamily:opts.mono?'monospace':'inherit'}}/>
                           </div>
                         );
                         const mfld = (key, label, opts={}) => (
                           <div style={{minWidth:0}}>
-                            <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>{label}</span>
+                            <span style={{fontSize:'10px',color:'rgba(255,255,255,0.58)',display:'block',marginBottom:'3px'}}>{label}</span>
                             <input value={m[key]??''} type={opts.type||'text'} onChange={e=>saveMitgliedField(id,key,e.target.value)}
                               style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none'}}/>
                           </div>
@@ -12996,17 +12996,17 @@ export default function TrainingsApp() {
 
                             {/* Persönliche Daten */}
                             <div style={{display:'grid',gap:'8px'}}>
-                              <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.35)'}}>Persönliche Daten</span>
+                              <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.52)'}}>Persönliche Daten</span>
                               <div style={{display:'grid',gridTemplateColumns:'1fr auto 1.4fr',gap:'6px',alignItems:'end'}}>
                                 {mfld('geburtsdatum','Geburtsdatum',{type:'date'})}
                                 <div style={{minWidth:0}}>
-                                  <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Alter</span>
+                                  <span style={{fontSize:'10px',color:'rgba(255,255,255,0.58)',display:'block',marginBottom:'3px'}}>Alter</span>
                                   <div style={{padding:'6px 10px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'7px',color:'#fbbf24',fontSize:'12px',fontWeight:'800',whiteSpace:'nowrap'}}>{calcAge(m.geburtsdatum)!==null?`${calcAge(m.geburtsdatum)} Jahre`:'–'}</div>
                                 </div>
                                 {mfld('email','E-Mail',{type:'email'})}
                               </div>
                               <div>
-                                <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Weitere E-Mails (z.B. Mutter/Vater — können sich damit ebenfalls einloggen und auf dieses Profil zugreifen)</span>
+                                <span style={{fontSize:'10px',color:'rgba(255,255,255,0.58)',display:'block',marginBottom:'3px'}}>Weitere E-Mails (z.B. Mutter/Vater — können sich damit ebenfalls einloggen und auf dieses Profil zugreifen)</span>
                                 <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:(m.zusatzEmails||[]).length?'6px':0}}>
                                   {(m.zusatzEmails||[]).map((em,i)=>(
                                     <span key={i} style={{display:'flex',alignItems:'center',gap:'5px',padding:'4px 8px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'20px',color:'#fbbf24',fontSize:'11px'}}>
@@ -13032,7 +13032,7 @@ export default function TrainingsApp() {
                               </div>
                               <div style={{display:'grid',gridTemplateColumns:'1fr',gap:'6px'}}>
                                 <div style={{minWidth:0}}>
-                                  <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Geschlecht</span>
+                                  <span style={{fontSize:'10px',color:'rgba(255,255,255,0.58)',display:'block',marginBottom:'3px'}}>Geschlecht</span>
                                   <select value={fin.geschlecht||''} onChange={e=>saveFinanzField(id,'geschlecht',e.target.value)}
                                     style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',cursor:'pointer'}}>
                                     <option value="" style={{background:'#1a1206'}}>– auswählen –</option>
@@ -13050,7 +13050,7 @@ export default function TrainingsApp() {
 
                             {/* Zahlungsdaten */}
                             <div style={{display:'grid',gap:'8px',paddingTop:'12px',borderTop:'1px solid rgba(251,191,36,0.15)'}}>
-                              <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.35)'}}>Zahlungsdaten</span>
+                              <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.52)'}}>Zahlungsdaten</span>
                               <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:'6px'}}>
                                 {fld('iban','IBAN',{mono:true})}{fld('bic','BIC',{mono:true})}
                               </div>
@@ -13059,7 +13059,7 @@ export default function TrainingsApp() {
                               </div>
                               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'6px'}}>
                                 <div style={{minWidth:0}}>
-                                  <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Zahlart</span>
+                                  <span style={{fontSize:'10px',color:'rgba(255,255,255,0.58)',display:'block',marginBottom:'3px'}}>Zahlart</span>
                                   <select value={fin.zahlart||''} onChange={e=>saveFinanzField(id,'zahlart',e.target.value)}
                                     style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',cursor:'pointer'}}>
                                     <option value="" style={{background:'#1a1206'}}>– auswählen –</option>
@@ -13070,7 +13070,7 @@ export default function TrainingsApp() {
                               </div>
                               <div style={{display:'grid',gridTemplateColumns:'1.4fr 1fr',gap:'6px'}}>
                                 <div style={{minWidth:0}}>
-                                  <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Beitragsart</span>
+                                  <span style={{fontSize:'10px',color:'rgba(255,255,255,0.58)',display:'block',marginBottom:'3px'}}>Beitragsart</span>
                                   <select value={fin.beitragsart||''} onChange={e=>{
                                       const key = e.target.value;
                                       const art = BEITRAGSARTEN.find(a=>a.key===key);
@@ -13086,7 +13086,7 @@ export default function TrainingsApp() {
                               </div>
                               {fin.beitragsart==='familienmitglied' && (
                                 <div style={{minWidth:0}}>
-                                  <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Gehört zu (Familienbeitrag-Zahler)</span>
+                                  <span style={{fontSize:'10px',color:'rgba(255,255,255,0.58)',display:'block',marginBottom:'3px'}}>Gehört zu (Familienbeitrag-Zahler)</span>
                                   <select value={fin.familienZahlerId||''} onChange={e=>saveFinanzField(id,'familienZahlerId',e.target.value||null)}
                                     style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',cursor:'pointer'}}>
                                     <option value="" style={{background:'#1a1206'}}>– niemand ausgewählt –</option>
@@ -13136,9 +13136,9 @@ export default function TrainingsApp() {
                             </div>
                             {(fin.mitgliedschaftsHistorie||[]).length > 0 && (
                               <div style={{padding:'8px 12px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px'}}>
-                                <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'3px'}}>📜 Frühere Mitgliedschaft(en)</span>
+                                <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.65)',display:'block',marginBottom:'3px'}}>📜 Frühere Mitgliedschaft(en)</span>
                                 {fin.mitgliedschaftsHistorie.map((h,i)=>(
-                                  <p key={i} style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.55)'}}>
+                                  <p key={i} style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.68)'}}>
                                     {h.eintritt||'?'} – {h.austritt||'?'}
                                   </p>
                                 ))}
@@ -13162,7 +13162,7 @@ export default function TrainingsApp() {
                 </div>
               );
             })}
-            {filtered.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.3)',fontSize:'13px'}}>Keine Treffer.</p>}
+            {filtered.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.48)',fontSize:'13px'}}>Keine Treffer.</p>}
           </div>
         </div>
         {pageScrollPos !== 'top' && (
@@ -13193,10 +13193,10 @@ export default function TrainingsApp() {
         <div className="ttc-sticky-hdr" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
           <button onClick={()=>navTo('mitglieder')} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'9px',color:'white',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',fontWeight:'600'}}><ArrowLeft size={15}/></button>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>📦 Ehemalige Mitglieder</h1>
-          <span style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>{exited.length}</span>
+          <span style={{fontSize:'12px',color:'rgba(255,255,255,0.58)',fontWeight:'600'}}>{exited.length}</span>
         </div>
         <div style={{padding:'16px 14px',maxWidth:'900px',margin:'0 auto'}}>
-          <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
+          <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.58)'}}>
             Alle ausgetretenen Mitglieder. Ein Austritt in der aktiven Mitgliederverwaltung landet automatisch hier. Personen, die im laufenden Halbjahr ausgetreten sind, werden weiterhin beim "➗ Teileinzug" berücksichtigt.
           </p>
           <input value={vergangeneSearch} onChange={e=>setVergangeneSearch(e.target.value)} placeholder="Suche nach Name oder E-Mail…"
@@ -13211,22 +13211,22 @@ export default function TrainingsApp() {
                   <button onClick={()=>setVergangeneExpandedId(isExpanded?null:id)}
                     style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',background:'transparent',border:'none',cursor:'pointer',textAlign:'left'}}>
                     <div style={{flex:'1 1 200px',minWidth:0}}>
-                      <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'white'}}>{m.nachname}, {m.vorname}{m.excelMitgliedId?<span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.35)'}}> #{m.excelMitgliedId}</span>:null}</p>
-                      <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.4)'}}>ausgetreten {fin.austrittsdatum}</p>
+                      <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'white'}}>{m.nachname}, {m.vorname}{m.excelMitgliedId?<span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.52)'}}> #{m.excelMitgliedId}</span>:null}</p>
+                      <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.58)'}}>ausgetreten {fin.austrittsdatum}</p>
                     </div>
-                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',flexShrink:0}}>{isExpanded?'▲':'▼'}</span>
+                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.48)',flexShrink:0}}>{isExpanded?'▲':'▼'}</span>
                   </button>
                   {isExpanded && (()=>{
                     const fld = (key, label, opts={}) => (
                       <div key={key} style={{minWidth:0}}>
-                        <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>{label}</span>
+                        <span style={{fontSize:'10px',color:'rgba(255,255,255,0.58)',display:'block',marginBottom:'3px'}}>{label}</span>
                         <input value={fin[key]??''} type={opts.type||'text'} onChange={e=>saveFinanzField(id,key,e.target.value)}
                           style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',fontFamily:opts.mono?'monospace':'inherit'}}/>
                       </div>
                     );
                     const mfld = (key, label, opts={}) => (
                       <div key={key} style={{minWidth:0}}>
-                        <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>{label}</span>
+                        <span style={{fontSize:'10px',color:'rgba(255,255,255,0.58)',display:'block',marginBottom:'3px'}}>{label}</span>
                         <input value={m[key]??''} type={opts.type||'text'} onChange={e=>saveMitgliedField(id,key,e.target.value)}
                           style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none'}}/>
                       </div>
@@ -13236,24 +13236,24 @@ export default function TrainingsApp() {
                         <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'10px',padding:'10px',display:'grid',gap:'10px'}}>
                           <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(196,181,253,0.6)',textTransform:'uppercase',letterSpacing:'0.5px'}}>⚙️ Rollen (früher)</span>
                           <div style={{display:'flex',gap:'4px',flexWrap:'wrap'}}>
-                            {roles.length===0?<span style={{fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>keine Rolle</span>:
-                              roles.map(r=><span key={r} style={{fontSize:'10px',fontWeight:'700',padding:'2px 7px',borderRadius:'20px',background:'rgba(255,255,255,0.08)',color:'rgba(255,255,255,0.5)'}}>{ROLE_LABELS[r]||r}</span>)}
+                            {roles.length===0?<span style={{fontSize:'11px',color:'rgba(255,255,255,0.42)'}}>keine Rolle</span>:
+                              roles.map(r=><span key={r} style={{fontSize:'10px',fontWeight:'700',padding:'2px 7px',borderRadius:'20px',background:'rgba(255,255,255,0.08)',color:'rgba(255,255,255,0.65)'}}>{ROLE_LABELS[r]||r}</span>)}
                           </div>
                         </div>
                         <div style={{background:'rgba(251,191,36,0.04)',border:'1px solid rgba(251,191,36,0.15)',borderRadius:'10px',padding:'10px',display:'grid',gap:'14px'}}>
                           <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(251,191,36,0.6)',textTransform:'uppercase',letterSpacing:'0.5px'}}>🗂️ Mitgliedsdaten</span>
                           <div style={{display:'grid',gap:'8px'}}>
-                            <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.35)'}}>Persönliche Daten</span>
+                            <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.52)'}}>Persönliche Daten</span>
                             <div style={{display:'grid',gridTemplateColumns:'1fr auto 1.4fr',gap:'6px',alignItems:'end'}}>
                               {mfld('geburtsdatum','Geburtsdatum',{type:'date'})}
                               <div style={{minWidth:0}}>
-                                <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Alter</span>
+                                <span style={{fontSize:'10px',color:'rgba(255,255,255,0.58)',display:'block',marginBottom:'3px'}}>Alter</span>
                                 <div style={{padding:'6px 10px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'7px',color:'#fbbf24',fontSize:'12px',fontWeight:'800',whiteSpace:'nowrap'}}>{calcAge(m.geburtsdatum)!==null?`${calcAge(m.geburtsdatum)} Jahre`:'–'}</div>
                               </div>
                               {mfld('email','E-Mail',{type:'email'})}
                             </div>
                             <div style={{minWidth:0}}>
-                              <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Geschlecht</span>
+                              <span style={{fontSize:'10px',color:'rgba(255,255,255,0.58)',display:'block',marginBottom:'3px'}}>Geschlecht</span>
                               <select value={fin.geschlecht||''} onChange={e=>saveFinanzField(id,'geschlecht',e.target.value)}
                                 style={{width:'100%',boxSizing:'border-box',padding:'6px 8px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none',cursor:'pointer'}}>
                                 <option value="" style={{background:'#1a1206'}}>– auswählen –</option>
@@ -13268,7 +13268,7 @@ export default function TrainingsApp() {
                             </div>
                           </div>
                           <div style={{display:'grid',gap:'8px',paddingTop:'12px',borderTop:'1px solid rgba(251,191,36,0.15)'}}>
-                            <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.35)'}}>Zahlungsdaten</span>
+                            <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.52)'}}>Zahlungsdaten</span>
                             <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:'6px'}}>
                               {fld('iban','IBAN',{mono:true})}{fld('bic','BIC',{mono:true})}
                             </div>
@@ -13280,7 +13280,7 @@ export default function TrainingsApp() {
                             </div>
                             <div style={{display:'grid',gridTemplateColumns:'1.4fr 1fr',gap:'6px'}}>
                               <div style={{minWidth:0}}>
-                                <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Beitragsart</span>
+                                <span style={{fontSize:'10px',color:'rgba(255,255,255,0.58)',display:'block',marginBottom:'3px'}}>Beitragsart</span>
                                 <select value={fin.beitragsart||''} onChange={e=>{
                                     const key = e.target.value;
                                     const art = BEITRAGSARTEN.find(a=>a.key===key);
@@ -13318,9 +13318,9 @@ export default function TrainingsApp() {
                         </div>
                         {(fin.mitgliedschaftsHistorie||[]).length > 0 && (
                           <div style={{padding:'8px 12px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px'}}>
-                            <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.5)',display:'block',marginBottom:'3px'}}>📜 Frühere Mitgliedschaft(en)</span>
+                            <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.65)',display:'block',marginBottom:'3px'}}>📜 Frühere Mitgliedschaft(en)</span>
                             {fin.mitgliedschaftsHistorie.map((h,i)=>(
-                              <p key={i} style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.55)'}}>
+                              <p key={i} style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.68)'}}>
                                 {h.eintritt||'?'} – {h.austritt||'?'}
                               </p>
                             ))}
@@ -13350,7 +13350,7 @@ export default function TrainingsApp() {
                 </div>
               );
             })}
-            {filtered.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.3)',fontSize:'13px'}}>Keine Treffer.</p>}
+            {filtered.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.48)',fontSize:'13px'}}>Keine Treffer.</p>}
           </div>
         </div>
       </div>
@@ -13389,7 +13389,7 @@ export default function TrainingsApp() {
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🎖️ Ämter und Ehrentitel</h1>
         </div>
         <div style={{padding:'16px 14px',maxWidth:'700px',margin:'0 auto'}}>
-          <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>
+          <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.58)'}}>
             Vorstandsposten, sonstige Funktionen (z.B. Hallenwart) und Ehrenmitgliedschaften — aktuelle und vergangene. Ohne "Bis"-Jahr gilt das Amt als laufend. Erscheint bei der Person unter Mitgliedsdaten und im Excel-Export.
           </p>
 
@@ -13414,10 +13414,10 @@ export default function TrainingsApp() {
               <div style={{display:'grid',gap:'8px'}}>
                 <div style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'13px'}}>
                   <span style={{color:'#fbbf24',fontWeight:'700'}}>{mitgliederListe[aemterPickId]?.vorname} {mitgliederListe[aemterPickId]?.nachname}</span>
-                  <button onClick={()=>setAemterPickId(null)} style={{padding:'2px 8px',background:'transparent',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'6px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'11px'}}>ändern</button>
+                  <button onClick={()=>setAemterPickId(null)} style={{padding:'2px 8px',background:'transparent',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'6px',color:'rgba(255,255,255,0.65)',cursor:'pointer',fontSize:'11px'}}>ändern</button>
                 </div>
                 <div>
-                  <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Art</span>
+                  <span style={{fontSize:'10px',color:'rgba(255,255,255,0.58)',display:'block',marginBottom:'3px'}}>Art</span>
                   <div style={{display:'flex',gap:'6px'}}>
                     {[{key:'amt',label:'💼 Amt'},{key:'ehrentitel',label:'🏅 Ehrentitel'},{key:'sonstiges',label:'📌 Sonstiges'}].map(o=>(
                       <button key={o.key} onClick={()=>setAemterForm(p=>({...p,art:o.key}))}
@@ -13429,12 +13429,12 @@ export default function TrainingsApp() {
                   style={{width:'100%',boxSizing:'border-box',padding:'9px 12px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'8px',color:'white',fontSize:'13px',outline:'none'}}/>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
                   <div>
-                    <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Von (Jahr)</span>
+                    <span style={{fontSize:'10px',color:'rgba(255,255,255,0.58)',display:'block',marginBottom:'3px'}}>Von (Jahr)</span>
                     <input value={aemterForm.von} onChange={e=>setAemterForm(p=>({...p,von:e.target.value}))} placeholder="z.B. 2010"
                       style={{width:'100%',boxSizing:'border-box',padding:'8px 10px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'8px',color:'white',fontSize:'13px',outline:'none'}}/>
                   </div>
                   <div>
-                    <span style={{fontSize:'10px',color:'rgba(255,255,255,0.4)',display:'block',marginBottom:'3px'}}>Bis (Jahr, leer = laufend)</span>
+                    <span style={{fontSize:'10px',color:'rgba(255,255,255,0.58)',display:'block',marginBottom:'3px'}}>Bis (Jahr, leer = laufend)</span>
                     <input value={aemterForm.bis} onChange={e=>setAemterForm(p=>({...p,bis:e.target.value}))} placeholder="z.B. 2020"
                       style={{width:'100%',boxSizing:'border-box',padding:'8px 10px',background:'#1a1206',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'8px',color:'white',fontSize:'13px',outline:'none'}}/>
                   </div>
@@ -13483,7 +13483,7 @@ export default function TrainingsApp() {
                 </div>
               </div>
             ))}
-            {holders.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.3)',fontSize:'13px'}}>Noch keine Ämter/Ehrentitel vergeben.</p>}
+            {holders.length===0&&<p style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.48)',fontSize:'13px'}}>Noch keine Ämter/Ehrentitel vergeben.</p>}
           </div>
         </div>
       </div>
@@ -13533,7 +13533,7 @@ export default function TrainingsApp() {
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>📅 Vereinskalender</h1>
         </div>
         <div style={{padding:'16px 14px',maxWidth:'820px',margin:'0 auto'}}>
-          <p style={{margin:'0 0 16px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>Wichtige Termine & Hallenbelegungen. 🔗 = automatisch aus dem TTC-Google-Kalender.</p>
+          <p style={{margin:'0 0 16px',fontSize:'12px',color:'rgba(255,255,255,0.58)'}}>Wichtige Termine & Hallenbelegungen. 🔗 = automatisch aus dem TTC-Google-Kalender.</p>
 
           {canEditKalender&&(
             <div style={{marginBottom:'16px'}}>
@@ -13554,7 +13554,7 @@ export default function TrainingsApp() {
                   <textarea placeholder="Beschreibung (optional)" rows={2} value={kalenderForm.description} onChange={e=>setKalenderForm(f=>({...f,description:e.target.value}))} style={{...inputStyleK,resize:'vertical'}}/>
                   <div style={{display:'flex',gap:'8px'}}>
                     <button onClick={saveKalenderEvent} style={{flex:1,padding:'10px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'9px',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>Speichern</button>
-                    <button onClick={()=>{setKalenderAdding(false);setKalenderEditId(null);}} style={{flex:1,padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.5)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'9px',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
+                    <button onClick={()=>{setKalenderAdding(false);setKalenderEditId(null);}} style={{flex:1,padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.65)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'9px',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
                   </div>
                 </div>
               )}
@@ -13562,12 +13562,12 @@ export default function TrainingsApp() {
           )}
 
           {kalenderLoading?(
-            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.3)'}}>
+            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.48)'}}>
               <div style={{fontSize:'36px',marginBottom:'12px'}}>⏳</div>
               <p style={{margin:0}}>Termine werden geladen…</p>
             </div>
           ):upcomingEvents.length===0?(
-            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.2)'}}>
+            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.4)'}}>
               <div style={{fontSize:'36px',marginBottom:'12px'}}>📭</div>
               <p style={{margin:0,fontWeight:'600'}}>Keine anstehenden Termine</p>
             </div>
@@ -13594,13 +13594,13 @@ export default function TrainingsApp() {
                         <div style={{flex:1,minWidth:0}}>
                           <p style={{margin:'0 0 3px',fontSize:'14px',fontWeight:'700',color:'white'}}>{e.source==='google'?'🔗 ':''}{e.title}</p>
                           <p style={{margin:'0 0 3px',fontSize:'12px',color:accentColor,fontWeight:'600'}}>{fmtEventDate(e)}</p>
-                          {e.location&&<p style={{margin:'0 0 3px',fontSize:'12px',color:'rgba(255,255,255,0.5)'}}>📍 {e.location}</p>}
-                          {e.description&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>{e.description}</p>}
+                          {e.location&&<p style={{margin:'0 0 3px',fontSize:'12px',color:'rgba(255,255,255,0.65)'}}>📍 {e.location}</p>}
+                          {e.description&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.58)'}}>{e.description}</p>}
                         </div>
                         {canEditKalender&&e.source==='manual'&&(
                           <div style={{display:'flex',gap:'4px',flexShrink:0}}>
                             <button onClick={()=>{setKalenderEditId(e.id);setKalenderForm({title:e.title||'',date:e.date||'',endDate:e.endDate||'',time:e.time||'',location:e.location||'',description:e.description||''});setKalenderAdding(true);}}
-                              style={{padding:'5px 8px',background:'rgba(255,255,255,0.06)',border:'none',borderRadius:'7px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'12px'}}>✏️</button>
+                              style={{padding:'5px 8px',background:'rgba(255,255,255,0.06)',border:'none',borderRadius:'7px',color:'rgba(255,255,255,0.65)',cursor:'pointer',fontSize:'12px'}}>✏️</button>
                             <button onClick={()=>deleteKalenderEvent(e.id)} style={{padding:'5px 8px',background:'rgba(220,38,38,0.12)',border:'none',borderRadius:'7px',color:'#fca5a5',cursor:'pointer',fontSize:'12px'}}><Trash2 size={13}/></button>
                           </div>
                         )}
@@ -13660,12 +13660,12 @@ export default function TrainingsApp() {
                 </label>
                 <button onClick={toggleTippspielRevealed} style={{padding:'9px 14px',background:revealed?'rgba(74,222,128,0.15)':'rgba(255,255,255,0.06)',border:`1px solid ${revealed?'rgba(74,222,128,0.4)':accentBorder}`,borderRadius:'9px',color:revealed?'#4ade80':'rgba(255,255,255,0.6)',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>{revealed?'✅ Tipps sind veröffentlicht':'🔒 Tipps veröffentlichen'}</button>
               </div>
-              <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>Solange nicht veröffentlicht, sieht jeder nur seine eigenen Tipps. Nach der Frist automatisch keine Bearbeitung mehr möglich — Veröffentlichen musst du hier manuell anstoßen.</p>
+              <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.52)'}}>Solange nicht veröffentlicht, sieht jeder nur seine eigenen Tipps. Nach der Frist automatisch keine Bearbeitung mehr möglich — Veröffentlichen musst du hier manuell anstoßen.</p>
             </div>
           )}
 
           {teams.length===0?(
-            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.2)'}}>
+            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.4)'}}>
               <div style={{fontSize:'36px',marginBottom:'12px'}}>🎱</div>
               <p style={{margin:0,fontWeight:'600'}}>{tippspielLoading?'Lädt…':'Noch keine Mannschaften importiert.'}</p>
             </div>
@@ -13681,7 +13681,7 @@ export default function TrainingsApp() {
                   <div key={t.teamId} style={{display:'flex',alignItems:'center',gap:'10px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'10px',padding:isMobile?'10px 12px':'8px 12px',flexWrap:'wrap'}}>
                     <div style={{flex:'1 1 auto',minWidth:0}}>
                       <p style={{margin:0,fontSize:'13px',fontWeight:'700',color:'white'}}>{t.name}</p>
-                      <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>{t.league}{t.leagueSize?` · ${t.leagueSize} Teams`:''}</p>
+                      <p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.58)'}}>{t.league}{t.leagueSize?` · ${t.leagueSize} Teams`:''}</p>
                       {t.currentRank&&<p style={{margin:'2px 0 0',fontSize:'11px',fontWeight:'700',color:accentColor}}>📊 Aktuell: Platz {t.currentRank}{t.leagueSize?` von ${t.leagueSize}`:''}</p>}
                     </div>
                     <input type="number" min="1" max="20" placeholder="Rang" value={myTipps[t.teamId]||''} disabled={!canEdit}
@@ -13693,7 +13693,7 @@ export default function TrainingsApp() {
 
               <div style={{marginBottom:'20px'}}>
                 <h3 style={{margin:'0 0 4px',color:'white',fontSize:'15px',fontWeight:'800'}}>🎁 Bonustipps</h3>
-                <p style={{margin:'0 0 12px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>Jeder richtige Bonustipp bringt 2 Punkte extra.</p>
+                <p style={{margin:'0 0 12px',fontSize:'12px',color:'rgba(255,255,255,0.58)'}}>Jeder richtige Bonustipp bringt 2 Punkte extra.</p>
                 <div style={{display:'grid',gap:'10px'}}>
                   {TIPPSPIEL_BONUS_QUESTIONS.map(q=>(
                     <div key={q.key} style={{background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'10px',padding:'10px 12px'}}>
@@ -13721,7 +13721,7 @@ export default function TrainingsApp() {
                       style={{width:'100%',padding:'14px',background:allFilled?'linear-gradient(135deg,#16a34a,#15803d)':'rgba(255,255,255,0.06)',color:allFilled?'white':'rgba(255,255,255,0.35)',border:allFilled?'none':'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',cursor:allFilled?'pointer':'not-allowed',fontWeight:'800',fontSize:'15px'}}>
                       💾 Zwischenspeichern
                     </button>
-                    <p style={{margin:'8px 0 0',fontSize:'12px',color:'rgba(255,255,255,0.4)',textAlign:'center'}}>
+                    <p style={{margin:'8px 0 0',fontSize:'12px',color:'rgba(255,255,255,0.58)',textAlign:'center'}}>
                       {!allFilled
                         ? 'Bitte für alle Mannschaften einen Rang eintragen, dann kannst du zwischenspeichern.'
                         : tippspielJustSaved
@@ -13741,7 +13741,7 @@ export default function TrainingsApp() {
                 return (
                   <div style={{marginBottom:'20px'}}>
                     <h3 style={{margin:'0 0 4px',color:'white',fontSize:'15px',fontWeight:'800'}}>📊 Live-Ranking (ohne Bonuspunkte)</h3>
-                    <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>Basiert auf der aktuellen Live-Tabelle, nicht auf der finalen Endplatzierung — die zählt erst am Saisonende, ebenso wie die Bonustipps.</p>
+                    <p style={{margin:'0 0 10px',fontSize:'11px',color:'rgba(255,255,255,0.48)'}}>Basiert auf der aktuellen Live-Tabelle, nicht auf der finalen Endplatzierung — die zählt erst am Saisonende, ebenso wie die Bonustipps.</p>
                     <div style={{display:'grid',gap:'5px'}}>
                       {ranking.map((r,i)=>{
                         const isOpen = expandedTipper===r.uid;
@@ -13749,10 +13749,10 @@ export default function TrainingsApp() {
                         return (
                           <div key={r.uid} style={{background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'9px',overflow:'hidden'}}>
                             <div onClick={()=>setExpandedTipper(isOpen?null:r.uid)} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',cursor:'pointer'}}>
-                              <span style={{fontSize:'12px',fontWeight:'800',color:'rgba(255,255,255,0.35)',width:'22px',flexShrink:0}}>{i+1}.</span>
+                              <span style={{fontSize:'12px',fontWeight:'800',color:'rgba(255,255,255,0.52)',width:'22px',flexShrink:0}}>{i+1}.</span>
                               <span style={{flex:'1 1 auto',fontSize:'13px',fontWeight:'700',color:'white'}}>{r.name}</span>
                               <span style={{fontSize:'14px',fontWeight:'800',color:accentColor}}>{r.total} P</span>
-                              <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',flexShrink:0}}>{isOpen?'▲':'▼'}</span>
+                              <span style={{fontSize:'11px',color:'rgba(255,255,255,0.48)',flexShrink:0}}>{isOpen?'▲':'▼'}</span>
                             </div>
                             {isOpen&&(
                               <div style={{padding:'0 12px 12px',display:'grid',gap:'8px'}}>
@@ -13820,7 +13820,7 @@ export default function TrainingsApp() {
                     </div>
                     {Object.keys(bonusAnswers).length>0&&(
                       <div style={{display:'grid',gap:'5px'}}>
-                        <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>Bonuspunkte je Person (automatisch berechnet):</p>
+                        <p style={{margin:'0 0 4px',fontSize:'11px',color:'rgba(255,255,255,0.52)'}}>Bonuspunkte je Person (automatisch berechnet):</p>
                         {Object.entries(allTipps).map(([uid,t])=>{
                           const total = TIPPSPIEL_BONUS_QUESTIONS.reduce((sum,q)=>sum+(bonusScore(q,t.bonus?.[q.key])||0),0);
                           return (
@@ -13909,7 +13909,7 @@ export default function TrainingsApp() {
                   style={{padding:'9px 14px',background:'linear-gradient(135deg,#2563eb,#1d4ed8)',color:'white',border:'none',borderRadius:'9px',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>
                   An alle ({fahrerOptions.length})
                 </button>
-                <span style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',alignSelf:'center'}}>oder unten einzeln auswählen:</span>
+                <span style={{fontSize:'12px',color:'rgba(255,255,255,0.58)',alignSelf:'center'}}>oder unten einzeln auswählen:</span>
               </div>
               <div style={{display:'grid',gap:'5px',maxHeight:'260px',overflowY:'auto',marginBottom:'12px'}}>
                 {fahrerOptions.map(f=>(
@@ -13919,7 +13919,7 @@ export default function TrainingsApp() {
                     {f}
                   </label>
                 ))}
-                {fahrerOptions.length===0&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.3)'}}>Keine E-Mail-Adressen im Plan gefunden.</p>}
+                {fahrerOptions.length===0&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.48)'}}>Keine E-Mail-Adressen im Plan gefunden.</p>}
               </div>
               <button onClick={()=>sendFahrplanIntroMail(introMailSelected)} disabled={sendingIntroMail || introMailSelected.length===0}
                 style={{padding:'9px 14px',background:introMailSelected.length?'linear-gradient(135deg,#2563eb,#1d4ed8)':'rgba(255,255,255,0.06)',color:introMailSelected.length?'white':'rgba(255,255,255,0.35)',border:'none',borderRadius:'9px',cursor:introMailSelected.length?'pointer':'not-allowed',fontWeight:'700',fontSize:'13px'}}>
@@ -13931,18 +13931,18 @@ export default function TrainingsApp() {
           {showAbfahrtManager&&canEditFahrer&&(
             <div style={{marginBottom:'16px',padding:'14px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'12px'}}>
               <p style={{margin:'0 0 4px',fontSize:'12px',fontWeight:'800',color:'#fbbf24',textTransform:'uppercase',letterSpacing:'0.5px'}}>🕐 Abfahrtszeitenmanager</p>
-              <p style={{margin:'0 0 12px',fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>Vorlaufzeit je Ort (Minuten vor Anpfiff) — reicht der reine Ortsname (z.B. "Niederzeuzheim"), erkennt die App das automatisch bei allen Mannschaften dieses Vereins. Die Abfahrtszeit bei Auswärtsspielen wird daraus berechnet: Anpfiff − Minuten.</p>
+              <p style={{margin:'0 0 12px',fontSize:'11px',color:'rgba(255,255,255,0.58)'}}>Vorlaufzeit je Ort (Minuten vor Anpfiff) — reicht der reine Ortsname (z.B. "Niederzeuzheim"), erkennt die App das automatisch bei allen Mannschaften dieses Vereins. Die Abfahrtszeit bei Auswärtsspielen wird daraus berechnet: Anpfiff − Minuten.</p>
               <div style={{display:'grid',gap:'6px',marginBottom:'14px',maxHeight:'320px',overflowY:'auto'}}>
                 {Object.entries(abfahrtClubs).sort((a,b)=>a[0].localeCompare(b[0],'de')).map(([club,minutes])=>(
                   <div key={club} style={{display:'flex',alignItems:'center',gap:'8px',background:'rgba(255,255,255,0.03)',borderRadius:'8px',padding:'6px 10px'}}>
                     <span style={{flex:'1 1 auto',fontSize:'12px',color:'white',fontWeight:'600'}}>{club}</span>
                     <input type="number" min="0" defaultValue={minutes} onBlur={e=>saveAbfahrtClub(club, e.target.value?parseInt(e.target.value,10):null)}
                       style={{width:'60px',padding:'5px',background:'#1a0a14',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'6px',color:'white',fontSize:'12px',textAlign:'center'}}/>
-                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>Min.</span>
+                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.52)'}}>Min.</span>
                     <button onClick={()=>saveAbfahrtClub(club,null)} style={{padding:'4px 7px',background:'rgba(220,38,38,0.12)',border:'none',borderRadius:'6px',color:'#fca5a5',cursor:'pointer',fontSize:'11px'}}>✕</button>
                   </div>
                 ))}
-                {Object.keys(abfahrtClubs).length===0&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.3)'}}>Noch keine Vereine hinterlegt.</p>}
+                {Object.keys(abfahrtClubs).length===0&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.48)'}}>Noch keine Vereine hinterlegt.</p>}
               </div>
               <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
                 <input type="text" placeholder="Ortsname (z.B. Niederzeuzheim)" value={newAbfahrtClub} onChange={e=>setNewAbfahrtClub(e.target.value)}
@@ -13969,12 +13969,12 @@ export default function TrainingsApp() {
             </div>
           )}
           {fahrplanLoading?(
-            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.3)'}}>
+            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.48)'}}>
               <div style={{fontSize:'36px',marginBottom:'12px'}}>⏳</div>
               <p style={{margin:0}}>Spielplan wird geladen…</p>
             </div>
           ):filtered.length===0?(
-            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.2)'}}>
+            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.4)'}}>
               <div style={{fontSize:'36px',marginBottom:'12px'}}>📭</div>
               <p style={{margin:0,fontWeight:'600'}}>Keine Spiele gefunden</p>
             </div>
@@ -13988,7 +13988,7 @@ export default function TrainingsApp() {
                   const monthKey = dt ? `${dt.getFullYear()}-${dt.getMonth()}` : null;
                   if (monthKey && monthKey !== lastMonth) {
                     lastMonth = monthKey;
-                    out.push(<p key={'m'+monthKey} style={{margin:i===0?'0 0 2px':'10px 0 2px',fontSize:'11px',fontWeight:'800',color:'rgba(255,255,255,0.35)',textTransform:'uppercase',letterSpacing:'0.5px'}}>{dt.toLocaleDateString('de-DE',{month:'long',year:'numeric'})}</p>);
+                    out.push(<p key={'m'+monthKey} style={{margin:i===0?'0 0 2px':'10px 0 2px',fontSize:'11px',fontWeight:'800',color:'rgba(255,255,255,0.52)',textTransform:'uppercase',letterSpacing:'0.5px'}}>{dt.toLocaleDateString('de-DE',{month:'long',year:'numeric'})}</p>);
                   }
                   const isEditingFahrer = editingFahrerRows.includes(it.meetingId);
                   const fahrerNode = canEditFahrer ? (
@@ -14018,17 +14018,17 @@ export default function TrainingsApp() {
                     <div key={i} style={{display:'flex',flexDirection:'column',gap:'5px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'10px',padding:'10px 12px',fontSize:'12px'}}>
                       <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
                         {it.liga&&<span style={{padding:'2px 7px',borderRadius:'6px',fontSize:'10px',fontWeight:'800',flexShrink:0,background:'rgba(147,197,253,0.15)',color:'#93c5fd'}}>{it.liga}</span>}
-                        <span style={{color:'rgba(255,255,255,0.5)',fontWeight:'700'}}>{fmtDate(it.datum)}{it.zeit?` ${it.zeit}`:''}</span>
+                        <span style={{color:'rgba(255,255,255,0.65)',fontWeight:'700'}}>{fmtDate(it.datum)}{it.zeit?` ${it.zeit}`:''}</span>
                       </div>
                       {it.treffpunkt&&<div style={{color:'#fbbf24',fontSize:'11px',fontWeight:'600'}}>{it.isHeimspiel?'Treffpunkt':'Abfahrt'}: {it.treffpunkt}</div>}
-                      <div style={{color:'white',fontWeight:'600',lineHeight:'1.35'}}>{it.heim} <span style={{color:'rgba(255,255,255,0.3)'}}>–</span> {it.gast}</div>
+                      <div style={{color:'white',fontWeight:'600',lineHeight:'1.35'}}>{it.heim} <span style={{color:'rgba(255,255,255,0.48)'}}>–</span> {it.gast}</div>
                       {fahrerNode}
                     </div>
                   ) : (
                     <div key={i} style={{display:'flex',alignItems:'center',gap:'8px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'9px',padding:'7px 10px',fontSize:'12px',flexWrap:'wrap'}}>
                       {it.liga&&<span style={{padding:'2px 7px',borderRadius:'6px',fontSize:'10px',fontWeight:'800',flexShrink:0,background:'rgba(147,197,253,0.15)',color:'#93c5fd'}}>{it.liga}</span>}
-                      <span style={{color:'rgba(255,255,255,0.5)',fontWeight:'700',flexShrink:0}}>{fmtDate(it.datum)}{it.zeit?` ${it.zeit}`:''}{it.treffpunkt?` (${it.isHeimspiel?'Treffpunkt':'Abfahrt'}: ${it.treffpunkt})`:''}</span>
-                      <span style={{color:'white',fontWeight:'600',flex:'1 1 auto',minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.heim} <span style={{color:'rgba(255,255,255,0.3)'}}>–</span> {it.gast}</span>
+                      <span style={{color:'rgba(255,255,255,0.65)',fontWeight:'700',flexShrink:0}}>{fmtDate(it.datum)}{it.zeit?` ${it.zeit}`:''}{it.treffpunkt?` (${it.isHeimspiel?'Treffpunkt':'Abfahrt'}: ${it.treffpunkt})`:''}</span>
+                      <span style={{color:'white',fontWeight:'600',flex:'1 1 auto',minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.heim} <span style={{color:'rgba(255,255,255,0.48)'}}>–</span> {it.gast}</span>
                       {fahrerNode}
                     </div>
                   ));
@@ -14060,7 +14060,7 @@ export default function TrainingsApp() {
             <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>⚔️ Trainingsmatches</h1>
           </div>
           <div style={{padding:'40px 20px',maxWidth:'500px',margin:'0 auto',display:'flex',flexDirection:'column',gap:'16px'}}>
-            <p style={{textAlign:'center',color:'rgba(255,255,255,0.4)',fontSize:'13px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'1.5px',margin:'0 0 8px'}}>Spielmodus wählen</p>
+            <p style={{textAlign:'center',color:'rgba(255,255,255,0.58)',fontSize:'13px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'1.5px',margin:'0 0 8px'}}>Spielmodus wählen</p>
             <button onClick={()=>setTmMode('single')}
               style={{padding:'28px 20px',background:'rgba(244,114,182,0.08)',border:'2px solid rgba(244,114,182,0.3)',borderRadius:'20px',cursor:'pointer',textAlign:'left',display:'flex',alignItems:'center',gap:'20px',transition:'transform 0.12s'}}
               onMouseEnter={e=>e.currentTarget.style.transform='translateY(-2px)'}
@@ -14068,7 +14068,7 @@ export default function TrainingsApp() {
               <span style={{fontSize:'48px',lineHeight:1,flexShrink:0}}>🏓</span>
               <div>
                 <p style={{margin:'0 0 4px',fontWeight:'800',color:'white',fontSize:'20px'}}>Einzel</p>
-                <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.4)',lineHeight:'1.4'}}>1 gegen 1 · Allzeittabelle & Verlauf</p>
+                <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.58)',lineHeight:'1.4'}}>1 gegen 1 · Allzeittabelle & Verlauf</p>
               </div>
             </button>
             <button onClick={()=>setTmMode('double')}
@@ -14078,7 +14078,7 @@ export default function TrainingsApp() {
               <span style={{fontSize:'48px',lineHeight:1,flexShrink:0}}>👥</span>
               <div>
                 <p style={{margin:'0 0 4px',fontWeight:'800',color:'#a5b4fc',fontSize:'20px'}}>Doppel</p>
-                <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.4)',lineHeight:'1.4'}}>2 gegen 2 · Paarungstabelle & Spielertabelle</p>
+                <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.58)',lineHeight:'1.4'}}>2 gegen 2 · Paarungstabelle & Spielertabelle</p>
               </div>
             </button>
           </div>
@@ -14149,7 +14149,7 @@ export default function TrainingsApp() {
       const resultOptions = ['3:0','3:1','3:2','2:3','1:3','0:3'];
       const PlayerSelect = ({label,field,exclude=[]}) => (
         <div>
-          <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase'}}>{label}</label>
+          <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',marginBottom:'5px',textTransform:'uppercase'}}>{label}</label>
           <select value={tmDoppelForm[field]} onChange={e=>setTmDoppelForm(f=>({...f,[field]:e.target.value}))}
             style={{width:'100%',padding:'9px 12px',background:'#1a0a1e',border:`1px solid ${tmDoppelForm[field]?dac:dacBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}>
             <option value="">Spieler wählen…</option>
@@ -14160,11 +14160,11 @@ export default function TrainingsApp() {
 
       const TableGrid = ({data, cols}) => (
         <div style={{background:'rgba(255,255,255,0.03)',border:`1px solid ${dacBorder}`,borderRadius:'14px',overflow:'hidden'}}>
-          <div style={{display:'grid',gridTemplateColumns:cols,gap:'4px',padding:'8px 14px',borderBottom:`1px solid ${dacBorder}`,fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'0.5px'}}>
+          <div style={{display:'grid',gridTemplateColumns:cols,gap:'4px',padding:'8px 14px',borderBottom:`1px solid ${dacBorder}`,fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.48)',textTransform:'uppercase',letterSpacing:'0.5px'}}>
             <span>#</span><span>Name</span><span style={{textAlign:'center'}}>M</span><span style={{textAlign:'center'}}>S</span><span style={{textAlign:'center'}}>N</span><span style={{textAlign:'right'}}>Quote</span>
           </div>
           {data.length===0
-            ? <div style={{padding:'24px',textAlign:'center',fontSize:'13px',color:'rgba(255,255,255,0.2)'}}>Noch keine Daten</div>
+            ? <div style={{padding:'24px',textAlign:'center',fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>Noch keine Daten</div>
             : data.map((row,i)=>(
               <div key={row.name} style={{display:'grid',gridTemplateColumns:cols,gap:'4px',padding:'10px 14px',borderBottom:i<data.length-1?'1px solid rgba(255,255,255,0.04)':'none',alignItems:'center'}}>
                 <span style={{fontSize:'12px',fontWeight:'800',color:i===0?'#fbbf24':i===1?'rgba(255,255,255,0.5)':i===2?'#cd7c32':'rgba(255,255,255,0.25)'}}>{i+1}</span>
@@ -14198,33 +14198,33 @@ export default function TrainingsApp() {
               <div style={{background:dacBg,border:`1px solid ${dacBorder}`,borderRadius:'16px',padding:'18px',marginBottom:'20px'}}>
                 <p style={{margin:'0 0 14px',fontSize:'12px',fontWeight:'800',color:dac,textTransform:'uppercase',letterSpacing:'0.5px'}}>Neues Doppelmatch</p>
                 <div style={{display:'grid',gap:'10px'}}>
-                  <p style={{margin:0,fontSize:'12px',fontWeight:'700',color:'rgba(255,255,255,0.5)'}}>🔵 Team 1</p>
+                  <p style={{margin:0,fontSize:'12px',fontWeight:'700',color:'rgba(255,255,255,0.65)'}}>🔵 Team 1</p>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
                     <PlayerSelect label="Spieler A" field="playerA" exclude={[tmDoppelForm.playerB,tmDoppelForm.playerC,tmDoppelForm.playerD].filter(Boolean)}/>
                     <PlayerSelect label="Spieler B" field="playerB" exclude={[tmDoppelForm.playerA,tmDoppelForm.playerC,tmDoppelForm.playerD].filter(Boolean)}/>
                   </div>
-                  <p style={{margin:0,fontSize:'12px',fontWeight:'700',color:'rgba(255,255,255,0.5)'}}>🔴 Team 2</p>
+                  <p style={{margin:0,fontSize:'12px',fontWeight:'700',color:'rgba(255,255,255,0.65)'}}>🔴 Team 2</p>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
                     <PlayerSelect label="Spieler C" field="playerC" exclude={[tmDoppelForm.playerA,tmDoppelForm.playerB,tmDoppelForm.playerD].filter(Boolean)}/>
                     <PlayerSelect label="Spieler D" field="playerD" exclude={[tmDoppelForm.playerA,tmDoppelForm.playerB,tmDoppelForm.playerC].filter(Boolean)}/>
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
                     <div>
-                      <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase'}}>Ergebnis (Sätze)</label>
+                      <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',marginBottom:'5px',textTransform:'uppercase'}}>Ergebnis (Sätze)</label>
                       <select value={tmDoppelForm.result} onChange={e=>setTmDoppelForm(f=>({...f,result:e.target.value}))}
                         style={{width:'100%',padding:'9px 12px',background:'#1a0a1e',border:`1px solid ${dacBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}>
                         {resultOptions.map(r=>{const[a,b]=r.split(':');return<option key={r} value={r}>Team 1 {a}:{b} Team 2</option>;})}
                       </select>
                     </div>
                     <div>
-                      <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase'}}>Datum</label>
+                      <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',marginBottom:'5px',textTransform:'uppercase'}}>Datum</label>
                       <input type="date" value={tmDoppelForm.date||TODAY} onChange={e=>setTmDoppelForm(f=>({...f,date:e.target.value}))}
                         style={{width:'100%',padding:'9px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${dacBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
                     </div>
                   </div>
                   <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>
                     <button onClick={()=>{setTmDoppelAdding(false);setTmDoppelForm({playerA:'',playerB:'',playerC:'',playerD:'',result:'3:0',date:''});}}
-                      style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
+                      style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.65)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
                     <button onClick={submitDoppel}
                       disabled={!tmDoppelForm.playerA||!tmDoppelForm.playerB||!tmDoppelForm.playerC||!tmDoppelForm.playerD||new Set([tmDoppelForm.playerA,tmDoppelForm.playerB,tmDoppelForm.playerC,tmDoppelForm.playerD]).size<4}
                       style={{padding:'9px 20px',background:`linear-gradient(135deg,${dac},#6366f1)`,color:'white',border:'none',borderRadius:'10px',fontWeight:'700',fontSize:'13px',cursor:'pointer',opacity:(!tmDoppelForm.playerA||!tmDoppelForm.playerB||!tmDoppelForm.playerC||!tmDoppelForm.playerD)?0.4:1}}>
@@ -14250,7 +14250,7 @@ export default function TrainingsApp() {
             {/* Verlauf */}
             <h2 style={{margin:'0 0 12px',fontSize:'16px',fontWeight:'800',color:'white'}}>📋 Abgeschlossene Doppelmatches</h2>
             {trainingsdoppel.length===0
-              ? <div style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.2)',fontSize:'13px'}}>Noch keine Doppelmatches</div>
+              ? <div style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.4)',fontSize:'13px'}}>Noch keine Doppelmatches</div>
               : <div style={{display:'grid',gap:'8px'}}>
                   {trainingsdoppel.map(m=>{
                     const d=m.date?new Date(m.date+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
@@ -14273,7 +14273,7 @@ export default function TrainingsApp() {
                             saveDoppel(trainingsdoppel.map(x=>x.id===m.id?{...x,score1:ns1,score2:ns2,date:de?.value||m.date}:x));
                             setTmDoppelEditId(null);
                           }} style={{padding:'8px 14px',background:`linear-gradient(135deg,${dac},#6366f1)`,border:'none',borderRadius:'8px',color:'white',fontWeight:'700',fontSize:'13px',cursor:'pointer'}}>Speichern</button>
-                          <button onClick={()=>setTmDoppelEditId(null)} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.5)',fontWeight:'600',fontSize:'13px',cursor:'pointer'}}>Abbrechen</button>
+                          <button onClick={()=>setTmDoppelEditId(null)} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.65)',fontWeight:'600',fontSize:'13px',cursor:'pointer'}}>Abbrechen</button>
                         </div>
                       </div>
                     );
@@ -14285,7 +14285,7 @@ export default function TrainingsApp() {
                             <span style={{fontWeight:'900',fontSize:'15px',color:'white'}}>{m.score1}:{m.score2}</span>
                             <span style={{fontWeight:'700',color:!t1won?'#86efac':'rgba(255,255,255,0.6)',fontSize:'13px'}}>{m.playerC} & {m.playerD}</span>
                           </div>
-                          <div style={{fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{d}</div>
+                          <div style={{fontSize:'11px',color:'rgba(255,255,255,0.48)'}}>{d}</div>
                         </div>
                         {isAdmin&&<button onClick={()=>setTmDoppelEditId(m.id)}
                           style={{width:'28px',height:'28px',borderRadius:'7px',background:dacBg,border:`1px solid ${dacBorder}`,color:dac,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Pencil size={12}/></button>}
@@ -14385,7 +14385,7 @@ export default function TrainingsApp() {
                     : registeredPlayers;
                   return (
                   <div style={{position:'relative'}}>
-                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'6px',textTransform:'uppercase'}}>Spieler 1</label>
+                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',marginBottom:'6px',textTransform:'uppercase'}}>Spieler 1</label>
                     <input type="text"
                       placeholder="Name suchen…"
                       value={tmForm.player1 || tmSearch2}
@@ -14394,11 +14394,11 @@ export default function TrainingsApp() {
                       onBlur={()=>setTimeout(()=>setTmSearchFocus2(false),150)}
                       style={{width:'100%',padding:'10px 12px',background:'#1a0a1e',border:`1px solid ${tmForm.player1?ac:acBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}
                     />
-                    {tmForm.player1&&<span style={{position:'absolute',right:'10px',top:'34px',fontSize:'12px',color:'rgba(255,255,255,0.3)',cursor:'pointer'}}
+                    {tmForm.player1&&<span style={{position:'absolute',right:'10px',top:'34px',fontSize:'12px',color:'rgba(255,255,255,0.48)',cursor:'pointer'}}
                       onMouseDown={()=>{setTmForm(f=>({...f,player1:''}));setTmSearch2('');}}>×</span>}
                     {tmSearchFocus2&&(
                       <div style={{position:'absolute',top:'100%',left:0,right:0,zIndex:50,background:'#1a0a1e',border:`1px solid ${acBorder}`,borderRadius:'10px',marginTop:'4px',maxHeight:'180px',overflowY:'auto',boxShadow:'0 8px 24px rgba(0,0,0,0.5)'}}>
-                        {sugg2.length===0&&<div style={{padding:'10px 12px',fontSize:'13px',color:'rgba(255,255,255,0.3)'}}>Kein Spieler gefunden</div>}
+                        {sugg2.length===0&&<div style={{padding:'10px 12px',fontSize:'13px',color:'rgba(255,255,255,0.48)'}}>Kein Spieler gefunden</div>}
                         {sugg2.map(p=>(
                           <div key={p} onMouseDown={()=>{setTmForm(f=>({...f,player1:p}));setTmSearch2('');setTmSearchFocus2(false);}}
                             style={{padding:'10px 12px',fontSize:'14px',color:'white',cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,0.05)'}}
@@ -14415,7 +14415,7 @@ export default function TrainingsApp() {
 
                 {/* Gegner Suchfeld */}
                 <div style={{position:'relative'}}>
-                  <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'6px',textTransform:'uppercase'}}>{tmForm.otherMatch?'Spieler 2':'Gegner'}</label>
+                  <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',marginBottom:'6px',textTransform:'uppercase'}}>{tmForm.otherMatch?'Spieler 2':'Gegner'}</label>
                   <input type="text"
                     placeholder="Name suchen…"
                     value={tmForm.opponent || tmSearch}
@@ -14427,11 +14427,11 @@ export default function TrainingsApp() {
                     onBlur={()=>setTimeout(()=>setTmSearchFocus(false),150)}
                     style={{width:'100%',padding:'10px 12px',background:'#1a0a1e',border:`1px solid ${tmForm.opponent?ac:acBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}
                   />
-                  {tmForm.opponent&&<span style={{position:'absolute',right:'10px',top:'34px',fontSize:'12px',color:'rgba(255,255,255,0.3)',cursor:'pointer'}}
+                  {tmForm.opponent&&<span style={{position:'absolute',right:'10px',top:'34px',fontSize:'12px',color:'rgba(255,255,255,0.48)',cursor:'pointer'}}
                     onMouseDown={()=>{setTmForm(f=>({...f,opponent:'',useCustom:false}));setTmSearch('');}}>×</span>}
                   {tmSearchFocus&&(
                     <div style={{position:'absolute',top:'100%',left:0,right:0,zIndex:50,background:'#1a0a1e',border:`1px solid ${acBorder}`,borderRadius:'10px',marginTop:'4px',maxHeight:'200px',overflowY:'auto',boxShadow:'0 8px 24px rgba(0,0,0,0.5)'}}>
-                      {tmSuggestions.length===0&&<div style={{padding:'10px 12px',fontSize:'13px',color:'rgba(255,255,255,0.3)'}}>Kein Spieler gefunden</div>}
+                      {tmSuggestions.length===0&&<div style={{padding:'10px 12px',fontSize:'13px',color:'rgba(255,255,255,0.48)'}}>Kein Spieler gefunden</div>}
                       {tmSuggestions.map(p=>(
                         <div key={p} onMouseDown={()=>{setTmForm(f=>({...f,opponent:p,useCustom:false}));setTmSearch('');setTmSearchFocus(false);}}
                           style={{padding:'10px 12px',fontSize:'14px',color:'white',cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,0.05)'}}
@@ -14457,14 +14457,14 @@ export default function TrainingsApp() {
                 {/* Ergebnis + Datum */}
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
                   <div>
-                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'6px',textTransform:'uppercase'}}>Ergebnis (Sätze)</label>
+                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',marginBottom:'6px',textTransform:'uppercase'}}>Ergebnis (Sätze)</label>
                     <select value={tmForm.result} onChange={e=>setTmForm(f=>({...f,result:e.target.value}))}
                       style={{width:'100%',padding:'10px 12px',background:'#1a0a1e',border:`1px solid ${acBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}>
                       {resultOptions.map(r=>{const [a,b]=r.split(':');const p1n=(tmForm.otherMatch?(tmForm.player1||tmSearch2||'Spieler 1'):me).split(' ')[0]||'S1';const p2n=(tmForm.useCustom?tmForm.opponentCustom:tmForm.opponent||'Spieler 2').split(' ')[0]||'S2';return <option key={r} value={r}>{p1n} {a}:{b} {p2n}</option>;})}
                     </select>
                   </div>
                   <div>
-                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'6px',textTransform:'uppercase'}}>Datum</label>
+                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',marginBottom:'6px',textTransform:'uppercase'}}>Datum</label>
                     <input type="date" value={tmForm.date||TODAY} onChange={e=>setTmForm(f=>({...f,date:e.target.value}))}
                       style={{width:'100%',padding:'10px 12px',background:'rgba(255,255,255,0.07)',border:`1px solid ${acBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}/>
                   </div>
@@ -14480,7 +14480,7 @@ export default function TrainingsApp() {
                   {tmForm.vorgabe&&(
                     <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:'10px',marginTop:'10px',alignItems:'end'}}>
                       <div>
-                        <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase'}}>Wer bekommt Vorgabe?</label>
+                        <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',marginBottom:'5px',textTransform:'uppercase'}}>Wer bekommt Vorgabe?</label>
                         <select value={tmForm.vorgabePlayer} onChange={e=>setTmForm(f=>({...f,vorgabePlayer:e.target.value}))}
                           style={{width:'100%',padding:'9px 12px',background:'#1a0a1e',border:`1px solid ${acBorder}`,borderRadius:'9px',color:'white',fontSize:'13px',outline:'none',boxSizing:'border-box'}}>
                           <option value={tmForm.otherMatch?(tmForm.player1||tmSearch2||me):me}>{(tmForm.otherMatch?(tmForm.player1||tmSearch2||me):me).split(' ')[0]||'S1'}</option>
@@ -14488,7 +14488,7 @@ export default function TrainingsApp() {
                         </select>
                       </div>
                       <div>
-                        <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.5)',marginBottom:'5px',textTransform:'uppercase'}}>Punkte</label>
+                        <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',marginBottom:'5px',textTransform:'uppercase'}}>Punkte</label>
                         <select value={tmForm.vorgabePoints} onChange={e=>setTmForm(f=>({...f,vorgabePoints:Number(e.target.value)}))}
                           style={{padding:'9px 12px',background:'#1a0a1e',border:`1px solid ${acBorder}`,borderRadius:'9px',color:'white',fontSize:'13px',outline:'none'}}>
                           {[1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={n}>{n}</option>)}
@@ -14501,7 +14501,7 @@ export default function TrainingsApp() {
                 {/* Buttons */}
                 <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>
                   <button onClick={()=>{setTmAdding(false);setTmSearch('');setTmSearch2('');}}
-                    style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
+                    style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.65)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
                   <button onClick={submitMatch} disabled={!(tmForm.useCustom?tmForm.opponentCustom.trim():tmForm.opponent)||(tmForm.otherMatch&&!(tmForm.player1||tmSearch2.trim()))}
                     style={{padding:'9px 20px',background:(tmForm.useCustom?tmForm.opponentCustom.trim():tmForm.opponent)?`linear-gradient(135deg,${ac},#db2777)`:'rgba(255,255,255,0.1)',color:'white',border:'none',borderRadius:'10px',cursor:(tmForm.useCustom?tmForm.opponentCustom.trim():tmForm.opponent)?'pointer':'not-allowed',fontWeight:'700',fontSize:'13px',opacity:(tmForm.useCustom?tmForm.opponentCustom.trim():tmForm.opponent)?1:0.5}}>
                     Match speichern
@@ -14525,10 +14525,10 @@ export default function TrainingsApp() {
               </div>
             </div>
             {tableData.length===0?(
-              <div style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.2)',fontSize:'13px'}}>Noch keine Matches gespielt</div>
+              <div style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.4)',fontSize:'13px'}}>Noch keine Matches gespielt</div>
             ):(
               <div style={{background:'rgba(255,255,255,0.03)',border:`1px solid ${acBorder}`,borderRadius:'14px',overflow:'hidden'}}>
-                <div style={{display:'grid',gridTemplateColumns:'28px 1fr 50px 50px 50px 56px',gap:'4px',padding:'8px 14px',borderBottom:`1px solid ${acBorder}`,fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'0.5px'}}>
+                <div style={{display:'grid',gridTemplateColumns:'28px 1fr 50px 50px 50px 56px',gap:'4px',padding:'8px 14px',borderBottom:`1px solid ${acBorder}`,fontSize:'10px',fontWeight:'800',color:'rgba(255,255,255,0.48)',textTransform:'uppercase',letterSpacing:'0.5px'}}>
                   <span>#</span><span>Spieler</span><span style={{textAlign:'center'}}>M</span><span style={{textAlign:'center'}}>S</span><span style={{textAlign:'center'}}>N</span><span style={{textAlign:'right'}}>Quote</span>
                 </div>
                 {tableData.map((row,i)=>{
@@ -14550,7 +14550,7 @@ export default function TrainingsApp() {
           {/* Match-Verlauf */}
           <h2 style={{margin:'0 0 12px',fontSize:'16px',fontWeight:'800',color:'white'}}>📋 Vergangene Matches</h2>
           {trainingsmatches.length===0?(
-            <div style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.2)',fontSize:'13px'}}>Noch keine Matches</div>
+            <div style={{textAlign:'center',padding:'30px',color:'rgba(255,255,255,0.4)',fontSize:'13px'}}>Noch keine Matches</div>
           ):(
             <div style={{display:'grid',gap:'8px'}}>
               {trainingsmatches.map(m=>{
@@ -14586,7 +14586,7 @@ export default function TrainingsApp() {
                         }} style={{padding:'8px 14px',background:`linear-gradient(135deg,${ac},#db2777)`,border:'none',borderRadius:'8px',color:'white',fontWeight:'700',fontSize:'13px',cursor:'pointer'}}>
                           Speichern
                         </button>
-                        <button onClick={()=>setTmEditId(null)} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.5)',fontWeight:'600',fontSize:'13px',cursor:'pointer'}}>
+                        <button onClick={()=>setTmEditId(null)} style={{padding:'8px 12px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.65)',fontWeight:'600',fontSize:'13px',cursor:'pointer'}}>
                           Abbrechen
                         </button>
                       </div>
@@ -14602,7 +14602,7 @@ export default function TrainingsApp() {
                         <span style={{fontWeight:'900',fontSize:'16px',color:'white'}}>{m.score1}:{m.score2}</span>
                         <span style={{fontWeight:'700',color:m.player2===me?'#f9a8d4':!p1wins?'#86efac':'rgba(255,255,255,0.6)',fontSize:'14px'}}>{m.player2}</span>
                       </div>
-                      <div style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',marginTop:'3px'}}>
+                      <div style={{fontSize:'11px',color:'rgba(255,255,255,0.48)',marginTop:'3px'}}>
                         {d}{m.vorgabe?` · Vorgabe: ${m.vorgabe.player.split(' ')[0]} +${m.vorgabe.points}Pkt`:''}
                       </div>
                     </div>
@@ -14653,7 +14653,7 @@ export default function TrainingsApp() {
           </p>
           <p style={{margin:'4px 0 0',fontSize:'12px',color:t.nextMatch?'#fbbf24':'rgba(255,255,255,0.3)',fontWeight:'700'}}>Nächstes Spiel: {fmtNextMatch(t.nextMatch)||'–'}</p>
         </button>
-        {t.url && <span style={{fontSize:'12px',color:'rgba(255,255,255,0.3)',flexShrink:0}}>↗</span>}
+        {t.url && <span style={{fontSize:'12px',color:'rgba(255,255,255,0.48)',flexShrink:0}}>↗</span>}
       </div>
     );
     return (
@@ -14663,9 +14663,9 @@ export default function TrainingsApp() {
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>🏓 TTC Mannschaften</h1>
         </div>
         <div style={{padding:'16px 14px',maxWidth:'700px',margin:'0 auto'}}>
-          <p style={{margin:'0 0 16px',fontSize:'12px',color:'rgba(255,255,255,0.4)',lineHeight:'1.5'}}>Alle Mannschaften des TTC Grün-Weiß Staffel, live von mytischtennis.de. ⭐ markiert bis zu {MAX_FAVORITE_TEAMS} Favoritenmannschaften — die stehen dann immer ganz oben. Antippen führt direkt zur jeweiligen Mannschaftsseite (Kader, Tabelle, Spielplan).</p>
-          {clubTeamsLoading && clubTeams===null && <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.3)'}}>⏳ Lade Mannschaften…</div>}
-          {clubTeams!==null && clubTeams.length===0 && !clubTeamsLoading && <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.3)'}}>Mannschaften konnten nicht geladen werden.</div>}
+          <p style={{margin:'0 0 16px',fontSize:'12px',color:'rgba(255,255,255,0.58)',lineHeight:'1.5'}}>Alle Mannschaften des TTC Grün-Weiß Staffel, live von mytischtennis.de. ⭐ markiert bis zu {MAX_FAVORITE_TEAMS} Favoritenmannschaften — die stehen dann immer ganz oben. Antippen führt direkt zur jeweiligen Mannschaftsseite (Kader, Tabelle, Spielplan).</p>
+          {clubTeamsLoading && clubTeams===null && <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.48)'}}>⏳ Lade Mannschaften…</div>}
+          {clubTeams!==null && clubTeams.length===0 && !clubTeamsLoading && <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.48)'}}>Mannschaften konnten nicht geladen werden.</div>}
           {favTeams.length>0 && (
             <div style={{marginBottom:'18px'}}>
               <p style={{margin:'0 0 8px',fontSize:'11px',fontWeight:'800',color:'rgba(251,191,36,0.7)',textTransform:'uppercase',letterSpacing:'1px'}}>⭐ Favoriten</p>
@@ -14710,35 +14710,35 @@ export default function TrainingsApp() {
             style={{width:'100%',padding:'11px',background:'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'12px',color:'#fbbf24',cursor:'pointer',fontWeight:'700',fontSize:'13px',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',marginBottom:'16px'}}>
             🌐 Zu MyTischtennis ↗
           </button>
-          <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.4)',lineHeight:'1.5'}}>Alle Punktspiele aller Mannschaften des TTC Grün-Weiß Staffel, live von mytischtennis.de — inklusive Ergebnis, sobald ein Spiel abgeschlossen ist.</p>
+          <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.58)',lineHeight:'1.5'}}>Alle Punktspiele aller Mannschaften des TTC Grün-Weiß Staffel, live von mytischtennis.de — inklusive Ergebnis, sobald ein Spiel abgeschlossen ist.</p>
           <div style={{display:'flex',gap:'6px',marginBottom:'16px'}}>
             {[['kommend','Kommende Spiele'],['alle','Alle Spiele']].map(([key,lbl])=>(
               <button key={key} onClick={()=>setSpielplanFilter(key)}
                 style={{padding:'7px 14px',borderRadius:'20px',border:`1px solid ${spielplanFilter===key?'#fbbf24':'rgba(255,255,255,0.15)'}`,background:spielplanFilter===key?'rgba(251,191,36,0.15)':'rgba(255,255,255,0.04)',color:spielplanFilter===key?'#fbbf24':'rgba(255,255,255,0.45)',fontWeight:'700',fontSize:'12px',cursor:'pointer'}}>{lbl}</button>
             ))}
           </div>
-          {spielplanLoading && spielplanMatches===null && <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.3)'}}>⏳ Lade Spielplan…</div>}
-          {spielplanMatches!==null && shown.length===0 && !spielplanLoading && <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.3)'}}>Keine Spiele gefunden.</div>}
+          {spielplanLoading && spielplanMatches===null && <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.48)'}}>⏳ Lade Spielplan…</div>}
+          {spielplanMatches!==null && shown.length===0 && !spielplanLoading && <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.48)'}}>Keine Spiele gefunden.</div>}
           <div style={{display:'grid',gap:'8px'}}>
             {shown.map(m=>(
               <div key={m.meetingId} style={{padding:'12px 14px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px'}}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px',marginBottom:'4px',flexWrap:'wrap'}}>
                   <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(251,191,36,0.6)'}}>{m.league}</span>
-                  <span style={{fontSize:'11px',color:'rgba(255,255,255,0.35)'}}>{fmtDate(m)}</span>
+                  <span style={{fontSize:'11px',color:'rgba(255,255,255,0.52)'}}>{fmtDate(m)}</span>
                 </div>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'10px',flexWrap:'wrap'}}>
                   <p style={{margin:0,fontSize:'14px',fontWeight:'700',color:'white'}}>
                     <span style={{color:m.isHome?'#fbbf24':'white'}}>{m.teamHome}</span>
-                    <span style={{color:'rgba(255,255,255,0.3)'}}> – </span>
+                    <span style={{color:'rgba(255,255,255,0.48)'}}> – </span>
                     <span style={{color:!m.isHome?'#fbbf24':'white'}}>{m.teamAway}</span>
                   </p>
                   {m.isComplete ? (
                     <span style={{fontSize:'14px',fontWeight:'800',color:'#86efac',flexShrink:0}}>{m.resultHome}:{m.resultAway}</span>
                   ) : (
-                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',flexShrink:0}}>noch offen</span>
+                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.48)',flexShrink:0}}>noch offen</span>
                   )}
                 </div>
-                {m.location?.label && <p style={{margin:'4px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>📍 {m.location.label}{m.location.city?`, ${m.location.city}`:''}</p>}
+                {m.location?.label && <p style={{margin:'4px 0 0',fontSize:'11px',color:'rgba(255,255,255,0.48)'}}>📍 {m.location.label}{m.location.city?`, ${m.location.city}`:''}</p>}
               </div>
             ))}
           </div>
@@ -14807,7 +14807,7 @@ export default function TrainingsApp() {
                   );
                 })}
               {Object.values(allUsers).filter(u=>u.name||u.email).filter(u=>!wzVisibilitySearch.trim()||((u.name||u.email)).toLowerCase().includes(wzVisibilitySearch.trim().toLowerCase())).length===0&&
-                <p style={{margin:'4px',fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>Keine Person gefunden.</p>}
+                <p style={{margin:'4px',fontSize:'11px',color:'rgba(255,255,255,0.48)'}}>Keine Person gefunden.</p>}
             </div>
             {(vis.userIds||[]).length>0&&<span style={{fontSize:'11px',color:ac,fontWeight:'600'}}>{vis.userIds.length} Person{vis.userIds.length===1?'':'en'} ausgewählt</span>}
           </div>
@@ -14959,7 +14959,7 @@ export default function TrainingsApp() {
               <div style={{display:'flex',gap:'8px',marginBottom:'14px'}}>
                 {Object.entries(typeCfg).map(([key,cfg])=>(
                   <button key={key} onClick={()=>setWzForm(f=>({...f,type:key}))}
-                    style={{flex:1,padding:'10px',borderRadius:'10px',border:`2px solid ${wzForm.type===key?cfg.border:'rgba(255,255,255,0.1)'}`,background:wzForm.type===key?cfg.bg:'rgba(255,255,255,0.04)',color:wzForm.type===key?cfg.color:'rgba(255,255,255,0.4)',cursor:'pointer',fontWeight:'800',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>
+                    style={{flex:1,padding:'10px',borderRadius:'10px',border:`2px solid ${wzForm.type===key?cfg.border:'rgba(255,255,255,0.1)'}`,background:wzForm.type===key?cfg.bg:'rgba(255,255,255,0.04)',color:wzForm.type===key?cfg.color:'rgba(255,255,255,0.58)',cursor:'pointer',fontWeight:'800',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>
                     {cfg.icon} {cfg.label}
                   </button>
                 ))}
@@ -14996,18 +14996,18 @@ export default function TrainingsApp() {
                 </div>
               )}
               <div style={{display:'flex',gap:'8px',alignItems:'center',marginTop:'10px',flexWrap:'wrap'}}>
-                <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)',flexShrink:0}}>Von: {authorName}</span>
+                <span style={{fontSize:'12px',color:'rgba(255,255,255,0.52)',flexShrink:0}}>Von: {authorName}</span>
                 <input type="date" value={wzForm.date} onChange={e=>setWzForm(f=>({...f,date:e.target.value}))} max={TODAY}
                   style={{padding:'5px 10px',borderRadius:'8px',border:`1px solid ${acBorder}`,background:'rgba(0,0,0,0.3)',color:'white',fontSize:'12px',outline:'none',fontFamily:'inherit'}}/>
-                {!wzForm.date&&<span style={{fontSize:'11px',color:'rgba(255,255,255,0.2)'}}>Kein Datum = heute</span>}
+                {!wzForm.date&&<span style={{fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>Kein Datum = heute</span>}
                 <input type="date" value={wzForm.dueDate} onChange={e=>setWzForm(f=>({...f,dueDate:e.target.value}))} min={TODAY}
                   style={{padding:'5px 10px',borderRadius:'8px',border:'1px solid rgba(239,68,68,0.4)',background:'rgba(0,0,0,0.3)',color:wzForm.dueDate?'#fca5a5':'rgba(255,255,255,0.3)',fontSize:'12px',outline:'none',fontFamily:'inherit'}}/>
-                {!wzForm.dueDate&&<span style={{fontSize:'11px',color:'rgba(255,255,255,0.2)'}}>Fälligkeitsdatum (optional)</span>}
+                {!wzForm.dueDate&&<span style={{fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>Fälligkeitsdatum (optional)</span>}
               </div>
               {VisibilityPicker(wzForm.visibility||{mode:'all',roles:[],userIds:[]}, updater=>setWzForm(f=>({...f,visibility:typeof updater==='function'?updater(f.visibility||{mode:'all',roles:[],userIds:[]}):updater})))}
               <div style={{display:'flex',gap:'8px',justifyContent:'flex-end',marginTop:'10px'}}>
                 <button onClick={()=>{setWzAdding(false);setWzForm({type:'zitat',text:'',date:'',dueDate:'',options:['',''],visibility:{mode:'all',roles:[],userIds:[]}});}}
-                  style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
+                  style={{padding:'9px 16px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.65)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
                 {(() => { const ok = wzForm.text.trim() && (wzForm.type!=='wette'||wzForm.options.filter(o=>o.trim()).length>=2); return (
                 <button onClick={submitWZ} disabled={!ok}
                   style={{padding:'9px 20px',background:ok?`linear-gradient(135deg,${ac},#d97706)`:'rgba(255,255,255,0.1)',color:'white',border:'none',borderRadius:'10px',cursor:ok?'pointer':'not-allowed',fontWeight:'700',fontSize:'13px',opacity:ok?1:0.5}}>
@@ -15020,7 +15020,7 @@ export default function TrainingsApp() {
 
           {/* Eintrags-Liste */}
           {wettenZitate.length === 0 && !wzAdding ? (
-            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.2)',fontSize:'14px'}}>Noch keine Einträge. Lege den ersten an!</div>
+            <div style={{textAlign:'center',padding:'60px 20px',color:'rgba(255,255,255,0.4)',fontSize:'14px'}}>Noch keine Einträge. Lege den ersten an!</div>
           ) : (
             <div style={{display:'flex',flexDirection:'column',gap:'22px'}}>
               {wettenZitate.filter(entry=>{
@@ -15097,7 +15097,7 @@ export default function TrainingsApp() {
                           style={{width:'100%',padding:'10px',background:'rgba(0,0,0,0.3)',border:`1px solid ${acBorder}`,borderRadius:'8px',color:'white',fontSize:'14px',outline:'none',resize:'vertical',boxSizing:'border-box',fontFamily:'inherit',lineHeight:'1.5'}}/>
                         {VisibilityPicker(wzEditVisibility, updater=>setWzEditVisibility(v=>typeof updater==='function'?updater(v):updater))}
                         <div style={{display:'flex',gap:'8px',marginTop:'8px',justifyContent:'flex-end'}}>
-                          <button onClick={()=>setWzEditId(null)} style={{padding:'7px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
+                          <button onClick={()=>setWzEditId(null)} style={{padding:'7px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.65)',cursor:'pointer',fontWeight:'600',fontSize:'13px'}}>Abbrechen</button>
                           <button onClick={()=>saveEdit(entry.id)} style={{padding:'7px 16px',background:`linear-gradient(135deg,${ac},#d97706)`,border:'none',borderRadius:'8px',color:'white',fontWeight:'700',fontSize:'13px',cursor:'pointer'}}>Speichern</button>
                         </div>
                       </div>
@@ -15126,7 +15126,7 @@ export default function TrainingsApp() {
                             )}
                             <div style={{display:'flex',gap:'8px',justifyContent:'flex-end',marginTop:'10px'}}>
                               <button onClick={()=>setWzAddOptionsId(null)}
-                                style={{padding:'6px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>Abbrechen</button>
+                                style={{padding:'6px 14px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.65)',cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>Abbrechen</button>
                               <button
                                 disabled={wzAddOptions.filter(o=>o.trim()).length<2}
                                 onClick={()=>{
@@ -15152,7 +15152,7 @@ export default function TrainingsApp() {
                           return (
                             <div style={{margin:'0 14px 14px',padding:'10px',background:'#2a1c10',borderRadius:'10px',display:'flex',flexDirection:'column',gap:'7px'}}>
                               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'2px'}}>
-                                <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',fontWeight:'700'}}>
+                                <span style={{fontSize:'11px',color:'rgba(255,255,255,0.48)',fontWeight:'700'}}>
                                   🗳️ {betOpen ? 'Abstimmen' : 'Geschlossen'} · {totalVotes} {totalVotes===1?'Stimme':'Stimmen'}
                                   {!betOpen && <span style={{marginLeft:'6px',color:'rgba(239,68,68,0.6)'}}>🔒</span>}
                                 </span>
@@ -15171,7 +15171,7 @@ export default function TrainingsApp() {
                                     <div style={{position:'relative',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px'}}>
                                       <span style={{fontSize:'13px',fontWeight:isMine?'800':'600',color:isMine?'#fbbf24':'rgba(255,255,255,0.8)'}}>{isMine?'✓ ':''}{opt}</span>
                                       <div style={{display:'flex',alignItems:'center',gap:'6px',flexShrink:0}}>
-                                        {voters.length>0&&<span style={{fontSize:'10px',color:'rgba(255,255,255,0.3)'}}>{voters.join(', ')}</span>}
+                                        {voters.length>0&&<span style={{fontSize:'10px',color:'rgba(255,255,255,0.48)'}}>{voters.join(', ')}</span>}
                                         <span style={{fontSize:'12px',fontWeight:'700',color:isMine?'#fbbf24':'rgba(255,255,255,0.4)'}}>{count} ({pct}%)</span>
                                       </div>
                                     </div>
@@ -15191,7 +15191,7 @@ export default function TrainingsApp() {
                 if (wzFilter!=='alle'&&entry.type!==wzFilter) return false;
                 if (wzSearch.trim()){const q=wzSearch.trim().toLowerCase();return entry.text?.toLowerCase().includes(q)||entry.createdBy?.toLowerCase().includes(q);}
                 return true;
-              }).length===0 && <div style={{textAlign:'center',padding:'40px 20px',color:'rgba(255,255,255,0.2)',fontSize:'14px'}}>Keine Einträge gefunden.</div>}
+              }).length===0 && <div style={{textAlign:'center',padding:'40px 20px',color:'rgba(255,255,255,0.4)',fontSize:'14px'}}>Keine Einträge gefunden.</div>}
             </div>
           )}
         </div>
@@ -15298,14 +15298,14 @@ export default function TrainingsApp() {
             <span style={{position:'absolute',left:'12px',top:'50%',transform:'translateY(-50%)',fontSize:'15px',pointerEvents:'none'}}>🔍</span>
             <input value={trikotSearch} onChange={e=>setTrikotSearch(e.target.value)} placeholder="Spieler suchen…"
               style={{width:'100%',boxSizing:'border-box',padding:'9px 12px 9px 36px',borderRadius:'10px',border:'1.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.06)',color:'white',fontSize:'14px',outline:'none'}}/>
-            {trikotSearch&&<button onClick={()=>setTrikotSearch('')} style={{position:'absolute',right:'10px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'rgba(255,255,255,0.4)',fontSize:'18px',cursor:'pointer',lineHeight:1}}>×</button>}
+            {trikotSearch&&<button onClick={()=>setTrikotSearch('')} style={{position:'absolute',right:'10px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'rgba(255,255,255,0.58)',fontSize:'18px',cursor:'pointer',lineHeight:1}}>×</button>}
           </div>
 
           {/* Fortschritt */}
           <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'10px 14px',background:'rgba(147,197,253,0.05)',border:'1px solid rgba(147,197,253,0.12)',borderRadius:'12px',marginBottom:'14px'}}>
             <div style={{flex:1}}>
               <div style={{display:'flex',justifyContent:'space-between',marginBottom:'5px'}}>
-                <span style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>Erfasst</span>
+                <span style={{fontSize:'12px',color:'rgba(255,255,255,0.58)',fontWeight:'600'}}>Erfasst</span>
                 <span style={{fontSize:'12px',fontWeight:'800',color:erfasst===alleUngefiltert.length&&alleUngefiltert.length>0?'#4ade80':'#93c5fd'}}>{erfasst} / {alleUngefiltert.length}</span>
               </div>
               <div style={{background:'rgba(255,255,255,0.08)',borderRadius:'99px',height:'6px',overflow:'hidden'}}>
@@ -15317,7 +15317,7 @@ export default function TrainingsApp() {
           {/* Spielerliste */}
           <div style={{display:'flex',flexDirection:'column',gap:'5px'}}>
             {alleSpieler.length===0 && (
-              <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.25)',fontSize:'14px'}}>Keine Spieler gefunden.</div>
+              <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.42)',fontSize:'14px'}}>Keine Spieler gefunden.</div>
             )}
             {alleSpieler.map(spieler => {
               const d = trikotDaten[spieler.id] || {};
@@ -15350,7 +15350,7 @@ export default function TrainingsApp() {
                         <p style={{margin:'0 0 8px',fontSize:'10px',fontWeight:'800',color:'rgba(147,197,253,0.5)',textTransform:'uppercase',letterSpacing:'1px'}}>Trikot</p>
                         <div style={{display:'flex',flexDirection:'column',gap:'7px'}}>
                           <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                            <span style={{fontSize:'11px',color:'rgba(255,255,255,0.4)',minWidth:'50px'}}>Größe</span>
+                            <span style={{fontSize:'11px',color:'rgba(255,255,255,0.58)',minWidth:'50px'}}>Größe</span>
                             <select value={d.groesse||''} onChange={e=>saveTrikot(spieler.id,'groesse',e.target.value)}
                               style={{flex:1,padding:'5px 8px',borderRadius:'7px',border:'1px solid rgba(147,197,253,0.2)',background:'rgba(15,30,60,0.8)',color:'white',fontSize:'13px',fontWeight:'700',outline:'none'}}>
                               <option value="" style={{color:'#94a3b8'}}>— wählen —</option>
@@ -15358,14 +15358,14 @@ export default function TrainingsApp() {
                             </select>
                           </div>
                           <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                            <span style={{fontSize:'11px',color:'rgba(255,255,255,0.4)',minWidth:'50px'}}>Schnitt</span>
+                            <span style={{fontSize:'11px',color:'rgba(255,255,255,0.58)',minWidth:'50px'}}>Schnitt</span>
                             <div style={{display:'flex',gap:'5px'}}>
                               <FBtn val="Damen" current={d.schnitt} onSet={v=>saveTrikot(spieler.id,'schnitt',v)}/>
                               <FBtn val="Herren" current={d.schnitt} onSet={v=>saveTrikot(spieler.id,'schnitt',v)}/>
                             </div>
                           </div>
                           <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                            <span style={{fontSize:'11px',color:'rgba(255,255,255,0.4)',minWidth:'50px'}}>Anzahl</span>
+                            <span style={{fontSize:'11px',color:'rgba(255,255,255,0.58)',minWidth:'50px'}}>Anzahl</span>
                             <div style={{display:'flex',gap:'5px'}}>
                               {ANZAHLEN.map(n=><FBtn key={n} val={n} current={d.anzahlTrikot} onSet={v=>saveTrikot(spieler.id,'anzahlTrikot',v)}/>)}
                             </div>
@@ -15390,7 +15390,7 @@ export default function TrainingsApp() {
                           </div>
                           {d.unterseite && d.unterseite !== 'Keine' && (<>
                             <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                              <span style={{fontSize:'11px',color:'rgba(255,255,255,0.4)',minWidth:'50px'}}>Größe</span>
+                              <span style={{fontSize:'11px',color:'rgba(255,255,255,0.58)',minWidth:'50px'}}>Größe</span>
                               <select value={d.groesseUnterseite||''} onChange={e=>saveTrikot(spieler.id,'groesseUnterseite',e.target.value)}
                                 style={{flex:1,padding:'5px 8px',borderRadius:'7px',border:'1px solid rgba(147,197,253,0.2)',background:'rgba(15,30,60,0.8)',color:'white',fontSize:'13px',fontWeight:'700',outline:'none'}}>
                                 <option value="" style={{color:'#94a3b8'}}>— wählen —</option>
@@ -15398,7 +15398,7 @@ export default function TrainingsApp() {
                               </select>
                             </div>
                             <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                              <span style={{fontSize:'11px',color:'rgba(255,255,255,0.4)',minWidth:'50px'}}>Anzahl</span>
+                              <span style={{fontSize:'11px',color:'rgba(255,255,255,0.58)',minWidth:'50px'}}>Anzahl</span>
                               <div style={{display:'flex',gap:'5px'}}>
                                 {ANZAHLEN.map(n=><FBtn key={n} val={n} current={d.anzahlUnterseite} onSet={v=>saveTrikot(spieler.id,'anzahlUnterseite',v)}/>)}
                               </div>
@@ -15468,7 +15468,7 @@ export default function TrainingsApp() {
               {label:'Saldo',            value:`${saldo>=0?'+':''}${saldo.toFixed(2)} €`,color:saldo>=0?'#4ade80':'#f87171',big:true},
             ].map(({label,value,color,big})=>(
               <div key={label} style={{background:'rgba(255,255,255,0.04)',border:`1px solid ${color}33`,borderRadius:'14px',padding:'14px',textAlign:'center'}}>
-                <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px',color:'rgba(255,255,255,0.4)'}}>{label}</p>
+                <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px',color:'rgba(255,255,255,0.58)'}}>{label}</p>
                 <p style={{margin:0,fontSize:big?'22px':'18px',fontWeight:'800',color}}>{value}</p>
               </div>
             ))}
@@ -15477,7 +15477,7 @@ export default function TrainingsApp() {
           {/* Trainingsstunden */}
           <div style={cardStyle}>
             <h3 style={{margin:'0 0 14px',color:accent,fontSize:'15px',fontWeight:'800'}}>🕐 Trainingsstunden</h3>
-            <p style={{margin:'0 0 12px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>1 Stunde = 7,50 € · Gesamtguthaben: <strong style={{color:'#4ade80'}}>{totalGuthaben.toFixed(2)} €</strong></p>
+            <p style={{margin:'0 0 12px',fontSize:'12px',color:'rgba(255,255,255,0.58)'}}>1 Stunde = 7,50 € · Gesamtguthaben: <strong style={{color:'#4ade80'}}>{totalGuthaben.toFixed(2)} €</strong></p>
             <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'14px'}}>
               <input type="date" value={rompelHoursForm.date} onChange={e=>setRompelHoursForm(f=>({...f,date:e.target.value}))} style={{...inputS,flex:'0 0 140px'}}/>
               <input type="number" placeholder="Stunden" min="0.5" step="0.5" value={rompelHoursForm.hours} onChange={e=>setRompelHoursForm(f=>({...f,hours:e.target.value}))} style={{...inputS,flex:'0 0 100px'}}/>
@@ -15485,12 +15485,12 @@ export default function TrainingsApp() {
               <button onClick={addHours} style={btnS('rgba(74,222,128,0.15)')}>+ Hinzufügen</button>
             </div>
             {hours.length === 0 ? (
-              <p style={{color:'rgba(255,255,255,0.25)',fontSize:'13px',textAlign:'center',padding:'12px'}}>Noch keine Stunden eingetragen.</p>
+              <p style={{color:'rgba(255,255,255,0.42)',fontSize:'13px',textAlign:'center',padding:'12px'}}>Noch keine Stunden eingetragen.</p>
             ) : (
               <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
                 {[...hours].reverse().map(h=>(
                   <div key={h.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 13px',background:'rgba(74,222,128,0.04)',border:'1px solid rgba(74,222,128,0.1)',borderRadius:'10px'}}>
-                    <span style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',flexShrink:0}}>{h.date}</span>
+                    <span style={{fontSize:'12px',color:'rgba(255,255,255,0.58)',flexShrink:0}}>{h.date}</span>
                     <span style={{fontWeight:'700',color:'#4ade80',flexShrink:0}}>{h.hours}h = {(h.hours*7.5).toFixed(2)} €</span>
                     <span style={{flex:1,fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>{h.desc}</span>
                     <button onClick={()=>deleteHours(h.id)} style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
@@ -15505,7 +15505,7 @@ export default function TrainingsApp() {
           {/* Ausgaben / Schulden */}
           <div style={cardStyle}>
             <h3 style={{margin:'0 0 14px',color:'#f87171',fontSize:'15px',fontWeight:'800'}}>💸 Offene Kosten / Schulden</h3>
-            <p style={{margin:'0 0 12px',fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>Gesamtschulden: <strong style={{color:'#f87171'}}>{totalAusgaben.toFixed(2)} €</strong></p>
+            <p style={{margin:'0 0 12px',fontSize:'12px',color:'rgba(255,255,255,0.58)'}}>Gesamtschulden: <strong style={{color:'#f87171'}}>{totalAusgaben.toFixed(2)} €</strong></p>
             <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'14px'}}>
               <input type="date" value={rompelExpForm.date} onChange={e=>setRompelExpForm(f=>({...f,date:e.target.value}))} style={{...inputS,flex:'0 0 140px'}}/>
               <input type="number" placeholder="Betrag €" min="0.01" step="0.01" value={rompelExpForm.amount} onChange={e=>setRompelExpForm(f=>({...f,amount:e.target.value}))} style={{...inputS,flex:'0 0 110px'}}/>
@@ -15513,12 +15513,12 @@ export default function TrainingsApp() {
               <button onClick={addExpense} style={btnS('rgba(248,113,113,0.15)')}>+ Hinzufügen</button>
             </div>
             {expenses.length === 0 ? (
-              <p style={{color:'rgba(255,255,255,0.25)',fontSize:'13px',textAlign:'center',padding:'12px'}}>Keine offenen Kosten.</p>
+              <p style={{color:'rgba(255,255,255,0.42)',fontSize:'13px',textAlign:'center',padding:'12px'}}>Keine offenen Kosten.</p>
             ) : (
               <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
                 {[...expenses].reverse().map(e=>(
                   <div key={e.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 13px',background:'rgba(248,113,113,0.04)',border:'1px solid rgba(248,113,113,0.1)',borderRadius:'10px'}}>
-                    <span style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',flexShrink:0}}>{e.date}</span>
+                    <span style={{fontSize:'12px',color:'rgba(255,255,255,0.58)',flexShrink:0}}>{e.date}</span>
                     <span style={{fontWeight:'700',color:'#f87171',flexShrink:0}}>{Number(e.amount).toFixed(2)} €</span>
                     <span style={{flex:1,fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>{e.desc}</span>
                     <button onClick={()=>deleteExpense(e.id)} style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
@@ -15591,7 +15591,7 @@ export default function TrainingsApp() {
               {label:'Kassenstand',     value:`${kassenstand>=0?'+':''}${kassenstand.toFixed(2)} €`, color:kassenstand>=0?'#4ade80':'#f87171', big:true},
             ].map(({label,value,color,big})=>(
               <div key={label} style={{background:'rgba(255,255,255,0.04)',border:`1px solid ${color}33`,borderRadius:'14px',padding:'14px',textAlign:'center'}}>
-                <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px',color:'rgba(255,255,255,0.4)'}}>{label}</p>
+                <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px',color:'rgba(255,255,255,0.58)'}}>{label}</p>
                 <p style={{margin:0,fontSize:big?'22px':'18px',fontWeight:'800',color}}>{value}</p>
               </div>
             ))}
@@ -15626,7 +15626,7 @@ export default function TrainingsApp() {
                 style={{flex:1,padding:'11px',background:pfandForm.type==='einnahme'?'rgba(74,222,128,0.15)':'rgba(248,113,113,0.15)',border:`1px solid ${pfandForm.type==='einnahme'?'rgba(74,222,128,0.3)':'rgba(248,113,113,0.3)'}`,borderRadius:'10px',color:pfandForm.type==='einnahme'?'#4ade80':'#f87171',fontWeight:'800',fontSize:'14px',cursor:'pointer',opacity:(!pfandForm.amount||(pfandForm.type==='ausgabe'&&!pfandForm.desc.trim()))?0.4:1}}>
                 {isEditing?'Speichern':'Eintrag hinzufügen'}
               </button>
-              {isEditing && <button onClick={resetForm} style={{padding:'11px 16px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.5)',fontWeight:'700',fontSize:'14px',cursor:'pointer'}}>Abbrechen</button>}
+              {isEditing && <button onClick={resetForm} style={{padding:'11px 16px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.65)',fontWeight:'700',fontSize:'14px',cursor:'pointer'}}>Abbrechen</button>}
             </div>
           </div>
 
@@ -15634,7 +15634,7 @@ export default function TrainingsApp() {
           <div style={cardS}>
             <h3 style={{margin:'0 0 14px',color:'rgba(255,255,255,0.6)',fontSize:'15px',fontWeight:'800'}}>📋 Alle Einträge</h3>
             {entries.length===0
-              ? <p style={{color:'rgba(255,255,255,0.25)',fontSize:'13px',textAlign:'center',padding:'20px'}}>Noch keine Einträge vorhanden.</p>
+              ? <p style={{color:'rgba(255,255,255,0.42)',fontSize:'13px',textAlign:'center',padding:'20px'}}>Noch keine Einträge vorhanden.</p>
               : <div style={{display:'flex',flexDirection:'column',gap:'7px'}}>
                 {entries.map(e=>(
                   <div key={e.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'11px 13px',background:e.type==='einnahme'?'rgba(74,222,128,0.04)':'rgba(248,113,113,0.04)',border:`1px solid ${e.type==='einnahme'?'rgba(74,222,128,0.12)':'rgba(248,113,113,0.12)'}`,borderRadius:'11px'}}>
@@ -15642,8 +15642,8 @@ export default function TrainingsApp() {
                       {e.type==='einnahme'?'Einnahme':'Ausgabe'}
                     </span>
                     <span style={{fontWeight:'800',fontSize:'15px',color:e.type==='einnahme'?'#4ade80':'#f87171',flexShrink:0}}>{Number(e.amount).toFixed(2)} €</span>
-                    <span style={{fontSize:'12px',color:'rgba(255,255,255,0.35)',flexShrink:0}}>{e.date}</span>
-                    <span style={{flex:1,fontSize:'13px',color:'rgba(255,255,255,0.55)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.desc||''}</span>
+                    <span style={{fontSize:'12px',color:'rgba(255,255,255,0.52)',flexShrink:0}}>{e.date}</span>
+                    <span style={{flex:1,fontSize:'13px',color:'rgba(255,255,255,0.68)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.desc||''}</span>
                     {canModify(e) && (<>
                       <button onClick={()=>{setPfandEditId(e.id);setPfandForm({type:e.type,date:e.date,amount:String(e.amount),desc:e.desc||''});window.scrollTo({top:0,behavior:'smooth'});}}
                         style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(147,197,253,0.08)',border:'1px solid rgba(147,197,253,0.15)',color:'#93c5fd',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
