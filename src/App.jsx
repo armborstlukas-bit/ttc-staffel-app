@@ -15445,6 +15445,10 @@ export default function TrainingsApp() {
       setRompelExpForm(f=>({...f, amount:'', desc:''}));
     };
     const deleteExpense = id => saveRompelData({...rompelData, expenses: expenses.filter(e=>e.id!==id)});
+    // Haken "abgerechnet" — reine Markierung, ob die vorlegende Person das Geld zurückbekommen
+    // hat. Verändert bewusst NICHT die Saldo-Rechnung (die Ausgabe bleibt dort weiter drin) —
+    // dient nur dem Überblick, welche Vorlagen schon beglichen wurden und welche noch nicht.
+    const toggleExpenseSettled = id => saveRompelData({...rompelData, expenses: expenses.map(e=>e.id===id?{...e,settled:!e.settled}:e)});
 
     const cardStyle = {background:'rgba(255,255,255,0.04)',border:'1px solid rgba(253,164,175,0.12)',borderRadius:'16px',padding:'18px',marginBottom:'16px'};
     const inputS = {padding:'10px 13px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(253,164,175,0.2)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',flex:1,minWidth:0};
@@ -15517,10 +15521,15 @@ export default function TrainingsApp() {
             ) : (
               <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
                 {[...expenses].reverse().map(e=>(
-                  <div key={e.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 13px',background:'rgba(248,113,113,0.04)',border:'1px solid rgba(248,113,113,0.1)',borderRadius:'10px'}}>
-                    <span style={{fontSize:'12px',color:'rgba(255,255,255,0.58)',flexShrink:0}}>{e.date}</span>
-                    <span style={{fontWeight:'700',color:'#f87171',flexShrink:0}}>{Number(e.amount).toFixed(2)} €</span>
-                    <span style={{flex:1,fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>{e.desc}</span>
+                  <div key={e.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 13px',background:e.settled?'rgba(255,255,255,0.03)':'rgba(248,113,113,0.04)',border:`1px solid ${e.settled?'rgba(255,255,255,0.08)':'rgba(248,113,113,0.1)'}`,borderRadius:'10px',opacity:e.settled?0.6:1}}>
+                    <button onClick={()=>toggleExpenseSettled(e.id)} title={e.settled?'Als abgerechnet markiert — Klick zum Zurücksetzen':'Als abgerechnet markieren (Person hat ihr Geld zurück)'}
+                      style={{width:'26px',height:'26px',borderRadius:'7px',background:e.settled?'rgba(74,222,128,0.15)':'rgba(255,255,255,0.06)',border:`1px solid ${e.settled?'rgba(74,222,128,0.4)':'rgba(255,255,255,0.15)'}`,color:e.settled?'#4ade80':'rgba(255,255,255,0.4)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'13px',fontWeight:'800'}}>
+                      {e.settled?'✓':''}
+                    </button>
+                    <span style={{fontSize:'12px',color:'rgba(255,255,255,0.58)',flexShrink:0,textDecoration:e.settled?'line-through':'none'}}>{e.date}</span>
+                    <span style={{fontWeight:'700',color:'#f87171',flexShrink:0,textDecoration:e.settled?'line-through':'none'}}>{Number(e.amount).toFixed(2)} €</span>
+                    <span style={{flex:1,fontSize:'13px',color:'rgba(255,255,255,0.6)',textDecoration:e.settled?'line-through':'none'}}>{e.desc}</span>
+                    {e.settled && <span style={{fontSize:'11px',fontWeight:'700',color:'#4ade80',flexShrink:0}}>abgerechnet</span>}
                     <button onClick={()=>deleteExpense(e.id)} style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                       <Trash2 size={11}/>
                     </button>
