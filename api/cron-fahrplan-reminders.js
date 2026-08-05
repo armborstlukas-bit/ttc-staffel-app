@@ -176,13 +176,21 @@ export default async function handler(req, res) {
       const fahrer = (game.fahrer || '').trim();
       if (!EMAIL_REGEX.test(fahrer)) continue; // nur informieren, wenn ein Betreuer mit E-Mail zugeordnet ist
 
-      const rows = diffs.map(f => {
+      // Immer ALLE aktuellen Spieldaten in der Mail zeigen (nicht nur die geänderten Felder!)
+      // — sonst fehlen dem Empfänger z.B. Datum/Uhrzeit komplett, wenn sich nur die Halle
+      // geändert hat. Geänderte Felder werden zusätzlich mit "war: ..." hervorgehoben.
+      const diffKeys = new Set(diffs.map(f => f.key));
+      const artLabel = game.isHeimspiel ? 'Treffpunkt' : 'Abfahrt';
+      const rows = TRACKED_FIELDS.map(f => {
         const fmt = f.fmt || (v => v || '–');
-        return `<tr><td><b>${f.label}</b></td><td>${fmt(prev[f.key])} → <b>${fmt(snap[f.key])}</b></td></tr>`;
+        const label = f.key === 'treffpunkt' ? artLabel : f.label;
+        const changed = diffKeys.has(f.key);
+        const oldNote = changed ? ` <span style="color:#dc2626;font-size:12px">(war: ${fmt(prev[f.key])})</span>` : '';
+        return `<tr><td><b>${label}</b></td><td>${changed?'<b>':''}${fmt(snap[f.key])}${changed?'</b>':''}${oldNote}</td></tr>`;
       }).join('');
       const html = `
         <p>Hallo,</p>
-        <p>bei deinem Spiel hat sich etwas geändert:</p>
+        <p>bei deinem Spiel hat sich etwas geändert — hier der komplette aktuelle Stand:</p>
         <table cellpadding="6" style="border-collapse:collapse">
           <tr><td><b>Spiel</b></td><td>${game.heim} – ${game.gast}</td></tr>
           <tr><td><b>Liga</b></td><td>${game.ligaName || game.liga}</td></tr>
