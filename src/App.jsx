@@ -15450,9 +15450,9 @@ export default function TrainingsApp() {
     // dient nur dem Überblick, welche Vorlagen schon beglichen wurden und welche noch nicht.
     const toggleExpenseSettled = id => saveRompelData({...rompelData, expenses: expenses.map(e=>e.id===id?{...e,settled:!e.settled}:e)});
 
-    const cardStyle = {background:'rgba(255,255,255,0.04)',border:'1px solid rgba(253,164,175,0.12)',borderRadius:'16px',padding:'18px',marginBottom:'16px'};
-    const inputS = {padding:'10px 13px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(253,164,175,0.2)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',flex:1,minWidth:0};
-    const btnS = (bg,col)=>({padding:'10px 18px',background:bg,border:'none',borderRadius:'10px',color:col||'white',cursor:'pointer',fontWeight:'700',fontSize:'14px',whiteSpace:'nowrap'});
+    const cardStyle = {background:'rgba(255,255,255,0.04)',border:'1px solid rgba(253,164,175,0.12)',borderRadius:'16px',padding:isMobile?'14px':'18px',marginBottom:'16px'};
+    const inputS = {padding:'10px 13px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(253,164,175,0.2)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',width:'100%',boxSizing:'border-box'};
+    const btnS = (bg,col)=>({padding:'11px 18px',background:bg,border:'none',borderRadius:'10px',color:col||'white',cursor:'pointer',fontWeight:'700',fontSize:'14px',whiteSpace:'nowrap',width:isMobile?'100%':'auto'});
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#1a0812 0%,#2d0820 45%,#150610 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
@@ -15461,20 +15461,27 @@ export default function TrainingsApp() {
           <img src="/rompel.jpg" alt="Rompel" style={{width:'32px',height:'32px',borderRadius:'50%',objectFit:'cover',objectPosition:'center top',border:`2px solid ${accent}`,flexShrink:0}}/>
           <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1,letterSpacing:'-0.3px'}}>Rompel Bereich</h1>
         </div>
-        <div style={{padding:'20px',maxWidth:'700px',margin:'0 auto'}}>
+        <div style={{padding:isMobile?'14px':'20px',maxWidth:'700px',margin:'0 auto'}}>
           {renderAccessManagerRow('rompelTrainers','Rompel Bereich',accent)}
 
-          {/* Saldo-Übersicht */}
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'12px',marginBottom:'24px'}}>
+          {/* Saldo-Übersicht — auf Mobile groß & gestapelt statt gequetscht in 3 Spalten */}
+          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr 1fr',gap:'10px',marginBottom:'20px'}}>
             {[
               {label:'Trainingsguthaben',value:`${totalGuthaben.toFixed(2)} €`,color:'#4ade80'},
               {label:'Offene Kosten',    value:`${totalAusgaben.toFixed(2)} €`,color:'#f87171'},
               {label:'Saldo',            value:`${saldo>=0?'+':''}${saldo.toFixed(2)} €`,color:saldo>=0?'#4ade80':'#f87171',big:true},
             ].map(({label,value,color,big})=>(
-              <div key={label} style={{background:'rgba(255,255,255,0.04)',border:`1px solid ${color}33`,borderRadius:'14px',padding:'14px',textAlign:'center'}}>
-                <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px',color:'rgba(255,255,255,0.58)'}}>{label}</p>
-                <p style={{margin:0,fontSize:big?'22px':'18px',fontWeight:'800',color}}>{value}</p>
-              </div>
+              isMobile ? (
+                <div key={label} style={{background:'rgba(255,255,255,0.04)',border:`1px solid ${color}33`,borderRadius:'14px',padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                  <p style={{margin:0,fontSize:'12px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.5px',color:'rgba(255,255,255,0.58)'}}>{label}</p>
+                  <p style={{margin:0,fontSize:big?'22px':'18px',fontWeight:'800',color}}>{value}</p>
+                </div>
+              ) : (
+                <div key={label} style={{background:'rgba(255,255,255,0.04)',border:`1px solid ${color}33`,borderRadius:'14px',padding:'14px',textAlign:'center'}}>
+                  <p style={{margin:'0 0 4px',fontSize:'10px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px',color:'rgba(255,255,255,0.58)'}}>{label}</p>
+                  <p style={{margin:0,fontSize:big?'22px':'18px',fontWeight:'800',color}}>{value}</p>
+                </div>
+              )
             ))}
           </div>
 
@@ -15482,25 +15489,40 @@ export default function TrainingsApp() {
           <div style={cardStyle}>
             <h3 style={{margin:'0 0 14px',color:accent,fontSize:'15px',fontWeight:'800'}}>🕐 Trainingsstunden</h3>
             <p style={{margin:'0 0 12px',fontSize:'12px',color:'rgba(255,255,255,0.58)'}}>1 Stunde = 7,50 € · Gesamtguthaben: <strong style={{color:'#4ade80'}}>{totalGuthaben.toFixed(2)} €</strong></p>
-            <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'14px'}}>
-              <input type="date" value={rompelHoursForm.date} onChange={e=>setRompelHoursForm(f=>({...f,date:e.target.value}))} style={{...inputS,flex:'0 0 140px'}}/>
-              <input type="number" placeholder="Stunden" min="0.5" step="0.5" value={rompelHoursForm.hours} onChange={e=>setRompelHoursForm(f=>({...f,hours:e.target.value}))} style={{...inputS,flex:'0 0 100px'}}/>
-              <input type="text" placeholder="Beschreibung (optional)" value={rompelHoursForm.desc} onChange={e=>setRompelHoursForm(f=>({...f,desc:e.target.value}))} style={inputS}/>
-              <button onClick={addHours} style={btnS('rgba(74,222,128,0.15)')}>+ Hinzufügen</button>
+            <div style={{display:'flex',flexDirection:isMobile?'column':'row',gap:'8px',flexWrap:'wrap',marginBottom:'14px'}}>
+              <div style={{display:'flex',gap:'8px',...(isMobile?{}:{flex:'0 0 auto'})}}>
+                <input type="date" value={rompelHoursForm.date} onChange={e=>setRompelHoursForm(f=>({...f,date:e.target.value}))} style={{...inputS,...(isMobile?{}:{width:'140px'})}}/>
+                <input type="number" placeholder="Stunden" min="0.5" step="0.5" value={rompelHoursForm.hours} onChange={e=>setRompelHoursForm(f=>({...f,hours:e.target.value}))} style={{...inputS,...(isMobile?{}:{width:'100px'})}}/>
+              </div>
+              <input type="text" placeholder="Beschreibung (optional)" value={rompelHoursForm.desc} onChange={e=>setRompelHoursForm(f=>({...f,desc:e.target.value}))} style={{...inputS,flex:1,minWidth:0}}/>
+              <button onClick={addHours} style={btnS('rgba(74,222,128,0.15)','#4ade80')}>+ Hinzufügen</button>
             </div>
             {hours.length === 0 ? (
               <p style={{color:'rgba(255,255,255,0.42)',fontSize:'13px',textAlign:'center',padding:'12px'}}>Noch keine Stunden eingetragen.</p>
             ) : (
               <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
                 {[...hours].reverse().map(h=>(
-                  <div key={h.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 13px',background:'rgba(74,222,128,0.04)',border:'1px solid rgba(74,222,128,0.1)',borderRadius:'10px'}}>
-                    <span style={{fontSize:'12px',color:'rgba(255,255,255,0.58)',flexShrink:0}}>{h.date}</span>
-                    <span style={{fontWeight:'700',color:'#4ade80',flexShrink:0}}>{h.hours}h = {(h.hours*7.5).toFixed(2)} €</span>
-                    <span style={{flex:1,fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>{h.desc}</span>
-                    <button onClick={()=>deleteHours(h.id)} style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                      <Trash2 size={11}/>
-                    </button>
-                  </div>
+                  isMobile ? (
+                    <div key={h.id} style={{padding:'10px 12px',background:'rgba(74,222,128,0.04)',border:'1px solid rgba(74,222,128,0.1)',borderRadius:'10px',display:'flex',flexDirection:'column',gap:'4px'}}>
+                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px'}}>
+                        <span style={{fontWeight:'700',color:'#4ade80',fontSize:'14px'}}>{h.hours}h = {(h.hours*7.5).toFixed(2)} €</span>
+                        <button onClick={()=>deleteHours(h.id)} style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                          <Trash2 size={11}/>
+                        </button>
+                      </div>
+                      <span style={{fontSize:'11px',color:'rgba(255,255,255,0.58)'}}>{h.date}</span>
+                      {h.desc && <span style={{fontSize:'12px',color:'rgba(255,255,255,0.6)'}}>{h.desc}</span>}
+                    </div>
+                  ) : (
+                    <div key={h.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 13px',background:'rgba(74,222,128,0.04)',border:'1px solid rgba(74,222,128,0.1)',borderRadius:'10px'}}>
+                      <span style={{fontSize:'12px',color:'rgba(255,255,255,0.58)',flexShrink:0}}>{h.date}</span>
+                      <span style={{fontWeight:'700',color:'#4ade80',flexShrink:0}}>{h.hours}h = {(h.hours*7.5).toFixed(2)} €</span>
+                      <span style={{flex:1,fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>{h.desc}</span>
+                      <button onClick={()=>deleteHours(h.id)} style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                        <Trash2 size={11}/>
+                      </button>
+                    </div>
+                  )
                 ))}
               </div>
             )}
@@ -15510,30 +15532,50 @@ export default function TrainingsApp() {
           <div style={cardStyle}>
             <h3 style={{margin:'0 0 14px',color:'#f87171',fontSize:'15px',fontWeight:'800'}}>💸 Offene Kosten / Schulden</h3>
             <p style={{margin:'0 0 12px',fontSize:'12px',color:'rgba(255,255,255,0.58)'}}>Gesamtschulden: <strong style={{color:'#f87171'}}>{totalAusgaben.toFixed(2)} €</strong></p>
-            <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'14px'}}>
-              <input type="date" value={rompelExpForm.date} onChange={e=>setRompelExpForm(f=>({...f,date:e.target.value}))} style={{...inputS,flex:'0 0 140px'}}/>
-              <input type="number" placeholder="Betrag €" min="0.01" step="0.01" value={rompelExpForm.amount} onChange={e=>setRompelExpForm(f=>({...f,amount:e.target.value}))} style={{...inputS,flex:'0 0 110px'}}/>
-              <input type="text" placeholder="Beschreibung" value={rompelExpForm.desc} onChange={e=>setRompelExpForm(f=>({...f,desc:e.target.value}))} style={inputS}/>
-              <button onClick={addExpense} style={btnS('rgba(248,113,113,0.15)')}>+ Hinzufügen</button>
+            <div style={{display:'flex',flexDirection:isMobile?'column':'row',gap:'8px',flexWrap:'wrap',marginBottom:'14px'}}>
+              <div style={{display:'flex',gap:'8px',...(isMobile?{}:{flex:'0 0 auto'})}}>
+                <input type="date" value={rompelExpForm.date} onChange={e=>setRompelExpForm(f=>({...f,date:e.target.value}))} style={{...inputS,...(isMobile?{}:{width:'140px'})}}/>
+                <input type="number" placeholder="Betrag €" min="0.01" step="0.01" value={rompelExpForm.amount} onChange={e=>setRompelExpForm(f=>({...f,amount:e.target.value}))} style={{...inputS,...(isMobile?{}:{width:'110px'})}}/>
+              </div>
+              <input type="text" placeholder="Beschreibung" value={rompelExpForm.desc} onChange={e=>setRompelExpForm(f=>({...f,desc:e.target.value}))} style={{...inputS,flex:1,minWidth:0}}/>
+              <button onClick={addExpense} style={btnS('rgba(248,113,113,0.15)','#f87171')}>+ Hinzufügen</button>
             </div>
             {expenses.length === 0 ? (
               <p style={{color:'rgba(255,255,255,0.42)',fontSize:'13px',textAlign:'center',padding:'12px'}}>Keine offenen Kosten.</p>
             ) : (
               <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
                 {[...expenses].reverse().map(e=>(
-                  <div key={e.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 13px',background:e.settled?'rgba(255,255,255,0.03)':'rgba(248,113,113,0.04)',border:`1px solid ${e.settled?'rgba(255,255,255,0.08)':'rgba(248,113,113,0.1)'}`,borderRadius:'10px',opacity:e.settled?0.6:1}}>
-                    <button onClick={()=>toggleExpenseSettled(e.id)} title={e.settled?'Als abgerechnet markiert — Klick zum Zurücksetzen':'Als abgerechnet markieren (Person hat ihr Geld zurück)'}
-                      style={{width:'26px',height:'26px',borderRadius:'7px',background:e.settled?'rgba(74,222,128,0.15)':'rgba(255,255,255,0.06)',border:`1px solid ${e.settled?'rgba(74,222,128,0.4)':'rgba(255,255,255,0.15)'}`,color:e.settled?'#4ade80':'rgba(255,255,255,0.4)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'13px',fontWeight:'800'}}>
-                      {e.settled?'✓':''}
-                    </button>
-                    <span style={{fontSize:'12px',color:'rgba(255,255,255,0.58)',flexShrink:0,textDecoration:e.settled?'line-through':'none'}}>{e.date}</span>
-                    <span style={{fontWeight:'700',color:'#f87171',flexShrink:0,textDecoration:e.settled?'line-through':'none'}}>{Number(e.amount).toFixed(2)} €</span>
-                    <span style={{flex:1,fontSize:'13px',color:'rgba(255,255,255,0.6)',textDecoration:e.settled?'line-through':'none'}}>{e.desc}</span>
-                    {e.settled && <span style={{fontSize:'11px',fontWeight:'700',color:'#4ade80',flexShrink:0}}>abgerechnet</span>}
-                    <button onClick={()=>deleteExpense(e.id)} style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                      <Trash2 size={11}/>
-                    </button>
-                  </div>
+                  isMobile ? (
+                    <div key={e.id} style={{padding:'10px 12px',background:e.settled?'rgba(255,255,255,0.03)':'rgba(248,113,113,0.04)',border:`1px solid ${e.settled?'rgba(255,255,255,0.08)':'rgba(248,113,113,0.1)'}`,borderRadius:'10px',opacity:e.settled?0.6:1,display:'flex',flexDirection:'column',gap:'4px'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                        <button onClick={()=>toggleExpenseSettled(e.id)} title={e.settled?'Als abgerechnet markiert — Klick zum Zurücksetzen':'Als abgerechnet markieren (Person hat ihr Geld zurück)'}
+                          style={{width:'26px',height:'26px',borderRadius:'7px',background:e.settled?'rgba(74,222,128,0.15)':'rgba(255,255,255,0.06)',border:`1px solid ${e.settled?'rgba(74,222,128,0.4)':'rgba(255,255,255,0.15)'}`,color:e.settled?'#4ade80':'rgba(255,255,255,0.4)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'13px',fontWeight:'800'}}>
+                          {e.settled?'✓':''}
+                        </button>
+                        <span style={{fontWeight:'700',color:'#f87171',fontSize:'14px',textDecoration:e.settled?'line-through':'none',flex:1}}>{Number(e.amount).toFixed(2)} €</span>
+                        {e.settled && <span style={{fontSize:'10px',fontWeight:'700',color:'#4ade80',flexShrink:0}}>abgerechnet</span>}
+                        <button onClick={()=>deleteExpense(e.id)} style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                          <Trash2 size={11}/>
+                        </button>
+                      </div>
+                      <span style={{fontSize:'11px',color:'rgba(255,255,255,0.58)',paddingLeft:'34px',textDecoration:e.settled?'line-through':'none'}}>{e.date}</span>
+                      {e.desc && <span style={{fontSize:'12px',color:'rgba(255,255,255,0.6)',paddingLeft:'34px',textDecoration:e.settled?'line-through':'none'}}>{e.desc}</span>}
+                    </div>
+                  ) : (
+                    <div key={e.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 13px',background:e.settled?'rgba(255,255,255,0.03)':'rgba(248,113,113,0.04)',border:`1px solid ${e.settled?'rgba(255,255,255,0.08)':'rgba(248,113,113,0.1)'}`,borderRadius:'10px',opacity:e.settled?0.6:1}}>
+                      <button onClick={()=>toggleExpenseSettled(e.id)} title={e.settled?'Als abgerechnet markiert — Klick zum Zurücksetzen':'Als abgerechnet markieren (Person hat ihr Geld zurück)'}
+                        style={{width:'26px',height:'26px',borderRadius:'7px',background:e.settled?'rgba(74,222,128,0.15)':'rgba(255,255,255,0.06)',border:`1px solid ${e.settled?'rgba(74,222,128,0.4)':'rgba(255,255,255,0.15)'}`,color:e.settled?'#4ade80':'rgba(255,255,255,0.4)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'13px',fontWeight:'800'}}>
+                        {e.settled?'✓':''}
+                      </button>
+                      <span style={{fontSize:'12px',color:'rgba(255,255,255,0.58)',flexShrink:0,textDecoration:e.settled?'line-through':'none'}}>{e.date}</span>
+                      <span style={{fontWeight:'700',color:'#f87171',flexShrink:0,textDecoration:e.settled?'line-through':'none'}}>{Number(e.amount).toFixed(2)} €</span>
+                      <span style={{flex:1,fontSize:'13px',color:'rgba(255,255,255,0.6)',textDecoration:e.settled?'line-through':'none'}}>{e.desc}</span>
+                      {e.settled && <span style={{fontSize:'11px',fontWeight:'700',color:'#4ade80',flexShrink:0}}>abgerechnet</span>}
+                      <button onClick={()=>deleteExpense(e.id)} style={{width:'26px',height:'26px',borderRadius:'7px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#f87171',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                        <Trash2 size={11}/>
+                      </button>
+                    </div>
+                  )
                 ))}
               </div>
             )}
