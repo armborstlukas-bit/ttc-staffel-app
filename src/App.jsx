@@ -874,6 +874,7 @@ export default function TrainingsApp() {
   const [ptMatchDraft, setPtMatchDraft]                             = useState(null);
   const [ptArchiveExpanded, setPtArchiveExpanded]                     = useState({});
   const [ptDetailModal, setPtDetailModal]                           = useState(null);
+  const [ptRowExpandedId, setPtRowExpandedId]                       = useState(null);
   const [mannTeamFilter, setMannTeamFilter]                 = useState(null);
   const [showParentCompose, setShowParentCompose]           = useState(false);
   const [parentMsgTitle, setParentMsgTitle]                 = useState('');
@@ -4959,6 +4960,7 @@ export default function TrainingsApp() {
 
           const renderPtRow = pt => {
             const isArc=!!pt.archivedAt;
+            const isExpanded = ptRowExpandedId===pt.id;
             const myIdx=pt.players.findIndex(p=>p.childId===myChild.id);
             const stats=pt.players.map((_,i)=>({idx:i,wins:0,losses:0,setsWon:0,setsLost:0}));
             (pt.matches||[]).forEach(m=>{if(!m.result||m.notRanked)return;const{sets1,sets2}=m.result;stats[m.p1Idx].setsWon+=sets1;stats[m.p1Idx].setsLost+=sets2;stats[m.p2Idx].setsWon+=sets2;stats[m.p2Idx].setsLost+=sets1;if(sets1>sets2)stats[m.p1Idx].wins++;else stats[m.p2Idx].wins++;});
@@ -4974,21 +4976,60 @@ export default function TrainingsApp() {
             const done=(pt.matches||[]).filter(m=>m.result).length;
             const total=(pt.matches||[]).length;
             const dateStr=new Date(pt.archivedAt||pt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+
+            // Standings (Tabelle) für die aufgeklappte Ansicht
+            const standings = pt.finalStandings || [...stats].sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:(b.setsWon-b.setsLost)-(a.setsWon-a.setsLost)).map((s,place)=>({place:place+1,childId:pt.players[s.idx]?.childId,name:pt.players[s.idx]?.name||'?',wins:s.wins,losses:s.losses,setsWon:s.setsWon,setsLost:s.setsLost}));
+
             return(
-              <div key={pt.id} onClick={()=>setPtDetailModal(pt)}
-                style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 14px',background:'rgba(255,255,255,0.04)',borderRadius:'12px',border:`1px solid ${isArc?'rgba(74,222,128,0.15)':'rgba(167,139,250,0.15)'}`,cursor:'pointer'}}>
-                <span style={{fontSize:'22px',flexShrink:0}}>{isArc?(placeEmojiPT[myEntry?.place-1]||(myEntry?.place+'.')):'🎯'}</span>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap',marginBottom:'2px'}}>
-                    {isArc
-                      ?<span style={{fontWeight:'800',color:'white',fontSize:'14px'}}>Platz {myEntry?.place}</span>
-                      :<span style={{fontWeight:'800',color:'#fde68a',fontSize:'14px'}}>Laufend {done}/{total}</span>}
-                    <span style={{fontSize:'11px',color:'rgba(167,139,250,0.6)',fontWeight:'600'}}>{pt.players.length}er Gruppe</span>
-                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.42)'}}>{dateStr}</span>
+              <div key={pt.id} style={{background:'rgba(255,255,255,0.04)',borderRadius:'12px',border:`1px solid ${isArc?'rgba(74,222,128,0.15)':'rgba(167,139,250,0.15)'}`,overflow:'hidden'}}>
+                <div onClick={()=>setPtRowExpandedId(isExpanded?null:pt.id)}
+                  style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 14px',cursor:'pointer'}}>
+                  <span style={{fontSize:'22px',flexShrink:0}}>{isArc?(placeEmojiPT[myEntry?.place-1]||(myEntry?.place+'.')):'🎯'}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap',marginBottom:'2px'}}>
+                      {isArc
+                        ?<span style={{fontWeight:'800',color:'white',fontSize:'14px'}}>Platz {myEntry?.place}</span>
+                        :<span style={{fontWeight:'800',color:'#fde68a',fontSize:'14px'}}>Laufend {done}/{total}</span>}
+                      <span style={{fontSize:'11px',color:'rgba(167,139,250,0.6)',fontWeight:'600'}}>{pt.players.length}er Gruppe</span>
+                      <span style={{fontSize:'11px',color:'rgba(255,255,255,0.42)'}}>{dateStr}</span>
+                    </div>
+                    {myEntry&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.52)'}}>{myEntry.wins}S {myEntry.losses}N · Sätze {myEntry.setsWon}:{myEntry.setsLost}</p>}
                   </div>
-                  {myEntry&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.52)'}}>{myEntry.wins}S {myEntry.losses}N · Sätze {myEntry.setsWon}:{myEntry.setsLost}</p>}
+                  <span style={{fontSize:'13px',color:'rgba(167,139,250,0.5)',flexShrink:0,transform:isExpanded?'rotate(180deg)':'none',transition:'transform 0.15s'}}>▼</span>
                 </div>
-                <span style={{fontSize:'15px',color:'rgba(167,139,250,0.3)',flexShrink:0}}>›</span>
+                {isExpanded&&(
+                  <div style={{padding:'0 14px 16px'}}>
+                    <p style={{margin:'0 0 8px',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.5)',textTransform:'uppercase',letterSpacing:'1.5px'}}>Tabelle</p>
+                    <div style={{display:'grid',gap:'4px',marginBottom:'16px'}}>
+                      {standings.map(st=>(
+                        <div key={st.childId||st.name} style={{display:'flex',alignItems:'center',gap:'10px',padding:'7px 10px',background:st.childId===myChild.id?'rgba(167,139,250,0.1)':'rgba(255,255,255,0.03)',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.05)'}}>
+                          <span style={{fontSize:'15px',flexShrink:0}}>{placeEmojiPT[st.place-1]||(st.place+'.')}</span>
+                          <div style={{flex:1,minWidth:0}}>
+                            <p style={{margin:0,fontWeight:'700',color:'white',fontSize:'12px'}}>{st.name}</p>
+                            <p style={{margin:0,fontSize:'10px',color:'rgba(255,255,255,0.5)'}}>{st.wins}S {st.losses}N · Sätze {st.setsWon}:{st.setsLost}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p style={{margin:'0 0 8px',fontSize:'10px',fontWeight:'800',color:'rgba(167,139,250,0.5)',textTransform:'uppercase',letterSpacing:'1.5px'}}>Einzelspiele</p>
+                    <div style={{display:'grid',gap:'5px'}}>
+                      {(pt.matches||[]).map((m,mi)=>{
+                        const p1=pt.players[m.p1Idx], p2=pt.players[m.p2Idx];
+                        const res=m.result;
+                        const isMyMatch = m.p1Idx===myIdx||m.p2Idx===myIdx;
+                        return (
+                          <div key={mi} style={{display:'flex',alignItems:'center',gap:'8px',padding:'7px 10px',background:isMyMatch?'rgba(167,139,250,0.07)':'rgba(255,255,255,0.025)',borderRadius:'8px'}}>
+                            <span style={{flex:1,fontSize:'12px',color:res&&res.sets1>res.sets2?'white':'rgba(255,255,255,0.5)',fontWeight:res&&res.sets1>res.sets2?'700':'400',textAlign:'right'}}>{p1?.name||'?'}</span>
+                            <span style={{fontSize:'13px',fontWeight:'800',color:res?'#a78bfa':'rgba(255,255,255,0.25)',minWidth:'34px',textAlign:'center',flexShrink:0}}>{res?`${res.sets1}:${res.sets2}`:'–:–'}</span>
+                            <span style={{flex:1,fontSize:'12px',color:res&&res.sets2>res.sets1?'white':'rgba(255,255,255,0.5)',fontWeight:res&&res.sets2>res.sets1?'700':'400'}}>{p2?.name||'?'}</span>
+                            {m.notRanked&&<span style={{fontSize:'9px',fontWeight:'700',color:'#fbbf24',flexShrink:0}}>🚫</span>}
+                          </div>
+                        );
+                      })}
+                      {(pt.matches||[]).length===0&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.4)',textAlign:'center',padding:'10px'}}>Keine Spiele.</p>}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           };
