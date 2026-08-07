@@ -9750,6 +9750,10 @@ export default function TrainingsApp() {
 
     const isDraftValid = () => {
       if (!ptMatchDraft) return false;
+      // "Nicht in die Wertung"-Matches brauchen kein gültiges Wett­kampf-Ergebnis (z.B. bei
+      // Geschwisterkindern reicht, dass gespielt wurde) — sonst blieb der Speichern-Button
+      // grundlos deaktiviert, obwohl gar keine Wertung mehr nötig ist.
+      if (ptMatchDraft.notRanked) return true;
       if (ptMatchDraft.mode==='scores') {
         const valid = ptMatchDraft.scores.filter(r=>r.s1!==''&&r.s2!==''&&Number(r.s1)!==Number(r.s2));
         const s1=valid.filter(r=>Number(r.s1)>Number(r.s2)).length;
@@ -9770,7 +9774,7 @@ export default function TrainingsApp() {
         const s2=validScores.filter(r=>r.s2>r.s1).length;
         result = {sets1:s1, sets2:s2, scores:validScores};
       } else {
-        result = {sets1:ptMatchDraft.sets1, sets2:ptMatchDraft.sets2, scores:[]};
+        result = {sets1:ptMatchDraft.sets1||0, sets2:ptMatchDraft.sets2||0, scores:[]};
       }
       updateMatchResult(ptMatchEditing, result, ptMatchDraft.notRanked);
       setPtMatchEditing(null);
