@@ -5105,7 +5105,7 @@ export default function TrainingsApp() {
             const mpt=ptDetailModal;const mPlayers=mpt.players||[];const mMatches=mpt.matches||[];const isArchived=!!mpt.archivedAt;
             const placeEmojiM=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
             const mStats=mPlayers.map((_,i)=>({idx:i,wins:0,losses:0,setsWon:0,setsLost:0}));
-            mMatches.forEach(m=>{if(!m.result)return;const{sets1,sets2}=m.result;mStats[m.p1Idx].setsWon+=sets1;mStats[m.p1Idx].setsLost+=sets2;mStats[m.p2Idx].setsWon+=sets2;mStats[m.p2Idx].setsLost+=sets1;if(sets1>sets2){mStats[m.p1Idx].wins++;mStats[m.p2Idx].losses++;}else{mStats[m.p2Idx].wins++;mStats[m.p1Idx].losses++;}});
+            mMatches.forEach(m=>{if(!m.result||m.notRanked)return;const{sets1,sets2}=m.result;mStats[m.p1Idx].setsWon+=sets1;mStats[m.p1Idx].setsLost+=sets2;mStats[m.p2Idx].setsWon+=sets2;mStats[m.p2Idx].setsLost+=sets1;if(sets1>sets2){mStats[m.p1Idx].wins++;mStats[m.p2Idx].losses++;}else{mStats[m.p2Idx].wins++;mStats[m.p1Idx].losses++;}});
             const mStandings=(mpt.finalStandings||(()=>[...mStats].sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:(b.setsWon-b.setsLost)-(a.setsWon-a.setsLost)).map((s,place)=>({place:place+1,childId:mPlayers[s.idx]?.childId,name:mPlayers[s.idx]?.name||'?',wins:s.wins,losses:s.losses,setsWon:s.setsWon,setsLost:s.setsLost})))());
             const numRoundsM=mPlayers.length%2===0?mPlayers.length-1:mPlayers.length;
             const roundsM=Array.from({length:numRoundsM},(_,i)=>i+1);
@@ -5521,7 +5521,7 @@ export default function TrainingsApp() {
           const isArchived=!!mpt.archivedAt;
           const placeEmojiM=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
           const mStats=mPlayers.map((_,i)=>({idx:i,wins:0,losses:0,setsWon:0,setsLost:0}));
-          mMatches.forEach(m=>{if(!m.result)return;const{sets1,sets2}=m.result;mStats[m.p1Idx].setsWon+=sets1;mStats[m.p1Idx].setsLost+=sets2;mStats[m.p2Idx].setsWon+=sets2;mStats[m.p2Idx].setsLost+=sets1;if(sets1>sets2){mStats[m.p1Idx].wins++;mStats[m.p2Idx].losses++;}else{mStats[m.p2Idx].wins++;mStats[m.p1Idx].losses++;}});
+          mMatches.forEach(m=>{if(!m.result||m.notRanked)return;const{sets1,sets2}=m.result;mStats[m.p1Idx].setsWon+=sets1;mStats[m.p1Idx].setsLost+=sets2;mStats[m.p2Idx].setsWon+=sets2;mStats[m.p2Idx].setsLost+=sets1;if(sets1>sets2){mStats[m.p1Idx].wins++;mStats[m.p2Idx].losses++;}else{mStats[m.p2Idx].wins++;mStats[m.p1Idx].losses++;}});
           const mStandings=(mpt.finalStandings||(()=>[...mStats].sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:(b.setsWon-b.setsLost)-(a.setsWon-a.setsLost)).map((s,place)=>({place:place+1,childId:mPlayers[s.idx]?.childId,name:mPlayers[s.idx]?.name||'?',wins:s.wins,losses:s.losses,setsWon:s.setsWon,setsLost:s.setsLost})))());
           const numRoundsM=mPlayers.length%2===0?mPlayers.length-1:mPlayers.length;
           const roundsM=Array.from({length:numRoundsM},(_,i)=>i+1);
@@ -5589,7 +5589,7 @@ export default function TrainingsApp() {
                   // Compute my current standing
                   const myIdx=pt.players.findIndex(p=>p.childId===myChild.id);
                   const stats=pt.players.map((_,i)=>({idx:i,wins:0,losses:0,setsWon:0,setsLost:0}));
-                  pt.matches.forEach(m=>{if(!m.result)return;const{sets1,sets2}=m.result;stats[m.p1Idx].setsWon+=sets1;stats[m.p1Idx].setsLost+=sets2;stats[m.p2Idx].setsWon+=sets2;stats[m.p2Idx].setsLost+=sets1;if(sets1>sets2)stats[m.p1Idx].wins++;else stats[m.p2Idx].wins++;});
+                  pt.matches.forEach(m=>{if(!m.result||m.notRanked)return;const{sets1,sets2}=m.result;stats[m.p1Idx].setsWon+=sets1;stats[m.p1Idx].setsLost+=sets2;stats[m.p2Idx].setsWon+=sets2;stats[m.p2Idx].setsLost+=sets1;if(sets1>sets2)stats[m.p1Idx].wins++;else stats[m.p2Idx].wins++;});
                   let myEntry=null;
                   if(pt.finalStandings){myEntry=pt.finalStandings.find(s=>s.childId===myChild.id);}
                   else{
@@ -5641,7 +5641,7 @@ export default function TrainingsApp() {
             const isArc=!!pt.archivedAt;
             const myIdx=pt.players.findIndex(p=>p.childId===myChild.id);
             const stats=pt.players.map((_,i)=>({idx:i,wins:0,losses:0,setsWon:0,setsLost:0}));
-            (pt.matches||[]).forEach(m=>{if(!m.result)return;const{sets1,sets2}=m.result;stats[m.p1Idx].setsWon+=sets1;stats[m.p1Idx].setsLost+=sets2;stats[m.p2Idx].setsWon+=sets2;stats[m.p2Idx].setsLost+=sets1;if(sets1>sets2)stats[m.p1Idx].wins++;else stats[m.p2Idx].wins++;});
+            (pt.matches||[]).forEach(m=>{if(!m.result||m.notRanked)return;const{sets1,sets2}=m.result;stats[m.p1Idx].setsWon+=sets1;stats[m.p1Idx].setsLost+=sets2;stats[m.p2Idx].setsWon+=sets2;stats[m.p2Idx].setsLost+=sets1;if(sets1>sets2)stats[m.p1Idx].wins++;else stats[m.p2Idx].wins++;});
             let myEntry=null;
             if(pt.finalStandings){myEntry=pt.finalStandings.find(s=>s.childId===myChild.id);}
             else{
@@ -6662,7 +6662,7 @@ export default function TrainingsApp() {
                 const isArchived=!!mpt.archivedAt;
                 const placeEmojiM=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
                 const mStats=mPlayers.map((_,i)=>({idx:i,wins:0,losses:0,setsWon:0,setsLost:0}));
-                mMatches.forEach(m=>{if(!m.result)return;const{sets1,sets2}=m.result;mStats[m.p1Idx].setsWon+=sets1;mStats[m.p1Idx].setsLost+=sets2;mStats[m.p2Idx].setsWon+=sets2;mStats[m.p2Idx].setsLost+=sets1;if(sets1>sets2){mStats[m.p1Idx].wins++;mStats[m.p2Idx].losses++;}else{mStats[m.p2Idx].wins++;mStats[m.p1Idx].losses++;}});
+                mMatches.forEach(m=>{if(!m.result||m.notRanked)return;const{sets1,sets2}=m.result;mStats[m.p1Idx].setsWon+=sets1;mStats[m.p1Idx].setsLost+=sets2;mStats[m.p2Idx].setsWon+=sets2;mStats[m.p2Idx].setsLost+=sets1;if(sets1>sets2){mStats[m.p1Idx].wins++;mStats[m.p2Idx].losses++;}else{mStats[m.p2Idx].wins++;mStats[m.p1Idx].losses++;}});
                 const mStandings=(mpt.finalStandings||(()=>[...mStats].sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:(b.setsWon-b.setsLost)-(a.setsWon-a.setsLost)).map((s,place)=>({place:place+1,childId:mPlayers[s.idx]?.childId,name:mPlayers[s.idx]?.name||'?',wins:s.wins,losses:s.losses,setsWon:s.setsWon,setsLost:s.setsLost})))());
                 const numRoundsM=mPlayers.length%2===0?mPlayers.length-1:mPlayers.length;
                 const roundsM=Array.from({length:numRoundsM},(_,i)=>i+1);
@@ -6729,7 +6729,7 @@ export default function TrainingsApp() {
                     const isArc=!!pt.archivedAt;
                     const myIdx=pt.players.findIndex(p=>p.childId===child.id);
                     const stats=pt.players.map((_,i)=>({idx:i,wins:0,losses:0,setsWon:0,setsLost:0}));
-                    pt.matches.forEach(m=>{if(!m.result)return;const{sets1,sets2}=m.result;stats[m.p1Idx].setsWon+=sets1;stats[m.p1Idx].setsLost+=sets2;stats[m.p2Idx].setsWon+=sets2;stats[m.p2Idx].setsLost+=sets1;if(sets1>sets2)stats[m.p1Idx].wins++;else stats[m.p2Idx].wins++;});
+                    pt.matches.forEach(m=>{if(!m.result||m.notRanked)return;const{sets1,sets2}=m.result;stats[m.p1Idx].setsWon+=sets1;stats[m.p1Idx].setsLost+=sets2;stats[m.p2Idx].setsWon+=sets2;stats[m.p2Idx].setsLost+=sets1;if(sets1>sets2)stats[m.p1Idx].wins++;else stats[m.p2Idx].wins++;});
                     let fs3=null;
                     if(pt.finalStandings){fs3=pt.finalStandings.find(s=>s.childId===child.id);}
                     else{
@@ -8963,7 +8963,7 @@ export default function TrainingsApp() {
                     ];
                   }
                   const stats3=pt.players.map((_,i)=>({idx:i,wins:0,losses:0,setsWon:0,setsLost:0,ptsWon:0,ptsLost:0}));
-                  pt.matches.forEach(m=>{if(!m.result)return;const{sets1,sets2,scores}=m.result;stats3[m.p1Idx].setsWon+=sets1;stats3[m.p1Idx].setsLost+=sets2;stats3[m.p2Idx].setsWon+=sets2;stats3[m.p2Idx].setsLost+=sets1;if(sets1>sets2){stats3[m.p1Idx].wins++;}else{stats3[m.p2Idx].wins++;}if(scores)scores.forEach(({s1,s2})=>{stats3[m.p1Idx].ptsWon+=Number(s1||0);stats3[m.p1Idx].ptsLost+=Number(s2||0);stats3[m.p2Idx].ptsWon+=Number(s2||0);stats3[m.p2Idx].ptsLost+=Number(s1||0);});});
+                  pt.matches.forEach(m=>{if(!m.result||m.notRanked)return;const{sets1,sets2,scores}=m.result;stats3[m.p1Idx].setsWon+=sets1;stats3[m.p1Idx].setsLost+=sets2;stats3[m.p2Idx].setsWon+=sets2;stats3[m.p2Idx].setsLost+=sets1;if(sets1>sets2){stats3[m.p1Idx].wins++;}else{stats3[m.p2Idx].wins++;}if(scores)scores.forEach(({s1,s2})=>{stats3[m.p1Idx].ptsWon+=Number(s1||0);stats3[m.p1Idx].ptsLost+=Number(s2||0);stats3[m.p2Idx].ptsWon+=Number(s2||0);stats3[m.p2Idx].ptsLost+=Number(s1||0);});});
                   const sorted3=[...stats3].sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:(b.setsWon-b.setsLost)-(a.setsWon-a.setsLost)||(b.ptsWon-b.ptsLost)-(a.ptsWon-a.ptsLost));
                   return sorted3.map((s,place)=>({place:place+1,childId:pt.players[s.idx].childId,name:pt.players[s.idx].name,seed:pt.players[s.idx].seed,wins:s.wins,losses:s.losses,setsWon:s.setsWon,setsLost:s.setsLost,ptsWon:s.ptsWon,ptsLost:s.ptsLost}));
                 })();
@@ -9704,8 +9704,8 @@ export default function TrainingsApp() {
     const placeEmoji = ['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
     const placeColor = ['#fde68a','#e2e8f0','#fdba74','rgba(255,255,255,0.35)'];
 
-    const updateMatchResult = (matchIdx, result) => {
-      const updMatches = matches.map((m,i) => i===matchIdx ? {...m,result} : m);
+    const updateMatchResult = (matchIdx, result, notRanked) => {
+      const updMatches = matches.map((m,i) => i===matchIdx ? {...m,result,notRanked:!!notRanked} : m);
       savePracticeTournaments({...practiceTournaments, [pt.id]: {...pt, matches:updMatches}});
     };
 
@@ -9739,10 +9739,11 @@ export default function TrainingsApp() {
 
     const initDraft = (matchIdx) => {
       const existing = matches[matchIdx].result;
+      const notRankedExisting = !!matches[matchIdx].notRanked;
       if (settings.trackSetScores) {
-        setPtMatchDraft({mode:'scores', scores:existing?.scores?.map(s=>({s1:String(s.s1),s2:String(s.s2)}))||[{s1:'',s2:''}]});
+        setPtMatchDraft({mode:'scores', scores:existing?.scores?.map(s=>({s1:String(s.s1),s2:String(s.s2)}))||[{s1:'',s2:''}], notRanked:notRankedExisting});
       } else {
-        setPtMatchDraft({mode:'simple', sets1:existing?.sets1||0, sets2:existing?.sets2||0});
+        setPtMatchDraft({mode:'simple', sets1:existing?.sets1||0, sets2:existing?.sets2||0, notRanked:notRankedExisting});
       }
       setPtMatchEditing(matchIdx);
     };
@@ -9771,7 +9772,7 @@ export default function TrainingsApp() {
       } else {
         result = {sets1:ptMatchDraft.sets1, sets2:ptMatchDraft.sets2, scores:[]};
       }
-      updateMatchResult(ptMatchEditing, result);
+      updateMatchResult(ptMatchEditing, result, ptMatchDraft.notRanked);
       setPtMatchEditing(null);
       setPtMatchDraft(null);
     };
@@ -9869,6 +9870,7 @@ export default function TrainingsApp() {
                             : <span style={{fontSize:'13px',color:'rgba(255,255,255,0.4)',fontWeight:'600'}}>vs</span>
                           }
                           {match.handicap&&<p style={{margin:'2px 0 0',fontSize:'10px',color:'rgba(253,230,138,0.6)',fontWeight:'600'}}>Vorgabe {match.handicap.points}P</p>}
+                          {match.notRanked&&<p style={{margin:'2px 0 0',fontSize:'9px',color:'#fbbf24',fontWeight:'700'}}>🚫 n. gewertet</p>}
                         </div>
 
                         {/* Spieler 2 */}
@@ -9971,6 +9973,11 @@ export default function TrainingsApp() {
                             </>
                           )}
 
+                          <button type="button" onClick={()=>setPtMatchDraft(d=>({...d,notRanked:!d.notRanked}))}
+                            title="Zählt weder als Sieg noch als Niederlage — Match gilt trotzdem als gespielt (z.B. bei Geschwisterkindern)"
+                            style={{display:'inline-flex',alignItems:'center',gap:'6px',padding:'6px 10px',marginBottom:'10px',borderRadius:'20px',border:`1px solid ${ptMatchDraft.notRanked?'#fbbf24':'rgba(255,255,255,0.15)'}`,background:ptMatchDraft.notRanked?'rgba(251,191,36,0.15)':'rgba(255,255,255,0.04)',color:ptMatchDraft.notRanked?'#fbbf24':'rgba(255,255,255,0.4)',cursor:'pointer',fontSize:'11px',fontWeight:'700'}}>
+                            🚫 Nicht in die Wertung
+                          </button>
                           <div style={{display:'flex',gap:'8px',marginTop:'4px'}}>
                             {res&&<button onClick={()=>{deleteResult(matchIdx);setPtMatchEditing(null);setPtMatchDraft(null);}}
                               style={{padding:'8px 10px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',borderRadius:'8px',cursor:'pointer',color:'#f87171',fontWeight:'700',fontSize:'12px'}}>
