@@ -854,6 +854,7 @@ export default function TrainingsApp() {
   const [ptCreating, setPtCreating]                                 = useState(false);
   const [ptCreateStep, setPtCreateStep]                             = useState(1);
   const [ptCreateForm, setPtCreateForm]                             = useState({type:'4er_gruppe',winSets:2,groupSize:4,setLength:11,deciderLength:7,trackSetScores:false,deciderCustom:false,handicap:false,handicapPerTTR:60,handicapMax:6,doubleElim:false,teamSize:2,teamSystem:'kingsCup'});
+  const [ptGroupConfig, setPtGroupConfig]                           = useState(null); // { numGroups, groupSizes, advancePerGroup, wildcards } — Turniermodus (Gruppenphase + gesetzter KO-Baum)
   const [ptTeamOrderA, setPtTeamOrderA]                             = useState([]);
   const [ptTeamOrderB, setPtTeamOrderB]                             = useState([]);
   const [ptTeamNameA, setPtTeamNameA]                               = useState('Mannschaft A');
@@ -8228,7 +8229,10 @@ export default function TrainingsApp() {
   if (view === 'practiceTournaments') {
     const jugendSubs = Object.values(subgroups).filter(sg => sg.groupId === 'jugend');
     const allPTList = Object.values(practiceTournaments).sort((a,b) => b.createdAt.localeCompare(a.createdAt));
-    const maxPlayers = ptCreateForm.type==='team' ? (ptCreateForm.teamSize*2) : (ptCreateForm.groupSize || 4);
+    // Nur beim Mannschaftsspiel gibt's eine feste Spieleranzahl — Rundenturnier, KO Runde
+    // und Turniermodus lassen frei wählen (Gruppengröße/Bracket ergibt sich automatisch
+    // aus der Anzahl ausgewählter Spieler).
+    const maxPlayers = ptCreateForm.type==='team' ? (ptCreateForm.teamSize*2) : Infinity;
 
     const getSeededPlayers = (ids) => ids
       .map(id => {
@@ -8278,6 +8282,89 @@ export default function TrainingsApp() {
       setPtSelectedAktive([]); setPtManualPlayers([]); setPtPlayerSearch(''); setPtShowManualForm(false);
       setPtTeamOrderA([]); setPtTeamOrderB([]); setPtTeamNameA('Mannschaft A'); setPtTeamNameB('Mannschaft B');
       setPtDoublesSeqA([]); setPtDoublesSeqB([]);
+    };
+
+    // ── Turniermodus: Gruppenphase + gesetzter KO-Baum ──────────────────────
+    // Schlägt anhand der Spieleranzahl eine sinnvolle Gruppeneinteilung vor: Zielgröße
+    // 4 pro Gruppe (3–5 toleriert), mindestens 2 Gruppen. Die Top-Platzierten je Gruppe
+    // kommen automatisch weiter, zusätzliche "Wildcard"-Plätze (beste Nicht-Automatiker
+    // gruppenübergreifend) füllen den KO-Baum auf die nächste sinnvolle Größe auf.
+    const suggestGroupConfig = (N) => {
+      let bestNumGroups = 2, bestScore = Infinity;
+      for (let g = 2; g <= Math.max(2, Math.floor(N/3)); g++) {
+        const avg = N / g;
+        if (avg < 3) continue;
+        const score = Math.abs(avg - 4);
+        if (score < bestScore) { bestScore = score; bestNumGroups = g; }
+      }
+      const numGroups = bestNumGroups;
+      const base = Math.floor(N / numGroups), extra = N % numGroups;
+      const groupSizes = Array.from({length:numGroups}, (_, i) => base + (i < extra ? 1 : 0));
+      const advancePerGroup = 2;
+      const totalAuto = numGroups * advancePerGroup;
+      const bracketTarget = Math.pow(2, Math.ceil(Math.log2(Math.max(totalAuto, 2))));
+      const wildcards = Math.max(0, bracketTarget - totalAuto);
+      return { numGroups, groupSizes, advancePerGroup, wildcards };
+    };
+    // Schlangen-Verteilung (Snake Draft): Seed 1 → Gruppe A, Seed 2 → Gruppe B, ...,
+    // dann rückwärts wieder zu Gruppe A usw. — verteilt starke/schwache Spieler gleichmäßig
+    // auf alle Gruppen, statt dass eine Gruppe zufällig nur Spitzenspieler bekommt.
+    const distributeSnake = (seededList, numGroups) => {
+      const groups = Array.from({length:numGroups}, () => []);
+      let dir = 1, g = 0;
+      seededList.forEach(p => {
+        groups[g].push(p);
+        if (dir===1) { if (g===numGroups-1) dir=-1; else g++; }
+        else { if (g===0) dir=1; else g--; }
+      });
+      return groups;
+    };
+    const getKoSlots = (size) => { if(size===1) return [0]; const prev=getKoSlots(size/2); const result=new Array(size); for(let i=0;i<size/2;i++){result[2*i]=prev[i];result[2*i+1]=size-1-prev[i];} return result; };
+
+    const startTurniermodusTournament = () => {
+      const seeded = getAllSeeded();
+      const cfg = ptGroupConfig || suggestGroupConfig(seeded.length);
+      const groupsPlayers = distributeSnake(seeded, cfg.numGroups);
+      const players = [];
+      const groupMeta = [];
+      groupsPlayers.forEach((gPlayers, gi) => {
+        const groupId = String.fromCharCode(65+gi);
+        const idxs = [];
+        gPlayers.forEach(p => { const idx = players.length; players.push({...p, seed:idx+1, groupId}); idxs.push(idx); });
+        groupMeta.push({ id:groupId, label:`Gruppe ${groupId}`, playerIdxs:idxs });
+      });
+      const matches = [];
+      groupMeta.forEach(g => {
+        const idxs = g.playerIdxs;
+        const n = idxs.length, hasBye = n % 2 === 1, N = hasBye ? n+1 : n;
+        const circle = Array.from({length:N}, (_,i) => i<n ? idxs[i] : -1);
+        const rotating = circle.slice(1);
+        for (let r=0; r<N-1; r++) {
+          const all = [circle[0], ...rotating];
+          for (let j=0; j<N/2; j++) {
+            const p1=all[j], p2=all[N-1-j];
+            if (p1!==-1 && p2!==-1) matches.push({groupId:g.id, round:r+1, p1Idx:p1, p2Idx:p2, result:null});
+          }
+          rotating.unshift(rotating.pop());
+        }
+      });
+      const id = 'pt_' + Date.now();
+      const newPT = {
+        id, type:'turniermodus', phase:'group',
+        createdAt: new Date().toISOString(),
+        createdBy: userProfile?.name || user?.email || 'Trainer',
+        settings: { winSets:ptCreateForm.winSets, setLength:ptCreateForm.setLength, deciderLength:ptCreateForm.deciderCustom?ptCreateForm.deciderLength:ptCreateForm.setLength, trackSetScores:ptCreateForm.trackSetScores, handicap:ptCreateForm.handicap, handicapPerTTR:ptCreateForm.handicapPerTTR||60, handicapMax:ptCreateForm.handicapMax },
+        players,
+        groups: groupMeta,
+        groupConfig: cfg,
+        doubleElim: ptCreateForm.doubleElim||false,
+        matches,
+        status:'active',
+      };
+      savePracticeTournaments({...practiceTournaments, [id]: newPT});
+      setActivePracticeId(id);
+      setPtCreating(false); setPtCreateStep(1); setPtGroupConfig(null); resetPtPlayerState();
+      navTo('practiceTournamentDetail');
     };
 
     // Anzahl Doppelpaare pro Mannschaftsgröße
@@ -8493,11 +8580,11 @@ export default function TrainingsApp() {
 
               {/* Step-Indicator */}
               <div style={{display:'flex',gap:'12px',marginBottom:'22px',alignItems:'center'}}>
-                {[{n:1,l:'Einstellungen'},{n:2,l:'Spieler'}].map(({n,l})=>(
+                {(ptCreateForm.type==='turniermodus'?[{n:1,l:'Einstellungen'},{n:2,l:'Spieler'},{n:3,l:'Gruppen'}]:[{n:1,l:'Einstellungen'},{n:2,l:'Spieler'}]).map(({n,l},i,arr)=>(
                   <div key={n} style={{display:'flex',alignItems:'center',gap:'6px'}}>
                     <div style={{width:'28px',height:'28px',borderRadius:'50%',background:ptCreateStep>=n?'#7c3aed':'#e5e7eb',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'13px',fontWeight:'800',color:'white'}}>{n}</div>
                     <span style={{fontSize:'12px',color:ptCreateStep>=n?'#7c3aed':'#9ca3af',fontWeight:'600'}}>{l}</span>
-                    {n<2&&<span style={{color:'#d1d5db',marginLeft:'4px'}}>›</span>}
+                    {i<arr.length-1&&<span style={{color:'#d1d5db',marginLeft:'4px'}}>›</span>}
                   </div>
                 ))}
                 <button onClick={()=>{setPtCreating(false);setPtCreateStep(1);resetPtPlayerState();}} style={{marginLeft:'auto',padding:'4px 10px',background:'#f3f4f6',border:'1px solid #e5e7eb',borderRadius:'8px',color:'#6b7280',cursor:'pointer',fontSize:'12px'}}>✕</button>
@@ -8507,27 +8594,21 @@ export default function TrainingsApp() {
               {ptCreateStep===1 && (
                 <>
                   <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.5px'}}>Wettkampftyp</p>
-                  <div style={{display:'flex',gap:'8px',marginBottom:'22px'}}>
-                    {[{v:'4er_gruppe',icon:'🎯',label:'Rundenturnier',desc:'Jeder gegen jeden'},{v:'ko_runde',icon:'🏆',label:'KO Runde',desc:'Turnierbaum · Double Elimination'},{v:'team',icon:'🤝',label:'Mannschaftsspiel',desc:'Team gegen Team'}].map(opt=>(
+                  <div style={{display:'flex',gap:'8px',marginBottom:'22px',flexWrap:'wrap'}}>
+                    {[{v:'4er_gruppe',icon:'🎯',label:'Rundenturnier',desc:'Jeder gegen jeden'},{v:'ko_runde',icon:'🏆',label:'KO Runde',desc:'Turnierbaum · Double Elimination'},{v:'turniermodus',icon:'🏅',label:'Turniermodus',desc:'Gruppenphase + gesetzter KO-Baum'},{v:'team',icon:'🤝',label:'Mannschaftsspiel',desc:'Team gegen Team'}].map(opt=>(
                       <button key={opt.v} onClick={()=>setPtCreateForm(f=>({...f,type:opt.v}))}
-                        style={{flex:1,padding:'12px 10px',border:`2px solid ${ptCreateForm.type===opt.v?'#7c3aed':'#e5e7eb'}`,borderRadius:'12px',background:ptCreateForm.type===opt.v?'rgba(124,58,237,0.08)':'#f9fafb',cursor:'pointer',textAlign:'left',transition:'all 0.1s'}}>
+                        style={{flex:'1 1 140px',padding:'12px 10px',border:`2px solid ${ptCreateForm.type===opt.v?'#7c3aed':'#e5e7eb'}`,borderRadius:'12px',background:ptCreateForm.type===opt.v?'rgba(124,58,237,0.08)':'#f9fafb',cursor:'pointer',textAlign:'left',transition:'all 0.1s'}}>
                         <div style={{fontSize:'20px',marginBottom:'3px'}}>{opt.icon}</div>
                         <div style={{fontWeight:'800',color:ptCreateForm.type===opt.v?'#7c3aed':'#1f2937',fontSize:'13px'}}>{opt.label}</div>
                         <div style={{fontSize:'10px',color:'#9ca3af',marginTop:'1px'}}>{opt.desc}</div>
                       </button>
                     ))}
                   </div>
-                  {ptCreateForm.type!=='ko_runde'&&ptCreateForm.type!=='team'&&<>
-                  <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.5px'}}>Gruppengröße</p>
-                  <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'22px'}}>
-                    {Array.from({length:28},(_,i)=>i+3).map(n=>(
-                      <button key={n} onClick={()=>setPtCreateForm(f=>({...f,groupSize:n}))}
-                        style={{...ptBtn(ptCreateForm.groupSize===n),flex:'none',width:'42px',fontSize:'15px'}}>
-                        {n}
-                      </button>
-                    ))}
-                  </div>
-                  </>}
+                  {ptCreateForm.type==='turniermodus'&&(
+                    <div style={{padding:'12px 14px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'12px',marginBottom:'22px'}}>
+                      <p style={{margin:0,fontSize:'12px',color:'#555',lineHeight:'1.5'}}>Erst spielt jede Gruppe "jeder gegen jeden", danach kommen die Besten in einen gesetzten KO-Baum. Gruppeneinteilung und Anzahl der Weiterkommenden schlage ich im nächsten Schritt automatisch vor, du kannst sie anpassen.</p>
+                    </div>
+                  )}
                   {ptCreateForm.type==='team'&&<>
                   <p style={{margin:'0 0 10px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.5px'}}>Mannschaftsgröße</p>
                   <div style={{display:'flex',gap:'6px',marginBottom:'18px'}}>
@@ -8572,7 +8653,7 @@ export default function TrainingsApp() {
                     </div>
                   )}
                   </>}
-                  {ptCreateForm.type==='ko_runde'&&(
+                  {(ptCreateForm.type==='ko_runde'||ptCreateForm.type==='turniermodus')&&(
                     <div style={{display:'flex',alignItems:'flex-start',gap:'12px',marginBottom:'20px',padding:'12px 14px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'12px'}}>
                       <button onClick={()=>setPtCreateForm(f=>({...f,doubleElim:!f.doubleElim}))}
                         style={{width:'22px',height:'22px',borderRadius:'6px',border:`2px solid ${ptCreateForm.doubleElim?'#7c3aed':'#d1d5db'}`,background:ptCreateForm.doubleElim?'rgba(124,58,237,0.1)':'transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginTop:'1px'}}>
@@ -8696,13 +8777,16 @@ export default function TrainingsApp() {
               {/* Step 2: Spieler */}
               {ptCreateStep===2 && (()=>{
                 const isKo = ptCreateForm.type==='ko_runde';
+                const isTurnier = ptCreateForm.type==='turniermodus';
+                const isFreeCount = isKo || isTurnier || ptCreateForm.type==='4er_gruppe'; // keine feste Spieleranzahl, nur Minimum
                 const isTeam = ptCreateForm.type==='team';
                 const allSeeded = seededPreview; // already computed via getAllSeeded()
                 const totalSelected = allSeeded.length;
                 const teamsComplete = ptTeamOrderA.length===ptCreateForm.teamSize && ptTeamOrderB.length===ptCreateForm.teamSize;
                 const doublesNeed = ptCreateForm.teamSize===2 ? 0 : teamDoublesCount(ptCreateForm.teamSize)*2;
                 const doublesComplete = doublesNeed===0 || (ptDoublesSeqA.length===doublesNeed && ptDoublesSeqB.length===doublesNeed);
-                const canStart = isKo ? totalSelected>=3 : isTeam ? (totalSelected===maxPlayers && teamsComplete && doublesComplete) : totalSelected===maxPlayers;
+                const minNeeded = isTurnier ? 6 : 3;
+                const canStart = isFreeCount ? totalSelected>=minNeeded : isTeam ? (totalSelected===maxPlayers && teamsComplete && doublesComplete) : totalSelected===maxPlayers;
 
                 const searchLower = ptPlayerSearch.toLowerCase().trim();
                 const aktiveList = Object.values(aktiveSpieler).sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
@@ -8717,7 +8801,7 @@ export default function TrainingsApp() {
                 );
 
                 const PlayerRow = ({id, name, sub, ttr, selected, onToggle, badgeLabel}) => {
-                  const disabled = !selected && !isKo && totalSelected>=maxPlayers;
+                  const disabled = !selected && !isFreeCount && totalSelected>=maxPlayers;
                   return (
                     <div onClick={()=>{if(disabled)return;onToggle();}}
                       style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 12px',borderRadius:'10px',border:`1.5px solid ${selected?'#7c3aed':'#e5e7eb'}`,background:selected?'rgba(124,58,237,0.06)':'#f9fafb',cursor:disabled?'not-allowed':'pointer',opacity:disabled?0.4:1,transition:'all 0.1s'}}>
@@ -8745,7 +8829,7 @@ export default function TrainingsApp() {
                 <>
                   <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'12px'}}>
                     <button onClick={()=>setPtCreateStep(1)} style={{padding:'6px 12px',background:'#f3f4f6',border:'1px solid #e5e7eb',borderRadius:'8px',color:'#6b7280',cursor:'pointer',fontSize:'13px',fontWeight:'600'}}>← Zurück</button>
-                    <h3 style={{margin:0,color:'#7c3aed',fontSize:'15px',fontWeight:'800'}}>Spieler ({totalSelected}{isKo?' (min. 3)':'/'+maxPlayers})</h3>
+                    <h3 style={{margin:0,color:'#7c3aed',fontSize:'15px',fontWeight:'800'}}>Spieler ({totalSelected}{isFreeCount?` (min. ${minNeeded})`:'/'+maxPlayers})</h3>
                   </div>
 
                   {/* Suche */}
@@ -8967,17 +9051,107 @@ export default function TrainingsApp() {
                     </div>
                   )}
 
-                  <button onClick={startTournament} disabled={!canStart}
+                  <button onClick={()=>{
+                      if(isTurnier){ setPtGroupConfig(suggestGroupConfig(totalSelected)); setPtCreateStep(3); return; }
+                      startTournament();
+                    }} disabled={!canStart}
                     style={{width:'100%',padding:'14px',background:canStart?'linear-gradient(135deg,#7c3aed,#6d28d9)':'#e5e7eb',color:canStart?'white':'#9ca3af',border:'none',borderRadius:'12px',cursor:canStart?'pointer':'not-allowed',fontWeight:'800',fontSize:'15px',opacity:canStart?1:0.7,transition:'all 0.15s'}}>
                     {canStart
-                      ?(isKo?`🏆 KO Turnier starten! (${totalSelected} Spieler)`:isTeam?'🤝 Mannschaftsspiel starten!':'🎮 Wettkampf starten!')
-                      :(isKo?`Mind. 3 Spieler auswählen (${totalSelected}/3)`
+                      ?(isKo?`🏆 KO Turnier starten! (${totalSelected} Spieler)`:isTurnier?`➡️ Weiter zur Gruppeneinteilung (${totalSelected} Spieler)`:isTeam?'🤝 Mannschaftsspiel starten!':'🎮 Wettkampf starten!')
+                      :(isFreeCount?`Mind. ${minNeeded} Spieler auswählen (${totalSelected}/${minNeeded})`
                         :isTeam?(totalSelected<maxPlayers?`Noch ${maxPlayers-totalSelected} Spieler auswählen`
                           :!teamsComplete?`Teams noch nicht vollständig (A: ${ptTeamOrderA.length}/${ptCreateForm.teamSize}, B: ${ptTeamOrderB.length}/${ptCreateForm.teamSize})`
                           :`Doppelaufstellung noch nicht vollständig (A: ${ptDoublesSeqA.length}/${doublesNeed}, B: ${ptDoublesSeqB.length}/${doublesNeed})`)
                         :`Noch ${maxPlayers-totalSelected} Spieler auswählen`)}
                   </button>
                 </>
+                );
+              })()}
+
+              {/* Step 3: Gruppeneinteilung (nur Turniermodus) */}
+              {ptCreateStep===3 && ptCreateForm.type==='turniermodus' && ptGroupConfig && (()=>{
+                const seeded = getAllSeeded();
+                const cfg = ptGroupConfig;
+                const groupsPreview = distributeSnake(seeded, cfg.numGroups);
+                const totalQualifiers = cfg.numGroups*cfg.advancePerGroup + cfg.wildcards;
+                const bracketSize = Math.pow(2, Math.ceil(Math.log2(Math.max(totalQualifiers,2))));
+                const updateCfg = (patch) => setPtGroupConfig(c=>{
+                  const next = {...c, ...patch};
+                  const tAuto = next.numGroups*next.advancePerGroup;
+                  const bt = Math.pow(2, Math.ceil(Math.log2(Math.max(tAuto,2))));
+                  if (patch.numGroups!==undefined || patch.advancePerGroup!==undefined) {
+                    next.wildcards = Math.max(0, bt-tAuto);
+                  }
+                  return next;
+                });
+                const maxGroups = Math.max(2, Math.floor(seeded.length/3));
+                return (
+                  <>
+                    <div style={{marginBottom:'18px',padding:'12px 14px',background:'#f5f3ff',border:'1px solid #ddd6fe',borderRadius:'12px'}}>
+                      <p style={{margin:0,fontSize:'12px',color:'#6d28d9',lineHeight:1.5}}>
+                        Vorschlag automatisch berechnet — du kannst Gruppenanzahl und Weiterkommende anpassen.
+                      </p>
+                    </div>
+
+                    <div style={{marginBottom:'16px'}}>
+                      <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'800',color:'#555'}}>Anzahl Gruppen</p>
+                      <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                        <button onClick={()=>updateCfg({numGroups:Math.max(2,cfg.numGroups-1)})} style={smBtn(false)}>−</button>
+                        <span style={{fontSize:'22px',fontWeight:'900',color:'#7c3aed',minWidth:'32px',textAlign:'center'}}>{cfg.numGroups}</span>
+                        <button onClick={()=>updateCfg({numGroups:Math.min(maxGroups,cfg.numGroups+1)})} style={smBtn(false)}>+</button>
+                        <span style={{fontSize:'12px',color:'#9ca3af'}}>Gruppen à ~{Math.round(seeded.length/cfg.numGroups)} Spieler</span>
+                      </div>
+                    </div>
+
+                    <div style={{marginBottom:'16px'}}>
+                      <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'800',color:'#555'}}>Weiterkommende pro Gruppe (automatisch)</p>
+                      <div style={{display:'flex',gap:'8px'}}>
+                        {[1,2,3].map(n=>(
+                          <button key={n} onClick={()=>updateCfg({advancePerGroup:n})}
+                            style={{flex:1,padding:'10px',borderRadius:'10px',border:`1.5px solid ${cfg.advancePerGroup===n?'#7c3aed':'#e5e7eb'}`,background:cfg.advancePerGroup===n?'rgba(124,58,237,0.08)':'#f9fafb',color:cfg.advancePerGroup===n?'#7c3aed':'#555',fontWeight:'800',cursor:'pointer'}}>
+                            {n}.-{n===1?'Platz':'Plätze'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{marginBottom:'16px'}}>
+                      <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'800',color:'#555'}}>Zusätzliche Wildcards (beste weitere Platzierte)</p>
+                      <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                        <button onClick={()=>updateCfg({wildcards:Math.max(0,cfg.wildcards-1)})} style={smBtn(false)}>−</button>
+                        <span style={{fontSize:'22px',fontWeight:'900',color:'#7c3aed',minWidth:'32px',textAlign:'center'}}>{cfg.wildcards}</span>
+                        <button onClick={()=>updateCfg({wildcards:cfg.wildcards+1})} style={smBtn(false)}>+</button>
+                      </div>
+                      <p style={{margin:'6px 0 0',fontSize:'11px',color:'#9ca3af'}}>
+                        {cfg.numGroups*cfg.advancePerGroup} automatisch + {cfg.wildcards} Wildcard(s) = {totalQualifiers} Qualifizierte → KO-Baum mit {bracketSize} Plätzen
+                      </p>
+                    </div>
+
+                    <div style={{marginBottom:'18px'}}>
+                      <p style={{margin:'0 0 8px',fontSize:'11px',fontWeight:'800',color:'#7c3aed',textTransform:'uppercase',letterSpacing:'0.4px'}}>Gruppenvorschau (Setzung per Schlangen-System)</p>
+                      <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+                        {groupsPreview.map((gPlayers,gi)=>(
+                          <div key={gi} style={{padding:'10px 12px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'10px'}}>
+                            <p style={{margin:'0 0 4px',fontSize:'11px',fontWeight:'800',color:'#7c3aed'}}>Gruppe {String.fromCharCode(65+gi)}</p>
+                            {gPlayers.map((p,pi)=>(
+                              <p key={p.childId} style={{margin:'2px 0',fontSize:'12px',color:'#374151'}}>{pi+1}. {p.name}{p.maxTTR>0?` (TTR ${p.maxTTR})`:''}</p>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{display:'flex',gap:'10px'}}>
+                      <button onClick={()=>setPtCreateStep(2)}
+                        style={{flex:'0 0 auto',padding:'14px 18px',background:'#f3f4f6',color:'#555',border:'1px solid #e5e7eb',borderRadius:'12px',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>
+                        ← Zurück
+                      </button>
+                      <button onClick={startTurniermodusTournament}
+                        style={{flex:1,padding:'14px',background:'linear-gradient(135deg,#7c3aed,#6d28d9)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'800',fontSize:'15px'}}>
+                        🏅 Turniermodus starten!
+                      </button>
+                    </div>
+                  </>
                 );
               })()}
             </div>
@@ -9702,6 +9876,234 @@ export default function TrainingsApp() {
                   {teamWinner ? <>Sieger: <strong style={{color:'#fde68a'}}>{teamWinner==='A'?teamA.name:teamB.name}</strong></> : 'Unentschieden'}
                 </p>
                 <button onClick={archiveTeamTournament} style={{padding:'12px 28px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'800',fontSize:'14px',display:'inline-flex',alignItems:'center',gap:'8px'}}><Archive size={16}/> Archivieren</button>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ── Turniermodus Detail: Gruppenphase ───────────────────────────────────
+    // Nach Abschluss der Gruppenphase wird dasselbe Dokument in-place zu einem
+    // 'ko_runde'-Wettkampf transformiert (siehe finishGroupPhase) — dadurch übernimmt
+    // automatisch der bestehende, unveränderte KO-Renderer weiter oben die KO-Phase.
+    if (pt.type === 'turniermodus' && pt.phase === 'group') {
+      const { settings: gSettings, players: gPlayers, matches: gMatches, groups: gGroups, groupConfig: gCfg } = pt;
+
+      const statsFor = (idxs) => {
+        const stats = idxs.map(idx => ({idx,wins:0,losses:0,setsWon:0,setsLost:0,ptsWon:0,ptsLost:0}));
+        const byIdx = Object.fromEntries(stats.map(s=>[s.idx,s]));
+        gMatches.forEach(m => {
+          if (!idxs.includes(m.p1Idx)) return;
+          if (!m.result || m.notRanked) return;
+          const {sets1,sets2,scores} = m.result;
+          byIdx[m.p1Idx].setsWon+=sets1; byIdx[m.p1Idx].setsLost+=sets2;
+          byIdx[m.p2Idx].setsWon+=sets2; byIdx[m.p2Idx].setsLost+=sets1;
+          if (sets1>sets2){byIdx[m.p1Idx].wins++;byIdx[m.p2Idx].losses++;}else{byIdx[m.p2Idx].wins++;byIdx[m.p1Idx].losses++;}
+          if (scores) scores.forEach(({s1,s2})=>{
+            if(s1!==''&&s2!==''){byIdx[m.p1Idx].ptsWon+=Number(s1);byIdx[m.p1Idx].ptsLost+=Number(s2);byIdx[m.p2Idx].ptsWon+=Number(s2);byIdx[m.p2Idx].ptsLost+=Number(s1);}
+          });
+        });
+        return [...stats].sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:((b.setsWon-b.setsLost)-(a.setsWon-a.setsLost))||((b.ptsWon-b.ptsLost)-(a.ptsWon-a.ptsLost)));
+      };
+
+      const groupStandings = gGroups.map(g => ({...g, standings: statsFor(g.playerIdxs)}));
+      const allDone = gMatches.every(m => m.result !== null);
+
+      const updateMatchResult = (matchIdx, result, notRanked) => {
+        const upd = gMatches.map((m,i) => i===matchIdx ? {...m,result,notRanked:!!notRanked} : m);
+        savePracticeTournaments({...practiceTournaments, [pt.id]: {...pt, matches:upd}});
+      };
+      const deleteResult = (matchIdx) => {
+        const upd = gMatches.map((m,i) => i===matchIdx ? {...m,result:null} : m);
+        savePracticeTournaments({...practiceTournaments, [pt.id]: {...pt, matches:upd}});
+      };
+      const initDraft = (matchIdx) => {
+        const existing = gMatches[matchIdx].result;
+        const notRankedExisting = !!gMatches[matchIdx].notRanked;
+        if (gSettings.trackSetScores) {
+          setPtMatchDraft({mode:'scores', scores:existing?.scores?.map(s=>({s1:String(s.s1),s2:String(s.s2)}))||[{s1:'',s2:''}], notRanked:notRankedExisting});
+        } else {
+          setPtMatchDraft({mode:'simple', sets1:existing?.sets1||0, sets2:existing?.sets2||0, notRanked:notRankedExisting});
+        }
+        setPtMatchEditing(matchIdx);
+      };
+      const isDraftValid = () => {
+        if (!ptMatchDraft) return false;
+        if (ptMatchDraft.notRanked) return true;
+        if (ptMatchDraft.mode==='scores') {
+          const valid = ptMatchDraft.scores.filter(r=>r.s1!==''&&r.s2!==''&&Number(r.s1)!==Number(r.s2));
+          const s1=valid.filter(r=>Number(r.s1)>Number(r.s2)).length;
+          const s2=valid.filter(r=>Number(r.s2)>Number(r.s1)).length;
+          return s1===gSettings.winSets||s2===gSettings.winSets;
+        } else {
+          const {sets1,sets2}=ptMatchDraft;
+          return (sets1===gSettings.winSets||sets2===gSettings.winSets)&&sets1!==sets2;
+        }
+      };
+      const saveDraft = () => {
+        if (ptMatchEditing===null||!ptMatchDraft) return;
+        let result;
+        if (ptMatchDraft.mode==='scores') {
+          const validScores = ptMatchDraft.scores.filter(r=>r.s1!==''&&r.s2!=='').map(r=>({s1:Number(r.s1),s2:Number(r.s2)}));
+          const s1=validScores.filter(r=>r.s1>r.s2).length;
+          const s2=validScores.filter(r=>r.s2>r.s1).length;
+          result = {sets1:s1, sets2:s2, scores:validScores};
+        } else {
+          result = {sets1:ptMatchDraft.sets1||0, sets2:ptMatchDraft.sets2||0, scores:[]};
+        }
+        updateMatchResult(ptMatchEditing, result, ptMatchDraft.notRanked);
+        setPtMatchEditing(null);
+        setPtMatchDraft(null);
+      };
+
+      // Transformiert das Dokument in-place: Gruppenphase → gesetzter KO-Baum.
+      // Automatische Qualifikanten: die besten `advancePerGroup` je Gruppe, plus die
+      // besten `wildcards` unter allen übrigen Spielern (über Gruppen hinweg, sortiert
+      // nach Siegen dann Satzdifferenz) — deckt "beste Drittplatzierte/Viertplatzierte" ab.
+      const finishGroupPhase = () => {
+        if (!window.confirm('Gruppenphase abschließen und KO-Baum auslosen?')) return;
+        const autoQualified = [];
+        const rest = [];
+        groupStandings.forEach(g => {
+          g.standings.forEach((s, pos) => {
+            if (pos < gCfg.advancePerGroup) autoQualified.push({...s, groupId:g.id, groupPos:pos+1});
+            else rest.push({...s, groupId:g.id, groupPos:pos+1});
+          });
+        });
+        rest.sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:(b.setsWon-b.setsLost)-(a.setsWon-a.setsLost));
+        const wildcardQualified = rest.slice(0, gCfg.wildcards);
+        const qualifiedStats = [...autoQualified, ...wildcardQualified];
+        // Setzung: nach Gruppenplatz (1., 2., ... über alle Gruppen) dann Bilanz, damit
+        // z.B. alle Gruppensieger vor allen Gruppenzweiten gesetzt werden (verhindert
+        // frühe Duelle zwischen starken Spielern).
+        qualifiedStats.sort((a,b)=>a.groupPos!==b.groupPos?a.groupPos-b.groupPos:(b.wins-a.wins)||((b.setsWon-b.setsLost)-(a.setsWon-a.setsLost)));
+        const koPlayers = qualifiedStats.map((s,i) => ({...gPlayers[s.idx], seed:i+1}));
+        const bracketSize = Math.pow(2, Math.ceil(Math.log2(Math.max(koPlayers.length,2))));
+        const slots = getKoSlots(bracketSize);
+        const playerSlots = slots.map(seedIdx => seedIdx < koPlayers.length ? koPlayers[seedIdx] : null);
+
+        const transformed = {
+          ...pt,
+          type:'ko_runde',
+          phase: undefined,
+          players: koPlayers,
+          bracketSize,
+          playerSlots,
+          matchResults: {},
+          groupPhaseArchive: { groups: gGroups, matches: gMatches, players: gPlayers, groupConfig: gCfg },
+          matches: undefined,
+          groups: undefined,
+          groupConfig: undefined,
+        };
+        // undefined-Felder wirklich entfernen (Firestore mag kein `undefined`)
+        Object.keys(transformed).forEach(k => { if (transformed[k]===undefined) delete transformed[k]; });
+        savePracticeTournaments({...practiceTournaments, [pt.id]: transformed});
+        setPtMatchEditing(null); setPtMatchDraft(null);
+      };
+
+      const inpStyleG = {background:'rgba(255,255,255,0.09)',border:'1px solid rgba(167,139,250,0.25)',borderRadius:'8px',color:'white',fontSize:'20px',fontWeight:'900',textAlign:'center',width:'58px',height:'44px',outline:'none'};
+
+      return (
+        <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+          <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
+            <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',gap:'14px',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px',margin:isMobile?'0 -14px 24px':'0 -24px 28px'}}>
+              <button onClick={()=>{setPtMatchEditing(null);setPtMatchDraft(null);navTo('practiceTournaments');}} style={{width:'38px',height:'38px',borderRadius:'10px',background:'rgba(74,222,128,0.1)',border:'1px solid rgba(74,222,128,0.2)',color:'#4ade80',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <ArrowLeft size={18}/>
+              </button>
+              <div style={{flex:1,minWidth:0}}>
+                <p style={{margin:'0 0 1px',color:'rgba(167,139,250,0.5)',fontSize:'11px',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.5px'}}>
+                  🏅 Turniermodus · Gruppenphase · {gGroups.length} Gruppen
+                </p>
+                <h2 style={{margin:0,color:'white',fontWeight:'800',fontSize:isMobile?'14px':'17px',letterSpacing:'-0.2px'}}>
+                  {new Date(pt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})} · {pt.createdBy}
+                </h2>
+              </div>
+            </div>
+
+            {groupStandings.map(g => (
+              <div key={g.id} style={{marginBottom:'26px'}}>
+                <h3 style={{margin:'0 0 10px',color:'#a78bfa',fontSize:'15px',fontWeight:'800'}}>{g.label}</h3>
+                <div style={{overflowX:'auto',marginBottom:'12px'}}>
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
+                    <thead>
+                      <tr style={{color:'rgba(255,255,255,0.4)',fontSize:'11px',textTransform:'uppercase'}}>
+                        <th style={{textAlign:'left',padding:'6px 8px'}}>#</th>
+                        <th style={{textAlign:'left',padding:'6px 8px'}}>Name</th>
+                        <th style={{padding:'6px 8px'}}>S</th>
+                        <th style={{padding:'6px 8px'}}>Sätze</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.standings.map((s,pos) => (
+                        <tr key={s.idx} style={{borderTop:'1px solid rgba(255,255,255,0.06)',background:pos<gCfg.advancePerGroup?'rgba(74,222,128,0.06)':'transparent'}}>
+                          <td style={{padding:'7px 8px',fontWeight:'800',color:pos<gCfg.advancePerGroup?'#4ade80':'rgba(255,255,255,0.5)'}}>{pos+1}</td>
+                          <td style={{padding:'7px 8px',fontWeight:'700'}}>{gPlayers[s.idx].name}</td>
+                          <td style={{padding:'7px 8px',textAlign:'center'}}>{s.wins}-{s.losses}</td>
+                          <td style={{padding:'7px 8px',textAlign:'center',color:'rgba(255,255,255,0.5)'}}>{s.setsWon}:{s.setsLost}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+                  {gMatches.map((m, matchIdx) => {
+                    if (m.groupId !== g.id) return null;
+                    const p1 = gPlayers[m.p1Idx], p2 = gPlayers[m.p2Idx];
+                    const res = m.result;
+                    const isEditing = ptMatchEditing === matchIdx;
+                    return (
+                      <div key={matchIdx} style={{padding:'10px 12px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.06)',borderRadius:'10px'}}>
+                        <div onClick={()=>isEditing?(setPtMatchEditing(null),setPtMatchDraft(null)):initDraft(matchIdx)} style={{display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer'}}>
+                          <span style={{fontSize:'13px',fontWeight:'700'}}>{p1.name} <span style={{color:'rgba(255,255,255,0.35)'}}>vs</span> {p2.name}</span>
+                          <span style={{fontSize:'14px',fontWeight:'900',color:res?'#4ade80':'rgba(255,255,255,0.3)'}}>
+                            {res ? `${res.sets1}:${res.sets2}` : '– : –'}{m.notRanked && <span style={{fontSize:'10px',marginLeft:'6px'}}>🚫 n. gewertet</span>}
+                          </span>
+                        </div>
+                        {isEditing && ptMatchDraft && (
+                          <div style={{marginTop:'12px'}}>
+                            <div style={{display:'flex',alignItems:'center',gap:'14px',justifyContent:'center',marginBottom:'12px'}}>
+                              <div style={{textAlign:'center'}}>
+                                <p style={{margin:'0 0 6px',fontSize:'12px',fontWeight:'700'}}>{p1.name}</p>
+                                <div style={{display:'flex',gap:'5px'}}>
+                                  {Array.from({length:gSettings.winSets+1},(_,n)=>(
+                                    <button key={n} onClick={()=>setPtMatchDraft(d=>({...d,sets1:n}))} style={{...inpStyleG,width:'38px',height:'38px',fontSize:'17px',borderColor:ptMatchDraft.sets1===n?'#a78bfa':'rgba(255,255,255,0.1)',background:ptMatchDraft.sets1===n?'rgba(167,139,250,0.25)':'rgba(255,255,255,0.04)',color:ptMatchDraft.sets1===n?'white':'rgba(255,255,255,0.4)'}}>{n}</button>
+                                  ))}
+                                </div>
+                              </div>
+                              <span style={{fontWeight:'900',color:'rgba(255,255,255,0.4)',fontSize:'20px'}}>:</span>
+                              <div style={{textAlign:'center'}}>
+                                <p style={{margin:'0 0 6px',fontSize:'12px',fontWeight:'700'}}>{p2.name}</p>
+                                <div style={{display:'flex',gap:'5px'}}>
+                                  {Array.from({length:gSettings.winSets+1},(_,n)=>(
+                                    <button key={n} onClick={()=>setPtMatchDraft(d=>({...d,sets2:n}))} style={{...inpStyleG,width:'38px',height:'38px',fontSize:'17px',borderColor:ptMatchDraft.sets2===n?'#a78bfa':'rgba(255,255,255,0.1)',background:ptMatchDraft.sets2===n?'rgba(167,139,250,0.25)':'rgba(255,255,255,0.04)',color:ptMatchDraft.sets2===n?'white':'rgba(255,255,255,0.4)'}}>{n}</button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                            <button onClick={()=>setPtMatchDraft(d=>({...d,notRanked:!d.notRanked}))}
+                              style={{width:'100%',marginBottom:'10px',padding:'8px',borderRadius:'8px',border:`1.5px solid ${ptMatchDraft.notRanked?'#f87171':'rgba(255,255,255,0.12)'}`,background:ptMatchDraft.notRanked?'rgba(248,113,113,0.12)':'rgba(255,255,255,0.03)',color:ptMatchDraft.notRanked?'#f87171':'rgba(255,255,255,0.5)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>
+                              🚫 Nicht in die Wertung
+                            </button>
+                            <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>
+                              {res&&<button onClick={()=>{deleteResult(matchIdx);setPtMatchEditing(null);setPtMatchDraft(null);}} style={{padding:'8px 12px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',borderRadius:'8px',color:'#f87171',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>Löschen</button>}
+                              <button onClick={()=>{setPtMatchEditing(null);setPtMatchDraft(null);}} style={{padding:'8px 12px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.65)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>Abbrechen</button>
+                              <button onClick={saveDraft} disabled={!isDraftValid()} style={{padding:'8px 18px',background:isDraftValid()?'linear-gradient(135deg,#7c3aed,#6d28d9)':'rgba(255,255,255,0.06)',border:'none',borderRadius:'8px',color:isDraftValid()?'white':'rgba(255,255,255,0.3)',cursor:isDraftValid()?'pointer':'not-allowed',fontWeight:'800',fontSize:'12px'}}>Speichern</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+
+            {allDone && (
+              <div style={{padding:'18px 20px',background:'rgba(74,222,128,0.07)',border:'1px solid rgba(74,222,128,0.22)',borderRadius:'16px',textAlign:'center'}}>
+                <p style={{margin:'0 0 6px',fontSize:'17px',fontWeight:'900',color:'#4ade80'}}>✅ Gruppenphase abgeschlossen!</p>
+                <p style={{margin:'0 0 14px',fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>Jetzt den gesetzten KO-Baum auslosen.</p>
+                <button onClick={finishGroupPhase} style={{padding:'12px 28px',background:'linear-gradient(135deg,#7c3aed,#6d28d9)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'800',fontSize:'14px',display:'inline-flex',alignItems:'center',gap:'8px'}}>🏆 KO-Baum auslosen</button>
               </div>
             )}
           </div>
