@@ -4852,6 +4852,7 @@ export default function TrainingsApp() {
     const subViewMeta = {
       benachrichtigungen: { label:'Benachrichtigungen', icon:'🔔', color:'#c4b5fd', colorFaint:'rgba(167,139,250,0.5)', border:'rgba(167,139,250,0.15)', bg:'linear-gradient(170deg,#0d0a1f 0%,#150d2e 45%,#0a0818 100%)', hdrBg:'rgba(13,10,31,0.97)' },
       trainingsverlauf:   { label:'Trainingsverlauf',   icon:'📋', color:'#67e8f9', colorFaint:'rgba(103,232,249,0.5)', border:'rgba(103,232,249,0.15)', bg:'linear-gradient(170deg,#051a20 0%,#082d38 45%,#041520 100%)', hdrBg:'rgba(5,26,32,0.97)'  },
+      uebungswettkaempfe: { label:'Übungswettkämpfe',   icon:'🎮', color:'#c4b5fd', colorFaint:'rgba(167,139,250,0.5)', border:'rgba(167,139,250,0.15)', bg:'linear-gradient(170deg,#0d0a1f 0%,#150d2e 45%,#0a0818 100%)', hdrBg:'rgba(13,10,31,0.97)'  },
       rangliste:          { label:'Rangliste',           icon:'📊', color:'#fbbf24', colorFaint:'rgba(251,191,36,0.5)',  border:'rgba(251,191,36,0.15)',  bg:'linear-gradient(170deg,#1a1200 0%,#2d1e00 45%,#1a1000 100%)', hdrBg:'rgba(26,18,0,0.97)'  },
       errungenschaften:   { label:'Errungenschaften',    icon:'🏅', color:'#86efac', colorFaint:'rgba(134,239,172,0.5)', border:'rgba(134,239,172,0.15)', bg:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)', hdrBg:'rgba(2,26,10,0.97)'  },
     };
@@ -5286,6 +5287,7 @@ export default function TrainingsApp() {
                 label:'Training & Gruppen', color:'rgba(103,232,249,0.45)',
                 links:[
                   {label:'Trainingsverlauf', icon:'📋', color:'#67e8f9', bg:'rgba(103,232,249,0.1)', border:'rgba(103,232,249,0.25)', action:()=>setElternSubView('trainingsverlauf')},
+                  {label:'Übungswettkämpfe', icon:'🎮', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)', border:'rgba(196,181,253,0.25)', action:()=>setElternSubView('uebungswettkaempfe')},
                 ],
               },
               {
@@ -5622,6 +5624,78 @@ export default function TrainingsApp() {
                 })}
               </div>
             </div>
+          );
+        })()}
+        {/* ── Übungswettkämpfe: eigene, vollständige Übersicht (laufend + Archiv) ── */}
+        {myChild&&elternSubView==='uebungswettkaempfe'&&(()=>{
+          const placeEmojiPT=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
+          const myPTsAll=[
+            ...Object.values(archivedPracticeTournaments),
+            ...Object.values(practiceTournaments),
+          ].filter(pt=>pt.players&&pt.players.some(p=>p.childId===myChild.id))
+           .sort((a,b)=>(b.archivedAt||b.createdAt||'').localeCompare(a.archivedAt||a.createdAt||''));
+          const laufend = myPTsAll.filter(pt=>!pt.archivedAt);
+          const abgeschlossen = myPTsAll.filter(pt=>!!pt.archivedAt);
+
+          const renderPtRow = pt => {
+            const isArc=!!pt.archivedAt;
+            const myIdx=pt.players.findIndex(p=>p.childId===myChild.id);
+            const stats=pt.players.map((_,i)=>({idx:i,wins:0,losses:0,setsWon:0,setsLost:0}));
+            (pt.matches||[]).forEach(m=>{if(!m.result)return;const{sets1,sets2}=m.result;stats[m.p1Idx].setsWon+=sets1;stats[m.p1Idx].setsLost+=sets2;stats[m.p2Idx].setsWon+=sets2;stats[m.p2Idx].setsLost+=sets1;if(sets1>sets2)stats[m.p1Idx].wins++;else stats[m.p2Idx].wins++;});
+            let myEntry=null;
+            if(pt.finalStandings){myEntry=pt.finalStandings.find(s=>s.childId===myChild.id);}
+            else{
+              const srt=[...stats].sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:(b.setsWon-b.setsLost)-(a.setsWon-a.setsLost));
+              const myRank=srt.findIndex(s=>s.idx===myIdx);
+              const ms=stats[myIdx]||{wins:0,setsWon:0,setsLost:0};
+              const mc=(pt.matches||[]).filter(m=>m.result&&(m.p1Idx===myIdx||m.p2Idx===myIdx)).length;
+              myEntry={place:myRank+1,wins:ms.wins,losses:mc-ms.wins,setsWon:ms.setsWon,setsLost:ms.setsLost};
+            }
+            const done=(pt.matches||[]).filter(m=>m.result).length;
+            const total=(pt.matches||[]).length;
+            const dateStr=new Date(pt.archivedAt||pt.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+            return(
+              <div key={pt.id} onClick={()=>setPtDetailModal(pt)}
+                style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 14px',background:'rgba(255,255,255,0.04)',borderRadius:'12px',border:`1px solid ${isArc?'rgba(74,222,128,0.15)':'rgba(167,139,250,0.15)'}`,cursor:'pointer'}}>
+                <span style={{fontSize:'22px',flexShrink:0}}>{isArc?(placeEmojiPT[myEntry?.place-1]||(myEntry?.place+'.')):'🎯'}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap',marginBottom:'2px'}}>
+                    {isArc
+                      ?<span style={{fontWeight:'800',color:'white',fontSize:'14px'}}>Platz {myEntry?.place}</span>
+                      :<span style={{fontWeight:'800',color:'#fde68a',fontSize:'14px'}}>Laufend {done}/{total}</span>}
+                    <span style={{fontSize:'11px',color:'rgba(167,139,250,0.6)',fontWeight:'600'}}>{pt.players.length}er Gruppe</span>
+                    <span style={{fontSize:'11px',color:'rgba(255,255,255,0.42)'}}>{dateStr}</span>
+                  </div>
+                  {myEntry&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.52)'}}>{myEntry.wins}S {myEntry.losses}N · Sätze {myEntry.setsWon}:{myEntry.setsLost}</p>}
+                </div>
+                <span style={{fontSize:'15px',color:'rgba(167,139,250,0.3)',flexShrink:0}}>›</span>
+              </div>
+            );
+          };
+
+          return (
+            <>
+              {myPTsAll.length===0 ? (
+                <div style={{...DARK_CARD,textAlign:'center',padding:'40px'}}>
+                  <p style={{color:'rgba(255,255,255,0.48)',margin:0}}>Noch keine Übungswettkämpfe.</p>
+                </div>
+              ) : (
+                <>
+                  {laufend.length>0 && (
+                    <div style={{marginBottom:'20px'}}>
+                      <span style={SECTION_LABEL('rgba(253,230,138,0.6)')}>🎯 Laufend</span>
+                      <div style={{display:'grid',gap:'6px'}}>{laufend.map(renderPtRow)}</div>
+                    </div>
+                  )}
+                  {abgeschlossen.length>0 && (
+                    <div>
+                      <span style={SECTION_LABEL('rgba(74,222,128,0.5)')}>✅ Abgeschlossen</span>
+                      <div style={{display:'grid',gap:'6px'}}>{abgeschlossen.map(renderPtRow)}</div>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
           );
         })()}
               {/* ── Rangliste Tile (nur Jugend) ── */}
