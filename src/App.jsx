@@ -832,7 +832,7 @@ export default function TrainingsApp() {
   const [tmSearchFocus, setTmSearchFocus] = useState(false);
   const [tmSearch2, setTmSearch2] = useState('');
   const [tmSearchFocus2, setTmSearchFocus2] = useState(false);
-  const [tmForm, setTmForm] = useState({opponent:'',opponentCustom:'',useCustom:false,player1:'',result:'3:0',vorgabe:false,vorgabePlayer:'',vorgabePoints:1,date:'',otherMatch:false});
+  const [tmForm, setTmForm] = useState({opponent:'',opponentCustom:'',useCustom:false,player1:'',result:'3:0',vorgabe:false,vorgabePlayer:'',vorgabePoints:1,date:'',otherMatch:false,notRanked:false});
   const [tmMode, setTmMode] = useState(null); // null=Auswahl, 'single', 'double'
   const [wettenZitate, setWettenZitate] = useState([]);
   const [wzAdding, setWzAdding] = useState(false);
@@ -14327,18 +14327,21 @@ export default function TrainingsApp() {
         score1: s1,
         score2: s2,
         vorgabe: tmForm.vorgabe && tmForm.vorgabePlayer ? {player: tmForm.vorgabePlayer, points: tmForm.vorgabePoints} : null,
+        // "Nicht in die Wertung" — z.B. bei Geschwisterkindern: Match gilt als gespielt/
+        // abgeschlossen, zählt aber weder als Sieg noch als Niederlage in der Tabelle.
+        notRanked: !!tmForm.notRanked,
         createdBy: me,
         createdAt: new Date().toISOString(),
       };
       saveMatches([entry, ...trainingsmatches]);
       setTmAdding(false);
       setTmSearch(''); setTmSearch2('');
-      setTmForm({opponent:'',opponentCustom:'',useCustom:false,player1:'',result:'3:0',vorgabe:false,vorgabePlayer:'',vorgabePoints:1,date:'',otherMatch:false});
+      setTmForm({opponent:'',opponentCustom:'',useCustom:false,player1:'',result:'3:0',vorgabe:false,vorgabePlayer:'',vorgabePoints:1,date:'',otherMatch:false,notRanked:false});
     };
 
-    // Build allzeit table (Vorgabe-Matches ausgeschlossen)
+    // Build allzeit table (Vorgabe-Matches und "nicht gewertete" Matches ausgeschlossen)
     const stats = {};
-    trainingsmatches.filter(m=>!m.vorgabe).forEach(m => {
+    trainingsmatches.filter(m=>!m.vorgabe && !m.notRanked).forEach(m => {
       [m.player1, m.player2].forEach((p,i) => {
         if (!stats[p]) stats[p] = {name:p, matches:0, wins:0, losses:0};
         stats[p].matches++;
@@ -14457,7 +14460,14 @@ export default function TrainingsApp() {
                 {/* Ergebnis + Datum */}
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
                   <div>
-                    <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',marginBottom:'6px',textTransform:'uppercase'}}>Ergebnis (Sätze)</label>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px',marginBottom:'6px'}}>
+                      <label style={{display:'block',fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',textTransform:'uppercase',margin:0}}>Ergebnis (Sätze)</label>
+                      <button type="button" onClick={()=>setTmForm(f=>({...f,notRanked:!f.notRanked}))}
+                        title="Zählt weder als Sieg noch als Niederlage — Match gilt trotzdem als gespielt (z.B. bei Geschwisterkindern)"
+                        style={{padding:'3px 8px',borderRadius:'20px',border:`1px solid ${tmForm.notRanked?'#fbbf24':'rgba(255,255,255,0.15)'}`,background:tmForm.notRanked?'rgba(251,191,36,0.15)':'rgba(255,255,255,0.04)',color:tmForm.notRanked?'#fbbf24':'rgba(255,255,255,0.4)',cursor:'pointer',fontSize:'10px',fontWeight:'700',whiteSpace:'nowrap',flexShrink:0}}>
+                        🚫 Nicht in die Wertung
+                      </button>
+                    </div>
                     <select value={tmForm.result} onChange={e=>setTmForm(f=>({...f,result:e.target.value}))}
                       style={{width:'100%',padding:'10px 12px',background:'#1a0a1e',border:`1px solid ${acBorder}`,borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',boxSizing:'border-box'}}>
                       {resultOptions.map(r=>{const [a,b]=r.split(':');const p1n=(tmForm.otherMatch?(tmForm.player1||tmSearch2||'Spieler 1'):me).split(' ')[0]||'S1';const p2n=(tmForm.useCustom?tmForm.opponentCustom:tmForm.opponent||'Spieler 2').split(' ')[0]||'S2';return <option key={r} value={r}>{p1n} {a}:{b} {p2n}</option>;})}
@@ -14570,18 +14580,25 @@ export default function TrainingsApp() {
                       <div style={{display:'flex',gap:'8px',flexWrap:'wrap',alignItems:'center',marginBottom:'8px'}}>
                         <span style={{fontSize:'13px',color:'rgba(255,255,255,0.6)',fontWeight:'600'}}>{m.player1} vs {m.player2}</span>
                       </div>
-                      <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                      <div style={{display:'flex',gap:'8px',flexWrap:'wrap',alignItems:'center'}}>
                         <select defaultValue={`${m.score1}:${m.score2}`} id={`score-${m.id}`}
                           style={{padding:'8px 10px',background:'#1a0a1e',border:`1px solid ${acBorder}`,borderRadius:'8px',color:'white',fontSize:'14px'}}>
                           {resultOptions.map(r=><option key={r} value={r}>{r}</option>)}
                         </select>
                         <input type="date" defaultValue={m.date||''} id={`date-${m.id}`}
                           style={{padding:'8px 10px',background:'rgba(255,255,255,0.07)',border:`1px solid ${acBorder}`,borderRadius:'8px',color:'white',fontSize:'13px'}}/>
+                        <button type="button" id={`notranked-${m.id}`} data-active={m.notRanked?'1':'0'}
+                          onClick={e=>{const btn=e.currentTarget; const on=btn.dataset.active==='1'; btn.dataset.active=on?'0':'1'; btn.style.background=on?'rgba(255,255,255,0.04)':'rgba(251,191,36,0.15)'; btn.style.color=on?'rgba(255,255,255,0.4)':'#fbbf24'; btn.style.borderColor=on?'rgba(255,255,255,0.15)':'#fbbf24';}}
+                          style={{padding:'7px 10px',borderRadius:'20px',border:`1px solid ${m.notRanked?'#fbbf24':'rgba(255,255,255,0.15)'}`,background:m.notRanked?'rgba(251,191,36,0.15)':'rgba(255,255,255,0.04)',color:m.notRanked?'#fbbf24':'rgba(255,255,255,0.4)',cursor:'pointer',fontSize:'11px',fontWeight:'700',whiteSpace:'nowrap'}}>
+                          🚫 Nicht in die Wertung
+                        </button>
                         <button onClick={()=>{
                           const scoreEl=document.getElementById(`score-${m.id}`);
                           const dateEl=document.getElementById(`date-${m.id}`);
+                          const notRankedEl=document.getElementById(`notranked-${m.id}`);
                           const [ns1,ns2]=(scoreEl?.value||`${m.score1}:${m.score2}`).split(':').map(Number);
-                          saveMatches(trainingsmatches.map(x=>x.id===m.id?{...x,score1:ns1,score2:ns2,date:dateEl?.value||m.date}:x));
+                          const newNotRanked = notRankedEl ? notRankedEl.dataset.active==='1' : !!m.notRanked;
+                          saveMatches(trainingsmatches.map(x=>x.id===m.id?{...x,score1:ns1,score2:ns2,date:dateEl?.value||m.date,notRanked:newNotRanked}:x));
                           setTmEditId(null);
                         }} style={{padding:'8px 14px',background:`linear-gradient(135deg,${ac},#db2777)`,border:'none',borderRadius:'8px',color:'white',fontWeight:'700',fontSize:'13px',cursor:'pointer'}}>
                           Speichern
@@ -14604,6 +14621,7 @@ export default function TrainingsApp() {
                       </div>
                       <div style={{fontSize:'11px',color:'rgba(255,255,255,0.48)',marginTop:'3px'}}>
                         {d}{m.vorgabe?` · Vorgabe: ${m.vorgabe.player.split(' ')[0]} +${m.vorgabe.points}Pkt`:''}
+                        {m.notRanked&&<span style={{marginLeft:'6px',padding:'1px 7px',borderRadius:'20px',background:'rgba(251,191,36,0.15)',border:'1px solid rgba(251,191,36,0.4)',color:'#fbbf24',fontWeight:'700',fontSize:'10px'}}>🚫 nicht gewertet</span>}
                       </div>
                     </div>
                     {canEdit&&<button onClick={()=>setTmEditId(m.id)}
