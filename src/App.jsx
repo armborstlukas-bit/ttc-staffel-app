@@ -139,6 +139,30 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 
+// Zerlegt einen Text an enthaltenen URLs (http/https sowie "www.") und gibt ein Array aus
+// Strings und klickbaren <a>-Elementen zurück — für Freitext-Felder wie die Pinnwand, in
+// denen Nutzer Links zu anderen Seiten posten und diese anklickbar sein sollen.
+const URL_REGEX = /((?:https?:\/\/|www\.)[^\s<>"']+)/gi;
+const linkifyText = (text, linkStyle) => {
+  if (!text) return text;
+  const parts = String(text).split(URL_REGEX);
+  return parts.map((part, i) => {
+    if (!URL_REGEX.test(part)) { URL_REGEX.lastIndex = 0; return part; }
+    URL_REGEX.lastIndex = 0;
+    // Satzzeichen am Ende (die oft direkt an einen Link angehängt werden) nicht mit verlinken
+    const trailingMatch = part.match(/[.,;:!?)]+$/);
+    const trailing = trailingMatch ? trailingMatch[0] : '';
+    const urlPart = trailing ? part.slice(0, -trailing.length) : part;
+    const href = urlPart.startsWith('http') ? urlPart : `https://${urlPart}`;
+    return (
+      <React.Fragment key={i}>
+        <a href={href} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
+          style={{color:'#2563eb',textDecoration:'underline',wordBreak:'break-all',...linkStyle}}>{urlPart}</a>{trailing}
+      </React.Fragment>
+    );
+  });
+};
+
 const FIXED_GROUPS = [
   { id: 'jugend',    name: 'Jugendgruppe',    emoji: '🏓', color: '#358941' },
   { id: 'anfaenger', name: 'Anfängergruppe',  emoji: '⭐', color: '#2563eb' },
@@ -15694,7 +15718,7 @@ export default function TrainingsApp() {
                       </div>
                     ) : (
                       <>
-                        <p style={{margin:0,padding:'12px 14px 10px',fontSize:'16px',fontWeight:'700',color:cfg.ink,lineHeight:'1.6',whiteSpace:'pre-wrap'}}>{entry.text}</p>
+                        <p style={{margin:0,padding:'12px 14px 10px',fontSize:'16px',fontWeight:'700',color:cfg.ink,lineHeight:'1.6',whiteSpace:'pre-wrap'}}>{linkifyText(entry.text)}</p>
                         {wzAddOptionsId===entry.id && (
                           <div style={{margin:'0 14px 14px',padding:'12px',background:'#2a1c10',border:'1px solid rgba(251,191,36,0.2)',borderRadius:'10px'}}>
                             <span style={{fontSize:'12px',fontWeight:'700',color:'rgba(251,191,36,0.7)',display:'block',marginBottom:'8px'}}>🎯 Optionen hinzufügen (min. 2)</span>
