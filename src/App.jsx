@@ -13335,10 +13335,6 @@ export default function TrainingsApp() {
               const fin = mitgliederFinanzen[id] || {};
               const beitragOffen = roles.length>0 && !fin.beitragsart;
               const topRole = highestRole(roles);
-              const rot = elternOhneKind || ttrKein || beitragOffen || accountLinkBroken;
-              const cardColors = rot ? {border:'rgba(239,68,68,0.6)', bg:'rgba(239,68,68,0.06)'}
-                : ttrAehnlich ? {border:'rgba(251,191,36,0.6)', bg:'rgba(251,191,36,0.07)'}
-                : (topRole ? {border:ROLE_COLORS[topRole].border, bg:ROLE_COLORS[topRole].bg} : {border:'rgba(196,181,253,0.2)', bg:'rgba(255,255,255,0.04)'});
               const memberEmails = [m.email, ...(m.zusatzEmails||[])].map(e=>(e||'').trim().toLowerCase()).filter(Boolean);
               const matchedUser = Object.values(allUsers).find(u => memberEmails.includes((u.email||'').trim().toLowerCase()));
               const otherMatchedUsers = Object.values(allUsers).filter(u => u.uid!==matchedUser?.uid && memberEmails.includes((u.email||'').trim().toLowerCase()));
@@ -13348,6 +13344,10 @@ export default function TrainingsApp() {
               // zu "Account keinem Kind zugeordnet" trotz korrekter Zuordnung geführt).
               const accountLinkedIds = matchedUser ? (matchedUser.linkedChildIds?.length>0 ? matchedUser.linkedChildIds : (matchedUser.linkedChildId?[matchedUser.linkedChildId]:[])) : [];
               const accountLinkBroken = roles.includes('eltern') && !!matchedUser && (accountLinkedIds.length===0 || accountLinkedIds.some(cid=>!children[cid]));
+              const rot = elternOhneKind || ttrKein || beitragOffen || accountLinkBroken;
+              const cardColors = rot ? {border:'rgba(239,68,68,0.6)', bg:'rgba(239,68,68,0.06)'}
+                : ttrAehnlich ? {border:'rgba(251,191,36,0.6)', bg:'rgba(251,191,36,0.07)'}
+                : (topRole ? {border:ROLE_COLORS[topRole].border, bg:ROLE_COLORS[topRole].bg} : {border:'rgba(196,181,253,0.2)', bg:'rgba(255,255,255,0.04)'});
               return (
                 <div key={id} style={{background:cardColors.bg,border:`1px solid ${cardColors.border}`,borderRadius:'10px',overflow:'hidden',...(rot?{boxShadow:'0 0 0 1px rgba(239,68,68,0.4)'}:ttrAehnlich?{boxShadow:'0 0 0 1px rgba(251,191,36,0.4)'}:{})}}>
                   <button onClick={()=>{setMitgliedExpandedId(isExpanded?null:id);setMitgliedChildSearch('');}}
