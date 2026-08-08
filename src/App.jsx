@@ -12775,6 +12775,23 @@ export default function TrainingsApp() {
       const cur = getLinkedIds(m);
       const next = cur.includes(childId) ? cur.filter(x=>x!==childId) : [...cur, childId];
       saveMitgliedField(id, 'linkedMemberIds', next);
+      // Diese Verknüpfung passiert nur auf Mitgliederlisten-Ebene (linkedMemberIds) und betrifft
+      // NICHT automatisch den echten App-Account (linkedChildIds) — dadurch konnte ein Elternteil
+      // hier korrekt zugeordnet sein, im eigenen Account aber trotzdem "kein Kind zugeordnet" sehen.
+      // Deshalb hier direkt mit-synchronisieren: passenden App-Account per E-Mail finden und dessen
+      // linkedChildIds auf Basis der (namensgleichen) verknüpften Kinder aktualisieren.
+      const memberEmails = [m.email, ...(m.zusatzEmails||[])].map(e=>(e||'').trim().toLowerCase()).filter(Boolean);
+      const matchedUser = Object.values(allUsers).find(u => memberEmails.includes((u.email||'').trim().toLowerCase()));
+      if (matchedUser) {
+        const childIds = next.map(mid => {
+          const lm = mitgliederListe[mid];
+          if (!lm) return null;
+          const fullName = `${lm.vorname} ${lm.nachname}`.trim().toLowerCase();
+          const foundChild = Object.values(children).find(c => (c.name||'').trim().toLowerCase() === fullName);
+          return foundChild?.id || null;
+        }).filter(Boolean);
+        linkChildrenToUser(matchedUser.uid, childIds);
+      }
     };
 
     const confirmAdminRole = async () => {
@@ -13318,13 +13335,19 @@ export default function TrainingsApp() {
               const fin = mitgliederFinanzen[id] || {};
               const beitragOffen = roles.length>0 && !fin.beitragsart;
               const topRole = highestRole(roles);
-              const rot = elternOhneKind || ttrKein || beitragOffen;
+              const rot = elternOhneKind || ttrKein || beitragOffen || accountLinkBroken;
               const cardColors = rot ? {border:'rgba(239,68,68,0.6)', bg:'rgba(239,68,68,0.06)'}
                 : ttrAehnlich ? {border:'rgba(251,191,36,0.6)', bg:'rgba(251,191,36,0.07)'}
                 : (topRole ? {border:ROLE_COLORS[topRole].border, bg:ROLE_COLORS[topRole].bg} : {border:'rgba(196,181,253,0.2)', bg:'rgba(255,255,255,0.04)'});
               const memberEmails = [m.email, ...(m.zusatzEmails||[])].map(e=>(e||'').trim().toLowerCase()).filter(Boolean);
               const matchedUser = Object.values(allUsers).find(u => memberEmails.includes((u.email||'').trim().toLowerCase()));
               const otherMatchedUsers = Object.values(allUsers).filter(u => u.uid!==matchedUser?.uid && memberEmails.includes((u.email||'').trim().toLowerCase()));
+              // Getrennt von linkedMemberIds (Mitgliederlisten-Verknüpfung, s.o.): das ist der ECHTE
+              // App-Account (linkedChildIds) — kann trotz korrekt gesetzter Mitgliederlisten-Verknüpfung
+              // leer sein oder auf ein inzwischen gelöschtes Kind zeigen (genau das hat schon zweimal
+              // zu "Account keinem Kind zugeordnet" trotz korrekter Zuordnung geführt).
+              const accountLinkedIds = matchedUser ? (matchedUser.linkedChildIds?.length>0 ? matchedUser.linkedChildIds : (matchedUser.linkedChildId?[matchedUser.linkedChildId]:[])) : [];
+              const accountLinkBroken = roles.includes('eltern') && !!matchedUser && (accountLinkedIds.length===0 || accountLinkedIds.some(cid=>!children[cid]));
               return (
                 <div key={id} style={{background:cardColors.bg,border:`1px solid ${cardColors.border}`,borderRadius:'10px',overflow:'hidden',...(rot?{boxShadow:'0 0 0 1px rgba(239,68,68,0.4)'}:ttrAehnlich?{boxShadow:'0 0 0 1px rgba(251,191,36,0.4)'}:{})}}>
                   <button onClick={()=>{setMitgliedExpandedId(isExpanded?null:id);setMitgliedChildSearch('');}}
@@ -13336,6 +13359,7 @@ export default function TrainingsApp() {
                         {matchedUser&&<span title="App-Account zugeordnet" style={{fontSize:'11px',fontWeight:'800',color:'#4ade80',background:'rgba(74,222,128,0.15)',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'50%',width:'16px',height:'16px',display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>✓</span>}
                       </p>
                       {elternOhneKind&&<p style={{margin:0,fontSize:'10px',color:'#fca5a5',fontWeight:'700'}}>⚠️ Kein Kind zugeordnet</p>}
+                      {accountLinkBroken&&<p style={{margin:0,fontSize:'10px',color:'#fca5a5',fontWeight:'700'}}>⚠️ App-Account nicht (mehr) mit echtem Kind verknüpft — sieht "kein Kind zugeordnet"</p>}
                       {ttrKein&&<p style={{margin:0,fontSize:'10px',color:'#fca5a5',fontWeight:'700'}}>⚠️ Kein TTR-Wert auffindbar</p>}
                       {ttrAehnlich&&<p style={{margin:0,fontSize:'10px',color:'#fbbf24',fontWeight:'700'}}>⚠️ TTR: nur ähnlicher Name gefunden</p>}
                       {beitragOffen&&<p style={{margin:0,fontSize:'10px',color:'#fca5a5',fontWeight:'700'}}>⚠️ Keine Beitragsart zugeordnet</p>}
@@ -13361,6 +13385,27 @@ export default function TrainingsApp() {
                           })}
                         </div>
                       </div>
+                      {accountLinkBroken&&(
+                        <div style={{padding:'8px 10px',background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:'8px'}}>
+                          <p style={{margin:'0 0 6px',fontSize:'11px',color:'#fca5a5',fontWeight:'700'}}>
+                            App-Account ist trotz Mitgliederlisten-Verknüpfung nicht mit einem echten Kind-Datensatz verbunden.
+                          </p>
+                          <button onClick={()=>{
+                              const childIds = linkedIds.map(mid => {
+                                const lm = mitgliederListe[mid];
+                                if (!lm) return null;
+                                const fullName = `${lm.vorname} ${lm.nachname}`.trim().toLowerCase();
+                                const foundChild = Object.values(children).find(c => (c.name||'').trim().toLowerCase() === fullName);
+                                return foundChild?.id || null;
+                              }).filter(Boolean);
+                              if (childIds.length===0) { alert('Kein passendes Kind per Namensabgleich gefunden. Bitte über "Kinder/Jugendliche" unten manuell zuordnen und erneut prüfen.'); return; }
+                              linkChildrenToUser(matchedUser.uid, childIds);
+                            }}
+                            style={{padding:'6px 12px',background:'rgba(74,222,128,0.15)',color:'#86efac',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>
+                            🔧 Jetzt reparieren
+                          </button>
+                        </div>
+                      )}
                       {roles.includes('eltern')&&(
                         <div>
                           <span style={{fontSize:'11px',fontWeight:'700',color:'rgba(255,255,255,0.65)',display:'block',marginBottom:'6px'}}>Kinder/Jugendliche ({linkedIds.length} ausgewählt)</span>
