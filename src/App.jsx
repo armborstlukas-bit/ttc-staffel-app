@@ -13367,7 +13367,19 @@ export default function TrainingsApp() {
               // leer sein oder auf ein inzwischen gelöschtes Kind zeigen (genau das hat schon zweimal
               // zu "Account keinem Kind zugeordnet" trotz korrekter Zuordnung geführt).
               const accountLinkedIds = matchedUser ? (matchedUser.linkedChildIds?.length>0 ? matchedUser.linkedChildIds : (matchedUser.linkedChildId?[matchedUser.linkedChildId]:[])) : [];
-              const accountLinkBroken = roles.includes('eltern') && !!matchedUser && (accountLinkedIds.length===0 || accountLinkedIds.some(cid=>!children[cid]));
+              // Welche Kind-IDs der Account laut Mitgliederliste eigentlich haben sollte: bei "eltern"
+              // die verknüpften Kinder (linkedIds -> Name -> children-Datensatz), bei "jugendlich" das
+              // Kind selbst (der Jugendliche IST ja das Kind). Reiner Namensabgleich, wie beim Erst-Login.
+              const nameToChildId = (vorname, nachname) => {
+                const fullName = `${vorname} ${nachname}`.trim().toLowerCase();
+                return Object.values(children).find(c => (c.name||'').trim().toLowerCase() === fullName)?.id || null;
+              };
+              const expectedChildIds = [
+                ...(roles.includes('eltern') ? linkedIds.map(mid => { const lm = mitgliederListe[mid]; return lm ? nameToChildId(lm.vorname, lm.nachname) : null; }) : []),
+                ...(roles.includes('jugendlich') ? [nameToChildId(m.vorname, m.nachname)] : []),
+              ].filter(Boolean);
+              const accountLinkBroken = !!matchedUser && expectedChildIds.length>0 &&
+                (accountLinkedIds.length===0 || accountLinkedIds.some(cid=>!children[cid]) || !expectedChildIds.every(cid=>accountLinkedIds.includes(cid)));
               const rot = elternOhneKind || ttrKein || beitragOffen || accountLinkBroken;
               const cardColors = rot ? {border:'rgba(239,68,68,0.6)', bg:'rgba(239,68,68,0.06)'}
                 : ttrAehnlich ? {border:'rgba(251,191,36,0.6)', bg:'rgba(251,191,36,0.07)'}
@@ -13414,17 +13426,7 @@ export default function TrainingsApp() {
                           <p style={{margin:'0 0 6px',fontSize:'11px',color:'#fca5a5',fontWeight:'700'}}>
                             App-Account ist trotz Mitgliederlisten-Verknüpfung nicht mit einem echten Kind-Datensatz verbunden.
                           </p>
-                          <button onClick={()=>{
-                              const childIds = linkedIds.map(mid => {
-                                const lm = mitgliederListe[mid];
-                                if (!lm) return null;
-                                const fullName = `${lm.vorname} ${lm.nachname}`.trim().toLowerCase();
-                                const foundChild = Object.values(children).find(c => (c.name||'').trim().toLowerCase() === fullName);
-                                return foundChild?.id || null;
-                              }).filter(Boolean);
-                              if (childIds.length===0) { alert('Kein passendes Kind per Namensabgleich gefunden. Bitte über "Kinder/Jugendliche" unten manuell zuordnen und erneut prüfen.'); return; }
-                              linkChildrenToUser(matchedUser.uid, childIds);
-                            }}
+                          <button onClick={()=>linkChildrenToUser(matchedUser.uid, expectedChildIds)}
                             style={{padding:'6px 12px',background:'rgba(74,222,128,0.15)',color:'#86efac',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'8px',cursor:'pointer',fontWeight:'700',fontSize:'11px'}}>
                             🔧 Jetzt reparieren
                           </button>
