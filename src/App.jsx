@@ -13385,13 +13385,29 @@ export default function TrainingsApp() {
               // leer sein oder auf ein inzwischen gelöschtes Kind zeigen (genau das hat schon zweimal
               // zu "Account keinem Kind zugeordnet" trotz korrekter Zuordnung geführt).
               const accountLinkedIds = matchedUser ? (matchedUser.linkedChildIds?.length>0 ? matchedUser.linkedChildIds : (matchedUser.linkedChildId?[matchedUser.linkedChildId]:[])) : [];
-              // Welche Kind-IDs der Account laut Mitgliederliste eigentlich haben sollte: bei "eltern"
-              // die verknüpften Kinder (linkedIds -> Name -> children-Datensatz), bei "jugendlich" das
-              // Kind selbst (der Jugendliche IST ja das Kind). Reiner Namensabgleich, wie beim Erst-Login.
-              const expectedChildIds = [
-                ...(roles.includes('eltern') ? linkedIds.map(mid => { const lm = mitgliederListe[mid]; return lm ? matchChildByName(`${lm.vorname} ${lm.nachname}`, children) : null; }) : []),
-                ...(roles.includes('jugendlich') ? [matchChildByName(`${m.vorname} ${m.nachname}`, children)] : []),
-              ].filter(Boolean);
+              // Welche Kind-IDs der Account laut Mitgliederliste eigentlich haben sollte. WICHTIG:
+              // mehrere Personen teilen sich manchmal einen einzigen App-Account/eine E-Mail (z.B. ein
+              // Elternteil + mehrere Geschwister loggen sich alle mit derselben Adresse ein) — deshalb
+              // hier NICHT nur diesen einen Mitgliederlisten-Eintrag betrachten, sondern ALLE Einträge,
+              // die dieselbe(n) E-Mail-Adresse(n) wie der App-Account nutzen ("Haushalt"). Sonst würde
+              // ein Reparieren-Klick für ein Geschwisterkind die Verknüpfung des anderen überschreiben.
+              const accountEmails = matchedUser ? [matchedUser.email, ...(matchedUser.zusatzEmails||[])].map(e=>(e||'').trim().toLowerCase()).filter(Boolean) : memberEmails;
+              const householdMembers = Object.values(mitgliederListe).filter(hm => {
+                const hmEmails = [hm.email, ...(hm.zusatzEmails||[])].map(e=>(e||'').trim().toLowerCase()).filter(Boolean);
+                return hmEmails.some(e=>accountEmails.includes(e));
+              });
+              const expectedChildIds = [...new Set(householdMembers.flatMap(hm => {
+                const hmRoles = getRoles(hm);
+                const ids = [];
+                if (hmRoles.includes('eltern')) {
+                  getLinkedIds(hm).forEach(mid => { const lm = mitgliederListe[mid]; if (lm) { const cid = matchChildByName(`${lm.vorname} ${lm.nachname}`, children); if (cid) ids.push(cid); } });
+                }
+                if (hmRoles.includes('jugendlich')) {
+                  const cid = matchChildByName(`${hm.vorname} ${hm.nachname}`, children);
+                  if (cid) ids.push(cid);
+                }
+                return ids;
+              }))];
               const accountLinkBroken = !!matchedUser && expectedChildIds.length>0 &&
                 (accountLinkedIds.length===0 || accountLinkedIds.some(cid=>!children[cid]) || !expectedChildIds.every(cid=>accountLinkedIds.includes(cid)));
               const rot = elternOhneKind || ttrKein || beitragOffen || accountLinkBroken;
