@@ -256,6 +256,29 @@ const levenshtein = (a, b) => {
   return d[m][n];
 };
 
+// Reihenfolge-unabhängiger, normalisierter Name für Abgleiche ("Nachname, Vorname" ==
+// "Vorname Nachname"), z.B. für TTR-Import und Kind-Verknüpfung.
+const wordSet = s => (s||'').replace(/,/g,' ').trim().toLowerCase().replace(/\s+/g,' ').split(' ').filter(Boolean).sort().join(' ');
+// Findet den zu einem Namen passenden Kind-Datensatz — erst exakt (reihenfolge-unabhängig),
+// dann tippfehler-tolerant per Levenshtein. Ein reiner exakter String-Vergleich (wie ursprünglich
+// bei der Erstregistrierung) lässt schon einen einzigen Buchstabendreher (z.B. "Jacob" vs. "Jakob")
+// die Verknüpfung lautlos scheitern — das hat mehrfach zu "Account keinem Kind zugeordnet" geführt.
+const matchChildByName = (name, childrenObj) => {
+  const target = wordSet(name);
+  if (!target) return null;
+  const pool = Object.values(childrenObj).map(c => ({ id: c.id, ws: wordSet(c.name) }));
+  const exact = pool.find(p => p.ws === target);
+  if (exact) return exact.id;
+  const close = pool
+    .map(p => ({ p, dist: levenshtein(p.ws, target) }))
+    .filter(({dist}) => dist>0 && dist<=2)
+    .sort((a,b)=>a.dist-b.dist);
+  // Bei mehreren gleich guten Kandidaten lieber gar nicht automatisch zuordnen (Fehlzuordnung
+  // wäre schlimmer als keine) — das muss dann manuell im Adminbereich entschieden werden.
+  if (close.length>0 && (close.length===1 || close[0].dist<close[1].dist)) return close[0].p.id;
+  return null;
+};
+
 const TODAY = new Date().toISOString().split('T')[0];
 const timeGreeting = () => {
   const h = new Date().getHours();
@@ -2582,12 +2605,11 @@ export default function TrainingsApp() {
 
       let autoLinkedChildIds = [];
       if (autoRoles.includes('eltern')) {
-        // Bestes-Möglich-Zuordnung: verknüpfte Mitglieder per Namensabgleich mit der
-        // echten Kinder-Liste der App verbinden (Trainings-/Anwesenheitsdaten).
+        // Bestes-Möglich-Zuordnung: verknüpfte Mitglieder per (tippfehler-tolerantem) Namensabgleich
+        // mit der echten Kinder-Liste der App verbinden (Trainings-/Anwesenheitsdaten).
         linkedMembers.forEach(lm => {
-          const fullName = `${lm.vorname} ${lm.nachname}`.trim().toLowerCase();
-          const foundChild = Object.values(children).find(c => (c.name||'').trim().toLowerCase() === fullName);
-          if (foundChild) autoLinkedChildIds.push(foundChild.id);
+          const foundChildId = matchChildByName(`${lm.vorname} ${lm.nachname}`, children);
+          if (foundChildId) autoLinkedChildIds.push(foundChildId);
         });
       }
       if (autoRoles.includes('jugendlich') && ownNames.length) {
@@ -2596,9 +2618,8 @@ export default function TrainingsApp() {
         // als einen Treffer geben, wenn dieselbe E-Mail bei mehreren eigenen Einträgen hinterlegt
         // ist (z.B. ein Elternteil mit derselben Adresse bei beiden Kindern).
         ownNames.forEach(ownName => {
-          const fullName = `${ownName.vorname} ${ownName.nachname}`.trim().toLowerCase();
-          const foundSelf = Object.values(children).find(c => (c.name||'').trim().toLowerCase() === fullName);
-          if (foundSelf) autoLinkedChildIds.push(foundSelf.id);
+          const foundSelfId = matchChildByName(`${ownName.vorname} ${ownName.nachname}`, children);
+          if (foundSelfId) autoLinkedChildIds.push(foundSelfId);
         });
       }
       autoLinkedChildIds = [...new Set(autoLinkedChildIds)];
@@ -12809,10 +12830,7 @@ export default function TrainingsApp() {
       if (matchedUser) {
         const childIds = next.map(mid => {
           const lm = mitgliederListe[mid];
-          if (!lm) return null;
-          const fullName = `${lm.vorname} ${lm.nachname}`.trim().toLowerCase();
-          const foundChild = Object.values(children).find(c => (c.name||'').trim().toLowerCase() === fullName);
-          return foundChild?.id || null;
+          return lm ? matchChildByName(`${lm.vorname} ${lm.nachname}`, children) : null;
         }).filter(Boolean);
         linkChildrenToUser(matchedUser.uid, childIds);
       }
@@ -13370,13 +13388,9 @@ export default function TrainingsApp() {
               // Welche Kind-IDs der Account laut Mitgliederliste eigentlich haben sollte: bei "eltern"
               // die verknüpften Kinder (linkedIds -> Name -> children-Datensatz), bei "jugendlich" das
               // Kind selbst (der Jugendliche IST ja das Kind). Reiner Namensabgleich, wie beim Erst-Login.
-              const nameToChildId = (vorname, nachname) => {
-                const fullName = `${vorname} ${nachname}`.trim().toLowerCase();
-                return Object.values(children).find(c => (c.name||'').trim().toLowerCase() === fullName)?.id || null;
-              };
               const expectedChildIds = [
-                ...(roles.includes('eltern') ? linkedIds.map(mid => { const lm = mitgliederListe[mid]; return lm ? nameToChildId(lm.vorname, lm.nachname) : null; }) : []),
-                ...(roles.includes('jugendlich') ? [nameToChildId(m.vorname, m.nachname)] : []),
+                ...(roles.includes('eltern') ? linkedIds.map(mid => { const lm = mitgliederListe[mid]; return lm ? matchChildByName(`${lm.vorname} ${lm.nachname}`, children) : null; }) : []),
+                ...(roles.includes('jugendlich') ? [matchChildByName(`${m.vorname} ${m.nachname}`, children)] : []),
               ].filter(Boolean);
               const accountLinkBroken = !!matchedUser && expectedChildIds.length>0 &&
                 (accountLinkedIds.length===0 || accountLinkedIds.some(cid=>!children[cid]) || !expectedChildIds.every(cid=>accountLinkedIds.includes(cid)));
