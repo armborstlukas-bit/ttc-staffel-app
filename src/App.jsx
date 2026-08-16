@@ -839,6 +839,15 @@ export default function TrainingsApp() {
   const [sendingIntroMail, setSendingIntroMail] = useState(false);
   const [showIntroMailPicker, setShowIntroMailPicker] = useState(false);
   const [showBetreuungStatus, setShowBetreuungStatus] = useState(false);
+  // Manuelle Übersteuerung des automatischen Namens-/E-Mail-Abgleichs im Betreuungsstatus:
+  // { [mitgliedKey]: 'mit' | 'ohne' } — key = "vorname|nachname" normalisiert.
+  const [betreuungOverrides, setBetreuungOverrides] = useState({});
+  const saveBetreuungOverride = (key, value) => {
+    const updated = { ...betreuungOverrides };
+    if (value === null) delete updated[key]; else updated[key] = value;
+    setBetreuungOverrides(updated);
+    setDoc(doc(db,'ttc','betreuungStatusOverrides'), updated);
+  };
   const [introMailSelected, setIntroMailSelected] = useState([]);
   const [abfahrtClubs, setAbfahrtClubs] = useState({});
   const [newAbfahrtClub, setNewAbfahrtClub] = useState('');
@@ -1093,6 +1102,7 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','trainingsdoppel'), s => setTrainingsdoppel(s.exists()&&Array.isArray(s.data().matches)?s.data().matches:[])),
       onSnapshot(doc(db,'ttc','wettenZitate'), s => setWettenZitate(s.exists()&&Array.isArray(s.data().entries)?s.data().entries:[])),
       onSnapshot(doc(db,'ttc','trikotDaten'), s => setTrikotDaten(s.exists()?s.data():{})),
+      onSnapshot(doc(db,'ttc','betreuungStatusOverrides'), s => setBetreuungOverrides(s.exists()?s.data():{})),
     ];
     if (['admin','aktiver','trainer'].includes(userRole))
       unsubs.push(onSnapshot(doc(db,'ttc','users'), s => { const d=s.exists()?s.data():{};allUsersRef.current=d;setAllUsers(d); }));
@@ -14575,34 +14585,58 @@ export default function TrainingsApp() {
             const aktiveMitglieder = Object.values(mitgliederListe)
               .filter(m => (m.roles?.length?m.roles:(m.role?[m.role]:[])).includes('aktiver'))
               .sort((a,b)=>`${a.nachname}${a.vorname}`.localeCompare(`${b.nachname}${b.vorname}`,'de'));
-            const hatBetreuung = m => {
+            const betreuungKey = m => `${m.vorname}|${m.nachname}`.trim().toLowerCase();
+            const autoHatBetreuung = m => {
               const email = (m.email||'').trim().toLowerCase();
               if (email && eingetrageneEmails.has(email)) return true;
               const ws = wordSet(`${m.vorname} ${m.nachname}`);
               return eingetrageneNamenWs.some(nw => nw===ws || (levenshtein(nw,ws)<=2));
             };
+            // Manuell verschobene Personen bleiben dort, bis sie zurückgeschoben oder wieder
+            // "automatisch" gestellt werden — überstimmt den Namens-/E-Mail-Abgleich gezielt.
+            const hatBetreuung = m => {
+              const ov = betreuungOverrides[betreuungKey(m)];
+              if (ov) return ov==='mit';
+              return autoHatBetreuung(m);
+            };
             const mit = aktiveMitglieder.filter(hatBetreuung);
             const ohne = aktiveMitglieder.filter(m=>!hatBetreuung(m));
+            const Row = (m, toList) => {
+              const key = betreuungKey(m);
+              const overridden = !!betreuungOverrides[key];
+              return (
+                <div key={key} style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',color:'white',padding:'6px 9px',background:toList==='mit'?'rgba(74,222,128,0.08)':'rgba(248,113,113,0.08)',border:`1px solid ${toList==='mit'?'rgba(74,222,128,0.2)':'rgba(248,113,113,0.2)'}`,borderRadius:'7px'}}>
+                  <span style={{flex:1}}>{m.vorname} {m.nachname}{overridden&&<span title="manuell verschoben" style={{marginLeft:'6px',fontSize:'10px',color:'rgba(255,255,255,0.4)'}}>✋</span>}</span>
+                  <button onClick={()=>saveBetreuungOverride(key, toList==='mit'?'ohne':'mit')}
+                    title={toList==='mit'?'Zu "Noch keine Betreuung" verschieben':'Zu "Bereits eingetragen" verschieben'}
+                    style={{padding:'3px 8px',background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'6px',color:'white',cursor:'pointer',fontSize:'11px',flexShrink:0}}>
+                    {toList==='mit'?'→ ❌':'→ ✅'}
+                  </button>
+                  {overridden&&(
+                    <button onClick={()=>saveBetreuungOverride(key, null)} title="Auf automatisch zurücksetzen"
+                      style={{padding:'3px 6px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'6px',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'11px',flexShrink:0}}>
+                      ↺
+                    </button>
+                  )}
+                </div>
+              );
+            };
             return (
               <div style={{marginBottom:'16px',padding:'14px',background:'rgba(251,191,36,0.06)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'12px'}}>
                 <p style={{margin:'0 0 4px',fontSize:'12px',fontWeight:'800',color:'#fbbf24',textTransform:'uppercase',letterSpacing:'0.5px'}}>📋 Betreuungsstatus — Aktive Spieler</p>
-                <p style={{margin:'0 0 12px',fontSize:'11px',color:'rgba(255,255,255,0.5)'}}>Abgleich per Name oder E-Mail mit den im Plan eingetragenen Fahrern/Betreuern (nur kommende Spiele).</p>
+                <p style={{margin:'0 0 12px',fontSize:'11px',color:'rgba(255,255,255,0.5)'}}>Abgleich per Name oder E-Mail mit den im Plan eingetragenen Fahrern/Betreuern (nur kommende Spiele). Mit den Pfeilen kannst du jemanden manuell in die andere Liste schieben.</p>
                 <div style={{display:'grid',gap:'14px',gridTemplateColumns:isMobile?'1fr':'1fr 1fr'}}>
                   <div>
                     <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'800',color:'#4ade80'}}>✅ Bereits eingetragen ({mit.length})</p>
                     <div style={{display:'grid',gap:'4px',maxHeight:'280px',overflowY:'auto'}}>
-                      {mit.map(m=>(
-                        <div key={`${m.vorname}-${m.nachname}`} style={{fontSize:'12px',color:'white',padding:'6px 9px',background:'rgba(74,222,128,0.08)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'7px'}}>{m.vorname} {m.nachname}</div>
-                      ))}
+                      {mit.map(m=>Row(m,'mit'))}
                       {mit.length===0&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>Niemand.</p>}
                     </div>
                   </div>
                   <div>
                     <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'800',color:'#f87171'}}>❌ Noch keine Betreuung ({ohne.length})</p>
                     <div style={{display:'grid',gap:'4px',maxHeight:'280px',overflowY:'auto'}}>
-                      {ohne.map(m=>(
-                        <div key={`${m.vorname}-${m.nachname}`} style={{fontSize:'12px',color:'white',padding:'6px 9px',background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.2)',borderRadius:'7px'}}>{m.vorname} {m.nachname}</div>
-                      ))}
+                      {ohne.map(m=>Row(m,'ohne'))}
                       {ohne.length===0&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>Alle eingetragen. 🎉</p>}
                     </div>
                   </div>
