@@ -838,6 +838,7 @@ export default function TrainingsApp() {
   const [kalenderEditId, setKalenderEditId] = useState(null);
   const [sendingIntroMail, setSendingIntroMail] = useState(false);
   const [showIntroMailPicker, setShowIntroMailPicker] = useState(false);
+  const [showBetreuungStatus, setShowBetreuungStatus] = useState(false);
   const [introMailSelected, setIntroMailSelected] = useState([]);
   const [abfahrtClubs, setAbfahrtClubs] = useState({});
   const [newAbfahrtClub, setNewAbfahrtClub] = useState('');
@@ -14528,6 +14529,12 @@ export default function TrainingsApp() {
                 {sendingIntroMail?'Sende…':'📧 Info an alle schicken'}
               </button>
             )}
+            {userRole==='admin'&&(
+              <button onClick={()=>setShowBetreuungStatus(v=>!v)}
+                style={{padding:isMobile?'10px 10px':'7px 12px',background:showBetreuungStatus?'rgba(251,191,36,0.18)':'rgba(251,191,36,0.1)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'9px',color:'#fbbf24',fontSize:isMobile?'13px':'12px',fontWeight:'700',cursor:'pointer',flex:isMobile?'1 1 100%':'0 0 auto'}}>
+                📋 Betreuungsstatus
+              </button>
+            )}
           </div>
 
           {showIntroMailPicker&&userRole==='admin'&&(
@@ -14556,6 +14563,53 @@ export default function TrainingsApp() {
               </button>
             </div>
           )}
+
+          {showBetreuungStatus&&userRole==='admin'&&(()=>{
+            // Abgleich "aktive Spieler" (Mitgliederliste, Rolle "aktiver") gegen die im Fahrplan
+            // eingetragenen Betreuer/Fahrer — per Name (tippfehler-tolerant, s. matchChildByName-
+            // Prinzip) ODER per E-Mail-Adresse, da im Fahrplan-Feld mal der Name, mal die Adresse
+            // einer Person eingetragen wird.
+            const eingetrageneRoh = upcoming.map(it=>(it.fahrer||'').trim()).filter(Boolean);
+            const eingetrageneEmails = new Set(eingetrageneRoh.filter(f=>f.includes('@')).map(f=>f.toLowerCase()));
+            const eingetrageneNamenWs = eingetrageneRoh.filter(f=>!f.includes('@')).map(f=>wordSet(f));
+            const aktiveMitglieder = Object.values(mitgliederListe)
+              .filter(m => (m.roles?.length?m.roles:(m.role?[m.role]:[])).includes('aktiver'))
+              .sort((a,b)=>`${a.nachname}${a.vorname}`.localeCompare(`${b.nachname}${b.vorname}`,'de'));
+            const hatBetreuung = m => {
+              const email = (m.email||'').trim().toLowerCase();
+              if (email && eingetrageneEmails.has(email)) return true;
+              const ws = wordSet(`${m.vorname} ${m.nachname}`);
+              return eingetrageneNamenWs.some(nw => nw===ws || (levenshtein(nw,ws)<=2));
+            };
+            const mit = aktiveMitglieder.filter(hatBetreuung);
+            const ohne = aktiveMitglieder.filter(m=>!hatBetreuung(m));
+            return (
+              <div style={{marginBottom:'16px',padding:'14px',background:'rgba(251,191,36,0.06)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'12px'}}>
+                <p style={{margin:'0 0 4px',fontSize:'12px',fontWeight:'800',color:'#fbbf24',textTransform:'uppercase',letterSpacing:'0.5px'}}>📋 Betreuungsstatus — Aktive Spieler</p>
+                <p style={{margin:'0 0 12px',fontSize:'11px',color:'rgba(255,255,255,0.5)'}}>Abgleich per Name oder E-Mail mit den im Plan eingetragenen Fahrern/Betreuern (nur kommende Spiele).</p>
+                <div style={{display:'grid',gap:'14px',gridTemplateColumns:isMobile?'1fr':'1fr 1fr'}}>
+                  <div>
+                    <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'800',color:'#4ade80'}}>✅ Bereits eingetragen ({mit.length})</p>
+                    <div style={{display:'grid',gap:'4px',maxHeight:'280px',overflowY:'auto'}}>
+                      {mit.map(m=>(
+                        <div key={`${m.vorname}-${m.nachname}`} style={{fontSize:'12px',color:'white',padding:'6px 9px',background:'rgba(74,222,128,0.08)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'7px'}}>{m.vorname} {m.nachname}</div>
+                      ))}
+                      {mit.length===0&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>Niemand.</p>}
+                    </div>
+                  </div>
+                  <div>
+                    <p style={{margin:'0 0 8px',fontSize:'12px',fontWeight:'800',color:'#f87171'}}>❌ Noch keine Betreuung ({ohne.length})</p>
+                    <div style={{display:'grid',gap:'4px',maxHeight:'280px',overflowY:'auto'}}>
+                      {ohne.map(m=>(
+                        <div key={`${m.vorname}-${m.nachname}`} style={{fontSize:'12px',color:'white',padding:'6px 9px',background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.2)',borderRadius:'7px'}}>{m.vorname} {m.nachname}</div>
+                      ))}
+                      {ohne.length===0&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>Alle eingetragen. 🎉</p>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {showAbfahrtManager&&canEditFahrer&&(
             <div style={{marginBottom:'16px',padding:'14px',background:'rgba(255,255,255,0.04)',border:`1px solid ${accentBorder}`,borderRadius:'12px'}}>
