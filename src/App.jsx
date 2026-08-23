@@ -9217,6 +9217,13 @@ export default function TrainingsApp() {
           {(()=>{
             const sevenDaysAgo = new Date(Date.now()-7*24*60*60*1000).toISOString();
             const toAutoArchive = allPTList.filter(pt=>{
+              // Turniermodus-Gruppenphase gilt NIE als "fertig" für die Auto-Archivierung, auch wenn
+              // alle Gruppenspiele einen Ergebniswert haben — das Turnier braucht noch den manuellen
+              // Schritt "Gruppenphase abschließen" (KO-Baum auslosen). Sonst landet es nach 7 Tagen
+              // im Archiv, bevor der KO-Baum je gezogen wurde, und ist von dort aus nicht mehr fertig
+              // spielbar. Erst nachdem transformiert wurde (type wird zu 'ko_runde'), greift die
+              // normale KO-Archivierungsregel.
+              if (pt.type==='turniermodus') return false;
               const done = pt.type==='ko_runde' ? !!(pt.matchResults?.gf) : (pt.matches||[]).every(m=>m.result);
               return done && pt.createdAt < sevenDaysAgo;
             });
@@ -10037,7 +10044,11 @@ export default function TrainingsApp() {
         const koPlayers = qualifiedStats.map((s,i) => ({...gPlayers[s.idx], seed:i+1}));
         const bracketSize = Math.pow(2, Math.ceil(Math.log2(Math.max(koPlayers.length,2))));
         const slots = getKoSlots(bracketSize);
-        const playerSlots = slots.map(seedIdx => seedIdx < koPlayers.length ? koPlayers[seedIdx] : null);
+        // WICHTIG: playerSlots braucht den Spieler-INDEX (in koPlayers/pt.players), nicht das
+        // Spieler-Objekt selbst — resolveKoBracket() greift später per pSlots[src.s] direkt darauf
+        // zu und benutzt den Wert als Array-Index (players[p]?.name). Ein Objekt statt einer Zahl
+        // hat den kompletten KO-Baum nach der Gruppenphase unrenderbar gemacht.
+        const playerSlots = slots.map(seedIdx => seedIdx < koPlayers.length ? seedIdx : null);
 
         const transformed = {
           ...pt,
