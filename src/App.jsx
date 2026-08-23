@@ -788,6 +788,9 @@ export default function TrainingsApp() {
   const [notifTab, setNotifTab]                             = useState('inbox'); // 'inbox' | 'trash'
   const [notifTrainerTab, setNotifTrainerTab]               = useState('sent'); // 'sent' | 'trash' | 'inbox'
   const [showTrainingHistory, setShowTrainingHistory]       = useState(false);
+  // "Ich fehle": beim erstmaligen Abmelden wird nach dem Grund gefragt (sessionId, bis bestätigt/abgebrochen).
+  const [missingReasonModal, setMissingReasonModal] = useState(null);
+  const [missingReasonText, setMissingReasonText] = useState('');
   const [showAchievements, setShowAchievements]             = useState(false);
   const [editingChildName, setEditingChildName]             = useState(null); // childId being renamed
   const [editingChildNameVal, setEditingChildNameVal]       = useState('');
@@ -2856,7 +2859,7 @@ export default function TrainingsApp() {
     setEditingSession(null);
   };
 
-  const respondToSession = (sessionId, response) => {
+  const respondToSession = (sessionId, response, reason) => {
     const myChild = getMyChild();
     const childId = myChild?.id || user?.uid;
     const session = sessions[sessionId];
@@ -2865,23 +2868,51 @@ export default function TrainingsApp() {
     const curStatus = typeof curRaw === 'object' ? curRaw?.status : curRaw;
     // Toggle: if same status → remove, else set new
     const by = userRole === 'jugendlich' ? 'self' : 'parent';
-    const newVal = curStatus === response ? null : { status: response, by };
+    const newVal = curStatus === response ? null : { status: response, by, ...(reason ? { reason } : {}) };
     const updatedSessions = { ...sessions, [sessionId]: { ...session, responses: { ...(session.responses||{}), [childId]: newVal } } };
     saveSessions(updatedSessions);
     if (response === 'missing' && myChild) {
       if (curStatus !== 'missing') {
-        // Auto-set attendance to absent_excused when marking as missing
-        saveChildren({ ...children, [myChild.id]: { ...myChild, attendance: { ...(myChild.attendance||{}), [session.date]: 'absent_excused' } } });
+        // Auto-set attendance to absent_excused when marking as missing. Der Grund wird separat
+        // (absenceReasons, pro Datum) am Kind gespeichert — attendance selbst bleibt ein reiner
+        // Status-String, damit bestehende Auswertungen unverändert weiterlaufen.
+        const nextAttendance = { ...myChild, attendance: { ...(myChild.attendance||{}), [session.date]: 'absent_excused' } };
+        if (reason) nextAttendance.absenceReasons = { ...(myChild.absenceReasons||{}), [session.date]: reason };
+        saveChildren({ ...children, [myChild.id]: nextAttendance });
       } else {
-        // "Fehlt"-Meldung wieder zurückgenommen: automatisch gesetzten Status wieder entfernen
-        // (nur falls er seitdem nicht manuell vom Trainer geändert wurde)
+        // "Fehlt"-Meldung wieder zurückgenommen: automatisch gesetzten Status (und Grund) wieder
+        // entfernen (nur falls er seitdem nicht manuell vom Trainer geändert wurde)
         const att = { ...(myChild.attendance||{}) };
+        const reasons = { ...(myChild.absenceReasons||{}) };
+        delete reasons[session.date];
         if (att[session.date] === 'absent_excused') {
           delete att[session.date];
-          saveChildren({ ...children, [myChild.id]: { ...myChild, attendance: att } });
+          saveChildren({ ...children, [myChild.id]: { ...myChild, attendance: att, absenceReasons: reasons } });
+        } else {
+          saveChildren({ ...children, [myChild.id]: { ...myChild, absenceReasons: reasons } });
         }
       }
     }
+  };
+
+  // Wird durch den "Ich fehle"-Button ausgelöst: beim erstmaligen Abmelden erst nach dem Grund
+  // fragen (Modal), bevor tatsächlich gespeichert wird. Beim Rückgängigmachen ("Abgemeldet")
+  // braucht es keinen Grund — direkt togglen.
+  const startMissingFlow = (sessionId) => {
+    const myChild = getMyChild();
+    const childId = myChild?.id || user?.uid;
+    const session = sessions[sessionId];
+    const curRaw = (session?.responses||{})[childId];
+    const curStatus = typeof curRaw === 'object' ? curRaw?.status : curRaw;
+    if (curStatus === 'missing') { respondToSession(sessionId, 'missing'); return; }
+    setMissingReasonText('');
+    setMissingReasonModal(sessionId);
+  };
+  const confirmMissingReason = () => {
+    if (!missingReasonModal) return;
+    respondToSession(missingReasonModal, 'missing', missingReasonText.trim());
+    setMissingReasonModal(null);
+    setMissingReasonText('');
   };
 
   const ensureTrainingDate = (sid, date) => {
@@ -5315,6 +5346,36 @@ export default function TrainingsApp() {
             ttrChangeQueue.forEach(it => localStorage.setItem(it.seenKey, '1'));
             setTtrChangeQueue([]);
           }}/>}
+        {missingReasonModal&&(
+          <Modal>
+            <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
+              <div style={{background:'#0a2210',border:'1px solid rgba(248,113,113,0.25)',borderRadius:'18px',padding:'24px',maxWidth:'380px',width:'100%',boxShadow:'0 32px 80px rgba(0,0,0,0.6)'}}>
+                <h3 style={{margin:'0 0 4px',color:'white',fontSize:'17px',fontWeight:'800'}}>❌ Grund für's Fehlen</h3>
+                <p style={{margin:'0 0 14px',color:'rgba(255,255,255,0.5)',fontSize:'13px'}}>Kurz angeben, damit der Trainer weiß, woran's liegt (optional, aber hilfreich).</p>
+                <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'10px'}}>
+                  {['Krank','Urlaub','Schule/Termin'].map(quick=>(
+                    <button key={quick} onClick={()=>setMissingReasonText(quick)}
+                      style={{padding:'6px 12px',borderRadius:'20px',border:`1px solid ${missingReasonText===quick?'#f87171':'rgba(255,255,255,0.15)'}`,background:missingReasonText===quick?'rgba(248,113,113,0.15)':'rgba(255,255,255,0.03)',color:missingReasonText===quick?'#f87171':'rgba(255,255,255,0.6)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>
+                      {quick}
+                    </button>
+                  ))}
+                </div>
+                <textarea autoFocus value={missingReasonText} onChange={e=>setMissingReasonText(e.target.value)} rows={3} placeholder="z.B. Krank, im Urlaub, Klassenfahrt…"
+                  style={{width:'100%',boxSizing:'border-box',padding:'10px 12px',background:'rgba(0,0,0,0.3)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',resize:'vertical',marginBottom:'16px'}}/>
+                <div style={{display:'flex',gap:'8px'}}>
+                  <button onClick={()=>{setMissingReasonModal(null);setMissingReasonText('');}}
+                    style={{flex:1,padding:'11px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.6)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>
+                    Abbrechen
+                  </button>
+                  <button onClick={confirmMissingReason}
+                    style={{flex:1,padding:'11px',background:'linear-gradient(135deg,#dc2626,#b91c1c)',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>
+                    Melde mich ab
+                  </button>
+                </div>
+              </div>
+            </div>
+          </Modal>
+        )}
 
         {/* Profil-Modal */}
         {showProfile&&(
@@ -5436,7 +5497,7 @@ export default function TrainingsApp() {
                         </div>
                         {getTrainerNames(session)&&<p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.52)'}}>👤 {getTrainerNames(session)}</p>}
                       </div>
-                      <button onClick={()=>respondToSession(session.id,'missing')}
+                      <button onClick={()=>startMissingFlow(session.id)}
                         style={{flexShrink:0,padding:'12px 20px',border:`2px solid ${isMissing?'#dc2626':'rgba(248,113,113,0.5)'}`,background:isMissing?'#dc2626':'rgba(220,38,38,0.08)',color:isMissing?'white':'#f87171',borderRadius:'12px',cursor:'pointer',fontWeight:'800',fontSize:'15px',whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:'6px'}}>
                         <X size={16}/> {isMissing?'Abgemeldet':'Ich fehle'}
                       </button>
@@ -5619,7 +5680,7 @@ export default function TrainingsApp() {
                             {session.info&&<div style={{display:'flex',alignItems:'flex-start',gap:'6px',marginTop:'8px',padding:'8px 10px',background:'rgba(96,165,250,0.08)',border:'1px solid rgba(96,165,250,0.2)',borderRadius:'8px'}}><Info size={14} color="#93c5fd" style={{marginTop:'2px',flexShrink:0}}/><p style={{margin:0,fontSize:'13px',color:'#93c5fd'}}>{session.info}</p></div>}
                           </div>
                           <div style={{display:'flex'}}>
-                            <button onClick={()=>respondToSession(session.id,'missing')}
+                            <button onClick={()=>startMissingFlow(session.id)}
                               style={{flex:1,padding:'10px',border:`2px solid #dc2626`,background:isMissing?'#dc2626':'transparent',color:isMissing?'white':'#f87171',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px',transition:'all 0.12s'}}>
                               <X size={18}/> {isMissing?'Abgemeldet – Rückgängig':'Ich fehle'}
                             </button>
@@ -6375,6 +6436,7 @@ export default function TrainingsApp() {
                           <p style={{margin:0,fontWeight:'700',color:'white',fontSize:'15px'}}>{child.name}</p>
                           {parentExcused&&<span style={{fontSize:'10px',fontWeight:'700',color:'#94a3b8',background:'rgba(148,163,184,0.12)',padding:'2px 8px',borderRadius:'20px',border:'1px solid rgba(148,163,184,0.25)'}}>{responseBy==='self'?'Selbst abgemeldet':'Eltern: abgemeldet'}</span>}
                         </div>
+                        {parentExcused&&parentResponse?.reason&&<p style={{margin:'0 0 2px',fontSize:'11px',color:'rgba(148,163,184,0.75)',fontStyle:'italic'}}>„{parentResponse.reason}"</p>}
                         {sub&&<p style={{margin:0,fontSize:'11px',color:'rgba(255,255,255,0.48)'}}>{sub.name}</p>}
                         {extraPlayers.some(ep=>ep.id===child.id)&&<p style={{margin:0,fontSize:'10px',fontWeight:'700',color:'#fbbf24'}}>⭐ Einzelspieler</p>}
                       </div>
@@ -6722,6 +6784,7 @@ export default function TrainingsApp() {
                           {isHistorical&&<span style={{fontSize:'10px',fontWeight:'700',color:'#93c5fd',background:'rgba(96,165,250,0.1)',padding:'1px 7px',borderRadius:'10px',border:'1px solid rgba(96,165,250,0.2)'}}>Frühere Gruppe</span>}
                           {parentExcused&&<span style={{fontSize:'10px',fontWeight:'700',color:'#94a3b8',background:'rgba(148,163,184,0.1)',padding:'1px 7px',borderRadius:'10px',border:'1px solid rgba(148,163,184,0.2)'}}>{responseBy==='self'?'Selbst abgemeldet':'Eltern abgemeldet'}</span>}
                         </div>
+                        {parentExcused&&parentResponse?.reason&&<p style={{margin:'3px 0 0',fontSize:'11px',color:'rgba(148,163,184,0.75)',fontStyle:'italic'}}>„{parentResponse.reason}"</p>}
                       </div>
                       {canEdit() ? (
                         <div style={{display:'flex',gap:'5px',alignItems:'center'}}>
