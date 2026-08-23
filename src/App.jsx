@@ -10020,6 +10020,13 @@ export default function TrainingsApp() {
         setPtMatchDraft(null);
       };
 
+      // (Duplikat von getKoSlots im Erstell-Assistenten (view==='practiceTournaments') — dort als
+      // eigene const definiert und deshalb NICHT aus dieser Detail-Ansicht heraus erreichbar. Ein
+      // Aufruf ohne diese lokale Kopie warf einen stillen ReferenceError beim Klick auf "KO-Baum
+      // auslosen" (JS-Fehler in einem Event-Handler crasht die Seite nicht sichtbar, es passiert
+      // einfach nichts) — das war der eigentliche Grund, warum der Übergang zur KO-Runde nie lief.
+      const getKoSlots = (size) => { if(size===1) return [0]; const prev=getKoSlots(size/2); const result=new Array(size); for(let i=0;i<size/2;i++){result[2*i]=prev[i];result[2*i+1]=size-1-prev[i];} return result; };
+
       // Transformiert das Dokument in-place: Gruppenphase → gesetzter KO-Baum.
       // Automatische Qualifikanten: die besten `advancePerGroup` je Gruppe, plus die
       // besten `wildcards` unter allen übrigen Spielern (über Gruppen hinweg, sortiert
