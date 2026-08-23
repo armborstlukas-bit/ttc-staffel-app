@@ -10021,59 +10021,103 @@ export default function TrainingsApp() {
       };
 
       // (Duplikat von getKoSlots im Erstell-Assistenten (view==='practiceTournaments') — dort als
-      // eigene const definiert und deshalb NICHT aus dieser Detail-Ansicht heraus erreichbar. Ein
-      // Aufruf ohne diese lokale Kopie warf einen stillen ReferenceError beim Klick auf "KO-Baum
-      // auslosen" (JS-Fehler in einem Event-Handler crasht die Seite nicht sichtbar, es passiert
-      // einfach nichts) — das war der eigentliche Grund, warum der Übergang zur KO-Runde nie lief.
+      // eigene const definiert und deshalb NICHT aus dieser Detail-Ansicht heraus erreichbar.)
       const getKoSlots = (size) => { if(size===1) return [0]; const prev=getKoSlots(size/2); const result=new Array(size); for(let i=0;i<size/2;i++){result[2*i]=prev[i];result[2*i+1]=size-1-prev[i];} return result; };
 
-      // Transformiert das Dokument in-place: Gruppenphase → gesetzter KO-Baum.
-      // Automatische Qualifikanten: die besten `advancePerGroup` je Gruppe, plus die
-      // besten `wildcards` unter allen übrigen Spielern (über Gruppen hinweg, sortiert
-      // nach Siegen dann Satzdifferenz) — deckt "beste Drittplatzierte/Viertplatzierte" ab.
-      const finishGroupPhase = () => {
-        if (!window.confirm('Gruppenphase abschließen und KO-Baum auslosen?')) return;
-        const autoQualified = [];
-        const rest = [];
-        groupStandings.forEach(g => {
-          g.standings.forEach((s, pos) => {
-            if (pos < gCfg.advancePerGroup) autoQualified.push({...s, groupId:g.id, groupPos:pos+1});
-            else rest.push({...s, groupId:g.id, groupPos:pos+1});
-          });
+      // Der KO-Baum wird NICHT mehr einmalig "erstellt"/das Dokument transformiert — stattdessen
+      // wird er bei JEDEM Rendern live aus dem aktuellen Gruppenstand neu berechnet (Qualifikanten,
+      // Setzung, Bracket-Struktur). Kommt ein neues Gruppenergebnis rein, verschiebt sich die Tabelle
+      // und der Baum darunter passt sich automatisch an. Die Gruppenübersicht bleibt dadurch immer
+      // erreichbar — kein Umschalt-Schritt mehr, der sie "verschluckt". Automatische Qualifikanten:
+      // die besten `advancePerGroup` je Gruppe, plus die besten `wildcards` unter allen übrigen
+      // Spielern (über Gruppen hinweg, sortiert nach Siegen dann Satzdifferenz).
+      const autoQualified = [];
+      const rest = [];
+      groupStandings.forEach(g => {
+        g.standings.forEach((s, pos) => {
+          if (pos < gCfg.advancePerGroup) autoQualified.push({...s, groupId:g.id, groupPos:pos+1});
+          else rest.push({...s, groupId:g.id, groupPos:pos+1});
         });
-        rest.sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:(b.setsWon-b.setsLost)-(a.setsWon-a.setsLost));
-        const wildcardQualified = rest.slice(0, gCfg.wildcards);
-        const qualifiedStats = [...autoQualified, ...wildcardQualified];
-        // Setzung: nach Gruppenplatz (1., 2., ... über alle Gruppen) dann Bilanz, damit
-        // z.B. alle Gruppensieger vor allen Gruppenzweiten gesetzt werden (verhindert
-        // frühe Duelle zwischen starken Spielern).
-        qualifiedStats.sort((a,b)=>a.groupPos!==b.groupPos?a.groupPos-b.groupPos:(b.wins-a.wins)||((b.setsWon-b.setsLost)-(a.setsWon-a.setsLost)));
-        const koPlayers = qualifiedStats.map((s,i) => ({...gPlayers[s.idx], seed:i+1}));
-        const bracketSize = Math.pow(2, Math.ceil(Math.log2(Math.max(koPlayers.length,2))));
-        const slots = getKoSlots(bracketSize);
-        // WICHTIG: playerSlots braucht den Spieler-INDEX (in koPlayers/pt.players), nicht das
-        // Spieler-Objekt selbst — resolveKoBracket() greift später per pSlots[src.s] direkt darauf
-        // zu und benutzt den Wert als Array-Index (players[p]?.name). Ein Objekt statt einer Zahl
-        // hat den kompletten KO-Baum nach der Gruppenphase unrenderbar gemacht.
-        const playerSlots = slots.map(seedIdx => seedIdx < koPlayers.length ? seedIdx : null);
+      });
+      rest.sort((a,b)=>b.wins!==a.wins?b.wins-a.wins:(b.setsWon-b.setsLost)-(a.setsWon-a.setsLost));
+      const wildcardQualified = rest.slice(0, gCfg.wildcards);
+      const qualifiedStats = [...autoQualified, ...wildcardQualified];
+      // Setzung: nach Gruppenplatz (1., 2., ... über alle Gruppen) dann Bilanz, damit z.B. alle
+      // Gruppensieger vor allen Gruppenzweiten gesetzt werden (verhindert frühe Duelle zwischen
+      // starken Spielern).
+      qualifiedStats.sort((a,b)=>a.groupPos!==b.groupPos?a.groupPos-b.groupPos:(b.wins-a.wins)||((b.setsWon-b.setsLost)-(a.setsWon-a.setsLost)));
+      const koPlayers = qualifiedStats.map((s,i) => ({...gPlayers[s.idx], seed:i+1}));
+      const koBracketSize = Math.pow(2, Math.ceil(Math.log2(Math.max(koPlayers.length,2))));
+      const koSlots = getKoSlots(koBracketSize);
+      const koPlayerSlots = koSlots.map(seedIdx => seedIdx < koPlayers.length ? seedIdx : null);
+      const koMatchResults = pt.koMatchResults || {};
+      const virtualKoPt = { settings: gSettings, players: koPlayers, bracketSize: koBracketSize, playerSlots: koPlayerSlots, matchResults: koMatchResults, doubleElim: pt.doubleElim||false };
+      const { resolved: koResolved, graph: koGraph } = resolveKoBracket(virtualKoPt);
+      const koAllM = [...koGraph.wbMatches, ...koGraph.lbMatches, ...(koGraph.grandFinal?[koGraph.grandFinal]:[])];
+      const koHasGF = pt.doubleElim && koGraph.grandFinal && koGraph.grandFinal.id !== koGraph.wbFinal?.id;
+      const koFinalId = koHasGF ? 'gf' : koGraph.wbFinal?.id;
+      const koFinalResult = koFinalId ? koMatchResults[koFinalId] : null;
+      const koWbRoundsNums = [...new Set(koGraph.wbMatches.map(m=>m.round))].sort((a,b)=>a-b);
+      const koWbTotalRounds = koWbRoundsNums.length||1;
+      const koRoundLabel = (r) => { const rem=koWbTotalRounds-r; if(rem===0) return pt.doubleElim?'WB Finale':'Finale'; if(rem===1)return'Halbfinale'; if(rem===2)return'Viertelfinale'; return`Runde ${r}`; };
 
-        const transformed = {
-          ...pt,
-          type:'ko_runde',
-          phase: undefined,
-          players: koPlayers,
-          bracketSize,
-          playerSlots,
-          matchResults: {},
-          groupPhaseArchive: { groups: gGroups, matches: gMatches, players: gPlayers, groupConfig: gCfg },
-          matches: undefined,
-          groups: undefined,
-          groupConfig: undefined,
-        };
-        // undefined-Felder wirklich entfernen (Firestore mag kein `undefined`)
-        Object.keys(transformed).forEach(k => { if (transformed[k]===undefined) delete transformed[k]; });
-        savePracticeTournaments({...practiceTournaments, [pt.id]: transformed});
+      const saveKoLiveResult = (matchId, result) => {
+        savePracticeTournaments({...practiceTournaments, [pt.id]: {...pt, koMatchResults:{...(pt.koMatchResults||{}), [matchId]:result}}});
+      };
+      const deleteKoLiveResult = (matchId) => {
+        const upd = {...(pt.koMatchResults||{})}; delete upd[matchId];
+        savePracticeTournaments({...practiceTournaments, [pt.id]: {...pt, koMatchResults:upd}});
+      };
+      const initKoLiveDraft = (matchId) => {
+        const existing = koMatchResults[matchId];
+        if (gSettings.trackSetScores) {
+          setPtMatchDraft({mode:'scores', scores:existing?.scores?.map(s=>({s1:String(s.s1),s2:String(s.s2)}))||[{s1:'',s2:''}]});
+        } else {
+          setPtMatchDraft({mode:'simple', sets1:existing?.sets1||0, sets2:existing?.sets2||0});
+        }
+        setPtMatchEditing(matchId);
+      };
+      const isKoDraftValid = () => {
+        if (!ptMatchDraft) return false;
+        if (ptMatchDraft.mode==='scores') {
+          const valid = ptMatchDraft.scores.filter(r=>r.s1!==''&&r.s2!==''&&Number(r.s1)!==Number(r.s2));
+          const s1=valid.filter(r=>Number(r.s1)>Number(r.s2)).length;
+          const s2=valid.filter(r=>Number(r.s2)>Number(r.s1)).length;
+          return s1===gSettings.winSets||s2===gSettings.winSets;
+        } else {
+          const {sets1,sets2}=ptMatchDraft;
+          return (sets1===gSettings.winSets||sets2===gSettings.winSets)&&sets1!==sets2;
+        }
+      };
+      const saveKoLiveDraft = () => {
+        if (ptMatchEditing===null||!ptMatchDraft) return;
+        let result;
+        if (ptMatchDraft.mode==='scores') {
+          const validScores = ptMatchDraft.scores.filter(r=>r.s1!==''&&r.s2!=='').map(r=>({s1:Number(r.s1),s2:Number(r.s2)}));
+          result = {sets1:validScores.filter(r=>r.s1>r.s2).length, sets2:validScores.filter(r=>r.s2>r.s1).length, scores:validScores};
+        } else {
+          result = {sets1:ptMatchDraft.sets1||0, sets2:ptMatchDraft.sets2||0, scores:[]};
+        }
+        saveKoLiveResult(ptMatchEditing, result);
         setPtMatchEditing(null); setPtMatchDraft(null);
+      };
+
+      const archiveTurniermodus = () => {
+        if (!window.confirm('Turnier wirklich archivieren? Der KO-Baum wird dann nicht mehr verändert.')) return;
+        const gfR = koResolved[koFinalId];
+        const finalStandings = koPlayers.map((p,i)=>({childId:p.childId,name:p.name,seed:p.seed,place:99}));
+        if (gfR?.result) {
+          const winner = gfR.result.sets1>gfR.result.sets2 ? gfR.p1 : gfR.p2;
+          const loser  = gfR.result.sets1>gfR.result.sets2 ? gfR.p2 : gfR.p1;
+          if (winner!=null) finalStandings[winner].place=1;
+          if (loser!=null)  finalStandings[loser].place=2;
+        }
+        const sortedStandings = finalStandings.sort((a,b)=>a.place-b.place).map((s,i)=>({...s,place:s.place===99?i+3:s.place}));
+        const archivedPT = {...pt, status:'archived', archivedAt:new Date().toISOString(), finalStandings:sortedStandings};
+        const newActive = {...practiceTournaments}; delete newActive[pt.id];
+        savePracticeTournaments(newActive);
+        saveArchivedPracticeTournaments({...archivedPracticeTournaments, [pt.id]: archivedPT});
+        setActivePracticeId(null); navTo('practiceTournaments');
       };
 
       const inpStyleG = {background:'rgba(255,255,255,0.09)',border:'1px solid rgba(167,139,250,0.25)',borderRadius:'8px',color:'white',fontSize:'20px',fontWeight:'900',textAlign:'center',width:'58px',height:'44px',outline:'none'};
@@ -10173,13 +10217,80 @@ export default function TrainingsApp() {
               </div>
             ))}
 
-            {allDone && (
-              <div style={{padding:'18px 20px',background:'rgba(74,222,128,0.07)',border:'1px solid rgba(74,222,128,0.22)',borderRadius:'16px',textAlign:'center'}}>
-                <p style={{margin:'0 0 6px',fontSize:'17px',fontWeight:'900',color:'#4ade80'}}>✅ Gruppenphase abgeschlossen!</p>
-                <p style={{margin:'0 0 14px',fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>Jetzt den gesetzten KO-Baum auslosen.</p>
-                <button onClick={finishGroupPhase} style={{padding:'12px 28px',background:'linear-gradient(135deg,#7c3aed,#6d28d9)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'800',fontSize:'14px',display:'inline-flex',alignItems:'center',gap:'8px'}}>🏆 KO-Baum auslosen</button>
-              </div>
-            )}
+            {/* ── Live KO-Baum: immer sichtbar, wird bei jedem Gruppenergebnis neu berechnet ── */}
+            <div style={{marginTop:'8px'}}>
+              <h3 style={{margin:'0 0 4px',color:'#a78bfa',fontSize:'15px',fontWeight:'800'}}>🏆 KO-Baum {allDone?'':'(vorläufig)'}</h3>
+              <p style={{margin:'0 0 14px',fontSize:'11px',color:'rgba(255,255,255,0.45)'}}>
+                {allDone
+                  ? `${koPlayers.length} Qualifizierte, gesetzt nach Gruppenplatz.`
+                  : `Wird laufend aus dem aktuellen Gruppenstand neu berechnet — kann sich noch verschieben, bis alle Gruppenspiele fertig sind.`}
+              </p>
+              {koPlayers.length<2 ? (
+                <p style={{fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>Noch keine Qualifikanten ermittelbar.</p>
+              ) : (
+                <div style={{display:'flex',flexDirection:'column',gap:'18px'}}>
+                  {koWbRoundsNums.map(r => (
+                    <div key={r}>
+                      <p style={{margin:'0 0 8px',fontSize:'11px',fontWeight:'800',color:'rgba(167,139,250,0.7)',textTransform:'uppercase',letterSpacing:'0.4px'}}>{koRoundLabel(r)}</p>
+                      <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+                        {koGraph.wbMatches.filter(m=>m.round===r).map(m => {
+                          const rm = koResolved[m.id];
+                          const p1 = rm.p1!=null && rm.p1!==undefined ? koPlayers[rm.p1] : null;
+                          const p2 = rm.p2!=null && rm.p2!==undefined ? koPlayers[rm.p2] : null;
+                          const pName = (p,raw) => raw===undefined?'…':raw===null?'Freilos':(p?.name||'?');
+                          const res = rm.result;
+                          const isEditing = ptMatchEditing === m.id;
+                          const canEdit = rm.p1!=null && rm.p1!==undefined && rm.p2!=null && rm.p2!==undefined;
+                          return (
+                            <div key={m.id} style={{padding:'10px 12px',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.06)',borderRadius:'10px',opacity:canEdit?1:0.5}}>
+                              <div onClick={()=>{if(!canEdit)return; isEditing?(setPtMatchEditing(null),setPtMatchDraft(null)):initKoLiveDraft(m.id);}} style={{display:'flex',alignItems:'center',justifyContent:'space-between',cursor:canEdit?'pointer':'default'}}>
+                                <span style={{fontSize:'13px',fontWeight:'700'}}>{pName(p1,rm.p1)} <span style={{color:'rgba(255,255,255,0.35)'}}>vs</span> {pName(p2,rm.p2)}</span>
+                                <span style={{fontSize:'14px',fontWeight:'900',color:res?'#4ade80':'rgba(255,255,255,0.3)'}}>{res ? `${res.sets1}:${res.sets2}` : '– : –'}</span>
+                              </div>
+                              {isEditing && ptMatchDraft && (
+                                <div style={{marginTop:'12px'}}>
+                                  <div style={{display:'flex',alignItems:'center',gap:'14px',justifyContent:'center',marginBottom:'12px'}}>
+                                    <div style={{textAlign:'center'}}>
+                                      <p style={{margin:'0 0 6px',fontSize:'12px',fontWeight:'700'}}>{pName(p1,rm.p1)}</p>
+                                      <div style={{display:'flex',gap:'5px'}}>
+                                        {Array.from({length:gSettings.winSets+1},(_,n)=>(
+                                          <button key={n} onClick={()=>setPtMatchDraft(d=>({...d,sets1:n}))} style={{...inpStyleG,width:'38px',height:'38px',fontSize:'17px',borderColor:ptMatchDraft.sets1===n?'#a78bfa':'rgba(255,255,255,0.1)',background:ptMatchDraft.sets1===n?'rgba(167,139,250,0.25)':'rgba(255,255,255,0.04)',color:ptMatchDraft.sets1===n?'white':'rgba(255,255,255,0.4)'}}>{n}</button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <span style={{fontWeight:'900',color:'rgba(255,255,255,0.4)',fontSize:'20px'}}>:</span>
+                                    <div style={{textAlign:'center'}}>
+                                      <p style={{margin:'0 0 6px',fontSize:'12px',fontWeight:'700'}}>{pName(p2,rm.p2)}</p>
+                                      <div style={{display:'flex',gap:'5px'}}>
+                                        {Array.from({length:gSettings.winSets+1},(_,n)=>(
+                                          <button key={n} onClick={()=>setPtMatchDraft(d=>({...d,sets2:n}))} style={{...inpStyleG,width:'38px',height:'38px',fontSize:'17px',borderColor:ptMatchDraft.sets2===n?'#a78bfa':'rgba(255,255,255,0.1)',background:ptMatchDraft.sets2===n?'rgba(167,139,250,0.25)':'rgba(255,255,255,0.04)',color:ptMatchDraft.sets2===n?'white':'rgba(255,255,255,0.4)'}}>{n}</button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div style={{display:'flex',gap:'8px',justifyContent:'flex-end'}}>
+                                    {res&&<button onClick={()=>{deleteKoLiveResult(m.id);setPtMatchEditing(null);setPtMatchDraft(null);}} style={{padding:'8px 12px',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',borderRadius:'8px',color:'#f87171',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>Löschen</button>}
+                                    <button onClick={()=>{setPtMatchEditing(null);setPtMatchDraft(null);}} style={{padding:'8px 12px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'8px',color:'rgba(255,255,255,0.65)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>Abbrechen</button>
+                                    <button onClick={saveKoLiveDraft} disabled={!isKoDraftValid()} style={{padding:'8px 18px',background:isKoDraftValid()?'linear-gradient(135deg,#7c3aed,#6d28d9)':'rgba(255,255,255,0.06)',border:'none',borderRadius:'8px',color:isKoDraftValid()?'white':'rgba(255,255,255,0.3)',cursor:isKoDraftValid()?'pointer':'not-allowed',fontWeight:'800',fontSize:'12px'}}>Speichern</button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {koFinalResult && (
+                <div style={{marginTop:'18px',padding:'18px 20px',background:'rgba(74,222,128,0.07)',border:'1px solid rgba(74,222,128,0.22)',borderRadius:'16px',textAlign:'center'}}>
+                  <p style={{margin:'0 0 6px',fontSize:'17px',fontWeight:'900',color:'#4ade80'}}>🏆 Turnier entschieden!</p>
+                  <p style={{margin:'0 0 14px',fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>Sobald nichts mehr eingetragen werden muss, kannst du archivieren.</p>
+                  <button onClick={archiveTurniermodus} style={{padding:'12px 28px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'12px',cursor:'pointer',fontWeight:'800',fontSize:'14px',display:'inline-flex',alignItems:'center',gap:'8px'}}><Archive size={16}/> Archivieren</button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       );
