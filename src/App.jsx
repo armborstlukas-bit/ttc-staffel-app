@@ -10061,6 +10061,77 @@ export default function TrainingsApp() {
       const koWbTotalRounds = koWbRoundsNums.length||1;
       const koRoundLabel = (r) => { const rem=koWbTotalRounds-r; if(rem===0) return pt.doubleElim?'WB Finale':'Finale'; if(rem===1)return'Halbfinale'; if(rem===2)return'Viertelfinale'; return`Runde ${r}`; };
 
+      // ── Live-Baum-Grafik (verbundene Boxen, wie beim reinen KO-Modus) — rein zur Anzeige,
+      // die Ergebniseingabe passiert weiter unten in der klickbaren Rundenliste. ──
+      const koMH=54, koMW=155, koCGAP=40, koRGAP=8, koR1S=koMH+koRGAP;
+      const koGetX=(r)=>(r-1)*(koMW+koCGAP);
+      const koGetY=(r,sl)=>{ const sp=Math.pow(2,r-1); return sl*sp*koR1S+(sp-1)/2*koR1S; };
+      const koWbR1Count=koGraph.wbMatches.filter(m=>m.round===1).length;
+      const koTreeH=Math.max(koWbR1Count*koR1S-koRGAP, koMH+4);
+      const koTreeW=koWbTotalRounds*(koMW+koCGAP)-koCGAP+(koHasGF?koCGAP+koMW:0);
+      const KoBracketTreeLive = () => (
+        <div style={{overflowX:'auto',paddingBottom:'4px',marginBottom:'18px'}}>
+          <div style={{position:'relative',width:koTreeW,height:koTreeH}}>
+            {koGraph.wbMatches.map(m=>{
+              const rm=koResolved[m.id]; if(!rm) return null;
+              const p1=rm.p1, p2=rm.p2;
+              if(p1===null&&p2===null) return null;
+              const res=rm.result, p1Won=res&&res.sets1>res.sets2, p2Won=res&&res.sets2>res.sets1;
+              const isBye=p1===null||p2===null;
+              const isLast=m.round===koWbTotalRounds&&!koHasGF;
+              const pName=(p)=>p===null?'Freilos':p===undefined?'…':koPlayers[p]?.name||'?';
+              const colBorder=isLast?'rgba(253,230,138,0.3)':res?'rgba(74,222,128,0.3)':'rgba(167,139,250,0.22)';
+              const colBg=isLast?'rgba(253,230,138,0.05)':isBye?'rgba(255,255,255,0.01)':'rgba(255,255,255,0.05)';
+              return (
+                <div key={m.id} style={{position:'absolute',left:koGetX(m.round),top:koGetY(m.round,m.slot),width:koMW,height:koMH,background:colBg,border:`1px solid ${isBye?'rgba(255,255,255,0.05)':colBorder}`,borderRadius:8,overflow:'hidden',display:'flex',flexDirection:'column',opacity:isBye?0.35:1}}>
+                  {[{p:p1,won:p1Won},{p:p2,won:p2Won}].map((row,ri)=>(
+                    <div key={ri} style={{flex:1,display:'flex',alignItems:'center',padding:'0 8px',gap:4,borderBottom:ri===0?'1px solid rgba(255,255,255,0.05)':'none'}}>
+                      <span style={{flex:1,fontSize:11,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:row.won?'#4ade80':res&&!row.won?'rgba(255,255,255,0.3)':row.p===undefined?'rgba(255,255,255,0.2)':'white'}}>{pName(row.p)}</span>
+                      {res&&<span style={{fontSize:13,fontWeight:900,color:row.won?'#4ade80':'rgba(255,255,255,0.28)',flexShrink:0}}>{ri===0?res.sets1:res.sets2}</span>}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+            {koHasGF&&(()=>{
+              const rm=koResolved['gf']; const res=rm?.result;
+              const p1=rm?.p1, p2=rm?.p2, p1Won=res&&res.sets1>res.sets2, p2Won=res&&res.sets2>res.sets1;
+              const gfX=koWbTotalRounds*(koMW+koCGAP), gfY=koGetY(koWbTotalRounds,0);
+              const pGF=(p,fb)=>p===null?'Freilos':p===undefined?fb:koPlayers[p]?.name||'?';
+              return (<div style={{position:'absolute',left:gfX,top:gfY,width:koMW,height:koMH,background:'rgba(253,230,138,0.06)',border:`1px solid ${res?'rgba(253,230,138,0.45)':'rgba(253,230,138,0.28)'}`,borderRadius:8,overflow:'hidden',display:'flex',flexDirection:'column'}}>
+                {[{p:p1,won:p1Won,fb:'WB Sieger'},{p:p2,won:p2Won,fb:'VB Sieger'}].map((row,ri)=>(
+                  <div key={ri} style={{flex:1,display:'flex',alignItems:'center',padding:'0 8px',gap:4,borderBottom:ri===0?'1px solid rgba(253,230,138,0.08)':'none'}}>
+                    <span style={{flex:1,fontSize:11,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:row.won?'#fde68a':res&&!row.won?'rgba(255,255,255,0.3)':row.p===undefined?'rgba(253,230,138,0.35)':'white'}}>{pGF(row.p,row.fb)}</span>
+                    {res&&<span style={{fontSize:13,fontWeight:900,color:row.won?'#fde68a':'rgba(255,255,255,0.28)',flexShrink:0}}>{ri===0?res.sets1:res.sets2}</span>}
+                  </div>
+                ))}
+              </div>);
+            })()}
+            <svg style={{position:'absolute',top:0,left:0,width:koTreeW,height:koTreeH,pointerEvents:'none',overflow:'visible'}}>
+              {koWbRoundsNums.slice(0,-1).map(round=>koGraph.wbMatches.filter(m=>m.round===round).map(m=>{
+                const x1=koGetX(round)+koMW, y1=koGetY(round,m.slot)+koMH/2;
+                const ns=Math.floor(m.slot/2), nr=round+1;
+                const x2=koGetX(nr), y2=koGetY(nr,ns)+koMH/2, midX=x1+koCGAP/2;
+                return <path key={m.id} d={`M${x1},${y1}H${midX}V${y2}H${x2}`} stroke="rgba(167,139,250,0.2)" strokeWidth="1.5" fill="none" strokeLinecap="round"/>;
+              }))}
+              {koHasGF&&(()=>{
+                const x1=koGetX(koWbTotalRounds)+koMW, y1=koGetY(koWbTotalRounds,0)+koMH/2;
+                const x2=koWbTotalRounds*(koMW+koCGAP);
+                return <path d={`M${x1},${y1}H${x2}`} stroke="rgba(253,230,138,0.28)" strokeWidth="1.5" fill="none" strokeDasharray="4,3"/>;
+              })()}
+            </svg>
+          </div>
+          <div style={{display:'flex',width:koTreeW,marginTop:'6px'}}>
+            {koWbRoundsNums.map(r=>(
+              <div key={r} style={{width:koMW+koCGAP,flexShrink:0,textAlign:'center'}}>
+                <span style={{fontSize:'10px',fontWeight:'700',color:'rgba(167,139,250,0.4)',textTransform:'uppercase',letterSpacing:'0.8px'}}>{koRoundLabel(r)}</span>
+              </div>
+            ))}
+            {koHasGF&&<div style={{width:koMW,flexShrink:0,textAlign:'center'}}><span style={{fontSize:'10px',fontWeight:'700',color:'rgba(253,230,138,0.5)',textTransform:'uppercase',letterSpacing:'0.8px'}}>Finale</span></div>}
+          </div>
+        </div>
+      );
+
       const saveKoLiveResult = (matchId, result) => {
         savePracticeTournaments({...practiceTournaments, [pt.id]: {...pt, koMatchResults:{...(pt.koMatchResults||{}), [matchId]:result}}});
       };
@@ -10228,6 +10299,8 @@ export default function TrainingsApp() {
               {koPlayers.length<2 ? (
                 <p style={{fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>Noch keine Qualifikanten ermittelbar.</p>
               ) : (
+                <>
+                <KoBracketTreeLive/>
                 <div style={{display:'flex',flexDirection:'column',gap:'18px'}}>
                   {koWbRoundsNums.map(r => (
                     <div key={r}>
@@ -10282,6 +10355,7 @@ export default function TrainingsApp() {
                     </div>
                   ))}
                 </div>
+                </>
               )}
               {koFinalResult && (
                 <div style={{marginTop:'18px',padding:'18px 20px',background:'rgba(74,222,128,0.07)',border:'1px solid rgba(74,222,128,0.22)',borderRadius:'16px',textAlign:'center'}}>
