@@ -195,6 +195,7 @@ const BEITRAGSARTEN = [
   { key: 'kind_ab10',        label: 'Kinder ab 10 Jahre',    amount: 96 },
   { key: 'aktive',           label: 'Aktive',                amount: 144 },
   { key: 'familienbeitrag',  label: 'Familienbeitrag',       amount: 240 },
+  { key: 'eltern_kind_gruppe', label: 'Eltern-Kind-Gruppe',  amount: 36 },
   { key: 'ehrenmitglied',    label: 'Ehrenmitglied',         amount: 0 },
   { key: 'familienmitglied', label: 'Familienmitglied',      amount: 0 },
   { key: 'arbeitslos',       label: 'Arbeitslos',            amount: 60 },
