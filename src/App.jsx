@@ -5352,14 +5352,6 @@ export default function TrainingsApp() {
               <div style={{background:'#0a2210',border:'1px solid rgba(248,113,113,0.25)',borderRadius:'18px',padding:'24px',maxWidth:'380px',width:'100%',boxShadow:'0 32px 80px rgba(0,0,0,0.6)'}}>
                 <h3 style={{margin:'0 0 4px',color:'white',fontSize:'17px',fontWeight:'800'}}>❌ Grund für's Fehlen</h3>
                 <p style={{margin:'0 0 14px',color:'rgba(255,255,255,0.5)',fontSize:'13px'}}>Kurz angeben, damit der Trainer weiß, woran's liegt (optional, aber hilfreich).</p>
-                <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'10px'}}>
-                  {['Krank','Urlaub','Schule/Termin'].map(quick=>(
-                    <button key={quick} onClick={()=>setMissingReasonText(quick)}
-                      style={{padding:'6px 12px',borderRadius:'20px',border:`1px solid ${missingReasonText===quick?'#f87171':'rgba(255,255,255,0.15)'}`,background:missingReasonText===quick?'rgba(248,113,113,0.15)':'rgba(255,255,255,0.03)',color:missingReasonText===quick?'#f87171':'rgba(255,255,255,0.6)',cursor:'pointer',fontWeight:'700',fontSize:'12px'}}>
-                      {quick}
-                    </button>
-                  ))}
-                </div>
                 <textarea autoFocus value={missingReasonText} onChange={e=>setMissingReasonText(e.target.value)} rows={3} placeholder="z.B. Krank, im Urlaub, Klassenfahrt…"
                   style={{width:'100%',boxSizing:'border-box',padding:'10px 12px',background:'rgba(0,0,0,0.3)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',resize:'vertical',marginBottom:'16px'}}/>
                 <div style={{display:'flex',gap:'8px'}}>
