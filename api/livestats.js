@@ -82,25 +82,39 @@ function applyMeetingToPlayers(meeting, report, players) {
       if (!p) continue;
       const key = p.player_id || `${p.firstname} ${p.lastname}`.trim().toLowerCase();
       if (!players[key]) players[key] = { name: `${p.firstname} ${p.lastname}`.trim(), results: [] };
-      players[key].results.push({ date: meeting.date, win: won });
+      players[key].results.push({ date: meeting.date, win: won, type: entry.game_type === 'double' ? 'double' : 'single' });
     }
   }
 }
 
-function buildLeaderboards(players) {
-  const rows = Object.values(players).map(p => {
-    const sorted = [...p.results].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+// Baut aus einer gefilterten Ergebnisliste (z.B. nur Einzel, nur Doppel, oder alles zusammen)
+// die drei Rankings. minGames = Mindestanzahl Spiele für die Siegquote (sonst würde 1:0 = 100%
+// ganz oben stehen).
+function computeRows(players, filterFn, minGames) {
+  return Object.values(players).map(p => {
+    const sorted = [...p.results].filter(filterFn).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     const wins = sorted.filter(r => r.win).length;
     const losses = sorted.length - wins;
     let maxStreak = 0, cur = 0;
     for (const r of sorted) { cur = r.win ? cur + 1 : 0; if (cur > maxStreak) maxStreak = cur; }
     const winPct = sorted.length > 0 ? Math.round((wins / sorted.length) * 1000) / 10 : 0;
     return { name: p.name, wins, losses, games: sorted.length, maxStreak, winPct };
-  });
-  const meisteSiege = [...rows].sort((a, b) => b.wins - a.wins || b.games - a.games).slice(0, 8);
-  const laengsteSerie = [...rows].filter(r => r.maxStreak > 0).sort((a, b) => b.maxStreak - a.maxStreak).slice(0, 8);
-  const besteSiegquote = [...rows].filter(r => r.games >= 5).sort((a, b) => b.winPct - a.winPct || b.games - a.games).slice(0, 8);
-  return { meisteSiege, laengsteSerie, besteSiegquote };
+  }).filter(r => r.games > 0);
+}
+
+function buildLeaderboards(players) {
+  const filters = { einzel: r => r.type === 'single', doppel: r => r.type === 'double', gesamt: () => true };
+  const out = {};
+  for (const [key, filterFn] of Object.entries(filters)) {
+    const rows = computeRows(players, filterFn, key === 'gesamt' ? 5 : 3);
+    const minGames = key === 'gesamt' ? 5 : 3;
+    out[key] = {
+      meisteSiege: [...rows].sort((a, b) => b.wins - a.wins || b.games - a.games).slice(0, 8),
+      laengsteSerie: [...rows].filter(r => r.maxStreak > 0).sort((a, b) => b.maxStreak - a.maxStreak).slice(0, 8),
+      besteSiegquote: [...rows].filter(r => r.games >= minGames).sort((a, b) => b.winPct - a.winPct || b.games - a.games).slice(0, 8),
+    };
+  }
+  return out;
 }
 
 export default async function handler(req, res) {
@@ -112,9 +126,14 @@ export default async function handler(req, res) {
     const roles = userData.roles?.length ? userData.roles : (userData.role ? [userData.role] : []);
     if (!roles.includes('admin')) { res.status(403).json({ error: 'Nur Admins (Testfeature)' }); return; }
 
+    // Schema v2 fügt game_type (Einzel/Doppel) zu jedem Ergebnis hinzu. Ein älterer Cache ohne
+    // diese Info kann Einzel/Doppel nicht rückwirkend unterscheiden -- deshalb bei Versionswechsel
+    // einmalig alles verwerfen und neu einlesen, statt mit unvollständigen Daten weiterzurechnen.
+    const SCHEMA_VERSION = 2;
     const cacheRef = adminDb().collection('ttc').doc('livestatsCache');
     const cacheSnap = await cacheRef.get();
-    const cache = cacheSnap.exists ? cacheSnap.data() : { processedMeetingIds: [], players: {} };
+    let cache = cacheSnap.exists ? cacheSnap.data() : { processedMeetingIds: [], players: {} };
+    if (cache.schemaVersion !== SCHEMA_VERSION) cache = { processedMeetingIds: [], players: {}, schemaVersion: SCHEMA_VERSION };
 
     const action = req.query.action || 'get';
     if (action === 'get') {
@@ -141,7 +160,7 @@ export default async function handler(req, res) {
       }
 
       const newProcessedIds = [...processedSet, ...neu.map(m => m.meetingId)];
-      const updated = { processedMeetingIds: newProcessedIds, players, updatedAt: new Date().toISOString() };
+      const updated = { processedMeetingIds: newProcessedIds, players, updatedAt: new Date().toISOString(), schemaVersion: SCHEMA_VERSION };
       await cacheRef.set(updated);
 
       res.status(200).json({

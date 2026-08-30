@@ -759,6 +759,7 @@ export default function TrainingsApp() {
   const [liveStats, setLiveStats] = useState(null);
   const [liveStatsLoading, setLiveStatsLoading] = useState(false);
   const [liveStatsMsg, setLiveStatsMsg] = useState('');
+  const [liveStatsExpanded, setLiveStatsExpanded] = useState(null);
   const [editingSession, setEditingSession]     = useState(null); // session being edited
   const [editForm, setEditForm]                 = useState({});
   const [deleteDialog, setDeleteDialog]         = useState(null);
@@ -15045,26 +15046,56 @@ export default function TrainingsApp() {
   // ── LIVE-STATISTIKEN (TESTFEATURE, nur Admin) ────────────────────────────
   if (view === 'livestats' && userRole === 'admin') {
     if (liveStats === null && !liveStatsLoading) loadLiveStats('get');
-    const lb = liveStats?.leaderboards || { meisteSiege: [], laengsteSerie: [], besteSiegquote: [] };
+    const empty3 = { meisteSiege: [], laengsteSerie: [], besteSiegquote: [] };
+    const lb = liveStats?.leaderboards || { einzel: empty3, doppel: empty3, gesamt: empty3 };
     const updatedLabel = liveStats?.updatedAt ? new Date(liveStats.updatedAt).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : null;
 
-    const Board = ({title, icon, rows, valueLabel, getValue, color}) => (
-      <div style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(167,139,250,0.15)',borderRadius:'16px',padding:'16px',marginBottom:'16px'}}>
-        <h3 style={{margin:'0 0 12px',color,fontSize:'15px',fontWeight:'800',display:'flex',alignItems:'center',gap:'8px'}}>{icon} {title}</h3>
-        {rows.length===0
-          ? <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>Noch keine Daten — auf „Aktualisieren" drücken.</p>
-          : <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
-              {rows.map((r,i)=>(
-                <div key={r.name+i} style={{display:'flex',alignItems:'center',gap:'10px',padding:'7px 10px',background:i===0?'rgba(251,191,36,0.06)':'rgba(255,255,255,0.02)',borderRadius:'9px'}}>
-                  <span style={{width:'20px',fontSize:'12px',fontWeight:'800',color:i===0?'#fbbf24':'rgba(255,255,255,0.4)',flexShrink:0}}>{i+1}.</span>
-                  <span style={{flex:1,fontSize:'13px',fontWeight:'700',color:'white'}}>{r.name}</span>
-                  <span style={{fontSize:'13px',fontWeight:'800',color}}>{getValue(r)} {valueLabel}</span>
-                </div>
-              ))}
+    // 3 Kategorien × 3 Varianten (Einzel/Doppel/Gesamt) = 9 aufklappbare Kacheln.
+    const TILES = [
+      {key:'meisteSiege-einzel',  cat:'meisteSiege',    label:'Meiste Siege — Einzel',        icon:'🏆', color:'#fbbf24', rows:lb.einzel.meisteSiege,    getValue:r=>`${r.wins} (${r.wins}:${r.losses})`},
+      {key:'meisteSiege-doppel',  cat:'meisteSiege',    label:'Meiste Siege — Doppel',         icon:'🏆', color:'#fbbf24', rows:lb.doppel.meisteSiege,    getValue:r=>`${r.wins} (${r.wins}:${r.losses})`},
+      {key:'meisteSiege-gesamt',  cat:'meisteSiege',    label:'Meiste Siege — Gesamt',         icon:'🏆', color:'#fbbf24', rows:lb.gesamt.meisteSiege,    getValue:r=>`${r.wins} (${r.wins}:${r.losses})`},
+      {key:'serie-einzel',        cat:'laengsteSerie',  label:'Längste Siegesserie — Einzel',  icon:'🔥', color:'#fb923c', rows:lb.einzel.laengsteSerie,  getValue:r=>`${r.maxStreak} in Folge`},
+      {key:'serie-doppel',        cat:'laengsteSerie',  label:'Längste Siegesserie — Doppel',  icon:'🔥', color:'#fb923c', rows:lb.doppel.laengsteSerie,  getValue:r=>`${r.maxStreak} in Folge`},
+      {key:'serie-gesamt',        cat:'laengsteSerie',  label:'Längste Siegesserie — Gesamt',  icon:'🔥', color:'#fb923c', rows:lb.gesamt.laengsteSerie,  getValue:r=>`${r.maxStreak} in Folge`},
+      {key:'quote-einzel',        cat:'besteSiegquote', label:'Beste Siegquote — Einzel',      icon:'🎯', color:'#4ade80', rows:lb.einzel.besteSiegquote,  getValue:r=>`${r.winPct}% (${r.games} Sp.)`},
+      {key:'quote-doppel',        cat:'besteSiegquote', label:'Beste Siegquote — Doppel',      icon:'🎯', color:'#4ade80', rows:lb.doppel.besteSiegquote,  getValue:r=>`${r.winPct}% (${r.games} Sp.)`},
+      {key:'quote-gesamt',        cat:'besteSiegquote', label:'Beste Siegquote — Gesamt',      icon:'🎯', color:'#4ade80', rows:lb.gesamt.besteSiegquote,  getValue:r=>`${r.winPct}% (${r.games} Sp.)`},
+    ];
+
+    const Tile = ({tile}) => {
+      const isOpen = liveStatsExpanded === tile.key;
+      const leader = tile.rows[0];
+      return (
+        <div style={{background:'rgba(255,255,255,0.04)',border:`1px solid ${isOpen?tile.color+'55':'rgba(167,139,250,0.15)'}`,borderRadius:'14px',overflow:'hidden',marginBottom:'10px'}}>
+          <button onClick={()=>setLiveStatsExpanded(isOpen?null:tile.key)}
+            style={{width:'100%',padding:'12px 14px',background:'transparent',border:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:'10px',textAlign:'left'}}>
+            <span style={{fontSize:'18px',flexShrink:0}}>{tile.icon}</span>
+            <div style={{flex:1,minWidth:0}}>
+              <p style={{margin:'0 0 2px',fontSize:'13px',fontWeight:'800',color:tile.color}}>{tile.label}</p>
+              <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.6)'}}>
+                {leader ? <>🥇 {leader.name} — {tile.getValue(leader)}</> : <span style={{color:'rgba(255,255,255,0.35)'}}>Noch keine Daten</span>}
+              </p>
             </div>
-        }
-      </div>
-    );
+            <ChevronRight size={16} color="rgba(255,255,255,0.35)" style={{flexShrink:0,transform:isOpen?'rotate(90deg)':'rotate(0deg)',transition:'transform 0.15s'}}/>
+          </button>
+          {isOpen && (
+            <div style={{padding:'0 14px 14px',display:'flex',flexDirection:'column',gap:'6px'}}>
+              {tile.rows.length===0
+                ? <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>Noch keine Daten — auf „Aktualisieren" drücken.</p>
+                : tile.rows.map((r,i)=>(
+                    <div key={r.name+i} style={{display:'flex',alignItems:'center',gap:'10px',padding:'7px 10px',background:i===0?tile.color+'12':'rgba(255,255,255,0.02)',borderRadius:'9px'}}>
+                      <span style={{width:'20px',fontSize:'12px',fontWeight:'800',color:i===0?tile.color:'rgba(255,255,255,0.4)',flexShrink:0}}>{i+1}.</span>
+                      <span style={{flex:1,fontSize:'13px',fontWeight:'700',color:'white'}}>{r.name}</span>
+                      <span style={{fontSize:'13px',fontWeight:'800',color:tile.color}}>{tile.getValue(r)}</span>
+                    </div>
+                  ))
+              }
+            </div>
+          )}
+        </div>
+      );
+    };
 
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#160c2e 0%,#0d0818 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
@@ -15089,9 +15120,11 @@ export default function TrainingsApp() {
           </div>
           {liveStatsMsg&&<p style={{margin:'0 0 16px',fontSize:'12px',color:'rgba(196,181,253,0.8)'}}>{liveStatsMsg}</p>}
 
-          <Board title="Meiste Siege" icon="🏆" color="#fbbf24" rows={lb.meisteSiege} valueLabel="Siege" getValue={r=>`${r.wins} (${r.wins}:${r.losses})`}/>
-          <Board title="Längste Siegesserie" icon="🔥" color="#fb923c" rows={lb.laengsteSerie} valueLabel="in Folge" getValue={r=>r.maxStreak}/>
-          <Board title="Beste Siegquote" icon="🎯" color="#4ade80" rows={lb.besteSiegquote} valueLabel="%" getValue={r=>`${r.winPct}% (${r.games} Sp.)`}/>
+          {['meisteSiege','laengsteSerie','besteSiegquote'].map(cat=>(
+            <div key={cat} style={{marginBottom:'18px'}}>
+              {TILES.filter(t=>t.cat===cat).map(tile=><Tile key={tile.key} tile={tile}/>)}
+            </div>
+          ))}
         </div>
       </div>
     );
