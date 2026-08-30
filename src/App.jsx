@@ -16242,15 +16242,19 @@ export default function TrainingsApp() {
 
     const erfasst = alleUngefiltert.filter(p => isComplete(p.id)).length;
 
-    // Ausgabe: Trikot und Unterseite werden UNABHÄNGIG voneinander als ausgegeben markiert — das
-    // deckt Teilausgabe automatisch ab (z.B. nur das Trikot schon mitgegeben, die Hose/der Rock
-    // fehlt noch), ohne einen extra "Teilausgabe"-Modus zu brauchen.
+    // Ausgabe: Trikot und Unterseite werden mit der jeweils ausgegebenen ANZAHL erfasst (nicht nur
+    // ja/nein) — wer z.B. 2 Trikots bestellt hat, kann auch erstmal nur 1 bekommen haben. Deckt
+    // Teilausgabe automatisch ab, ohne einen extra "Teilausgabe"-Modus zu brauchen.
+    const clampAusgabe = (val, max) => Math.max(0, Math.min(Number(max)||0, Number(val)||0));
     const ausgabeStatus = (id) => {
       const d = trikotDaten[id] || {};
       const brauchtUnterseite = d.unterseite && d.unterseite !== 'Keine';
-      const teile = [!!d.ausgabeTrikot, ...(brauchtUnterseite ? [!!d.ausgabeUnterseite] : [])];
-      if (teile.every(Boolean)) return 'komplett';
-      if (teile.some(Boolean)) return 'teilweise';
+      const trikotSoll = Number(d.anzahlTrikot)||0, trikotIst = clampAusgabe(d.ausgabeTrikotAnzahl, trikotSoll);
+      const unterSoll = brauchtUnterseite ? (Number(d.anzahlUnterseite)||0) : 0;
+      const unterIst = brauchtUnterseite ? clampAusgabe(d.ausgabeUnterseiteAnzahl, unterSoll) : 0;
+      const sollGesamt = trikotSoll + unterSoll, istGesamt = trikotIst + unterIst;
+      if (sollGesamt>0 && istGesamt>=sollGesamt) return 'komplett';
+      if (istGesamt>0) return 'teilweise';
       return 'keine';
     };
     const ausgegeben = alleUngefiltert.filter(p => ausgabeStatus(p.id)==='komplett').length;
@@ -16259,11 +16263,11 @@ export default function TrainingsApp() {
       const esc = v => String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       const th = v => `<th style="background:#1d4ed8;color:white;font-weight:bold;padding:6px 10px;border:1px solid #93c5fd">${esc(v)}</th>`;
       const td = v => `<td style="padding:5px 10px;border:1px solid #cbd5e1">${esc(v)}</td>`;
-      const header = ['Name','Typ','Trikotgröße','Trikotschnitt','Anzahl Trikots','Trikot ausgegeben','Unterseite','Größe Unterseite','Anzahl Unterseite','Unterseite ausgegeben'];
+      const header = ['Name','Typ','Trikotgröße','Trikotschnitt','Anzahl Trikots','Trikots ausgegeben','Unterseite','Größe Unterseite','Anzahl Unterseite','Unterseite ausgegeben'];
       const rows = alleUngefiltert.map(p => {
         const d = trikotDaten[p.id]||{};
         const hatUnterseite = d.unterseite && d.unterseite !== 'Keine';
-        return [p.name, p.typ==='jugend'?'Jugend':'Aktiv', d.groesse||'–', d.schnitt||'–', d.anzahlTrikot||'–', d.ausgabeTrikot?'Ja':'Nein', d.unterseite||'–', d.unterseite==='Keine'?'–':(d.groesseUnterseite||'–'), d.unterseite==='Keine'?'–':(d.anzahlUnterseite||'–'), hatUnterseite?(d.ausgabeUnterseite?'Ja':'Nein'):'–'];
+        return [p.name, p.typ==='jugend'?'Jugend':'Aktiv', d.groesse||'–', d.schnitt||'–', d.anzahlTrikot||'–', `${clampAusgabe(d.ausgabeTrikotAnzahl,d.anzahlTrikot)}/${d.anzahlTrikot||0}`, d.unterseite||'–', d.unterseite==='Keine'?'–':(d.groesseUnterseite||'–'), d.unterseite==='Keine'?'–':(d.anzahlUnterseite||'–'), hatUnterseite?`${clampAusgabe(d.ausgabeUnterseiteAnzahl,d.anzahlUnterseite)}/${d.anzahlUnterseite||0}`:'–'];
       });
       const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Trikotgrößen</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table border="1" style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:13px"><thead><tr>${header.map(th).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(td).join('')}</tr>`).join('')}</tbody></table></body></html>`;
       const blob = new Blob(['﻿'+html], {type:'application/vnd.ms-excel;charset=utf-8'});
@@ -16429,32 +16433,45 @@ export default function TrainingsApp() {
                           </>)}
                         </div>
                       </div>
-                      {/* Ausgabe */}
-                      <div style={{gridColumn:isMobile?'auto':'1 / -1',borderTop:'1px solid rgba(255,255,255,0.06)',paddingTop:'12px',marginTop:'2px'}}>
-                        <p style={{margin:'0 0 8px',fontSize:'10px',fontWeight:'800',color:'rgba(251,191,36,0.6)',textTransform:'uppercase',letterSpacing:'1px'}}>📦 Ausgabe</p>
-                        <div style={{display:'flex',flexDirection:'column',gap:'7px'}}>
-                          <button onClick={()=>{
-                              const brauchtUnterseite = d.unterseite && d.unterseite !== 'Keine';
-                              const alleGegeben = ausgStatus === 'komplett';
-                              saveTrikot(spieler.id,'ausgabeTrikot', !alleGegeben);
-                              if (brauchtUnterseite) saveTrikot(spieler.id,'ausgabeUnterseite', !alleGegeben);
-                            }}
-                            style={{padding:'9px 12px',borderRadius:'9px',border:`1.5px solid ${ausgStatus==='komplett'?'rgba(74,222,128,0.5)':'rgba(255,255,255,0.15)'}`,background:ausgStatus==='komplett'?'rgba(74,222,128,0.12)':'rgba(255,255,255,0.03)',color:ausgStatus==='komplett'?'#4ade80':'rgba(255,255,255,0.6)',fontWeight:'800',fontSize:'13px',cursor:'pointer',display:'flex',alignItems:'center',gap:'8px'}}>
-                            {ausgStatus==='komplett'?'✅':'⬜'} Alles ausgegeben
-                          </button>
-                          <p style={{margin:'2px 0 0',fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.35)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Teilausgabe — einzeln abhaken</p>
-                          <label style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',padding:'4px 2px'}}>
-                            <input type="checkbox" checked={!!d.ausgabeTrikot} onChange={e=>saveTrikot(spieler.id,'ausgabeTrikot',e.target.checked)} style={{width:'16px',height:'16px',cursor:'pointer'}}/>
-                            <span style={{fontSize:'13px',color:d.ausgabeTrikot?'white':'rgba(255,255,255,0.55)',fontWeight:'600'}}>Trikot{d.groesse?` (${d.groesse}${d.schnitt?`, ${d.schnitt}`:''})`:''} ausgegeben</span>
-                          </label>
-                          {d.unterseite && d.unterseite !== 'Keine' && (
-                            <label style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',padding:'4px 2px'}}>
-                              <input type="checkbox" checked={!!d.ausgabeUnterseite} onChange={e=>saveTrikot(spieler.id,'ausgabeUnterseite',e.target.checked)} style={{width:'16px',height:'16px',cursor:'pointer'}}/>
-                              <span style={{fontSize:'13px',color:d.ausgabeUnterseite?'white':'rgba(255,255,255,0.55)',fontWeight:'600'}}>{d.unterseite}{d.groesseUnterseite?` (${d.groesseUnterseite})`:''} ausgegeben</span>
-                            </label>
-                          )}
-                        </div>
-                      </div>
+                      {/* Ausgabe — mit ANZAHL, nicht nur ja/nein (wer z.B. 2 Trikots bestellt hat,
+                          kann auch erstmal nur 1 bekommen haben) */}
+                      {(()=>{
+                        const brauchtUnterseite = d.unterseite && d.unterseite !== 'Keine';
+                        const trikotSoll = Number(d.anzahlTrikot)||0, trikotIst = clampAusgabe(d.ausgabeTrikotAnzahl, trikotSoll);
+                        const unterSoll = brauchtUnterseite ? (Number(d.anzahlUnterseite)||0) : 0;
+                        const unterIst = brauchtUnterseite ? clampAusgabe(d.ausgabeUnterseiteAnzahl, unterSoll) : 0;
+                        const Stepper = ({label, ist, soll, onChange}) => (
+                          <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'6px 2px'}}>
+                            <span style={{flex:1,fontSize:'13px',fontWeight:'600',color:ist>=soll&&soll>0?'white':'rgba(255,255,255,0.6)'}}>{label}</span>
+                            <div style={{display:'flex',alignItems:'center',gap:'8px',flexShrink:0}}>
+                              <button onClick={()=>onChange(ist-1)} disabled={ist<=0}
+                                style={{width:'28px',height:'28px',borderRadius:'7px',border:'1px solid rgba(255,255,255,0.15)',background:'rgba(255,255,255,0.04)',color:ist<=0?'rgba(255,255,255,0.2)':'white',cursor:ist<=0?'not-allowed':'pointer',fontSize:'16px',fontWeight:'700',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
+                              <span style={{minWidth:'44px',textAlign:'center',fontSize:'13px',fontWeight:'800',color:soll>0&&ist>=soll?'#4ade80':soll>0&&ist>0?'#fbbf24':'rgba(255,255,255,0.4)'}}>{ist} / {soll}</span>
+                              <button onClick={()=>onChange(ist+1)} disabled={ist>=soll}
+                                style={{width:'28px',height:'28px',borderRadius:'7px',border:'1px solid rgba(255,255,255,0.15)',background:'rgba(255,255,255,0.04)',color:ist>=soll?'rgba(255,255,255,0.2)':'white',cursor:ist>=soll?'not-allowed':'pointer',fontSize:'16px',fontWeight:'700',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
+                            </div>
+                          </div>
+                        );
+                        return (
+                          <div style={{gridColumn:isMobile?'auto':'1 / -1',borderTop:'1px solid rgba(255,255,255,0.06)',paddingTop:'12px',marginTop:'2px'}}>
+                            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'6px'}}>
+                              <p style={{margin:0,fontSize:'10px',fontWeight:'800',color:'rgba(251,191,36,0.6)',textTransform:'uppercase',letterSpacing:'1px'}}>📦 Ausgabe</p>
+                              <button onClick={()=>{
+                                  const alleGegeben = ausgStatus === 'komplett';
+                                  saveTrikot(spieler.id,'ausgabeTrikotAnzahl', alleGegeben?0:trikotSoll);
+                                  if (brauchtUnterseite) saveTrikot(spieler.id,'ausgabeUnterseiteAnzahl', alleGegeben?0:unterSoll);
+                                }}
+                                style={{padding:'4px 10px',borderRadius:'20px',border:`1px solid ${ausgStatus==='komplett'?'rgba(74,222,128,0.4)':'rgba(255,255,255,0.15)'}`,background:ausgStatus==='komplett'?'rgba(74,222,128,0.1)':'rgba(255,255,255,0.03)',color:ausgStatus==='komplett'?'#4ade80':'rgba(255,255,255,0.55)',fontWeight:'700',fontSize:'11px',cursor:'pointer'}}>
+                                {ausgStatus==='komplett'?'✅ Alles gegeben':'Alles als gegeben markieren'}
+                              </button>
+                            </div>
+                            <Stepper label={`Trikot${d.groesse?` (${d.groesse}${d.schnitt?`, ${d.schnitt}`:''})`:''}`} ist={trikotIst} soll={trikotSoll} onChange={v=>saveTrikot(spieler.id,'ausgabeTrikotAnzahl',clampAusgabe(v,trikotSoll))}/>
+                            {brauchtUnterseite && (
+                              <Stepper label={`${d.unterseite}${d.groesseUnterseite?` (${d.groesseUnterseite})`:''}`} ist={unterIst} soll={unterSoll} onChange={v=>saveTrikot(spieler.id,'ausgabeUnterseiteAnzahl',clampAusgabe(v,unterSoll))}/>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
