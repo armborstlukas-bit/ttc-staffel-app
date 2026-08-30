@@ -755,6 +755,10 @@ export default function TrainingsApp() {
   const [trikotFilter, setTrikotFilter] = useState('alle');
   const [trikotSearch, setTrikotSearch] = useState('');
   const [trikotExpanded, setTrikotExpanded] = useState(null);
+  // Testfeature Live-Statistiken (nur Admin)
+  const [liveStats, setLiveStats] = useState(null);
+  const [liveStatsLoading, setLiveStatsLoading] = useState(false);
+  const [liveStatsMsg, setLiveStatsMsg] = useState('');
   const [editingSession, setEditingSession]     = useState(null); // session being edited
   const [editForm, setEditForm]                 = useState({});
   const [deleteDialog, setDeleteDialog]         = useState(null);
@@ -1824,6 +1828,25 @@ export default function TrainingsApp() {
       .then(r=>r.json()).then(d=>{
         setFahrplan(Array.isArray(d.items)?d.items:[]);
       }).catch(()=>{}).finally(()=>setFahrplanLoading(false));
+  };
+
+  // Testfeature Live-Statistiken: 'get' lädt nur den Cache (schnell), 'refresh' stößt das
+  // Nachladen neu abgeschlossener Spiele vom offiziellen Spielplan an (kann ein paar Sekunden
+  // dauern, da für jedes neue Spiel der Spielbericht einzeln abgerufen wird).
+  const loadLiveStats = async (action='get') => {
+    if (!user) return;
+    setLiveStatsLoading(true); setLiveStatsMsg('');
+    try {
+      const idToken = await user.getIdToken();
+      const r = await fetch(`/api/livestats?action=${action}`, { headers: { Authorization: `Bearer ${idToken}` } });
+      const d = await r.json();
+      if (!r.ok) { setLiveStatsMsg(d.error || 'Fehler beim Laden.'); return; }
+      setLiveStats(d);
+      if (action==='refresh') {
+        setLiveStatsMsg(d.remaining>0 ? `${d.newlyProcessed} neue Spiele verarbeitet, ${d.remaining} weitere warten noch — nochmal auf Aktualisieren drücken.` : `Fertig — alle ${d.meetingsProcessed} abgeschlossenen Spiele erfasst.`);
+      }
+    } catch { setLiveStatsMsg('Verbindung fehlgeschlagen.'); }
+    finally { setLiveStatsLoading(false); }
   };
 
   // Lädt beim Login einmalig den Abgabe-Status fürs Tippspiel (unabhängig davon, ob
@@ -4495,6 +4518,7 @@ export default function TrainingsApp() {
           {label:'Gegnerlogbuch',    icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.08)',   border:'rgba(8,145,178,0.25)',   action:()=>navTo('gegnerlogbuch')},
           ...(userRole==='admin'?[
             {label:'Trainingsmatches',icon:'⚔️', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.25)', action:()=>navTo('trainingsmatches')},
+            {label:'Live-Statistiken 🧪',icon:'📡', color:'#a78bfa', bg:'rgba(167,139,250,0.08)', border:'rgba(167,139,250,0.25)', action:()=>navTo('livestats')},
           ]:[]),
         ],
       },
@@ -15013,6 +15037,61 @@ export default function TrainingsApp() {
               })()}
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── LIVE-STATISTIKEN (TESTFEATURE, nur Admin) ────────────────────────────
+  if (view === 'livestats' && userRole === 'admin') {
+    if (liveStats === null && !liveStatsLoading) loadLiveStats('get');
+    const lb = liveStats?.leaderboards || { meisteSiege: [], laengsteSerie: [], besteSiegquote: [] };
+    const updatedLabel = liveStats?.updatedAt ? new Date(liveStats.updatedAt).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : null;
+
+    const Board = ({title, icon, rows, valueLabel, getValue, color}) => (
+      <div style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(167,139,250,0.15)',borderRadius:'16px',padding:'16px',marginBottom:'16px'}}>
+        <h3 style={{margin:'0 0 12px',color,fontSize:'15px',fontWeight:'800',display:'flex',alignItems:'center',gap:'8px'}}>{icon} {title}</h3>
+        {rows.length===0
+          ? <p style={{margin:0,fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>Noch keine Daten — auf „Aktualisieren" drücken.</p>
+          : <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+              {rows.map((r,i)=>(
+                <div key={r.name+i} style={{display:'flex',alignItems:'center',gap:'10px',padding:'7px 10px',background:i===0?'rgba(251,191,36,0.06)':'rgba(255,255,255,0.02)',borderRadius:'9px'}}>
+                  <span style={{width:'20px',fontSize:'12px',fontWeight:'800',color:i===0?'#fbbf24':'rgba(255,255,255,0.4)',flexShrink:0}}>{i+1}.</span>
+                  <span style={{flex:1,fontSize:'13px',fontWeight:'700',color:'white'}}>{r.name}</span>
+                  <span style={{fontSize:'13px',fontWeight:'800',color}}>{getValue(r)} {valueLabel}</span>
+                </div>
+              ))}
+            </div>
+        }
+      </div>
+    );
+
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(135deg,#160c2e 0%,#0d0818 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        <div className="ttc-sticky-hdr-light" style={{padding:'12px 20px',display:'flex',alignItems:'center',gap:'10px'}}>
+          <button onClick={()=>navTo('home')} style={s.btn('#a78bfa')}><Home size={16}/></button>
+          <h1 style={{margin:0,color:'white',fontSize:'20px',fontWeight:'800',flex:1}}>📡 Live-Statistiken</h1>
+        </div>
+        <div style={{padding:'16px 20px',maxWidth:'700px',margin:'0 auto'}}>
+          <div style={{padding:'12px 14px',background:'rgba(167,139,250,0.08)',border:'1px solid rgba(167,139,250,0.25)',borderRadius:'12px',marginBottom:'16px'}}>
+            <p style={{margin:'0 0 4px',fontSize:'13px',color:'#c4b5fd',fontWeight:'700'}}>🧪 Testfeature</p>
+            <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.55)',lineHeight:1.5}}>
+              Berechnet direkt aus den offiziellen Spielberichten (mytischtennis.de) für die laufende Saison — Einzel und Doppel zählen beide mit. Nur für dich als Admin sichtbar. Wenn's gut läuft, bauen wir mehr Statistiken und einen öffentlichen Bereich dafür aus.
+            </p>
+          </div>
+
+          <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'18px',flexWrap:'wrap'}}>
+            <button onClick={()=>loadLiveStats('refresh')} disabled={liveStatsLoading}
+              style={{padding:'10px 18px',background:liveStatsLoading?'rgba(167,139,250,0.15)':'linear-gradient(135deg,#7c3aed,#6d28d9)',color:'white',border:'none',borderRadius:'10px',cursor:liveStatsLoading?'not-allowed':'pointer',fontWeight:'800',fontSize:'13px',display:'flex',alignItems:'center',gap:'8px'}}>
+              <RefreshCw size={14} style={liveStatsLoading?{animation:'spin 1s linear infinite'}:{}}/> {liveStatsLoading?'Lädt…':'Aktualisieren'}
+            </button>
+            {updatedLabel&&<span style={{fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>Stand: {updatedLabel} · {liveStats?.meetingsProcessed||0} Spiele erfasst</span>}
+          </div>
+          {liveStatsMsg&&<p style={{margin:'0 0 16px',fontSize:'12px',color:'rgba(196,181,253,0.8)'}}>{liveStatsMsg}</p>}
+
+          <Board title="Meiste Siege" icon="🏆" color="#fbbf24" rows={lb.meisteSiege} valueLabel="Siege" getValue={r=>`${r.wins} (${r.wins}:${r.losses})`}/>
+          <Board title="Längste Siegesserie" icon="🔥" color="#fb923c" rows={lb.laengsteSerie} valueLabel="in Folge" getValue={r=>r.maxStreak}/>
+          <Board title="Beste Siegquote" icon="🎯" color="#4ade80" rows={lb.besteSiegquote} valueLabel="%" getValue={r=>`${r.winPct}% (${r.games} Sp.)`}/>
         </div>
       </div>
     );
