@@ -124,7 +124,11 @@ export default async function handler(req, res) {
     const userSnap = await adminDb().collection('users').doc(uid).get();
     const userData = userSnap.exists ? userSnap.data() : {};
     const roles = userData.roles?.length ? userData.roles : (userData.role ? [userData.role] : []);
-    if (!roles.includes('admin')) { res.status(403).json({ error: 'Nur Admins (Testfeature)' }); return; }
+    // Lesen dürfen alle angemeldeten Mitglieder (außer pending/blocked); das Nachladen neuer
+    // Spiele von der externen Seite (action=refresh, kostet Zeit + Requests) bleibt Admins vorbehalten.
+    if (roles.includes('pending') || roles.includes('blocked') || roles.length === 0) { res.status(403).json({ error: 'Kein Zugriff' }); return; }
+    const isAdmin = roles.includes('admin');
+    if ((req.query.action || 'get') === 'refresh' && !isAdmin) { res.status(403).json({ error: 'Nur Admins können aktualisieren' }); return; }
 
     // Schema v2 fügt game_type (Einzel/Doppel) zu jedem Ergebnis hinzu. Ein älterer Cache ohne
     // diese Info kann Einzel/Doppel nicht rückwirkend unterscheiden -- deshalb bei Versionswechsel

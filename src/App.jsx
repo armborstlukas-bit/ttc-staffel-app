@@ -434,6 +434,66 @@ function AchievementUnlockCelebration({ queue, onDone, eyebrow, ctaLabel }) {
   );
 }
 
+// ── Ankündigung "Live-Statistiken" (einmalig pro Account) ───────────────────────
+function LiveStatsAnnouncement({ onDismiss, onOpen }) {
+  const confetti = React.useMemo(() => Array.from({ length: 30 }, (_, i) => ({
+    left: Math.random() * 100,
+    delay: Math.random() * 1.2,
+    duration: 2.4 + Math.random() * 1.6,
+    color: ['#a78bfa', '#c4b5fd', '#ffffff', '#fbbf24', '#7c3aed'][i % 5],
+    rotate: Math.random() * 360,
+    size: 6 + Math.random() * 6,
+  })), []);
+  return (
+    <Modal>
+      <div style={{position:'fixed',inset:0,zIndex:99999,overflow:'hidden',
+        background:'radial-gradient(circle at 50% 30%, rgba(124,58,237,0.5), rgba(6,3,15,0.92) 70%)',
+        display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}}>
+        {confetti.map((c,i) => (
+          <span key={i} className="ttc-confetti-piece" style={{
+            left:`${c.left}%`, background:c.color, borderRadius: i%3===0?'50%':'2px',
+            width:`${c.size}px`, height:`${c.size*1.5}px`,
+            animationDuration:`${c.duration}s`, animationDelay:`${c.delay}s`,
+            transform:`rotate(${c.rotate}deg)`,
+          }}/>
+        ))}
+        <div style={{position:'relative',textAlign:'center',maxWidth:'380px',width:'100%',background:'rgba(20,10,40,0.6)',border:'1px solid rgba(167,139,250,0.3)',borderRadius:'24px',padding:'32px 26px',backdropFilter:'blur(6px)',boxShadow:'0 20px 60px rgba(0,0,0,0.5)'}}>
+          <div style={{position:'relative',width:'110px',height:'110px',margin:'0 auto 18px',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <span className="ttc-unlock-ring" style={{position:'absolute',inset:0,borderRadius:'50%',border:'3px solid #a78bfa'}}/>
+            <span className="ttc-unlock-ring" style={{position:'absolute',inset:0,borderRadius:'50%',border:'3px solid #c4b5fd',animationDelay:'0.4s'}}/>
+            <div className="ttc-unlock-badge" style={{position:'relative',width:'96px',height:'96px',borderRadius:'50%',
+              background:'radial-gradient(circle at 35% 30%, #a78bfa, #6d28d9 70%)',
+              border:'4px solid white',display:'flex',alignItems:'center',justifyContent:'center',
+              boxShadow:'0 0 0 6px rgba(167,139,250,0.25)'}}>
+              <span style={{fontSize:'42px',filter:'drop-shadow(0 3px 6px rgba(0,0,0,0.4))'}}>📡</span>
+            </div>
+          </div>
+          <p style={{margin:'0 0 6px',fontSize:'11px',fontWeight:'900',letterSpacing:'2px',textTransform:'uppercase',color:'#c4b5fd'}}>🆕 Neu in der App</p>
+          <h2 style={{margin:'0 0 10px',fontSize:'23px',fontWeight:'900',color:'white',textShadow:'0 2px 10px rgba(0,0,0,0.5)',lineHeight:1.2}}>Live-Statistiken</h2>
+          <p style={{margin:'0 0 16px',fontSize:'13px',color:'rgba(255,255,255,0.75)',lineHeight:'1.5'}}>
+            Direkt aus den offiziellen Spielberichten berechnet — wer diese Saison am meisten gewinnt, die längste Siegesserie hat und die beste Siegquote, jeweils für Einzel, Doppel und Gesamt.
+          </p>
+          <div style={{display:'flex',flexDirection:'column',gap:'6px',marginBottom:'22px',textAlign:'left'}}>
+            {[['🏆','Meiste Siege'],['🔥','Längste Siegesserie'],['🎯','Beste Siegquote']].map(([icon,label])=>(
+              <div key={label} style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'12px',color:'rgba(255,255,255,0.7)',fontWeight:'600'}}>
+                <span>{icon}</span><span>{label}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+            <button onClick={onOpen} style={{padding:'13px 24px',background:'linear-gradient(135deg,#a78bfa,#7c3aed)',color:'white',border:'none',borderRadius:'99px',cursor:'pointer',fontWeight:'800',fontSize:'14px',boxShadow:'0 8px 24px rgba(124,58,237,0.5)'}}>
+              📡 Jetzt ansehen
+            </button>
+            <button onClick={onDismiss} style={{padding:'10px',background:'transparent',color:'rgba(255,255,255,0.5)',border:'none',cursor:'pointer',fontWeight:'600',fontSize:'12px'}}>
+              Später
+            </button>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 // ── Feier-/Aufmunterungs-Animation nach dem monatlichen TTR-Import ──────────────
 // Zeigt jedem Spieler beim nächsten App-Öffnen, wie sich sein TTR-Wert seit dem letzten
 // Monat verändert hat — bei einem Plus etwas Lobendes mit Konfetti, bei einem Minus etwas
@@ -760,6 +820,7 @@ export default function TrainingsApp() {
   const [liveStatsLoading, setLiveStatsLoading] = useState(false);
   const [liveStatsMsg, setLiveStatsMsg] = useState('');
   const [liveStatsExpanded, setLiveStatsExpanded] = useState(null);
+  const [showLiveStatsAnnouncement, setShowLiveStatsAnnouncement] = useState(false);
   const [editingSession, setEditingSession]     = useState(null); // session being edited
   const [editForm, setEditForm]                 = useState({});
   const [deleteDialog, setDeleteDialog]         = useState(null);
@@ -1848,6 +1909,27 @@ export default function TrainingsApp() {
       }
     } catch { setLiveStatsMsg('Verbindung fehlgeschlagen.'); }
     finally { setLiveStatsLoading(false); }
+  };
+
+  // Kündigt das neue Live-Statistiken-Feature einmalig pro Account an (persistiert am
+  // Nutzerprofil, nicht nur lokal — läuft also bei jedem Login, egal auf welchem Gerät, nur
+  // einmal). Wartet mit pending/blocked, damit die Ankündigung nicht schon vor Freischaltung kommt.
+  useEffect(() => {
+    if (!userProfile || !user) return;
+    const roles = userProfile.roles?.length ? userProfile.roles : (userProfile.role ? [userProfile.role] : []);
+    if (roles.includes('pending') || roles.includes('blocked') || roles.length === 0) return;
+    if (userProfile.seenLiveStatsAnnouncement) return;
+    setShowLiveStatsAnnouncement(true);
+  }, [userProfile?.seenLiveStatsAnnouncement, userProfile?.roles, userProfile?.role, !!user]);
+
+  const dismissLiveStatsAnnouncement = (goTo) => {
+    setShowLiveStatsAnnouncement(false);
+    if (userProfile) setUserProfile(p => ({ ...p, seenLiveStatsAnnouncement: true }));
+    if (user?.uid) {
+      setDoc(doc(db,'users',user.uid), { seenLiveStatsAnnouncement: true }, { merge: true }).catch(()=>{});
+      updateDoc(doc(db,'ttc','users'), { [`${user.uid}.seenLiveStatsAnnouncement`]: true }).catch(()=>{});
+    }
+    if (goTo) navTo('livestats');
   };
 
   // Lädt beim Login einmalig den Abgabe-Status fürs Tippspiel (unabhängig davon, ob
@@ -3753,7 +3835,7 @@ export default function TrainingsApp() {
   }
 
   // ── PASSIVES MITGLIED: stark eingeschränkter Bereich ──────────────────────
-  if (userRole === 'passiv' && !['ttcnews','kalender','tippspiel','wettenZitate','ttcMannschaften','spielplan','verbesserungswuensche'].includes(view)) {
+  if (userRole === 'passiv' && !['ttcnews','kalender','tippspiel','wettenZitate','ttcMannschaften','spielplan','verbesserungswuensche','livestats'].includes(view)) {
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px'}}>
@@ -3787,6 +3869,7 @@ export default function TrainingsApp() {
                 links:[
                   ...(canAccessTeams()?[{label:'TTC Mannschaften', icon:'🏆', color:'#2dd4bf', bg:'rgba(45,212,191,0.08)', border:'rgba(45,212,191,0.2)', action:()=>navTo('ttcMannschaften')}]:[]),
                   {label:'Spielplan', icon:'📆', color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)', action:()=>navTo('spielplan')},
+                  {label:'Live-Statistiken', icon:'📡', color:'#a78bfa', bg:'rgba(167,139,250,0.07)', border:'rgba(167,139,250,0.2)', action:()=>navTo('livestats')},
                 ],
               },
               {
@@ -4014,6 +4097,14 @@ export default function TrainingsApp() {
       </Modal>
     );
   };
+
+  // ── Ankündigung "Live-Statistiken" (einmalig pro Account, unabhängig von der Ansicht) ──
+  if (showLiveStatsAnnouncement) {
+    return <LiveStatsAnnouncement
+      onOpen={()=>dismissLiveStatsAnnouncement(true)}
+      onDismiss={()=>dismissLiveStatsAnnouncement(false)}
+    />;
+  }
 
   // ── TRAININGSPLAN ────────────────────────────────────────────
   if (view==='trainingsplan') {
@@ -4517,9 +4608,9 @@ export default function TrainingsApp() {
           {label:'Spielplan',        icon:'📆', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)', action:()=>navTo('spielplan')},
           {label:'TTR Werte',        icon:'📈', color:'#fbbf24', bg:'rgba(251,191,36,0.08)',  border:'rgba(251,191,36,0.25)',  action:()=>navTo('ttrWerte')},
           {label:'Gegnerlogbuch',    icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.08)',   border:'rgba(8,145,178,0.25)',   action:()=>navTo('gegnerlogbuch')},
+          {label:'Live-Statistiken', icon:'📡', color:'#a78bfa', bg:'rgba(167,139,250,0.08)', border:'rgba(167,139,250,0.25)', action:()=>navTo('livestats')},
           ...(userRole==='admin'?[
             {label:'Trainingsmatches',icon:'⚔️', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.25)', action:()=>navTo('trainingsmatches')},
-            {label:'Live-Statistiken 🧪',icon:'📡', color:'#a78bfa', bg:'rgba(167,139,250,0.08)', border:'rgba(167,139,250,0.25)', action:()=>navTo('livestats')},
           ]:[]),
         ],
       },
@@ -4740,7 +4831,7 @@ export default function TrainingsApp() {
 
 
   // ── AKTIVER DASHBOARD ────────────────────────────────────────────────────
-  if (userRole === 'aktiver' && !['gegnerlogbuch','ttcnews','trainingsmatches','wettenZitate','fahrplan','tippspiel','kalender','verbesserungswuensche','ttcMannschaften','spielplan'].includes(view)) {
+  if (userRole === 'aktiver' && !['gegnerlogbuch','ttcnews','trainingsmatches','wettenZitate','fahrplan','tippspiel','kalender','verbesserungswuensche','ttcMannschaften','spielplan','livestats'].includes(view)) {
     const dateLabel = new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
 
     const submitGegner = () => {
@@ -4885,6 +4976,7 @@ export default function TrainingsApp() {
                   {label:'Trainingsmatches',icon:'⚔️', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.2)', action:()=>navTo('trainingsmatches')},
                   ...(canAccessTeams()?[{label:'TTC Mannschaften', icon:'🏆', color:'#2dd4bf', bg:'rgba(45,212,191,0.08)', border:'rgba(45,212,191,0.2)', action:()=>navTo('ttcMannschaften')}]:[]),
                   {label:'Spielplan', icon:'📆', color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)', action:()=>navTo('spielplan')},
+                  {label:'Live-Statistiken', icon:'📡', color:'#a78bfa', bg:'rgba(167,139,250,0.07)', border:'rgba(167,139,250,0.2)', action:()=>navTo('livestats')},
                 ],
               },
               {
@@ -5547,6 +5639,7 @@ export default function TrainingsApp() {
                   {label:'TTC Mannschaften', icon:'🏓', color:'#2dd4bf', bg:'rgba(45,212,191,0.1)',  border:'rgba(45,212,191,0.25)',  action:()=>navTo('ttcMannschaften')},
                   {label:'Spielplan',        icon:'📆', color:'#fcd34d', bg:'rgba(252,211,77,0.1)',   border:'rgba(252,211,77,0.25)',   action:()=>navTo('spielplan')},
                   ...(isJugend ? [{label:'Gegnerlogbuch', icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.1)', border:'rgba(8,145,178,0.25)', action:()=>navTo('gegnerlogbuch')}] : []),
+                  {label:'Live-Statistiken', icon:'📡', color:'#a78bfa', bg:'rgba(167,139,250,0.1)', border:'rgba(167,139,250,0.25)', action:()=>navTo('livestats')},
                 ],
               },
               {
@@ -15044,7 +15137,7 @@ export default function TrainingsApp() {
   }
 
   // ── LIVE-STATISTIKEN (TESTFEATURE, nur Admin) ────────────────────────────
-  if (view === 'livestats' && userRole === 'admin') {
+  if (view === 'livestats' && !!user) {
     if (liveStats === null && !liveStatsLoading) loadLiveStats('get');
     const empty3 = { meisteSiege: [], laengsteSerie: [], besteSiegquote: [] };
     const lb = liveStats?.leaderboards || { einzel: empty3, doppel: empty3, gesamt: empty3 };
@@ -15105,17 +15198,19 @@ export default function TrainingsApp() {
         </div>
         <div style={{padding:'16px 20px',maxWidth:'700px',margin:'0 auto'}}>
           <div style={{padding:'12px 14px',background:'rgba(167,139,250,0.08)',border:'1px solid rgba(167,139,250,0.25)',borderRadius:'12px',marginBottom:'16px'}}>
-            <p style={{margin:'0 0 4px',fontSize:'13px',color:'#c4b5fd',fontWeight:'700'}}>🧪 Testfeature</p>
+            <p style={{margin:'0 0 4px',fontSize:'13px',color:'#c4b5fd',fontWeight:'700'}}>📡 Neu</p>
             <p style={{margin:0,fontSize:'12px',color:'rgba(255,255,255,0.55)',lineHeight:1.5}}>
-              Berechnet direkt aus den offiziellen Spielberichten (mytischtennis.de) für die laufende Saison — Einzel und Doppel zählen beide mit. Nur für dich als Admin sichtbar. Wenn's gut läuft, bauen wir mehr Statistiken und einen öffentlichen Bereich dafür aus.
+              Berechnet direkt aus den offiziellen Spielberichten (mytischtennis.de) für die laufende Saison — Einzel und Doppel zählen beide mit.
             </p>
           </div>
 
           <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'18px',flexWrap:'wrap'}}>
-            <button onClick={()=>loadLiveStats('refresh')} disabled={liveStatsLoading}
-              style={{padding:'10px 18px',background:liveStatsLoading?'rgba(167,139,250,0.15)':'linear-gradient(135deg,#7c3aed,#6d28d9)',color:'white',border:'none',borderRadius:'10px',cursor:liveStatsLoading?'not-allowed':'pointer',fontWeight:'800',fontSize:'13px',display:'flex',alignItems:'center',gap:'8px'}}>
-              <RefreshCw size={14} style={liveStatsLoading?{animation:'spin 1s linear infinite'}:{}}/> {liveStatsLoading?'Lädt…':'Aktualisieren'}
-            </button>
+            {userRole==='admin' && (
+              <button onClick={()=>loadLiveStats('refresh')} disabled={liveStatsLoading}
+                style={{padding:'10px 18px',background:liveStatsLoading?'rgba(167,139,250,0.15)':'linear-gradient(135deg,#7c3aed,#6d28d9)',color:'white',border:'none',borderRadius:'10px',cursor:liveStatsLoading?'not-allowed':'pointer',fontWeight:'800',fontSize:'13px',display:'flex',alignItems:'center',gap:'8px'}}>
+                <RefreshCw size={14} style={liveStatsLoading?{animation:'spin 1s linear infinite'}:{}}/> {liveStatsLoading?'Lädt…':'Aktualisieren'}
+              </button>
+            )}
             {updatedLabel&&<span style={{fontSize:'11px',color:'rgba(255,255,255,0.4)'}}>Stand: {updatedLabel} · {liveStats?.meetingsProcessed||0} Spiele erfasst</span>}
           </div>
           {liveStatsMsg&&<p style={{margin:'0 0 16px',fontSize:'12px',color:'rgba(196,181,253,0.8)'}}>{liveStatsMsg}</p>}
