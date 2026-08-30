@@ -16242,14 +16242,28 @@ export default function TrainingsApp() {
 
     const erfasst = alleUngefiltert.filter(p => isComplete(p.id)).length;
 
+    // Ausgabe: Trikot und Unterseite werden UNABHÄNGIG voneinander als ausgegeben markiert — das
+    // deckt Teilausgabe automatisch ab (z.B. nur das Trikot schon mitgegeben, die Hose/der Rock
+    // fehlt noch), ohne einen extra "Teilausgabe"-Modus zu brauchen.
+    const ausgabeStatus = (id) => {
+      const d = trikotDaten[id] || {};
+      const brauchtUnterseite = d.unterseite && d.unterseite !== 'Keine';
+      const teile = [!!d.ausgabeTrikot, ...(brauchtUnterseite ? [!!d.ausgabeUnterseite] : [])];
+      if (teile.every(Boolean)) return 'komplett';
+      if (teile.some(Boolean)) return 'teilweise';
+      return 'keine';
+    };
+    const ausgegeben = alleUngefiltert.filter(p => ausgabeStatus(p.id)==='komplett').length;
+
     const exportExcel = () => {
       const esc = v => String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       const th = v => `<th style="background:#1d4ed8;color:white;font-weight:bold;padding:6px 10px;border:1px solid #93c5fd">${esc(v)}</th>`;
       const td = v => `<td style="padding:5px 10px;border:1px solid #cbd5e1">${esc(v)}</td>`;
-      const header = ['Name','Typ','Trikotgröße','Trikotschnitt','Anzahl Trikots','Unterseite','Größe Unterseite','Anzahl Unterseite'];
+      const header = ['Name','Typ','Trikotgröße','Trikotschnitt','Anzahl Trikots','Trikot ausgegeben','Unterseite','Größe Unterseite','Anzahl Unterseite','Unterseite ausgegeben'];
       const rows = alleUngefiltert.map(p => {
         const d = trikotDaten[p.id]||{};
-        return [p.name, p.typ==='jugend'?'Jugend':'Aktiv', d.groesse||'–', d.schnitt||'–', d.anzahlTrikot||'–', d.unterseite||'–', d.unterseite==='Keine'?'–':(d.groesseUnterseite||'–'), d.unterseite==='Keine'?'–':(d.anzahlUnterseite||'–')];
+        const hatUnterseite = d.unterseite && d.unterseite !== 'Keine';
+        return [p.name, p.typ==='jugend'?'Jugend':'Aktiv', d.groesse||'–', d.schnitt||'–', d.anzahlTrikot||'–', d.ausgabeTrikot?'Ja':'Nein', d.unterseite||'–', d.unterseite==='Keine'?'–':(d.groesseUnterseite||'–'), d.unterseite==='Keine'?'–':(d.anzahlUnterseite||'–'), hatUnterseite?(d.ausgabeUnterseite?'Ja':'Nein'):'–'];
       });
       const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Trikotgrößen</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table border="1" style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:13px"><thead><tr>${header.map(th).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(td).join('')}</tr>`).join('')}</tbody></table></body></html>`;
       const blob = new Blob(['﻿'+html], {type:'application/vnd.ms-excel;charset=utf-8'});
@@ -16296,14 +16310,27 @@ export default function TrainingsApp() {
           </div>
 
           {/* Fortschritt */}
-          <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'10px 14px',background:'rgba(147,197,253,0.05)',border:'1px solid rgba(147,197,253,0.12)',borderRadius:'12px',marginBottom:'14px'}}>
-            <div style={{flex:1}}>
-              <div style={{display:'flex',justifyContent:'space-between',marginBottom:'5px'}}>
-                <span style={{fontSize:'12px',color:'rgba(255,255,255,0.58)',fontWeight:'600'}}>Erfasst</span>
-                <span style={{fontSize:'12px',fontWeight:'800',color:erfasst===alleUngefiltert.length&&alleUngefiltert.length>0?'#4ade80':'#93c5fd'}}>{erfasst} / {alleUngefiltert.length}</span>
+          <div style={{display:'flex',flexDirection:isMobile?'column':'row',gap:'10px',marginBottom:'14px'}}>
+            <div style={{flex:1,display:'flex',alignItems:'center',gap:'12px',padding:'10px 14px',background:'rgba(147,197,253,0.05)',border:'1px solid rgba(147,197,253,0.12)',borderRadius:'12px'}}>
+              <div style={{flex:1}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:'5px'}}>
+                  <span style={{fontSize:'12px',color:'rgba(255,255,255,0.58)',fontWeight:'600'}}>Erfasst</span>
+                  <span style={{fontSize:'12px',fontWeight:'800',color:erfasst===alleUngefiltert.length&&alleUngefiltert.length>0?'#4ade80':'#93c5fd'}}>{erfasst} / {alleUngefiltert.length}</span>
+                </div>
+                <div style={{background:'rgba(255,255,255,0.08)',borderRadius:'99px',height:'6px',overflow:'hidden'}}>
+                  <div style={{width:alleUngefiltert.length>0?`${Math.round(erfasst/alleUngefiltert.length*100)}%`:'0%',height:'100%',background:erfasst===alleUngefiltert.length&&alleUngefiltert.length>0?'linear-gradient(90deg,#16a34a,#4ade80)':'linear-gradient(90deg,#1d4ed8,#93c5fd)',borderRadius:'99px',transition:'width 0.4s'}}/>
+                </div>
               </div>
-              <div style={{background:'rgba(255,255,255,0.08)',borderRadius:'99px',height:'6px',overflow:'hidden'}}>
-                <div style={{width:alleUngefiltert.length>0?`${Math.round(erfasst/alleUngefiltert.length*100)}%`:'0%',height:'100%',background:erfasst===alleUngefiltert.length&&alleUngefiltert.length>0?'linear-gradient(90deg,#16a34a,#4ade80)':'linear-gradient(90deg,#1d4ed8,#93c5fd)',borderRadius:'99px',transition:'width 0.4s'}}/>
+            </div>
+            <div style={{flex:1,display:'flex',alignItems:'center',gap:'12px',padding:'10px 14px',background:'rgba(251,191,36,0.05)',border:'1px solid rgba(251,191,36,0.15)',borderRadius:'12px'}}>
+              <div style={{flex:1}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:'5px'}}>
+                  <span style={{fontSize:'12px',color:'rgba(255,255,255,0.58)',fontWeight:'600'}}>📦 Ausgegeben</span>
+                  <span style={{fontSize:'12px',fontWeight:'800',color:ausgegeben===alleUngefiltert.length&&alleUngefiltert.length>0?'#4ade80':'#fbbf24'}}>{ausgegeben} / {alleUngefiltert.length}</span>
+                </div>
+                <div style={{background:'rgba(255,255,255,0.08)',borderRadius:'99px',height:'6px',overflow:'hidden'}}>
+                  <div style={{width:alleUngefiltert.length>0?`${Math.round(ausgegeben/alleUngefiltert.length*100)}%`:'0%',height:'100%',background:ausgegeben===alleUngefiltert.length&&alleUngefiltert.length>0?'linear-gradient(90deg,#16a34a,#4ade80)':'linear-gradient(90deg,#d97706,#fbbf24)',borderRadius:'99px',transition:'width 0.4s'}}/>
+                </div>
               </div>
             </div>
           </div>
@@ -16316,13 +16343,15 @@ export default function TrainingsApp() {
             {alleSpieler.map(spieler => {
               const d = trikotDaten[spieler.id] || {};
               const complete = isComplete(spieler.id);
+              const ausgStatus = ausgabeStatus(spieler.id);
               const isOpen = trikotExpanded === spieler.id;
               return (
                 <div key={spieler.id} style={{borderRadius:'11px',overflow:'hidden',border:`1px solid ${complete?'rgba(74,222,128,0.15)':'rgba(255,255,255,0.07)'}`,background:complete?'rgba(74,222,128,0.04)':'rgba(255,255,255,0.025)'}}>
                   {/* Kompakte Zeile */}
                   <div style={{display:'flex',alignItems:'center',padding:'9px 12px',gap:'10px'}}>
-                    <span style={{fontSize:complete?'16px':'14px',flexShrink:0}}>{complete?'✅':'❌'}</span>
+                    <span style={{fontSize:complete?'16px':'14px',flexShrink:0}} title="Größen erfasst">{complete?'✅':'❌'}</span>
                     <span style={{flex:1,fontWeight:'700',fontSize:'14px',color:'white'}}>{spieler.name}</span>
+                    {ausgStatus!=='keine'&&<span style={{fontSize:'10px',fontWeight:'800',padding:'2px 8px',borderRadius:'20px',flexShrink:0,color:ausgStatus==='komplett'?'#4ade80':'#fbbf24',background:ausgStatus==='komplett'?'rgba(74,222,128,0.12)':'rgba(251,191,36,0.12)',border:`1px solid ${ausgStatus==='komplett'?'rgba(74,222,128,0.3)':'rgba(251,191,36,0.3)'}`}}>{ausgStatus==='komplett'?'📦 ausgegeben':'📦 teilweise'}</span>}
                     <span style={{fontSize:'10px',fontWeight:'700',color:spieler.typ==='jugend'?'rgba(74,222,128,0.4)':'rgba(147,197,253,0.4)',textTransform:'uppercase',letterSpacing:'0.5px',flexShrink:0}}>{spieler.typ==='jugend'?'J':'A'}</span>
                     {userRole==='admin' && (
                       <button onClick={e=>{e.stopPropagation();deleteTrikotSpieler(spieler.id);}}
@@ -16398,6 +16427,32 @@ export default function TrainingsApp() {
                               </div>
                             </div>
                           </>)}
+                        </div>
+                      </div>
+                      {/* Ausgabe */}
+                      <div style={{gridColumn:isMobile?'auto':'1 / -1',borderTop:'1px solid rgba(255,255,255,0.06)',paddingTop:'12px',marginTop:'2px'}}>
+                        <p style={{margin:'0 0 8px',fontSize:'10px',fontWeight:'800',color:'rgba(251,191,36,0.6)',textTransform:'uppercase',letterSpacing:'1px'}}>📦 Ausgabe</p>
+                        <div style={{display:'flex',flexDirection:'column',gap:'7px'}}>
+                          <button onClick={()=>{
+                              const brauchtUnterseite = d.unterseite && d.unterseite !== 'Keine';
+                              const alleGegeben = ausgStatus === 'komplett';
+                              saveTrikot(spieler.id,'ausgabeTrikot', !alleGegeben);
+                              if (brauchtUnterseite) saveTrikot(spieler.id,'ausgabeUnterseite', !alleGegeben);
+                            }}
+                            style={{padding:'9px 12px',borderRadius:'9px',border:`1.5px solid ${ausgStatus==='komplett'?'rgba(74,222,128,0.5)':'rgba(255,255,255,0.15)'}`,background:ausgStatus==='komplett'?'rgba(74,222,128,0.12)':'rgba(255,255,255,0.03)',color:ausgStatus==='komplett'?'#4ade80':'rgba(255,255,255,0.6)',fontWeight:'800',fontSize:'13px',cursor:'pointer',display:'flex',alignItems:'center',gap:'8px'}}>
+                            {ausgStatus==='komplett'?'✅':'⬜'} Alles ausgegeben
+                          </button>
+                          <p style={{margin:'2px 0 0',fontSize:'10px',fontWeight:'700',color:'rgba(255,255,255,0.35)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Teilausgabe — einzeln abhaken</p>
+                          <label style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',padding:'4px 2px'}}>
+                            <input type="checkbox" checked={!!d.ausgabeTrikot} onChange={e=>saveTrikot(spieler.id,'ausgabeTrikot',e.target.checked)} style={{width:'16px',height:'16px',cursor:'pointer'}}/>
+                            <span style={{fontSize:'13px',color:d.ausgabeTrikot?'white':'rgba(255,255,255,0.55)',fontWeight:'600'}}>Trikot{d.groesse?` (${d.groesse}${d.schnitt?`, ${d.schnitt}`:''})`:''} ausgegeben</span>
+                          </label>
+                          {d.unterseite && d.unterseite !== 'Keine' && (
+                            <label style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',padding:'4px 2px'}}>
+                              <input type="checkbox" checked={!!d.ausgabeUnterseite} onChange={e=>saveTrikot(spieler.id,'ausgabeUnterseite',e.target.checked)} style={{width:'16px',height:'16px',cursor:'pointer'}}/>
+                              <span style={{fontSize:'13px',color:d.ausgabeUnterseite?'white':'rgba(255,255,255,0.55)',fontWeight:'600'}}>{d.unterseite}{d.groesseUnterseite?` (${d.groesseUnterseite})`:''} ausgegeben</span>
+                            </label>
+                          )}
                         </div>
                       </div>
                     </div>
