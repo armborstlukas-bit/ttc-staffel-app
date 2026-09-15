@@ -2076,7 +2076,11 @@ export default function TrainingsApp() {
     try {
       const r = await fetch('/api/spielplan?date_start=2026-08-01&date_end=2027-05-31&_='+Date.now());
       const d = await r.json();
-      setSpielplanMatches(Array.isArray(d.matches) ? d.matches : []);
+      if (d.error === 'bot_detection') {
+        setSpielplanMatches('bot_blocked'); // Sonderwert
+      } else {
+        setSpielplanMatches(Array.isArray(d.matches) ? d.matches : []);
+      }
     } catch { setSpielplanMatches([]); }
     finally { setSpielplanLoading(false); }
   };
@@ -15891,9 +15895,11 @@ export default function TrainingsApp() {
   // ── SPIELPLAN ─────────────────────────────────────────────────────────────
   if (view === 'spielplan' && !!user) {
     if (spielplanMatches === null && !spielplanLoading) fetchSpielplan();
-    const openMyTischtennis = () => { const a=document.createElement('a'); a.href='https://www.mytischtennis.de/click-tt/HeTTV/25--26/verein/33066/TTC_G.-W._Staffel_1953/mannschaften'; a.target='_blank'; a.rel='noopener noreferrer'; document.body.appendChild(a); a.click(); document.body.removeChild(a); };
+    const openMyTischtennis = () => { const a=document.createElement('a'); a.href='https://www.mytischtennis.de/click-tt/HeTTV/26--27/verein/33066/TTC_G.-W._Staffel_1953/spielplan'; a.target='_blank'; a.rel='noopener noreferrer'; document.body.appendChild(a); a.click(); document.body.removeChild(a); };
     const nowIso = new Date().toISOString();
-    const shown = (spielplanMatches||[]).filter(m => spielplanFilter==='alle' || !m.date || m.date >= nowIso || (m.state!=='done' && !m.isComplete));
+    const isBotBlocked = spielplanMatches === 'bot_blocked';
+    const matchList = Array.isArray(spielplanMatches) ? spielplanMatches : [];
+    const shown = matchList.filter(m => spielplanFilter==='alle' || !m.date || m.date >= nowIso || (m.state!=='done' && !m.isComplete));
     const fmtDate = m => {
       if (m.formattedDay && m.formattedTime) return `${m.formattedDay}, ${m.formattedTime} Uhr`;
       if (!m.date) return '';
@@ -15919,7 +15925,15 @@ export default function TrainingsApp() {
             ))}
           </div>
           {spielplanLoading && spielplanMatches===null && <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.48)'}}>⏳ Lade Spielplan…</div>}
-          {spielplanMatches!==null && shown.length===0 && !spielplanLoading && <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.48)'}}>Keine Spiele gefunden.</div>}
+          {isBotBlocked && (
+            <div style={{textAlign:'center',padding:'32px 20px',background:'rgba(251,191,36,0.07)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:'14px',marginBottom:'16px'}}>
+              <div style={{fontSize:'32px',marginBottom:'10px'}}>🤖</div>
+              <p style={{margin:'0 0 8px',fontWeight:'700',color:'#fbbf24',fontSize:'14px'}}>Spielplan momentan nicht abrufbar</p>
+              <p style={{margin:'0 0 14px',fontSize:'12px',color:'rgba(255,255,255,0.5)',lineHeight:'1.5'}}>mytischtennis.de zeigt eine Bot-Schutzseite. Bitte direkt auf MyTischtennis nachschauen.</p>
+              <button onClick={openMyTischtennis} style={{padding:'9px 18px',background:'rgba(251,191,36,0.15)',border:'1px solid rgba(251,191,36,0.4)',borderRadius:'10px',color:'#fbbf24',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>🌐 MyTischtennis öffnen ↗</button>
+            </div>
+          )}
+          {!isBotBlocked && spielplanMatches!==null && shown.length===0 && !spielplanLoading && <div style={{textAlign:'center',padding:'40px',color:'rgba(255,255,255,0.48)'}}>Keine Spiele gefunden.</div>}
           <div style={{display:'grid',gap:'8px'}}>
             {shown.map(m=>(
               <div key={m.meetingId} style={{padding:'12px 14px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px'}}>

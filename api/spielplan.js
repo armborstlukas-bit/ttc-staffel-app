@@ -4,6 +4,22 @@
 const CLUB_PATH = 'HeTTV/26--27/verein/33066/TTC_G.-W._Staffel_1953';
 const BASE = 'https://www.mytischtennis.de';
 
+// Realistische Browser-Header um Bot-Detection zu umgehen
+const BROWSER_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+  'Accept-Language': 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7',
+  'Accept-Encoding': 'gzip, deflate, br',
+  'Referer': 'https://www.mytischtennis.de/',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'same-origin',
+  'Sec-Fetch-User': '?1',
+  'Upgrade-Insecure-Requests': '1',
+  'Cache-Control': 'no-cache',
+  'Pragma': 'no-cache',
+};
+
 function extractRemixData(html, routeMatcher) {
   const marker = 'window.__remixContext = ';
   const scriptStart = html.indexOf(marker);
@@ -16,13 +32,22 @@ function extractRemixData(html, routeMatcher) {
 }
 
 export default async function handler(req, res) {
+  // CORS für Vercel
+  res.setHeader('Access-Control-Allow-Origin', '*');
+
   try {
     const dateStart = req.query.date_start || '2026-08-01';
     const dateEnd = req.query.date_end || '2027-05-31';
     const url = `${BASE}/click-tt/${CLUB_PATH}/spielplan?date_start=${encodeURIComponent(dateStart)}&date_end=${encodeURIComponent(dateEnd)}`;
-    const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+
+    const response = await fetch(url, { headers: BROWSER_HEADERS });
     if (!response.ok) throw new Error('Seite nicht erreichbar: ' + response.status);
     const html = await response.text();
+
+    // Bot-Detection erkennen: Wenn keine Remix-Daten aber Verifizierungsseite
+    if (!html.includes('window.__remixContext') && html.includes('Verifizierung')) {
+      return res.status(503).json({ error: 'bot_detection', message: 'mytischtennis.de zeigt eine Verifizierungsseite — bitte später erneut versuchen.' });
+    }
 
     const routeData = extractRemixData(html, k => k.includes('spielplan'));
     const byDate = routeData?.data || {};

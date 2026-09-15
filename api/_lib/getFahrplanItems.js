@@ -44,19 +44,40 @@ function buildFahrplanMatcher(sheetItems) {
 
 const SPIELPLAN_URL = 'https://www.mytischtennis.de/click-tt/HeTTV/26--27/verein/33066/TTC_G.-W._Staffel_1953/spielplan?date_start=2026-08-01&date_end=2027-05-31';
 
+// Realistischere Browser-Header, um von mytischtennis.de seltener als Bot geblockt zu werden
+// (deren Bot-/Rate-Limit-Schutz zeigt manchmal statt der echten Seite eine Verifizierungs-/
+// Zwischenseite an, die selbst noch eine gueltige window.__remixContext-Struktur enthaelt, nur
+// eben ohne die spielplan-Route mit echten Daten — das fiel bisher NICHT auf, weil der Code
+// dann einfach eine leere Spielliste zurueckgab, statt einen Fehler zu werfen).
+const BROWSER_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+  'Accept-Language': 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7',
+  'Referer': 'https://www.mytischtennis.de/',
+  'Upgrade-Insecure-Requests': '1',
+};
+
 export async function getFahrplanItems() {
-  const response = await fetch(SPIELPLAN_URL, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  const response = await fetch(SPIELPLAN_URL, { headers: BROWSER_HEADERS });
   if (!response.ok) throw new Error('Seite nicht erreichbar: ' + response.status);
   const html = await response.text();
 
   const marker = 'window.__remixContext = ';
   const scriptStart = html.indexOf(marker);
-  if (scriptStart === -1) throw new Error('Datenstruktur nicht gefunden (window.__remixContext)');
+  if (scriptStart === -1) {
+    if (html.includes('Verifizierung')) throw new Error('mytischtennis.de zeigt eine Bot-Verifizierungsseite (kein Spielplan abrufbar)');
+    throw new Error('Datenstruktur nicht gefunden (window.__remixContext)');
+  }
   const scriptEnd = html.indexOf('</script>', scriptStart);
   let jsonStr = html.slice(scriptStart + marker.length, scriptEnd).replace(/;\s*$/, '');
   const ctx = JSON.parse(jsonStr);
 
   const routeKey = Object.keys(ctx.state.loaderData || {}).find(k => k.includes('spielplan'));
+  // Die Seite kann eine formal gueltige Remix-Struktur liefern, aber ohne die spielplan-Route
+  // (z.B. bei einer Bot-Zwischenseite) -- das darf NICHT als "0 Spiele diese Saison" durchgehen,
+  // sonst wird der gespeicherte Spielplan-Snapshot fälschlich geleert und alle künftigen
+  // Änderungserkennungen (Spielverlegungen etc.) sowie Erinnerungsmails bleiben stumm aus.
+  if (!routeKey) throw new Error('Spielplan-Route nicht in den Seitendaten gefunden (evtl. Bot-Schutz)');
   if (!routeKey) throw new Error('Spielplan-Route nicht gefunden');
   const byDate = ctx.state.loaderData[routeKey].data || {};
 

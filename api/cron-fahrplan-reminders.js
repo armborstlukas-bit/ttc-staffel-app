@@ -28,9 +28,52 @@ export default async function handler(req, res) {
     return;
   }
 
+  // TEMP-Diagnose (kein Mailversand): prüft nur, ob der Spielplan-Fetch noch funktioniert,
+  // und zeigt den Stand von Snapshot/Log (letzter Cron-Lauf). Mit &repair=1 wird der Snapshot
+  // (nur die reinen Vergleichsdaten, KEINE Mails) aus dem aktuellen, funktionierenden Abruf neu
+  // aufgebaut -- notwendig, weil der heutige Lauf ihn durch eine leere Bot-Schutz-Antwort auf
+  // 0 Spiele geleert hatte.
+  if (req.query.diag === '1') {
+    try {
+      const items = await getFahrplanItems();
+      const db = adminDb();
+      if (req.query.repair === '1') {
+        const rebuilt = {};
+        items.forEach(g => { if (g.meetingId) rebuilt[g.meetingId] = { datum: g.datum || '', zeit: g.zeit || '', isHeimspiel: !!g.isHeimspiel, halle: g.halle || '', treffpunkt: g.treffpunkt || '' }; });
+        await db.collection('ttc').doc('fahrplanSnapshot').set({ items: rebuilt, updatedAt: new Date().toISOString() });
+        res.status(200).json({ ok: true, repaired: true, meetingCount: Object.keys(rebuilt).length });
+        return;
+      }
+      const snapSnap = await db.collection('ttc').doc('fahrplanSnapshot').get();
+      const logSnap = await db.collection('ttc').doc('fahrplanReminderLog').get();
+      res.status(200).json({
+        ok: true, count: items.length,
+        snapshotUpdatedAt: snapSnap.exists ? snapSnap.data().updatedAt : null,
+        snapshotMeetingCount: snapSnap.exists ? Object.keys(snapSnap.data().items || {}).length : 0,
+        reminderLogEntries: logSnap.exists ? Object.keys(logSnap.data() || {}).length : 0,
+      });
+    } catch (e) {
+      res.status(200).json({ ok: false, error: String(e?.message || e) });
+    }
+    return;
+  }
+
   try {
     const items = await getFahrplanItems();
     const db = adminDb();
+
+    // Notbremse: eine verdächtig leere/stark geschrumpfte Spielplan-Antwort (z.B. durch eine
+    // Bot-Schutzseite, die getFahrplanItems() nicht als Fehler erkannt hat) darf NIE den
+    // gespeicherten Snapshot überschreiben -- sonst sieht der nächste Lauf jedes Spiel wieder
+    // als "neu" statt als "geändert", und Verlegungen werden nie erkannt. Schwelle: weniger als
+    // die Hälfte der zuletzt bekannten Spiele gilt als verdächtig.
+    const existingSnapForGuard = await db.collection('ttc').doc('fahrplanSnapshot').get();
+    const existingMeetingCount = existingSnapForGuard.exists ? Object.keys(existingSnapForGuard.data().items || {}).length : 0;
+    if (existingMeetingCount > 5 && items.length < existingMeetingCount / 2) {
+      console.error(`[cron-fahrplan-reminders] Abbruch: nur ${items.length} Spiele geladen, zuletzt bekannt waren ${existingMeetingCount} -- vermutlich Bot-Schutzseite statt echtem Spielplan. Snapshot bleibt unverändert.`);
+      res.status(200).json({ sent: 0, changeMailsSent: 0, aborted: true, reason: 'suspiciously_few_items', itemsFetched: items.length, previousMeetingCount: existingMeetingCount });
+      return;
+    }
 
     // E-Mail -> Nutzer-UID Zuordnung, um neben der Mail auch eine Push-Nachricht an einen
     // ggf. existierenden App-Account mit derselben Adresse zu schicken.
