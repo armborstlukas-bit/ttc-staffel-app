@@ -40,6 +40,13 @@ if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styl
     .ttc-blink {
       animation: ttcBlink 1.4s ease-in-out infinite;
     }
+    @keyframes ttcSpin { to { transform: rotate(360deg); } }
+    .ttc-spin { animation: ttcSpin 1s linear infinite; }
+    .ttc-redaktion-editor:empty::before { content: attr(data-placeholder); color: #8a9a91; }
+    .ttc-redaktion-editor p, .ttc-redaktion-preview p { margin: 0 0 0.8em; }
+    .ttc-redaktion-editor h3, .ttc-redaktion-preview h3 { font-size: 1.3em; margin: 1em 0 0.4em; }
+    .ttc-redaktion-editor:focus { box-shadow: 0 0 0 4px rgba(74,222,128,0.45); }
+    .ttc-redaktion-preview img { max-width: 100%; height: auto; }
     .ttc-view-enter {
       animation: ttcFadeSlide 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
@@ -121,6 +128,7 @@ import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, si
 import { getFirestore, doc, setDoc, updateDoc, deleteDoc, deleteField, arrayUnion, arrayRemove, increment, onSnapshot, getDoc, collection, getDocs } from 'firebase/firestore';
 import { getMessaging, getToken as getFcmToken, onMessage, isSupported as isFcmSupported } from 'firebase/messaging';
 import { Check, X, Plus, Trash2, Download, LogOut, ArrowLeft, Clock, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save, Trophy, Home, Archive, MessageSquare, Bell, Send, Pencil } from 'lucide-react';
+import Redaktion from './Redaktion.jsx';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCrx34HEgaHnRE187Cja4JNAtbexvrA6Vg",
@@ -1374,6 +1382,7 @@ export default function TrainingsApp() {
   const saveAktiveSpieler                = d => { setAktiveSpieler(d);               setDoc(doc(db,'ttc','aktiveSpieler'),                  d); };
   const canAccessRompel    = () => userRole === 'admin' || (appSettings.rompelTrainers  || []).includes(user?.uid);
   const canAccessPfand     = () => userRole === 'admin' || (appSettings.pfandTrainers   || []).includes(user?.uid);
+  const canAccessRedaktion = () => userRole === 'admin' || (appSettings.redaktionMembers || []).includes(user?.uid); // Redaktion der Vereinswebseite
   const canAccessPinnwand  = () => !!user; // Pinnwand ist fuer alle eingeloggten Nutzer sichtbar; Sichtbarkeit einzelner Beitraege wird pro Beitrag geregelt
   const canAccessTeams = () => !!user; // TTC Mannschaften ist fuer alle eingeloggten Nutzer sichtbar (Admin, Trainer, Aktive, Eltern, Jugendliche, Passive)
   const MAX_FAVORITE_TEAMS = 3;
@@ -3880,6 +3889,7 @@ export default function TrainingsApp() {
                 label:'Verein & Kommunikation', color:'rgba(147,197,253,0.45)',
                 links:[
                   {label:'TTC News', icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.08)', border:'rgba(74,222,128,0.2)', action:()=>{navTo('ttcnews');fetchTtcNews();}},
+                  ...(canAccessRedaktion()?[{label:'Redaktion', icon:'✍️', color:'#4ade80', bg:'rgba(74,222,128,0.08)', border:'rgba(74,222,128,0.25)', action:()=>navTo('redaktion')}]:[]),
                   {label:'Vereinskalender', icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.2)', action:()=>{navTo('kalender');fetchKalender();}},
                   ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
                   {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.07)', border:'rgba(196,181,253,0.2)', blink: verbesserungenNeedsAttention, action:openVerbesserungen},
@@ -4623,6 +4633,7 @@ export default function TrainingsApp() {
         color: 'rgba(147,197,253,0.45)',
         links: [
           {label:'TTC News',         icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',   action:()=>{navTo('ttcnews');fetchTtcNews();}},
+          ...(canAccessRedaktion()?[{label:'Redaktion', icon:'✍️', color:'#4ade80', bg:'rgba(74,222,128,0.08)', border:'rgba(74,222,128,0.25)', action:()=>navTo('redaktion')}]:[]),
           {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>navTo('notifications'), badge: unreadCount},
           {label:'Vereinskalender',  icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)', action:()=>{navTo('kalender');fetchKalender();}},
           {label:'Wer fährt wann',   icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
@@ -4987,6 +4998,7 @@ export default function TrainingsApp() {
                 label:'Verein & Kommunikation', color:'rgba(147,197,253,0.45)',
                 links:[
                   {label:'TTC News',        icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',  action:()=>{navTo('ttcnews');fetchTtcNews();}},
+                  ...(canAccessRedaktion()?[{label:'Redaktion', icon:'✍️', color:'#4ade80', bg:'rgba(74,222,128,0.08)', border:'rgba(74,222,128,0.25)', action:()=>navTo('redaktion')}]:[]),
                   {label:'Vereinskalender', icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.2)', action:()=>{navTo('kalender');fetchKalender();}},
                   {label:'Wer fährt wann',  icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.2)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
                   ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.07)', border:'rgba(253,230,138,0.2)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
@@ -5651,6 +5663,7 @@ export default function TrainingsApp() {
                 links:[
                   {label:'Nachrichten', icon:'🔔', color:'#a78bfa', bg:'rgba(167,139,250,0.1)', border:'rgba(167,139,250,0.25)', action:()=>setElternSubView('benachrichtigungen'), badge: active.length>0?active.length:0},
                   {label:'TTC News', icon:'📰', color:'#86efac', bg:'rgba(134,239,172,0.1)', border:'rgba(134,239,172,0.25)', action:()=>{navTo('ttcnews');fetchTtcNews();}},
+                  ...(canAccessRedaktion()?[{label:'Redaktion', icon:'✍️', color:'#4ade80', bg:'rgba(74,222,128,0.08)', border:'rgba(74,222,128,0.25)', action:()=>navTo('redaktion')}]:[]),
                   {label:'Vereinskalender', icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.1)', border:'rgba(251,191,36,0.25)', action:()=>{navTo('kalender');fetchKalender();}},
                   {label:'Wer fährt wann', icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.1)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
                   ...(canAccessPinnwand()?[{label:'Pinnwand', icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.1)', border:'rgba(253,230,138,0.25)', action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
@@ -16703,6 +16716,11 @@ export default function TrainingsApp() {
         </div>
       </div>
     );
+  }
+
+  // ── REDAKTION (Berichte für die Vereinswebseite) ──────────────────────
+  if (view === 'redaktion' && canAccessRedaktion()) {
+    return <Redaktion key={viewKey} user={user} isMobile={isMobile} onHome={()=>navTo('home')} accessRow={renderAccessManagerRow('redaktionMembers','Redaktion','#4ade80')} />;
   }
 
   // ── ROMPEL BEREICH ──────────────────────────────────────────────────────
