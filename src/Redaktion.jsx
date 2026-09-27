@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Home, ArrowLeft, Bold, Heading2, List, Undo2, ImagePlus, Star, Trash2, Eye, CheckCircle2, X, Loader2, PenLine, Plus, ExternalLink, Search } from 'lucide-react';
+import { Home, ArrowLeft, Bold, Heading2, List, Undo2, ImagePlus, Star, Trash2, Eye, CheckCircle2, X, Loader2, PenLine, Plus, ExternalLink, Search, AlignJustify, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 
 // ── Redaktion: Berichte für die Vereinswebseite schreiben ────────────────────────
 // Die Berichte werden über die Schnittstelle der Webseite gespeichert (gleiches Firebase-Konto).
@@ -17,7 +17,14 @@ const catLabel = (id) => CATEGORIES.find(c => c.id === id)?.label || 'Verein';
 const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
 const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
 const imgSrc = (u) => (u?.startsWith('/') ? WEB_URL + u : u);
-const EMPTY = { title: '', category: '', html: '', images: [], date: today() };
+const EMPTY = { title: '', category: '', html: '', images: [], date: today(), textAlign: 'justify' };
+// Textausrichtung des Berichts auf der Webseite – Standard ist Blocksatz
+const ALIGNS = [
+  { id: 'justify', label: 'Blocksatz', Icon: AlignJustify },
+  { id: 'left', label: 'Links', Icon: AlignLeft },
+  { id: 'center', label: 'Mittig', Icon: AlignCenter },
+  { id: 'right', label: 'Rechts', Icon: AlignRight },
+];
 
 const A = '#4ade80';
 const C = {
@@ -232,7 +239,7 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
   useEffect(() => {
     if (!id) return;
     api(`/news/${id}`).then(d => {
-      setForm({ title: d.title, category: d.category, html: d.html, images: d.images || [], date: d.date || today() });
+      setForm({ title: d.title, category: d.category, html: d.html, images: d.images || [], date: d.date || today(), textAlign: d.textAlign || 'justify' });
       setStatus(d.status);
       setLoaded(true);
     }).catch(e => setError(e.message));
@@ -360,9 +367,21 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
           <button onMouseDown={e => e.preventDefault()} onClick={() => cmd('insertUnorderedList')} style={toolBtn}><List size={14} /> Liste</button>
           <button onMouseDown={e => e.preventDefault()} onClick={() => cmd('undo')} style={toolBtn}><Undo2 size={14} /> Rückgängig</button>
         </div>
+        <div role="radiogroup" aria-label="Ausrichtung" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '5px', marginBottom: '8px' }}>
+          <span style={{ ...C.muted, fontSize: '12px', marginRight: '2px' }}>Ausrichtung:</span>
+          {ALIGNS.map(({ id: a, label, Icon }) => {
+            const on = (form.textAlign || 'justify') === a;
+            return (
+              <button key={a} role="radio" aria-checked={on} onMouseDown={e => e.preventDefault()} onClick={() => update({ textAlign: a })}
+                style={{ ...toolBtn, ...(on ? { background: 'rgba(74,222,128,0.16)', borderColor: A, color: '#bbf7d0' } : {}) }}>
+                <Icon size={14} /> {label}
+              </button>
+            );
+          })}
+        </div>
         <div ref={editorRef} className="ttc-redaktion-editor" contentEditable suppressContentEditableWarning onInput={onInput} onPaste={onPaste}
           role="textbox" aria-multiline="true" aria-label="Text des Berichts" data-placeholder="Hier den Bericht schreiben …"
-          style={{ minHeight: '240px', padding: '12px 14px', fontSize: '15px', lineHeight: 1.65, color: '#111', background: '#fff', borderRadius: '10px', outline: 'none', overflowWrap: 'anywhere' }} />
+          lang="de" style={{ minHeight: '240px', padding: '12px 14px', fontSize: '15px', lineHeight: 1.65, color: '#111', background: '#fff', borderRadius: '10px', outline: 'none', overflowWrap: 'anywhere', textAlign: form.textAlign || 'justify', hyphens: 'auto', WebkitHyphens: 'auto' }} />
       </Step>
 
       <Step n="4" title="Fotos" note="(freiwillig)">
@@ -414,7 +433,7 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
             <p style={{ margin: '0 0 6px', color: '#5f6b63', fontSize: '13px' }}>{catLabel(form.category)} · {fmtDate(form.date)}</p>
             <h1 style={{ fontSize: isMobile ? '24px' : '32px', lineHeight: 1.1, margin: '0 0 16px' }}>{form.title || 'Ohne Überschrift'}</h1>
             {form.images[0] && <img src={imgSrc(form.images[0])} alt="" style={{ width: '100%', borderRadius: '8px', marginBottom: '16px' }} />}
-            <div className="ttc-redaktion-preview" style={{ fontSize: '16px', lineHeight: 1.65 }} dangerouslySetInnerHTML={{ __html: form.html }} />
+            <div className="ttc-redaktion-preview" lang="de" style={{ fontSize: '16px', lineHeight: 1.65, textAlign: form.textAlign || 'justify', hyphens: 'auto', WebkitHyphens: 'auto' }} dangerouslySetInnerHTML={{ __html: form.html }} />
             {form.images.length > 1 && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: '6px', marginTop: '18px' }}>{form.images.slice(1).map(u => <img key={u} src={imgSrc(u)} alt="" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover' }} />)}</div>}
           </div>
         </div>
