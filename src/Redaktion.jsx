@@ -11,9 +11,9 @@ const CATEGORIES = [
   { id: 'nachwuchs', label: 'Nachwuchs', hint: 'Jugend, Turniere, Lehrgänge' },
   { id: 'verein', label: 'Verein', hint: 'Feiern, Ehrungen, Termine' },
   { id: 'osterturnier', label: 'Osterturnier', hint: 'rund um Ostern' },
-  { id: 'presse', label: 'Presse', hint: 'Zeitungsartikel' },
+  { id: '', label: 'Keine Angabe', hint: 'nur unter „Alle“' },
 ];
-const catLabel = (id) => CATEGORIES.find(c => c.id === id)?.label || 'Verein';
+const catLabel = (id) => (id === 'presse' ? 'Presse' : id && CATEGORIES.find(c => c.id === id)?.label) || 'Ohne Artikelart';
 const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
 const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
 const imgSrc = (u) => (u?.startsWith('/') ? WEB_URL + u : u);
@@ -239,7 +239,7 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
   useEffect(() => {
     if (!id) return;
     api(`/news/${id}`).then(d => {
-      setForm({ title: d.title, category: d.category, html: d.html, images: d.images || [], date: d.date || today(), textAlign: d.textAlign || 'justify' });
+      setForm({ title: d.title, category: d.category || '', html: d.html, images: d.images || [], date: d.date || today(), textAlign: d.textAlign || 'justify' });
       setStatus(d.status);
       setLoaded(true);
     }).catch(e => setError(e.message));
@@ -292,7 +292,6 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
     setError('');
     const body = { ...form, html: editorRef.current?.innerHTML || form.html, status: targetStatus };
     if (!body.title.trim()) return setError('Bitte oben eine Überschrift eingeben (Schritt 1).');
-    if (!body.category) return setError('Bitte auswählen, worum es geht (Schritt 2).');
     setBusy(true);
     try {
       const res = id ? await api(`/news/${id}`, { method: 'PUT', body }) : await api('/news', { method: 'POST', body });
@@ -343,7 +342,7 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
         <input value={form.title} onChange={e => update({ title: e.target.value })} placeholder="z. B. Herren I gewinnt Derby gegen Elz" maxLength={160} style={{ ...C.input, fontSize: '15px', fontWeight: 600 }} aria-label="Überschrift" />
       </Step>
 
-      <Step n="2" title="Worum geht es?">
+      <Step n="2" title="Worum geht es?" note="(freiwillig)">
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: '8px' }} role="radiogroup">
           {CATEGORIES.map(c => {
             const on = form.category === c.id;
