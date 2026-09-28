@@ -487,7 +487,7 @@ const badgeS = { display: 'inline-block', padding: '1px 8px', borderRadius: '999
 const photoTag = { position: 'absolute', left: '4px', bottom: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '3px 7px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, background: 'rgba(255,255,255,0.95)', color: '#111' };
 
 // ---------- TTC News: kurze Meldungen für das weiße Laufband auf der Startseite ----------
-const EMPTY_TICK = { text: '', link: '', until: '' };
+const EMPTY_TICK = { text: '', date: '', link: '', until: '' };
 function TickerManager({ api, isMobile }) {
   const [items, setItems] = useState(null);
   const [form, setForm] = useState(EMPTY_TICK);
@@ -521,20 +521,23 @@ function TickerManager({ api, isMobile }) {
     try { await api(`/ticker/${t.id}`, { method: 'DELETE' }); await load(); } catch (e) { setError(e.message); }
   };
   const todayIso = today();
-  const expired = (t) => t.until && t.until < todayIso;
+  const expired = (t) => (t.until || t.date) && (t.until || t.date) < todayIso;
 
   return (
     <>
       <div style={C.card}>
         <strong style={{ display: 'block', fontSize: '15px', marginBottom: '4px' }}>{editId ? 'Meldung bearbeiten' : 'Neue TTC News'}</strong>
         <p style={{ ...C.muted, margin: '0 0 12px', fontSize: '12px' }}>Kurze Meldungen laufen im weißen Band auf der Startseite durch – z. B. Termine, Absagen oder Hinweise.</p>
-        <textarea value={form.text} onChange={e => setForm(f => ({ ...f, text: e.target.value.slice(0, 140) }))} rows={2} placeholder="z. B. Samstag, 12.10.: Vereinsmeisterschaften ab 10 Uhr in der Halle" aria-label="Text der Meldung" style={{ ...C.input, resize: 'vertical', fontFamily: 'inherit' }} />
+        <textarea value={form.text} onChange={e => setForm(f => ({ ...f, text: e.target.value.slice(0, 140) }))} rows={2} placeholder="z. B. Vereinsmeisterschaften ab 10 Uhr in der Halle" aria-label="Text der Meldung" style={{ ...C.input, resize: 'vertical', fontFamily: 'inherit' }} />
         <div style={{ ...C.muted, fontSize: '11px', textAlign: 'right', margin: '3px 0 10px' }}>{form.text.length}/140 Zeichen</div>
+        <label style={{ display: 'block', fontSize: '12px', ...C.muted, marginBottom: '10px' }}>Datum des Termins – steht im Laufband vor der Meldung
+          <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} style={{ ...C.input, marginTop: '4px', colorScheme: 'dark', maxWidth: '220px' }} />
+        </label>
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: '10px' }}>
           <label style={{ fontSize: '12px', ...C.muted }}>Link (freiwillig)
             <input value={form.link} onChange={e => setForm(f => ({ ...f, link: e.target.value }))} placeholder="https://…" style={{ ...C.input, marginTop: '4px' }} />
           </label>
-          <label style={{ fontSize: '12px', ...C.muted }}>Anzeigen bis (freiwillig)
+          <label style={{ fontSize: '12px', ...C.muted }}>Anzeigen bis (freiwillig, sonst bis zum Termin)
             <input type="date" value={form.until} onChange={e => setForm(f => ({ ...f, until: e.target.value }))} style={{ ...C.input, marginTop: '4px', colorScheme: 'dark' }} />
           </label>
         </div>
@@ -553,13 +556,13 @@ function TickerManager({ api, isMobile }) {
         const live = t.active && !expired(t);
         return (
           <div key={t.id} style={{ ...C.card, padding: '12px 14px', marginBottom: '8px', opacity: live ? 1 : 0.6 }}>
-            <div style={{ fontSize: '14px', fontWeight: 600, lineHeight: 1.4 }}>{t.text}</div>
+            <div style={{ fontSize: '14px', fontWeight: 600, lineHeight: 1.4 }}>{t.date && <span style={{ color: A, marginRight: '6px' }}>{fmtDate(t.date)}:</span>}{t.text}</div>
             <div style={{ ...C.muted, fontSize: '11px', marginTop: '4px' }}>
               {live ? '🟢 läuft auf der Startseite' : expired(t) ? '⏱ abgelaufen' : '⏸ ausgeblendet'}
               {t.until ? ` · bis ${fmtDate(t.until)}` : ''}{t.link ? ' · mit Link' : ''}{t.author ? ` · ${t.author}` : ''}
             </div>
             <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
-              <button onClick={() => { setEditId(t.id); setForm({ text: t.text, link: t.link, until: t.until }); setMsg(''); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={btn('ghost', { padding: '6px 11px', fontSize: '12px' })}><PenLine size={13} /> Bearbeiten</button>
+              <button onClick={() => { setEditId(t.id); setForm({ text: t.text, date: t.date || '', link: t.link, until: t.until }); setMsg(''); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={btn('ghost', { padding: '6px 11px', fontSize: '12px' })}><PenLine size={13} /> Bearbeiten</button>
               <button onClick={() => toggle(t)} style={btn('ghost', { padding: '6px 11px', fontSize: '12px' })}>{t.active ? 'Ausblenden' : 'Wieder anzeigen'}</button>
               <button onClick={() => remove(t)} style={btn('danger', { padding: '6px 11px', fontSize: '12px' })}><Trash2 size={13} /> Löschen</button>
             </div>
