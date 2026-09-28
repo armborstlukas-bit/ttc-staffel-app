@@ -84,6 +84,7 @@ async function shrink(file) {
 
 export default function Redaktion({ user, isMobile, onHome, accessRow }) {
   const [screen, setScreen] = useState({ name: 'list' }); // list | edit | done
+  const [tab, setTab] = useState('berichte'); // berichte | news
 
   const api = useCallback(async (path, { method = 'GET', body, form } = {}) => {
     const token = await user.getIdToken();
@@ -106,7 +107,16 @@ export default function Redaktion({ user, isMobile, onHome, accessRow }) {
       </div>
       <div style={{ padding: isMobile ? '14px' : '20px', maxWidth: '760px', margin: '0 auto' }}>
         {screen.name === 'list' && accessRow}
-        {screen.name === 'list' && <Overview api={api} isMobile={isMobile} onNew={() => setScreen({ name: 'edit' })} onEdit={(id) => setScreen({ name: 'edit', id })} />}
+        {screen.name === 'list' && (
+          <div role="tablist" aria-label="Bereich" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', padding: '4px', marginBottom: '16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(74,222,128,0.14)', borderRadius: '12px' }}>
+            {[['berichte', '📰 Berichte'], ['news', '📣 TTC News']].map(([key, label]) => (
+              <button key={key} role="tab" aria-selected={tab === key} onClick={() => setTab(key)}
+                style={{ padding: '9px 10px', borderRadius: '9px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 700, background: tab === key ? A : 'transparent', color: tab === key ? '#052e16' : 'rgba(255,255,255,0.75)' }}>{label}</button>
+            ))}
+          </div>
+        )}
+        {screen.name === 'list' && tab === 'news' && <TickerManager api={api} isMobile={isMobile} />}
+        {screen.name === 'list' && tab === 'berichte' && <Overview api={api} isMobile={isMobile} onNew={() => setScreen({ name: 'edit' })} onEdit={(id) => setScreen({ name: 'edit', id })} />}
         {screen.name === 'edit' && <Editor api={api} id={screen.id} isMobile={isMobile} onBack={() => setScreen({ name: 'list' })} onDone={(res) => setScreen({ name: 'done', ...res })} />}
         {screen.name === 'done' && <Done res={screen} onBack={() => setScreen({ name: 'list' })} />}
       </div>
@@ -475,3 +485,87 @@ function Spinner() {
 const alertS = { background: 'rgba(248,113,113,0.1)', color: '#fecaca', border: '1px solid rgba(248,113,113,0.35)', padding: '10px 13px', borderRadius: '10px', margin: '12px 0', fontSize: '13px' };
 const badgeS = { display: 'inline-block', padding: '1px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: 700, background: 'rgba(74,222,128,0.16)', color: '#bbf7d0' };
 const photoTag = { position: 'absolute', left: '4px', bottom: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '3px 7px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, background: 'rgba(255,255,255,0.95)', color: '#111' };
+
+// ---------- TTC News: kurze Meldungen für das weiße Laufband auf der Startseite ----------
+const EMPTY_TICK = { text: '', link: '', until: '' };
+function TickerManager({ api, isMobile }) {
+  const [items, setItems] = useState(null);
+  const [form, setForm] = useState(EMPTY_TICK);
+  const [editId, setEditId] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [msg, setMsg] = useState('');
+
+  const load = useCallback(() => api('/ticker').then(d => setItems(d.items)).catch(e => setError(e.message)), [api]);
+  useEffect(() => { load(); }, [load]);
+
+  const save = async () => {
+    setError(''); setMsg('');
+    if (form.text.trim().length < 3) return setError('Bitte einen Text für die Meldung eingeben.');
+    setBusy(true);
+    try {
+      if (editId) await api(`/ticker/${editId}`, { method: 'PUT', body: { ...form, active: true } });
+      else await api('/ticker', { method: 'POST', body: form });
+      setMsg(editId ? 'Meldung gespeichert.' : 'Meldung veröffentlicht – sie läuft jetzt auf der Startseite.');
+      setForm(EMPTY_TICK); setEditId(null);
+      await load();
+    } catch (e) { setError(e.message); } finally { setBusy(false); }
+  };
+  const toggle = async (t) => {
+    setError('');
+    try { await api(`/ticker/${t.id}`, { method: 'PUT', body: { ...t, active: !t.active } }); await load(); } catch (e) { setError(e.message); }
+  };
+  const remove = async (t) => {
+    if (!window.confirm('Diese Meldung endgültig löschen?')) return;
+    setError('');
+    try { await api(`/ticker/${t.id}`, { method: 'DELETE' }); await load(); } catch (e) { setError(e.message); }
+  };
+  const todayIso = today();
+  const expired = (t) => t.until && t.until < todayIso;
+
+  return (
+    <>
+      <div style={C.card}>
+        <strong style={{ display: 'block', fontSize: '15px', marginBottom: '4px' }}>{editId ? 'Meldung bearbeiten' : 'Neue TTC News'}</strong>
+        <p style={{ ...C.muted, margin: '0 0 12px', fontSize: '12px' }}>Kurze Meldungen laufen im weißen Band auf der Startseite durch – z. B. Termine, Absagen oder Hinweise.</p>
+        <textarea value={form.text} onChange={e => setForm(f => ({ ...f, text: e.target.value.slice(0, 140) }))} rows={2} placeholder="z. B. Samstag, 12.10.: Vereinsmeisterschaften ab 10 Uhr in der Halle" aria-label="Text der Meldung" style={{ ...C.input, resize: 'vertical', fontFamily: 'inherit' }} />
+        <div style={{ ...C.muted, fontSize: '11px', textAlign: 'right', margin: '3px 0 10px' }}>{form.text.length}/140 Zeichen</div>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: '10px' }}>
+          <label style={{ fontSize: '12px', ...C.muted }}>Link (freiwillig)
+            <input value={form.link} onChange={e => setForm(f => ({ ...f, link: e.target.value }))} placeholder="https://…" style={{ ...C.input, marginTop: '4px' }} />
+          </label>
+          <label style={{ fontSize: '12px', ...C.muted }}>Anzeigen bis (freiwillig)
+            <input type="date" value={form.until} onChange={e => setForm(f => ({ ...f, until: e.target.value }))} style={{ ...C.input, marginTop: '4px', colorScheme: 'dark' }} />
+          </label>
+        </div>
+        {error && <p style={{ color: '#fca5a5', fontSize: '13px', margin: '10px 0 0' }}>{error}</p>}
+        {msg && <p style={{ color: '#bbf7d0', fontSize: '13px', margin: '10px 0 0' }}>✓ {msg}</p>}
+        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px', flexWrap: 'wrap' }}>
+          {editId && <button onClick={() => { setEditId(null); setForm(EMPTY_TICK); }} style={btn('ghost')}>Abbrechen</button>}
+          <button onClick={save} disabled={busy} style={btn('primary', { opacity: busy ? 0.6 : 1 })}>{busy ? <Loader2 size={15} className="ttc-spin" /> : <CheckCircle2 size={15} />} {editId ? 'Speichern' : 'Veröffentlichen'}</button>
+        </div>
+      </div>
+
+      <strong style={{ display: 'block', fontSize: '14px', margin: '4px 0 10px' }}>Alle Meldungen</strong>
+      {items === null ? <Spinner /> : items.length === 0 ? (
+        <p style={{ ...C.muted, fontSize: '13px' }}>Noch keine TTC News. Die erste Meldung oben eintragen.</p>
+      ) : items.map(t => {
+        const live = t.active && !expired(t);
+        return (
+          <div key={t.id} style={{ ...C.card, padding: '12px 14px', marginBottom: '8px', opacity: live ? 1 : 0.6 }}>
+            <div style={{ fontSize: '14px', fontWeight: 600, lineHeight: 1.4 }}>{t.text}</div>
+            <div style={{ ...C.muted, fontSize: '11px', marginTop: '4px' }}>
+              {live ? '🟢 läuft auf der Startseite' : expired(t) ? '⏱ abgelaufen' : '⏸ ausgeblendet'}
+              {t.until ? ` · bis ${fmtDate(t.until)}` : ''}{t.link ? ' · mit Link' : ''}{t.author ? ` · ${t.author}` : ''}
+            </div>
+            <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
+              <button onClick={() => { setEditId(t.id); setForm({ text: t.text, link: t.link, until: t.until }); setMsg(''); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={btn('ghost', { padding: '6px 11px', fontSize: '12px' })}><PenLine size={13} /> Bearbeiten</button>
+              <button onClick={() => toggle(t)} style={btn('ghost', { padding: '6px 11px', fontSize: '12px' })}>{t.active ? 'Ausblenden' : 'Wieder anzeigen'}</button>
+              <button onClick={() => remove(t)} style={btn('danger', { padding: '6px 11px', fontSize: '12px' })}><Trash2 size={13} /> Löschen</button>
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
