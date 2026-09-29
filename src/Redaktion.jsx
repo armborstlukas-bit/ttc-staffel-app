@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Home, ArrowLeft, Bold, Italic, Underline, Heading2, List, Undo2, ImagePlus, Star, ArrowUp, ArrowDown, PanelLeft, PanelRight, RectangleHorizontal, Trash2, Eye, CheckCircle2, X, Loader2, PenLine, Plus, ExternalLink, Search, AlignJustify, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 
 // ── Redaktion: Berichte für die Vereinswebseite schreiben ────────────────────────
@@ -299,14 +300,17 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
     while (node.parentNode && node.parentNode !== root) node = node.parentNode;
     return node.parentNode === root ? node : null;
   };
+  // Lage eines Fotos relativ zum Schreibfeld-Rahmen (für Anfasser und Leiste)
+  const measure = (el) => {
+    const r = el.getBoundingClientRect(), w = wrapRef.current.getBoundingClientRect();
+    return { top: r.top - w.top, left: r.left - w.left, width: r.width, height: r.height };
+  };
   const clearSel = () => { editorRef.current?.querySelectorAll('.ttc-img-sel').forEach(e => e.classList.remove('ttc-img-sel')); setSel(null); };
   const selectImg = (el) => {
     clearSel();
     const target = el.closest('figure') || el;
     target.classList.add('ttc-img-sel');
-    const block = topBlock(target);
-    const top = target.getBoundingClientRect().top - wrapRef.current.getBoundingClientRect().top;
-    setSel({ el: target, block, top });
+    setSel({ el: target, block: topBlock(target), rect: measure(target) });
   };
   const insertPhoto = (url, after) => {
     const root = editorRef.current;
@@ -338,8 +342,9 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
     clearSel(); onInput();
   };
   // Foto im Text: links / volle Breite / rechts (Text fließt neben schmalen Fotos weiter)
-  const placeSel = (side) => {
-    if (!sel) return;
+  const getW = (fig) => Number(fig.className.match(/img-w-(\d+)/)?.[1]) || null;
+  const setW = (fig, pct) => { [...fig.classList].filter(c => /^img-w-/.test(c)).forEach(c => fig.classList.remove(c)); if (pct) fig.classList.add(`img-w-${pct}`); };
+  const ensureFigure = () => {
     let fig = sel.el.tagName === 'FIGURE' ? sel.el : sel.el.closest('figure');
     if (!fig) { // alte Berichte: Foto ohne Rahmen – in einen Rahmen setzen
       fig = document.createElement('figure');
@@ -349,9 +354,41 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
       fig.appendChild(sel.el);
       if (block && block !== sel.el) { if (!block.textContent.trim() && !block.querySelector('img')) block.replaceWith(fig); else block.after(fig); } else editorRef.current.appendChild(fig);
     }
+    return fig;
+  };
+  // Seite wählen: links / mittig / rechts – die Größe bleibt, neben Text startet ein großes Foto mit 45 %
+  const placeSel = (side) => {
+    if (!sel) return;
+    const fig = ensureFigure();
     fig.classList.remove('img-left', 'img-right');
-    if (side) fig.classList.add(side === 'left' ? 'img-left' : 'img-right');
+    if (side) { fig.classList.add(side === 'left' ? 'img-left' : 'img-right'); if (!getW(fig)) setW(fig, 45); }
     onInput(); selectImg(fig.querySelector('img'));
+  };
+  // Größe an den Ecken ziehen (Maus und Finger). Ab 85 % wird das Foto automatisch volle Breite.
+  const [sizeLabel, setSizeLabel] = useState('');
+  const onHandleDown = (e) => startResize(e, e.currentTarget.dataset.corner);
+  const startResize = (e, corner) => {
+    if (!sel) return;
+    e.preventDefault(); e.stopPropagation();
+    const fig = ensureFigure();
+    const side = fig.classList.contains('img-left') ? 'img-left' : fig.classList.contains('img-right') ? 'img-right' : '';
+    const cs = getComputedStyle(editorRef.current);
+    const full = editorRef.current.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const startW = fig.getBoundingClientRect().width, startX = e.clientX;
+    const sign = corner.includes('r') ? 1 : -1;
+    const centered = !side && getW(fig);
+    const move = (ev) => {
+      const w = startW + sign * (ev.clientX - startX) * (centered ? 2 : 1);
+      const pct = Math.max(15, Math.min(100, Math.round((w / full) * 20) * 5));
+      if (pct >= 85) { setW(fig, null); fig.classList.remove('img-left', 'img-right'); setSizeLabel('Volle Breite'); }
+      else { setW(fig, pct); if (side && !fig.classList.contains(side)) fig.classList.add(side); setSizeLabel(`${pct} %`); }
+      setSel(s => s && ({ ...s, el: fig, rect: measure(fig) }));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
+      setSizeLabel(''); onInput(); selectImg(fig.querySelector('img'));
+    };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
   };
   const selSide = sel ? ((sel.el.closest?.('figure') || sel.el).classList.contains('img-left') ? 'left' : (sel.el.closest?.('figure') || sel.el).classList.contains('img-right') ? 'right' : '') : '';
   const onEditorClick = (e) => {
@@ -510,7 +547,7 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
       </Step>
 
       <Step n="4" title="Text">
-        <p style={{ ...C.muted, margin: '0 0 10px', fontSize: '12px' }}>Einfach hineinschreiben – oder einen fertigen Text aus Word bzw. einer E-Mail einfügen. Fotos: in Schritt 3 „In Text einfügen“ tippen – sie erscheinen unter dem Absatz, in dem du zuletzt geschrieben hast. Ein Foto im Text antippen, um es nach links oder rechts neben den Text zu setzen, zu verschieben oder zu entfernen.</p>
+        <p style={{ ...C.muted, margin: '0 0 10px', fontSize: '12px' }}>Einfach hineinschreiben – oder einen fertigen Text aus Word bzw. einer E-Mail einfügen. Fotos: in Schritt 3 „In Text einfügen“ tippen – sie erscheinen unter dem Absatz, in dem du zuletzt geschrieben hast. Ein Foto im Text antippen: an den grünen Ecken größer oder kleiner ziehen, links/mittig/rechts setzen, verschieben oder entfernen.</p>
         <div role="toolbar" aria-label="Formatierung" style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
           {[['bold', Bold, 'Fett'], ['italic', Italic, 'Kursiv'], ['underline', Underline, 'Unterstrichen']].map(([c, Icon, label]) => (
             <button key={c} aria-pressed={fmt[c]} onMouseDown={e => e.preventDefault()} onClick={() => cmd(c)}
@@ -538,10 +575,19 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
             onClick={onEditorClick} onKeyDown={() => sel && clearSel()} onDragOver={e => { if ([...e.dataTransfer.types].includes('text/ttc-foto')) e.preventDefault(); }} onDrop={onEditorDrop}
             role="textbox" aria-multiline="true" aria-label="Text des Berichts" data-placeholder="Hier den Bericht schreiben …"
             lang="de" style={{ minHeight: '240px', padding: '12px 14px', fontSize: '15px', lineHeight: 1.65, color: '#111', background: '#fff', borderRadius: '10px', outline: 'none', overflowWrap: 'anywhere', textAlign: form.textAlign || 'justify', hyphens: 'auto', WebkitHyphens: 'auto' }} />
+          {sel && ['tl', 'tr', 'bl', 'br'].map(c => (
+            <span key={c} data-corner={c} onPointerDown={onHandleDown} aria-hidden title="Ziehen, um die Größe zu ändern"
+              style={{ position: 'absolute', zIndex: 6, width: isMobile ? '26px' : '16px', height: isMobile ? '26px' : '16px', borderRadius: '50%', background: A, border: '3px solid #052e16', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', touchAction: 'none',
+                top: sel.rect.top + (c[0] === 'b' ? sel.rect.height : 0) - (isMobile ? 13 : 8), left: sel.rect.left + (c[1] === 'r' ? sel.rect.width : 0) - (isMobile ? 13 : 8),
+                cursor: c === 'tl' || c === 'br' ? 'nwse-resize' : 'nesw-resize' }} />
+          ))}
+          {sel && sizeLabel && (
+            <span style={{ position: 'absolute', zIndex: 6, top: sel.rect.top + sel.rect.height / 2 - 16, left: sel.rect.left + sel.rect.width / 2, transform: 'translateX(-50%)', padding: '6px 12px', borderRadius: '8px', background: 'rgba(5,46,22,0.9)', color: 'white', fontWeight: 800, fontSize: '14px', pointerEvents: 'none' }}>{sizeLabel}</span>
+          )}
           {sel && (
-            <div role="toolbar" aria-label="Foto im Text" style={{ position: 'absolute', top: Math.max(4, sel.top - 50), left: '50%', transform: 'translateX(-50%)', flexWrap: 'nowrap', whiteSpace: 'nowrap', display: 'flex', gap: '4px', padding: '4px', borderRadius: '10px', background: '#052e16', boxShadow: '0 6px 20px rgba(0,0,0,0.35)', zIndex: 5 }}>
-              {[['left', PanelLeft, 'Links'], ['', RectangleHorizontal, 'Groß'], ['right', PanelRight, 'Rechts']].map(([side, Icon, label]) => (
-                <button key={label} onMouseDown={e => e.preventDefault()} onClick={() => placeSel(side)} aria-pressed={selSide === side} title={side ? `Foto ${label.toLowerCase()}, Text daneben` : 'Foto in voller Breite'}
+            <div role="toolbar" aria-label="Foto im Text" style={{ position: 'absolute', top: Math.max(4, sel.rect.top - 52), left: '50%', transform: 'translateX(-50%)', flexWrap: 'nowrap', whiteSpace: 'nowrap', display: 'flex', gap: '4px', padding: '4px', borderRadius: '10px', background: '#052e16', boxShadow: '0 6px 20px rgba(0,0,0,0.35)', zIndex: 5 }}>
+              {[['left', PanelLeft, 'Links'], ['', RectangleHorizontal, 'Mitte'], ['right', PanelRight, 'Rechts']].map(([side, Icon, label]) => (
+                <button key={label} onMouseDown={e => e.preventDefault()} onClick={() => placeSel(side)} aria-pressed={selSide === side} title={side ? `Foto ${label.toLowerCase()}, Text daneben` : 'Foto mittig'}
                   style={{ ...imgBtn, ...(selSide === side ? { background: A, color: '#052e16' } : {}) }}><Icon size={16} />{!isMobile && ` ${label}`}</button>
               ))}
               <span style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '4px 2px' }} />
@@ -568,14 +614,15 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
         </button>
       </div>
 
-      {preview && (() => {
+      {/* Vorschau direkt an die Seite hängen: sonst hält die Einblend-Animation der App das Fenster fest und die Zurück-Leiste rutscht aus dem Bild */}
+      {preview && createPortal((() => {
         const coverUrl = (form.coverImage || form.images[0] || '');
         const gallery = form.images.filter(u => u !== coverUrl && !(form.html || '').includes(u));
         return (
-          <div role="dialog" aria-modal="true" aria-label="Vorschau" style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.75)', overflowY: 'auto' }}>
+          <div role="dialog" aria-modal="true" aria-label="Vorschau" onKeyDown={e => e.key === 'Escape' && setPreview(false)} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.75)', overflowY: 'auto' }}>
             <div style={{ position: 'sticky', top: 0, zIndex: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', padding: '10px 14px', background: '#052e16', color: 'white', fontSize: '13px' }}>
-              <span><Eye size={14} style={{ verticalAlign: '-2px' }} /> So erscheint der Bericht auf der Webseite</span>
-              <button onClick={() => setPreview(false)} style={btn('primary', { padding: '7px 12px', fontSize: '13px' })}><X size={15} /> Schließen</button>
+              <button onClick={() => setPreview(false)} autoFocus style={btn('primary', { padding: '8px 14px', fontSize: '14px' })}><ArrowLeft size={16} /> Zurück zum Text</button>
+              {!isMobile && <span style={{ opacity: 0.8 }}><Eye size={14} style={{ verticalAlign: '-2px' }} /> So erscheint der Bericht auf der Webseite</span>}
             </div>
             <article style={{ background: '#f3f1ea', color: '#0b1a11', maxWidth: '860px', margin: isMobile ? '0 auto' : '24px auto', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
               <header style={{ background: 'radial-gradient(120% 140% at 12% 20%, #17602f 0%, #0f4a25 48%, #0a3319 100%)', color: '#f3f1ea', padding: isMobile ? '22px 18px' : '36px 40px', borderBottom: '4px solid #b6f36a' }}>
@@ -590,9 +637,12 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
                 {gallery.length > 0 && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: '8px', marginTop: '24px' }}>{gallery.map(u => <img key={u} src={imgSrc(u)} alt="" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', display: 'block' }} />)}</div>}
               </div>
             </article>
+            <div style={{ position: 'sticky', bottom: 0, display: 'flex', justifyContent: 'center', padding: '14px' }}>
+              <button onClick={() => setPreview(false)} style={btn('primary', { padding: '12px 22px', fontSize: '15px', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' })}><ArrowLeft size={17} /> Zurück zum Text</button>
+            </div>
           </div>
         );
-      })()}
+      })(), document.body)}
     </>
   );
 }

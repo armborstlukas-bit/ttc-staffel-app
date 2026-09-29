@@ -53,6 +53,21 @@ if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styl
     .ttc-redaktion-editor figure.img-left, .ttc-redaktion-preview figure.img-left { float: left; width: 44%; margin: 0.3em 1.2em 0.8em 0; }
     .ttc-redaktion-editor figure.img-right, .ttc-redaktion-preview figure.img-right { float: right; width: 44%; margin: 0.3em 0 0.8em 1.2em; }
     .ttc-redaktion-editor::after, .ttc-redaktion-preview::after { content: ''; display: block; clear: both; }
+    .ttc-redaktion-editor figure.img-w-15, .ttc-redaktion-preview figure.img-w-15 { width: 15%; }
+    .ttc-redaktion-editor figure.img-w-20, .ttc-redaktion-preview figure.img-w-20 { width: 20%; }
+    .ttc-redaktion-editor figure.img-w-25, .ttc-redaktion-preview figure.img-w-25 { width: 25%; }
+    .ttc-redaktion-editor figure.img-w-30, .ttc-redaktion-preview figure.img-w-30 { width: 30%; }
+    .ttc-redaktion-editor figure.img-w-35, .ttc-redaktion-preview figure.img-w-35 { width: 35%; }
+    .ttc-redaktion-editor figure.img-w-40, .ttc-redaktion-preview figure.img-w-40 { width: 40%; }
+    .ttc-redaktion-editor figure.img-w-45, .ttc-redaktion-preview figure.img-w-45 { width: 45%; }
+    .ttc-redaktion-editor figure.img-w-50, .ttc-redaktion-preview figure.img-w-50 { width: 50%; }
+    .ttc-redaktion-editor figure.img-w-55, .ttc-redaktion-preview figure.img-w-55 { width: 55%; }
+    .ttc-redaktion-editor figure.img-w-60, .ttc-redaktion-preview figure.img-w-60 { width: 60%; }
+    .ttc-redaktion-editor figure.img-w-65, .ttc-redaktion-preview figure.img-w-65 { width: 65%; }
+    .ttc-redaktion-editor figure.img-w-70, .ttc-redaktion-preview figure.img-w-70 { width: 70%; }
+    .ttc-redaktion-editor figure.img-w-75, .ttc-redaktion-preview figure.img-w-75 { width: 75%; }
+    .ttc-redaktion-editor figure.img-w-80, .ttc-redaktion-preview figure.img-w-80 { width: 80%; }
+    .ttc-redaktion-editor figure[class*="img-w-"]:not(.img-left):not(.img-right), .ttc-redaktion-preview figure[class*="img-w-"]:not(.img-left):not(.img-right) { margin-left: auto; margin-right: auto; }
     .ttc-redaktion-editor h3, .ttc-redaktion-preview h3, .ttc-redaktion-preview h2 { clear: both; }
     .ttc-redaktion-preview { font-size: 17px; line-height: 1.7; color: #1a2a20; }
     .ttc-redaktion-preview h2 { font-size: 1.6em; line-height: 1.15; margin: 1.4em 0 0.5em; font-weight: 800; }
