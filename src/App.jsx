@@ -7323,11 +7323,31 @@ export default function TrainingsApp() {
       saveRanglistenspiele({ ...ranglistenspiele, active: updated });
     };
     const deleteSpiel = (spielId) => saveRanglistenspiele({ ...ranglistenspiele, active: activeSpiele.filter(s=>s.id!==spielId) });
+    // Wie oft wurde ein Kind zuletzt in Folge herausgefordert? (laufende + abgeschlossene Spiele, neueste zuerst;
+    // war es beim letzten Spiel selbst Herausforderer → 0)
+    const spielZeit = sp => Number(String(sp.id||'').split('_')[1]) || Date.parse(sp.closedAt||sp.date||'') || 0;
+    const alleSpieleNeu = [...activeSpiele, ...(ranglistenspiele.archived||[])].sort((a,b)=>spielZeit(b)-spielZeit(a));
+    const herausgefordertInFolge = {};
+    const serieFertig = new Set();
+    alleSpieleNeu.forEach(sp => {
+      [sp.challengerId, sp.defenderId].forEach(id => {
+        if (!id || serieFertig.has(id)) return;
+        if (id === sp.defenderId) herausgefordertInFolge[id] = (herausgefordertInFolge[id]||0) + 1;
+        else { herausgefordertInFolge[id] = herausgefordertInFolge[id]||0; serieFertig.add(id); }
+      });
+    });
+    const HERAUSFORDER_LIMIT = 3;
+    const herausforderungOk = (defenderId) => {
+      const n = herausgefordertInFolge[defenderId]||0;
+      if (n < HERAUSFORDER_LIMIT) return true;
+      return window.confirm(`⚠️ ${children[defenderId]?.name||'Dieses Kind'} wurde bereits ${n}× in Folge herausgefordert und sollte jetzt eigentlich nicht herausgefordert werden.\n\nTrotzdem ansetzen?`);
+    };
     const startNeuesSpiel = () => {
       if (!newSpielForm.challengerId || !newSpielForm.defenderId) return;
       const chalIdx = rangliste.indexOf(newSpielForm.challengerId);
       const defIdx  = rangliste.indexOf(newSpielForm.defenderId);
       if (chalIdx === -1 || defIdx === -1 || chalIdx <= defIdx) return;
+      if (!herausforderungOk(newSpielForm.defenderId)) return;
       const spiel = { id: 'spiel_'+Date.now(), challengerId: newSpielForm.challengerId, defenderId: newSpielForm.defenderId, sets1: null, sets2: null, winSets: 3, date: new Date().toISOString().slice(0,10) };
       saveRanglistenspiele({ ...ranglistenspiele, active: [...activeSpiele, spiel] });
       setNewSpielForm({ open: false, challengerId: '', defenderId: '' });
@@ -7351,6 +7371,7 @@ export default function TrainingsApp() {
       // lower rank number = higher position, challenger must be lower-ranked (higher index)
       const challengerId = firstIdx > secondIdx ? first : childId;
       const defenderId   = firstIdx > secondIdx ? childId : first;
+      if (!herausforderungOk(defenderId)) { setRangSelection([]); return; }
       const spiel = { id: 'spiel_'+Date.now(), challengerId, defenderId, sets1: null, sets2: null, winSets: 3, date: new Date().toISOString().slice(0,10) };
       saveRanglistenspiele({ ...ranglistenspiele, active: [...activeSpiele, spiel] });
       setRangSelection([]);
@@ -7373,6 +7394,7 @@ export default function TrainingsApp() {
                   vs <span style={{color:'rgba(255,255,255,0.65)',marginLeft:'6px'}}>Wähle 2. Spieler…</span>
                 </span>
             }
+            <span style={{flexBasis:'100%',order:9,fontSize:'11.5px',color:'rgba(255,255,255,0.75)'}}>🛡️ Zahl = so oft zuletzt in Folge herausgefordert · ab {HERAUSFORDER_LIMIT}× bitte nicht mehr herausfordern</span>
             <button onClick={()=>{ setRangSelectionMode(false); setRangSelection([]); }}
               style={{padding:'5px 12px',borderRadius:'8px',border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.12)',color:'white',cursor:'pointer',fontSize:'12px',fontWeight:'700',flexShrink:0}}>
               Modus beenden
@@ -7736,6 +7758,17 @@ export default function TrainingsApp() {
                         {sub&&<p style={{margin:0,fontSize:'11px',color:'#9ca3af'}}>{grp?.emoji} {sub.name}</p>}
                       </div>
                       {hasActiveSpiel&&<span style={{fontSize:'11px',background:'#fff7ed',color:'#ea580c',border:'1px solid #fb923c',borderRadius:'8px',padding:'2px 7px',fontWeight:'700',flexShrink:0}}>⚔️ aktiv</span>}
+                      {rangSelectionMode && (()=>{
+                        const n = herausgefordertInFolge[childId]||0;
+                        const warn = n >= HERAUSFORDER_LIMIT;
+                        return (
+                          <span title={`${n}× in Folge herausgefordert`}
+                            style={{fontSize:'12px',fontWeight:'800',borderRadius:'8px',padding:'3px 8px',flexShrink:0,whiteSpace:'nowrap',
+                              background:warn?'#dc2626':n===2?'#fef3c7':'#f3f4f6',color:warn?'white':n===2?'#92400e':n===1?'#374151':'#9ca3af',border:`1px solid ${warn?'#b91c1c':n===2?'#fcd34d':'#e5e7eb'}`}}>
+                            {warn?'⚠️':'🛡️'} {n}×{warn?' – nicht herausfordern':''}
+                          </span>
+                        );
+                      })()}
                       {!rangSelectionMode && (
                         <div style={{display:'flex',gap:'4px',alignItems:'center',flexShrink:0}}>
                           <button onClick={()=>moveUp(idx)} disabled={idx===0}

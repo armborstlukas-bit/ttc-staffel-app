@@ -16,8 +16,8 @@ function UpdateBanner() {
   return (
     <div className="tb-in" style={{ margin: '14px 16px 0', borderRadius: '16px', padding: '13px 14px', background: `linear-gradient(120deg, ${T.deep}, ${T.ink2} 62%)`, border: '1px solid rgba(182,243,106,0.24)', display: 'flex', alignItems: 'center', gap: '12px', animationDelay: '.08s' }}>
       <div style={{ minWidth: 0 }}>
-        <div style={{ ...monoLabel, color: T.signal }}>{r ? 'Update · Mi 14.10.' : 'Jetzt live'}</div>
-        <div style={{ fontWeight: 700, fontSize: '14px', marginTop: '3px', lineHeight: 1.25 }}>Neue Webseite.<br />Neue App.</div>
+        <div style={{ ...monoLabel, color: T.signal }}>{r ? 'Neue Webseite · Mi 14.10.' : 'Jetzt online'}</div>
+        <div style={{ fontWeight: 700, fontSize: '14px', marginTop: '3px', lineHeight: 1.25 }}>Aus Alt wird Neu.</div>
       </div>
       <div style={{ marginLeft: 'auto', fontFamily: T.display, fontStretch: '125%', fontWeight: 900, fontSize: '20px', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.5px' }}>
         {r ? <>{d}<span style={{ color: T.muted, fontSize: '14px' }}>T</span> {pad(h)}:{pad(m)}<span style={{ color: T.muted }}>:{pad(s)}</span></> : '🎉'}

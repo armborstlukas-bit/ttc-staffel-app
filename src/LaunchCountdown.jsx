@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-// Countdown zum großen Launch: neue TTC-Webseite + erstes großes App-Update
+// Countdown zum Launch der neuen TTC-Webseite
 // Mittwoch, 14.10.2026, 15:00 Uhr (MESZ). Wird auf allen Startseiten unter der Begrüßung gezeigt
 // und verschwindet 7 Tage nach dem Start von selbst.
 export const LAUNCH_AT = new Date('2026-10-14T15:00:00+02:00').getTime();
@@ -42,24 +42,24 @@ export default function LaunchCountdown() {
   const live = rest <= 0;
 
   return (
-    <div className="lc-card" role="region" aria-label="Countdown zum großen Update">
+    <div className="lc-card" role="region" aria-label="Countdown zur neuen Webseite">
       <style>{CSS}</style>
       <div className="lc-in">
         {[8, 23, 41, 58, 74, 90].map((l, i) => <span key={l} className="lc-spark" style={{ left: `${l}%`, animationDelay: `${i * 0.7}s` }} />)}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span className="lc-dot" />
-          <span style={{ fontSize: '10.5px', fontWeight: 900, letterSpacing: '2px', textTransform: 'uppercase', color: '#86efac' }}>{live ? 'Jetzt live' : 'Das erste große Update'}</span>
+          <span style={{ fontSize: '10.5px', fontWeight: 900, letterSpacing: '2px', textTransform: 'uppercase', color: '#86efac' }}>{live ? 'Jetzt online' : 'Die neue TTC-Webseite'}</span>
           <span style={{ flex: 1 }} />
           <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(250,204,21,.9)', whiteSpace: 'nowrap' }}>Mi · 14.10. · 15:00</span>
         </div>
 
         {live ? (<>
           <h2 style={{ margin: '12px 0 6px', fontSize: '24px', fontWeight: 900, color: 'white', letterSpacing: '-0.6px', lineHeight: 1.1 }}>🎉 Es ist so weit!</h2>
-          <p style={{ margin: '0 0 14px', fontSize: '14px', lineHeight: 1.5, color: 'rgba(255,255,255,.75)' }}>Die neue TTC-Webseite ist online – und die App bekommt ihr erstes großes Update.</p>
+          <p style={{ margin: '0 0 14px', fontSize: '14px', lineHeight: 1.5, color: 'rgba(255,255,255,.75)' }}>Aus Alt wird Neu: Die neue TTC-Webseite ist online. Schau vorbei!</p>
           <a href={WEBSEITE} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '11px 18px', background: 'linear-gradient(135deg,#22c55e,#15803d)', color: 'white', borderRadius: '11px', fontWeight: 800, fontSize: '14px', textDecoration: 'none', boxShadow: '0 8px 22px -8px rgba(34,197,94,.8)' }}>Zur neuen Webseite →</a>
         </>) : (<>
           <h2 style={{ margin: '10px 0 0', fontSize: '21px', fontWeight: 900, color: 'white', letterSpacing: '-0.6px', lineHeight: 1.15 }}>
-            Neue Webseite. <span style={{ background: 'linear-gradient(90deg,#4ade80,#facc15)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>Neue App.</span>
+            Aus Alt wird <span style={{ background: 'linear-gradient(90deg,#4ade80,#facc15)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>Neu.</span>
           </h2>
           <div className="lc-grid">
             {teile(rest).map(([v, l]) => (
@@ -67,7 +67,7 @@ export default function LaunchCountdown() {
             ))}
           </div>
           <p style={{ margin: 0, fontSize: '12.5px', lineHeight: 1.5, color: 'rgba(255,255,255,.66)' }}>
-            Am <b style={{ color: 'white' }}>Mittwoch, 14. Oktober um 15 Uhr</b> geht die neue TTC-Webseite online – und die App bekommt ihr frisches Design. Seid gespannt!
+            Wir erneuern unsere Webseite aus den 2010er-Jahren: Am <b style={{ color: 'white' }}>Mittwoch, 14. Oktober um 15 Uhr</b> geht die neue TTC-Webseite online. Seid gespannt!
           </p>
         </>)}
       </div>
