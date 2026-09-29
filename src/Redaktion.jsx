@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Home, ArrowLeft, Bold, Italic, Underline, Heading2, List, Undo2, ImagePlus, Star, ArrowUp, ArrowDown, Trash2, Eye, CheckCircle2, X, Loader2, PenLine, Plus, ExternalLink, Search, AlignJustify, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
+import { Home, ArrowLeft, Bold, Italic, Underline, Heading2, List, Undo2, ImagePlus, Star, ArrowUp, ArrowDown, PanelLeft, PanelRight, RectangleHorizontal, Trash2, Eye, CheckCircle2, X, Loader2, PenLine, Plus, ExternalLink, Search, AlignJustify, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 
 // ── Redaktion: Berichte für die Vereinswebseite schreiben ────────────────────────
 // Die Berichte werden über die Schnittstelle der Webseite gespeichert (gleiches Firebase-Konto).
@@ -21,9 +21,9 @@ const EMPTY = { title: '', category: '', html: '', images: [], coverImage: '', d
 
 // ---------- Fotos im Schreibfeld: Adressen für die Anzeige in der App vollständig machen, beim Speichern wieder kürzen ----------
 const absImages = (html) => (html || '').replace(/(src=")(\/media\/web\/)/g, `$1${WEB_URL}$2`);
-const toEditorHtml = (html) => absImages(html).replace(/<figure>/g, '<figure contenteditable="false">');
+const toEditorHtml = (html) => absImages(html).replace(/<figure(?=[\s>])/g, '<figure contenteditable="false"');
 const fromEditorHtml = (html) => (html || '').split(`${WEB_URL}/media/web/`).join('/media/web/')
-  .replace(/ contenteditable="false"/g, '').replace(/ class="ttc-img-sel"/g, '').replace(/ class=""/g, '');
+  .replace(/ contenteditable="false"/g, '').replace(/\s*ttc-img-sel/g, '').replace(/ class="\s*"/g, '');
 // Textausrichtung des Berichts auf der Webseite – Standard ist Blocksatz
 const ALIGNS = [
   { id: 'justify', label: 'Blocksatz', Icon: AlignJustify },
@@ -337,6 +337,23 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
     if (b && b !== sel.el && !b.textContent.trim() && !b.querySelector('img')) b.remove();
     clearSel(); onInput();
   };
+  // Foto im Text: links / volle Breite / rechts (Text fließt neben schmalen Fotos weiter)
+  const placeSel = (side) => {
+    if (!sel) return;
+    let fig = sel.el.tagName === 'FIGURE' ? sel.el : sel.el.closest('figure');
+    if (!fig) { // alte Berichte: Foto ohne Rahmen – in einen Rahmen setzen
+      fig = document.createElement('figure');
+      fig.setAttribute('contenteditable', 'false');
+      const block = topBlock(sel.el);
+      sel.el.classList.remove('ttc-img-sel');
+      fig.appendChild(sel.el);
+      if (block && block !== sel.el) { if (!block.textContent.trim() && !block.querySelector('img')) block.replaceWith(fig); else block.after(fig); } else editorRef.current.appendChild(fig);
+    }
+    fig.classList.remove('img-left', 'img-right');
+    if (side) fig.classList.add(side === 'left' ? 'img-left' : 'img-right');
+    onInput(); selectImg(fig.querySelector('img'));
+  };
+  const selSide = sel ? ((sel.el.closest?.('figure') || sel.el).classList.contains('img-left') ? 'left' : (sel.el.closest?.('figure') || sel.el).classList.contains('img-right') ? 'right' : '') : '';
   const onEditorClick = (e) => {
     const img = e.target.closest?.('img');
     if (img && editorRef.current.contains(img)) selectImg(img); else if (sel) clearSel();
@@ -493,7 +510,7 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
       </Step>
 
       <Step n="4" title="Text">
-        <p style={{ ...C.muted, margin: '0 0 10px', fontSize: '12px' }}>Einfach hineinschreiben – oder einen fertigen Text aus Word bzw. einer E-Mail einfügen. Fotos: in Schritt 3 „In Text einfügen“ tippen – sie erscheinen unter dem Absatz, in dem du zuletzt geschrieben hast. Ein Foto im Text antippen, um es zu verschieben oder zu entfernen.</p>
+        <p style={{ ...C.muted, margin: '0 0 10px', fontSize: '12px' }}>Einfach hineinschreiben – oder einen fertigen Text aus Word bzw. einer E-Mail einfügen. Fotos: in Schritt 3 „In Text einfügen“ tippen – sie erscheinen unter dem Absatz, in dem du zuletzt geschrieben hast. Ein Foto im Text antippen, um es nach links oder rechts neben den Text zu setzen, zu verschieben oder zu entfernen.</p>
         <div role="toolbar" aria-label="Formatierung" style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
           {[['bold', Bold, 'Fett'], ['italic', Italic, 'Kursiv'], ['underline', Underline, 'Unterstrichen']].map(([c, Icon, label]) => (
             <button key={c} aria-pressed={fmt[c]} onMouseDown={e => e.preventDefault()} onClick={() => cmd(c)}
@@ -522,9 +539,14 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
             role="textbox" aria-multiline="true" aria-label="Text des Berichts" data-placeholder="Hier den Bericht schreiben …"
             lang="de" style={{ minHeight: '240px', padding: '12px 14px', fontSize: '15px', lineHeight: 1.65, color: '#111', background: '#fff', borderRadius: '10px', outline: 'none', overflowWrap: 'anywhere', textAlign: form.textAlign || 'justify', hyphens: 'auto', WebkitHyphens: 'auto' }} />
           {sel && (
-            <div role="toolbar" aria-label="Foto im Text" style={{ position: 'absolute', top: Math.max(4, sel.top + 8), right: '10px', display: 'flex', gap: '4px', padding: '4px', borderRadius: '10px', background: '#052e16', boxShadow: '0 6px 20px rgba(0,0,0,0.35)', zIndex: 5 }}>
-              <button onMouseDown={e => e.preventDefault()} onClick={() => moveSel(-1)} style={imgBtn} aria-label="Foto nach oben"><ArrowUp size={16} /> Hoch</button>
-              <button onMouseDown={e => e.preventDefault()} onClick={() => moveSel(1)} style={imgBtn} aria-label="Foto nach unten"><ArrowDown size={16} /> Runter</button>
+            <div role="toolbar" aria-label="Foto im Text" style={{ position: 'absolute', top: Math.max(4, sel.top - 50), left: '50%', transform: 'translateX(-50%)', flexWrap: 'nowrap', whiteSpace: 'nowrap', display: 'flex', gap: '4px', padding: '4px', borderRadius: '10px', background: '#052e16', boxShadow: '0 6px 20px rgba(0,0,0,0.35)', zIndex: 5 }}>
+              {[['left', PanelLeft, 'Links'], ['', RectangleHorizontal, 'Groß'], ['right', PanelRight, 'Rechts']].map(([side, Icon, label]) => (
+                <button key={label} onMouseDown={e => e.preventDefault()} onClick={() => placeSel(side)} aria-pressed={selSide === side} title={side ? `Foto ${label.toLowerCase()}, Text daneben` : 'Foto in voller Breite'}
+                  style={{ ...imgBtn, ...(selSide === side ? { background: A, color: '#052e16' } : {}) }}><Icon size={16} />{!isMobile && ` ${label}`}</button>
+              ))}
+              <span style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '4px 2px' }} />
+              <button onMouseDown={e => e.preventDefault()} onClick={() => moveSel(-1)} style={imgBtn} aria-label="Foto nach oben"><ArrowUp size={16} />{!isMobile && ' Hoch'}</button>
+              <button onMouseDown={e => e.preventDefault()} onClick={() => moveSel(1)} style={imgBtn} aria-label="Foto nach unten"><ArrowDown size={16} />{!isMobile && ' Runter'}</button>
               <button onMouseDown={e => e.preventDefault()} onClick={removeSel} style={{ ...imgBtn, color: '#fca5a5' }} aria-label="Foto aus dem Text nehmen"><X size={16} /></button>
             </div>
           )}
@@ -546,18 +568,31 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
         </button>
       </div>
 
-      {preview && (
-        <div role="dialog" aria-modal="true" aria-label="Vorschau" style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.7)', overflowY: 'auto', padding: '16px 10px' }}>
-          <div style={{ background: '#f3f1ea', color: '#0b1a11', maxWidth: '720px', margin: '0 auto', borderRadius: '14px', padding: isMobile ? '16px' : '28px' }}>
-            <button onClick={() => setPreview(false)} style={btn('ghost', { color: '#0b1a11', borderColor: 'rgba(11,26,17,0.3)', background: 'transparent', marginBottom: '14px' })}><X size={15} /> Vorschau schließen</button>
-            <p style={{ margin: '0 0 6px', color: '#5f6b63', fontSize: '13px' }}>{catLabel(form.category)} · {fmtDate(form.date)}</p>
-            <h1 style={{ fontSize: isMobile ? '24px' : '32px', lineHeight: 1.1, margin: '0 0 16px' }}>{form.title || 'Ohne Überschrift'}</h1>
-            {form.images[0] && <img src={imgSrc(form.images[0])} alt="" style={{ width: '100%', borderRadius: '8px', marginBottom: '16px' }} />}
-            <div className="ttc-redaktion-preview" lang="de" style={{ fontSize: '16px', lineHeight: 1.65, textAlign: form.textAlign || 'justify', hyphens: 'auto', WebkitHyphens: 'auto' }} dangerouslySetInnerHTML={{ __html: absImages(form.html) }} />
-            {form.images.length > 1 && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: '6px', marginTop: '18px' }}>{form.images.slice(1).map(u => <img key={u} src={imgSrc(u)} alt="" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover' }} />)}</div>}
+      {preview && (() => {
+        const coverUrl = (form.coverImage || form.images[0] || '');
+        const gallery = form.images.filter(u => u !== coverUrl && !(form.html || '').includes(u));
+        return (
+          <div role="dialog" aria-modal="true" aria-label="Vorschau" style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.75)', overflowY: 'auto' }}>
+            <div style={{ position: 'sticky', top: 0, zIndex: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', padding: '10px 14px', background: '#052e16', color: 'white', fontSize: '13px' }}>
+              <span><Eye size={14} style={{ verticalAlign: '-2px' }} /> So erscheint der Bericht auf der Webseite</span>
+              <button onClick={() => setPreview(false)} style={btn('primary', { padding: '7px 12px', fontSize: '13px' })}><X size={15} /> Schließen</button>
+            </div>
+            <article style={{ background: '#f3f1ea', color: '#0b1a11', maxWidth: '860px', margin: isMobile ? '0 auto' : '24px auto', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
+              <header style={{ background: 'radial-gradient(120% 140% at 12% 20%, #17602f 0%, #0f4a25 48%, #0a3319 100%)', color: '#f3f1ea', padding: isMobile ? '22px 18px' : '36px 40px', borderBottom: '4px solid #b6f36a' }}>
+                <div style={{ fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: '11px', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '12px' }}>
+                  <span style={{ color: '#b6f36a' }}>{form.category ? catLabel(form.category) : 'Aktuelles'}</span><span style={{ opacity: 0.75 }}> · {fmtDate(form.date)}</span>
+                </div>
+                <h1 style={{ margin: 0, fontSize: isMobile ? '26px' : '38px', lineHeight: 1.05, fontWeight: 800, letterSpacing: '-0.02em' }}>{form.title || 'Ohne Überschrift'}</h1>
+              </header>
+              {coverUrl && <img src={imgSrc(coverUrl)} alt="" style={{ width: '100%', maxHeight: '420px', objectFit: 'cover', display: 'block' }} />}
+              <div style={{ padding: isMobile ? '22px 18px 28px' : '36px 40px 44px', maxWidth: '680px', margin: '0 auto' }}>
+                <div className="ttc-redaktion-preview" lang="de" style={{ textAlign: form.textAlign || 'justify', hyphens: 'auto', WebkitHyphens: 'auto' }} dangerouslySetInnerHTML={{ __html: absImages(form.html) }} />
+                {gallery.length > 0 && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: '8px', marginTop: '24px' }}>{gallery.map(u => <img key={u} src={imgSrc(u)} alt="" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', display: 'block' }} />)}</div>}
+              </div>
+            </article>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </>
   );
 }
