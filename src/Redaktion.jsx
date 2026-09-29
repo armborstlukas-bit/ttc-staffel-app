@@ -590,7 +590,6 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
       </Step>
 
       <Step n="4" title="Text">
-        <p style={{ ...C.muted, margin: '0 0 10px', fontSize: '12px' }}>Einfach hineinschreiben – oder einen fertigen Text aus Word bzw. einer E-Mail einfügen. Fotos: in Schritt 3 „In Text einfügen“ tippen – sie erscheinen unter dem Absatz, in dem du zuletzt geschrieben hast. Fotos im Text einfach anfassen und an die gewünschte Stelle ziehen. Antippen: an den grünen Ecken größer oder kleiner ziehen, links/mittig/rechts setzen oder entfernen.</p>
         <div role="toolbar" aria-label="Formatierung" style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
           {[['bold', Bold, 'Fett'], ['italic', Italic, 'Kursiv'], ['underline', Underline, 'Unterstrichen']].map(([c, Icon, label]) => (
             <button key={c} aria-pressed={fmt[c]} onMouseDown={e => e.preventDefault()} onClick={() => cmd(c)}
