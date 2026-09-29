@@ -325,6 +325,33 @@ const matchChildByName = (name, childrenObj) => {
 };
 
 const TODAY = new Date().toISOString().split('T')[0];
+
+// Vorformulierte Austrittsbestätigung – wird nach dem Eintragen eines Austritts angeboten (E-Mail oder Text kopieren)
+const austrittsBestaetigung = (m = {}, fin = {}) => {
+  const name = [m.vorname, m.nachname].filter(Boolean).join(' ');
+  const de = (iso) => (iso && /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso.split('-').reverse().join('.') : iso || '');
+  const betreff = `Bestätigung des Austritts – TTC Grün-Weiß Staffel 1953 e.V.`;
+  const text = [
+    'Hallo,',
+    '',
+    `hiermit bestätigen wir den Austritt von ${name} aus dem TTC Grün-Weiß Staffel 1953 e.V. zum ${de(fin.austrittsdatum)}.`,
+    '',
+    `Mitglied: ${name}`,
+    m.geburtsdatum ? `Geburtsdatum: ${de(m.geburtsdatum)}` : null,
+    fin.eintrittsdatum ? `Mitglied seit: ${de(fin.eintrittsdatum)}` : null,
+    `Austritt zum: ${de(fin.austrittsdatum)}`,
+    '',
+    'Wir bedanken uns herzlich für die gemeinsame Zeit im Verein. Eine Rückkehr ist jederzeit herzlich willkommen – ob beim Training, beim Osterturnier oder einfach als Gast in der Halle.',
+    '',
+    'Mit sportlichen Grüßen',
+    '',
+    'Lukas Armborst',
+    '1. Vorsitzender',
+    'TTC Grün-Weiß Staffel 1953 e.V.',
+    'Bergstraße 6, 65556 Limburg',
+  ].filter(l => l !== null).join('\n');
+  return { betreff, text, an: m.email || '' };
+};
 const timeGreeting = () => {
   const h = new Date().getHours();
   if (h < 6) return 'Gute Nacht';
@@ -823,6 +850,8 @@ export default function TrainingsApp() {
   const [jubilaeumJahr, setJubilaeumJahr] = useState(String(new Date().getFullYear()));
   const [mitgliedAustrittEditId, setMitgliedAustrittEditId] = useState(null);
   const [mitgliedAustrittDatum, setMitgliedAustrittDatum] = useState('');
+  const [austrittMailId, setAustrittMailId] = useState(null); // Mitglied, für das die Austrittsbestätigung angeboten wird
+  const [austrittMailCopied, setAustrittMailCopied] = useState(false);
   const [wiedereintrittEditId, setWiedereintrittEditId] = useState(null);
   const [wiedereintrittDatum, setWiedereintrittDatum] = useState('');
   const [zusatzEmailDraft, setZusatzEmailDraft] = useState({});
@@ -13424,6 +13453,30 @@ export default function TrainingsApp() {
             </Modal>
           );
         })()}
+        {austrittMailId && mitgliederListe[austrittMailId] && (()=>{
+          const m = mitgliederListe[austrittMailId];
+          const fin = mitgliederFinanzen[austrittMailId] || {};
+          const { betreff, text, an } = austrittsBestaetigung(m, fin);
+          const mailto = `mailto:${encodeURIComponent(an)}?subject=${encodeURIComponent(betreff)}&body=${encodeURIComponent(text)}`;
+          const copy = async () => { try { await navigator.clipboard.writeText(`${betreff}\n\n${text}`); setAustrittMailCopied(true); } catch { setAustrittMailCopied(false); } };
+          return (
+            <Modal>
+            <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:'16px'}} onClick={()=>setAustrittMailId(null)}>
+              <div onClick={e=>e.stopPropagation()} style={{background:'#10231a',border:'1px solid rgba(74,222,128,0.3)',borderRadius:'16px',padding:'20px',width:'100%',maxWidth:'560px',maxHeight:'90vh',overflowY:'auto'}}>
+                <h3 style={{margin:'0 0 4px',color:'white',fontSize:'17px',fontWeight:'800'}}>🚪 Austritt eingetragen</h3>
+                <p style={{margin:'0 0 12px',color:'rgba(255,255,255,0.6)',fontSize:'12px'}}>Bestätigung für {m.vorname} {m.nachname}{an ? <> an <b style={{color:'#bbf7d0'}}>{an}</b></> : ' – keine E-Mail-Adresse hinterlegt, bitte im Mailprogramm ergänzen'}.</p>
+                <div style={{fontSize:'11px',color:'rgba(255,255,255,0.5)',marginBottom:'4px'}}>Betreff: {betreff}</div>
+                <pre style={{whiteSpace:'pre-wrap',fontFamily:'inherit',fontSize:'13px',lineHeight:1.55,color:'#e5efe8',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',padding:'12px',margin:'0 0 14px'}}>{text}</pre>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+                  <a href={mailto} style={{padding:'11px',background:'#16a34a',color:'white',borderRadius:'10px',fontWeight:'800',fontSize:'13px',textAlign:'center',textDecoration:'none'}}>📧 Per E-Mail senden</a>
+                  <button onClick={copy} style={{padding:'11px',background:'rgba(255,255,255,0.08)',color:'white',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'10px',cursor:'pointer',fontWeight:'800',fontSize:'13px'}}>{austrittMailCopied ? '✓ Kopiert' : '📋 Text kopieren'}</button>
+                </div>
+                <button onClick={()=>setAustrittMailId(null)} style={{marginTop:'8px',width:'100%',padding:'10px',background:'transparent',color:'rgba(255,255,255,0.6)',border:'none',cursor:'pointer',fontWeight:'700',fontSize:'13px'}}>Schließen</button>
+              </div>
+            </div>
+            </Modal>
+          );
+        })()}
         {showJubilaeumExport && (()=>{
           const runExport = () => {
             const jahr = Number(jubilaeumJahr);
@@ -14195,7 +14248,7 @@ export default function TrainingsApp() {
                                 <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
                                   <input type="date" value={mitgliedAustrittDatum} onChange={e=>setMitgliedAustrittDatum(e.target.value)}
                                     style={{padding:'7px 10px',background:'#1a1206',border:'1px solid #dc2626',borderRadius:'7px',color:'white',fontSize:'12px',outline:'none'}}/>
-                                  <button onClick={()=>{ if(!mitgliedAustrittDatum) return; saveFinanzField(id,'austrittsdatum',mitgliedAustrittDatum); setMitgliedAustrittEditId(null); setMitgliedExpandedId(null); }}
+                                  <button onClick={()=>{ if(!mitgliedAustrittDatum) return; saveFinanzField(id,'austrittsdatum',mitgliedAustrittDatum); setMitgliedAustrittEditId(null); setMitgliedExpandedId(null); setAustrittMailCopied(false); setAustrittMailId(id); }}
                                     style={{padding:'7px 12px',background:'#dc2626',color:'white',border:'none',borderRadius:'7px',cursor:'pointer',fontWeight:'800',fontSize:'12px'}}>✓ Bestätigen</button>
                                   <button onClick={()=>setMitgliedAustrittEditId(null)}
                                     style={{padding:'7px 10px',background:'transparent',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'7px',color:'rgba(255,255,255,0.6)',cursor:'pointer',fontSize:'12px'}}>Abbrechen</button>
@@ -14306,6 +14359,8 @@ export default function TrainingsApp() {
                     );
                     return (
                       <div style={{padding:'0 12px 14px',display:'grid',gap:'12px'}}>
+                        <button onClick={()=>{setAustrittMailCopied(false);setAustrittMailId(id);}}
+                          style={{justifySelf:'start',padding:'8px 14px',background:'rgba(74,222,128,0.12)',border:'1px solid rgba(74,222,128,0.4)',borderRadius:'9px',color:'#bbf7d0',cursor:'pointer',fontWeight:'800',fontSize:'12px'}}>📧 Austrittsbestätigung senden</button>
                         <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'10px',padding:'10px',display:'grid',gap:'10px'}}>
                           <span style={{fontSize:'10px',fontWeight:'800',color:'rgba(196,181,253,0.6)',textTransform:'uppercase',letterSpacing:'0.5px'}}>⚙️ Rollen (früher)</span>
                           <div style={{display:'flex',gap:'4px',flexWrap:'wrap'}}>
