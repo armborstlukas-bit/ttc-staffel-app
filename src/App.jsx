@@ -165,6 +165,7 @@ import { getFirestore, doc, setDoc, updateDoc, deleteDoc, deleteField, arrayUnio
 import { getMessaging, getToken as getFcmToken, onMessage, isSupported as isFcmSupported } from 'firebase/messaging';
 import { Check, X, Plus, Trash2, Download, LogOut, ArrowLeft, Clock, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save, Trophy, Home, Archive, MessageSquare, Bell, Send, Pencil } from 'lucide-react';
 import Redaktion from './Redaktion.jsx';
+import LaunchCountdown from './LaunchCountdown.jsx';
 const Abrechnung = React.lazy(() => import('./Abrechnung.jsx'));
 
 const firebaseConfig = {
@@ -3936,6 +3937,7 @@ export default function TrainingsApp() {
             <p style={{margin:'0 0 6px',color:'rgba(74,222,128,0.5)',fontSize:'12px',fontWeight:'700',letterSpacing:'1.5px',textTransform:'uppercase'}}>{new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>
             <h1 style={{margin:0,color:'white',fontSize:isMobile?'19px':'22px',fontWeight:'800',letterSpacing:'-0.5px',lineHeight:1.1}}>🏓 {timeGreeting()}</h1>
           </div>
+          <LaunchCountdown />
           {(()=>{
             const QL_STYLE_PA = (bg,border) => ({
               position:'relative',padding:'15px 8px 13px',background:bg,border:'1px solid '+border,
@@ -4815,6 +4817,7 @@ export default function TrainingsApp() {
             <p style={{margin:'0 0 8px',color:'rgba(74,222,128,0.5)',fontSize:'12px',fontWeight:'700',letterSpacing:'1.5px',textTransform:'uppercase'}}>{dateLabel}</p>
             <h1 style={{margin:0,color:'white',fontSize:isMobile?'20px':'24px',fontWeight:'800',letterSpacing:'-0.5px',lineHeight:1.1}}>🏓 {timeGreeting()}</h1>
           </div>
+          <div style={{marginTop:'-12px'}}><LaunchCountdown /></div>
 
           {/* ── 1. Training nächste 14 Tage ──────────────────────────── */}
           <p style={{color:'rgba(74,222,128,0.45)',fontSize:'10px',fontWeight:'800',textTransform:'uppercase',letterSpacing:'2px',margin:'0 0 12px'}}>Training nächste 14 Tage</p>
@@ -5040,6 +5043,7 @@ export default function TrainingsApp() {
                   Dein TTR: <span style={{color:'#38bdf8',fontWeight:'800'}}>{lastTtr.ttr}</span>
                   <span style={{color:'rgba(255,255,255,0.42)',fontSize:'12px',marginLeft:'6px'}}>({lastTtr.month})</span>
                 </p>}
+                <div style={{marginTop:'16px',marginBottom:'-24px'}}><LaunchCountdown /></div>
               </div>
             );
           })()}
@@ -5621,6 +5625,7 @@ export default function TrainingsApp() {
             </h1>
             <span style={{color:'rgba(74,222,128,0.4)',fontSize:'11px',fontWeight:'600'}}>{dateLabel}</span>
           </div>
+          {!elternSubView && <LaunchCountdown />}
 
           {/* ── Back-Button wenn Sub-View aktiv ── */}
           {elternSubView && (
