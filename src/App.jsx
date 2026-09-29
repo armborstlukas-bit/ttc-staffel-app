@@ -13390,15 +13390,16 @@ export default function TrainingsApp() {
             const jahr = Number(geburtstagJahr);
             if (!jahr) return;
             const rows = [];
-            Object.values(mitgliederListe).forEach(m=>{
+            Object.entries(mitgliederListe).forEach(([id,m])=>{
               if (!m.geburtsdatum) return;
               const [gy] = m.geburtsdatum.split('-').map(Number);
               if (!gy) return;
               const alter = jahr - gy;
               if (alter > 0 && alter % 5 === 0) {
-                // Kontaktdaten zum Gratulieren gleich mit ausgeben
-                const adresse = [m.strasse, [m.plz, m.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ');
-                rows.push({ Vorname: m.vorname||'', Nachname: m.nachname||'', Geburtsdatum: fmtDateDE(m.geburtsdatum), [`Wird ${jahr} Jahre alt`]: alter, 'E-Mail': m.email||'', Handy: m.handy||'', Telefon: m.telefon||'', Adresse: adresse });
+                // Kontaktdaten zum Gratulieren – liegen getrennt in mitgliederFinanzen (nur für Admins lesbar)
+                const k = mitgliederFinanzen[id] || {};
+                const adresse = [k.strasse, [k.plz, k.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+                rows.push({ Vorname: m.vorname||'', Nachname: m.nachname||'', Geburtsdatum: fmtDateDE(m.geburtsdatum), [`Wird ${jahr} Jahre alt`]: alter, 'E-Mail': m.email||'', Handy: k.handy||'', Telefon: k.telefon||'', Adresse: adresse });
               }
             });
             rows.sort((a,b)=>a.Nachname.localeCompare(b.Nachname,'de'));
