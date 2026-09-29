@@ -69,7 +69,11 @@ if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styl
     .ttc-redaktion-editor figure.img-w-80, .ttc-redaktion-preview figure.img-w-80 { width: 80%; }
     .ttc-redaktion-editor figure[class*="img-w-"]:not(.img-left):not(.img-right), .ttc-redaktion-preview figure[class*="img-w-"]:not(.img-left):not(.img-right) { margin-left: auto; margin-right: auto; }
     .ttc-redaktion-editor h3, .ttc-redaktion-preview h3, .ttc-redaktion-preview h2 { clear: both; }
-    .ttc-redaktion-preview { font-size: 17px; line-height: 1.7; color: #1a2a20; }
+    .ttc-redaktion-preview { font-size: 17px; line-height: 1.7; color: #1a2a20; overflow-wrap: anywhere; }
+    .ttc-redaktion-editor figure { -webkit-user-drag: none; user-select: none; }
+    .ttc-redaktion-editor .ttc-img-sel, .ttc-redaktion-editor .ttc-img-sel img { touch-action: none; }
+    .ttc-redaktion-editor img { -webkit-user-drag: none; }
+    .ttc-redaktion-editor figure.ttc-img-drag { opacity: 0.35; }
     .ttc-redaktion-preview h2 { font-size: 1.6em; line-height: 1.15; margin: 1.4em 0 0.5em; font-weight: 800; }
     .ttc-redaktion-preview h3 { font-weight: 800; line-height: 1.2; color: #0b1a11; }
     .ttc-redaktion-preview strong, .ttc-redaktion-preview b { font-weight: 700; color: #0b1a11; }

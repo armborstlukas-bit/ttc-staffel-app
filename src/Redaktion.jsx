@@ -24,7 +24,7 @@ const EMPTY = { title: '', category: '', html: '', images: [], coverImage: '', d
 const absImages = (html) => (html || '').replace(/(src=")(\/media\/web\/)/g, `$1${WEB_URL}$2`);
 const toEditorHtml = (html) => absImages(html).replace(/<figure(?=[\s>])/g, '<figure contenteditable="false"');
 const fromEditorHtml = (html) => (html || '').split(`${WEB_URL}/media/web/`).join('/media/web/')
-  .replace(/ contenteditable="false"/g, '').replace(/\s*ttc-img-sel/g, '').replace(/ class="\s*"/g, '');
+  .replace(/ contenteditable="false"/g, '').replace(/\s*ttc-img-(sel|drag)/g, '').replace(/ class="\s*"/g, '');
 // Textausrichtung des Berichts auf der Webseite – Standard ist Blocksatz
 const ALIGNS = [
   { id: 'justify', label: 'Blocksatz', Icon: AlignJustify },
@@ -344,17 +344,60 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
   // Foto im Text: links / volle Breite / rechts (Text fließt neben schmalen Fotos weiter)
   const getW = (fig) => Number(fig.className.match(/img-w-(\d+)/)?.[1]) || null;
   const setW = (fig, pct) => { [...fig.classList].filter(c => /^img-w-/.test(c)).forEach(c => fig.classList.remove(c)); if (pct) fig.classList.add(`img-w-${pct}`); };
-  const ensureFigure = () => {
-    let fig = sel.el.tagName === 'FIGURE' ? sel.el : sel.el.closest('figure');
+  const figureFor = (el) => {
+    let fig = el.tagName === 'FIGURE' ? el : el.closest('figure');
     if (!fig) { // alte Berichte: Foto ohne Rahmen – in einen Rahmen setzen
+      const img = el.tagName === 'IMG' ? el : el.querySelector('img');
       fig = document.createElement('figure');
       fig.setAttribute('contenteditable', 'false');
-      const block = topBlock(sel.el);
-      sel.el.classList.remove('ttc-img-sel');
-      fig.appendChild(sel.el);
-      if (block && block !== sel.el) { if (!block.textContent.trim() && !block.querySelector('img')) block.replaceWith(fig); else block.after(fig); } else editorRef.current.appendChild(fig);
+      const block = topBlock(img);
+      img.classList.remove('ttc-img-sel');
+      if (block && block !== img) { if (!block.textContent.replace(/\s/g, '') && block.querySelectorAll('img').length === 1) block.replaceWith(fig); else block.after(fig); } else editorRef.current.appendChild(fig);
+      fig.appendChild(img);
     }
     return fig;
+  };
+  const ensureFigure = () => figureFor(sel.el);
+
+  // Foto mit Maus oder Finger an eine andere Stelle im Text ziehen (verschiebt – keine Kopie)
+  const [dropLine, setDropLine] = useState(null);
+  const onEditorPointerDown = (e) => {
+    const img = e.target.closest?.('img');
+    if (!img || !editorRef.current.contains(img) || e.button > 0) return;
+    // Finger: erst antippen (Auswahl), dann ziehen – so bleibt die Seite über Fotos scrollbar
+    if (e.pointerType === 'touch' && !(img.closest('figure') || img).classList.contains('ttc-img-sel')) return;
+    e.preventDefault();
+    const fig = figureFor(img);
+    selectImg(fig.querySelector('img'));
+    const root = editorRef.current;
+    const startY = e.clientY, startX = e.clientX;
+    let dragging = false, target = null;
+    const move = (ev) => {
+      if (!dragging && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 6) return;
+      if (!dragging) { dragging = true; fig.classList.add('ttc-img-drag'); }
+      // Absatz unter dem Zeiger suchen – obere Hälfte: davor, untere Hälfte: dahinter
+      const blocks = [...root.children].filter(b => b !== fig);
+      let best = null;
+      for (const b of blocks) {
+        const r = b.getBoundingClientRect();
+        if (ev.clientY < r.top + r.height / 2) { best = { block: b, before: true }; break; }
+        best = { block: b, before: false };
+      }
+      target = best;
+      if (best) {
+        const r = best.block.getBoundingClientRect(), w = wrapRef.current.getBoundingClientRect();
+        setDropLine((best.before ? r.top - 4 : r.bottom + 2) - w.top);
+      }
+      // am Rand automatisch mitscrollen
+      if (ev.clientY < 60) window.scrollBy(0, -12); else if (ev.clientY > window.innerHeight - 60) window.scrollBy(0, 12);
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
+      fig.classList.remove('ttc-img-drag'); setDropLine(null);
+      if (dragging && target) { if (target.before) target.block.before(fig); else target.block.after(fig); }
+      onInput(); selectImg(fig.querySelector('img'));
+    };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
   };
   // Seite wählen: links / mittig / rechts – die Größe bleibt, neben Text startet ein großes Foto mit 45 %
   const placeSel = (side) => {
@@ -547,7 +590,7 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
       </Step>
 
       <Step n="4" title="Text">
-        <p style={{ ...C.muted, margin: '0 0 10px', fontSize: '12px' }}>Einfach hineinschreiben – oder einen fertigen Text aus Word bzw. einer E-Mail einfügen. Fotos: in Schritt 3 „In Text einfügen“ tippen – sie erscheinen unter dem Absatz, in dem du zuletzt geschrieben hast. Ein Foto im Text antippen: an den grünen Ecken größer oder kleiner ziehen, links/mittig/rechts setzen, verschieben oder entfernen.</p>
+        <p style={{ ...C.muted, margin: '0 0 10px', fontSize: '12px' }}>Einfach hineinschreiben – oder einen fertigen Text aus Word bzw. einer E-Mail einfügen. Fotos: in Schritt 3 „In Text einfügen“ tippen – sie erscheinen unter dem Absatz, in dem du zuletzt geschrieben hast. Fotos im Text einfach anfassen und an die gewünschte Stelle ziehen. Antippen: an den grünen Ecken größer oder kleiner ziehen, links/mittig/rechts setzen oder entfernen.</p>
         <div role="toolbar" aria-label="Formatierung" style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
           {[['bold', Bold, 'Fett'], ['italic', Italic, 'Kursiv'], ['underline', Underline, 'Unterstrichen']].map(([c, Icon, label]) => (
             <button key={c} aria-pressed={fmt[c]} onMouseDown={e => e.preventDefault()} onClick={() => cmd(c)}
@@ -572,10 +615,11 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
         </div>
         <div ref={wrapRef} style={{ position: 'relative' }}>
           <div ref={editorRef} className="ttc-redaktion-editor" contentEditable suppressContentEditableWarning onInput={onInput} onPaste={onPaste}
-            onClick={onEditorClick} onKeyDown={() => sel && clearSel()} onDragOver={e => { if ([...e.dataTransfer.types].includes('text/ttc-foto')) e.preventDefault(); }} onDrop={onEditorDrop}
+            onClick={onEditorClick} onPointerDown={onEditorPointerDown} onDragStart={e => { if (e.target.closest?.('img, figure')) e.preventDefault(); }} onKeyDown={() => sel && clearSel()} onDragOver={e => { if ([...e.dataTransfer.types].includes('text/ttc-foto')) e.preventDefault(); }} onDrop={onEditorDrop}
             role="textbox" aria-multiline="true" aria-label="Text des Berichts" data-placeholder="Hier den Bericht schreiben …"
             lang="de" style={{ minHeight: '240px', padding: '12px 14px', fontSize: '15px', lineHeight: 1.65, color: '#111', background: '#fff', borderRadius: '10px', outline: 'none', overflowWrap: 'anywhere', textAlign: form.textAlign || 'justify', hyphens: 'auto', WebkitHyphens: 'auto' }} />
-          {sel && ['tl', 'tr', 'bl', 'br'].map(c => (
+          {dropLine !== null && <div aria-hidden style={{ position: 'absolute', left: '10px', right: '10px', top: dropLine, height: '4px', borderRadius: '2px', background: A, boxShadow: '0 0 0 3px rgba(74,222,128,0.3)', zIndex: 7, pointerEvents: 'none' }} />}
+          {sel && dropLine === null && ['tl', 'tr', 'bl', 'br'].map(c => (
             <span key={c} data-corner={c} onPointerDown={onHandleDown} aria-hidden title="Ziehen, um die Größe zu ändern"
               style={{ position: 'absolute', zIndex: 6, width: isMobile ? '26px' : '16px', height: isMobile ? '26px' : '16px', borderRadius: '50%', background: A, border: '3px solid #052e16', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', touchAction: 'none',
                 top: sel.rect.top + (c[0] === 'b' ? sel.rect.height : 0) - (isMobile ? 13 : 8), left: sel.rect.left + (c[1] === 'r' ? sel.rect.width : 0) - (isMobile ? 13 : 8),
