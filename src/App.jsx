@@ -165,6 +165,7 @@ import { getFirestore, doc, setDoc, updateDoc, deleteDoc, deleteField, arrayUnio
 import { getMessaging, getToken as getFcmToken, onMessage, isSupported as isFcmSupported } from 'firebase/messaging';
 import { Check, X, Plus, Trash2, Download, LogOut, ArrowLeft, Clock, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save, Trophy, Home, Archive, MessageSquare, Bell, Send, Pencil } from 'lucide-react';
 import Redaktion from './Redaktion.jsx';
+const Abrechnung = React.lazy(() => import('./Abrechnung.jsx'));
 
 const firebaseConfig = {
   apiKey: "AIzaSyCrx34HEgaHnRE187Cja4JNAtbexvrA6Vg",
@@ -4723,6 +4724,7 @@ export default function TrainingsApp() {
         label: 'Verwaltung',
         color: 'rgba(196,181,253,0.45)',
         links: [
+          {label:'Abrechnung', icon:'🧾', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.25)', action:()=>navTo('abrechnung')},
           {label:'Mitglieder', icon:'🗂️', color:'#c4b5fd', bg:'rgba(196,181,253,0.08)', border:'rgba(196,181,253,0.2)', action:()=>navTo('mitglieder')},
           {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
           {label:'Datenlöschen',   icon:'🗑️', color:'#fca5a5', bg:'rgba(220,38,38,0.08)', border:'rgba(220,38,38,0.25)', action:()=>navTo('datenloeschen')},
@@ -4733,6 +4735,7 @@ export default function TrainingsApp() {
           label: 'Verwaltung',
           color: 'rgba(196,181,253,0.45)',
           links: [
+            {label:'Abrechnung', icon:'🧾', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.25)', action:()=>navTo('abrechnung')},
             {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
           ],
         },
@@ -16816,6 +16819,13 @@ export default function TrainingsApp() {
   }
 
   // ── REDAKTION (Berichte für die Vereinswebseite) ──────────────────────
+  if (view === 'abrechnung' && canEdit()) {
+    return (
+      <React.Suspense fallback={<div style={{minHeight:'100vh',background:'#021a0a'}}/>}>
+        <Abrechnung key={viewKey} isMobile={isMobile} userName={userProfile?.name||''} onHome={()=>navTo('home')} />
+      </React.Suspense>
+    );
+  }
   if (view === 'redaktion' && canAccessRedaktion()) {
     return <Redaktion key={viewKey} user={user} isMobile={isMobile} onHome={()=>navTo('home')} accessRow={renderAccessManagerRow('redaktionMembers','Redaktion','#4ade80')} />;
   }
