@@ -13396,7 +13396,9 @@ export default function TrainingsApp() {
               if (!gy) return;
               const alter = jahr - gy;
               if (alter > 0 && alter % 5 === 0) {
-                rows.push({ Vorname: m.vorname||'', Nachname: m.nachname||'', Geburtsdatum: fmtDateDE(m.geburtsdatum), [`Wird ${jahr} Jahre alt`]: alter, 'E-Mail': m.email||'' });
+                // Kontaktdaten zum Gratulieren gleich mit ausgeben
+                const adresse = [m.strasse, [m.plz, m.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+                rows.push({ Vorname: m.vorname||'', Nachname: m.nachname||'', Geburtsdatum: fmtDateDE(m.geburtsdatum), [`Wird ${jahr} Jahre alt`]: alter, 'E-Mail': m.email||'', Handy: m.handy||'', Telefon: m.telefon||'', Adresse: adresse });
               }
             });
             rows.sort((a,b)=>a.Nachname.localeCompare(b.Nachname,'de'));
@@ -13408,7 +13410,7 @@ export default function TrainingsApp() {
             <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
               <div style={{background:'#0a2210',border:'1px solid rgba(251,191,36,0.3)',borderRadius:'16px',padding:'22px',maxWidth:'360px',width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.4)'}}>
                 <h3 style={{margin:'0 0 4px',color:'white',fontSize:'17px',fontWeight:'800'}}>🎂 Geburtstagsliste</h3>
-                <p style={{margin:'0 0 14px',color:'rgba(255,255,255,0.58)',fontSize:'12px'}}>Exportiert alle Mitglieder, die im gewählten Jahr einen runden Geburtstag (5er-Schritte: 10, 15, 20, 25 …) haben.</p>
+                <p style={{margin:'0 0 14px',color:'rgba(255,255,255,0.58)',fontSize:'12px'}}>Exportiert alle Mitglieder, die im gewählten Jahr einen runden Geburtstag (5er-Schritte: 10, 15, 20, 25 …) haben – mit Handy, Telefon und Adresse zum Gratulieren.</p>
                 <span style={{fontSize:'11px',color:'rgba(255,255,255,0.65)',display:'block',marginBottom:'4px'}}>Bezugsjahr</span>
                 <input value={geburtstagJahr} onChange={e=>setGeburtstagJahr(e.target.value)} type="number"
                   style={{width:'100%',boxSizing:'border-box',padding:'10px 12px',background:'#1a1206',border:'1px solid rgba(251,191,36,0.4)',borderRadius:'9px',color:'white',fontSize:'14px',outline:'none',marginBottom:'16px'}}/>
