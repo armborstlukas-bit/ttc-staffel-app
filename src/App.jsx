@@ -166,6 +166,8 @@ import { getMessaging, getToken as getFcmToken, onMessage, isSupported as isFcmS
 import { Check, X, Plus, Trash2, Download, LogOut, ArrowLeft, Clock, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save, Trophy, Home, Archive, MessageSquare, Bell, Send, Pencil } from 'lucide-react';
 import Redaktion from './Redaktion.jsx';
 import LaunchCountdown from './LaunchCountdown.jsx';
+import BetaHome from './BetaHome.jsx';
+import { betaStore, BETA_LS_KEY, BETA_EMAILS } from './betaStore.js';
 const Abrechnung = React.lazy(() => import('./Abrechnung.jsx'));
 
 const firebaseConfig = {
@@ -2597,6 +2599,9 @@ export default function TrainingsApp() {
   const formatSessionTime = (session) => session?.endTime ? `${session.time}–${session.endTime}` : session?.time;
 
   const canEdit = () => ['admin','trainer'].includes(userRole);
+  // Neues Design (Beta) – nur für freigeschaltete Accounts, pro Gerät ein-/ausschaltbar
+  const [betaDesign, setBetaDesign] = useState(() => { try { return localStorage.getItem(BETA_LS_KEY) === '1'; } catch { return false; } });
+  const setBeta = (on) => { setBetaDesign(on); try { on ? localStorage.setItem(BETA_LS_KEY, '1') : localStorage.removeItem(BETA_LS_KEY); } catch { /* egal */ } };
 
   // Groups this user may access: admins see all, trainers only their assigned groups
   const getMyGroupIds = () => {
@@ -3720,6 +3725,95 @@ export default function TrainingsApp() {
     label: {fontSize:'13px',fontWeight:'600',color:'#555',marginBottom:'4px',display:'block'},
   };
 
+  // Kacheln der Trainer-/Admin-Startseite (auch für die untere Leiste des neuen Designs)
+  const buildQuickCategories = () => [
+      {
+        label: 'Training & Gruppen',
+        color: 'rgba(134,239,172,0.45)',
+        links: [
+          {label:'Trainingsplan',    icon:'📅', color:'#86efac', bg:'rgba(134,239,172,0.1)',  border:'rgba(134,239,172,0.25)', action:()=>navTo('trainingsplan')},
+          {label:'Meine Gruppen',    icon:'👥', color:'#6ee7b7', bg:'rgba(110,231,183,0.1)',  border:'rgba(110,231,183,0.25)', action:()=>navTo('meingruppen')},
+          {label:'Übungswettkämpfe',icon:'🎮', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)',  border:'rgba(196,181,253,0.25)', action:()=>navTo('practiceTournaments')},
+          ...(canEdit()?[
+            {label:'Trikotgrößen', icon:'👕', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.2)', action:()=>navTo('trikotgroessen')},
+          ]:[]),
+          {label:'Materialverwaltung',icon:'🏓', color:'#fb923c', bg:'rgba(251,146,60,0.08)', border:'rgba(251,146,60,0.25)',  action:()=>navTo('materialverwaltung')},
+        ],
+      },
+      {
+        label: 'Wettkampf & Leistung',
+        color: 'rgba(253,230,138,0.45)',
+        links: [
+          {label:'Rangliste',        icon:'📊', color:'#fcd34d', bg:'rgba(252,211,77,0.1)',   border:'rgba(252,211,77,0.25)',  action:()=>navTo('rangliste')},
+          {label:'Errungenschaften', icon:'🏅', color:'#d9f99d', bg:'rgba(217,249,157,0.1)',  border:'rgba(217,249,157,0.25)', action:()=>navTo('achievements')},
+          {label:'TTC Mannschaften', icon:'🏆', color:'#2dd4bf', bg:'rgba(45,212,191,0.1)',   border:'rgba(45,212,191,0.25)',  action:()=>navTo('ttcMannschaften')},
+          {label:'Spielplan',        icon:'📆', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)', action:()=>navTo('spielplan')},
+          {label:'TTR Werte',        icon:'📈', color:'#fbbf24', bg:'rgba(251,191,36,0.08)',  border:'rgba(251,191,36,0.25)',  action:()=>navTo('ttrWerte')},
+          {label:'Gegnerlogbuch',    icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.08)',   border:'rgba(8,145,178,0.25)',   action:()=>navTo('gegnerlogbuch')},
+          {label:'Live-Statistiken', icon:'📡', color:'#a78bfa', bg:'rgba(167,139,250,0.08)', border:'rgba(167,139,250,0.25)', action:()=>navTo('livestats')},
+          ...(userRole==='admin'?[
+            {label:'Trainingsmatches',icon:'⚔️', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.25)', action:()=>navTo('trainingsmatches')},
+          ]:[]),
+        ],
+      },
+      {
+        label: 'Verein & Kommunikation',
+        color: 'rgba(147,197,253,0.45)',
+        links: [
+          {label:'TTC News',         icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',   action:()=>{navTo('ttcnews');fetchTtcNews();}},
+          ...(canAccessRedaktion()?[{label:'Redaktion', icon:'✍️', color:'#4ade80', bg:'rgba(74,222,128,0.08)', border:'rgba(74,222,128,0.25)', action:()=>navTo('redaktion')}]:[]),
+          {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>navTo('notifications'), badge: getTrainerUnreadCount()},
+          {label:'Vereinskalender',  icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)', action:()=>{navTo('kalender');fetchKalender();}},
+          {label:'Wer fährt wann',   icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
+          ...(canAccessPinnwand()?[{label:'Pinnwand',  icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.2)',  action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
+          {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.08)', border:'rgba(196,181,253,0.25)', blink: verbesserungenNeedsAttention, action:openVerbesserungen},
+        ],
+      },
+      {
+        label: 'Freizeit',
+        color: 'rgba(244,114,182,0.45)',
+        links: [
+          {label: tippspielNeedsAttention&&tippspielConfig?.deadline ? `Tippspiel bis ${new Date(tippspielConfig.deadline+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}` : 'TTC Tippspiel', icon:'🎱', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.25)', blink: tippspielNeedsAttention, action:()=>{markTippspielSeen();navTo('tippspiel');fetchTippspiel();}},
+          ...(canAccessRompel()?[
+            {label:'Rompel Bereich', icon:{type:'img',src:'/rompel.jpg'}, color:'#fda4af', bg:'rgba(253,164,175,0.08)', border:'rgba(253,164,175,0.25)', action:()=>navTo('rompel')},
+          ]:[]),
+          ...(canAccessPfand()?[
+            {label:'Pfandkasse', icon:'♻️', color:'#86efac', bg:'rgba(134,239,172,0.08)', border:'rgba(134,239,172,0.2)', action:()=>navTo('pfandkasse')},
+          ]:[]),
+        ],
+      },
+      ...(userRole==='admin'?[{
+        label: 'Verwaltung',
+        color: 'rgba(196,181,253,0.45)',
+        links: [
+          {label:'Abrechnung', icon:'🧾', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.25)', action:()=>navTo('abrechnung')},
+          {label:'Mitglieder', icon:'🗂️', color:'#c4b5fd', bg:'rgba(196,181,253,0.08)', border:'rgba(196,181,253,0.2)', action:()=>navTo('mitglieder')},
+          {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
+          {label:'Datenlöschen',   icon:'🗑️', color:'#fca5a5', bg:'rgba(220,38,38,0.08)', border:'rgba(220,38,38,0.25)', action:()=>navTo('datenloeschen')},
+          {label:'App-Statistik',  icon:'📈', color:'#7dd3fc', bg:'rgba(125,211,252,0.1)', border:'rgba(125,211,252,0.25)', action:()=>navTo('usageStats')},
+        ],
+      }]:[
+        {
+          label: 'Verwaltung',
+          color: 'rgba(196,181,253,0.45)',
+          links: [
+            {label:'Abrechnung', icon:'🧾', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.25)', action:()=>navTo('abrechnung')},
+            {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
+          ],
+        },
+      ]),
+    ];
+  const betaOn = !!user && BETA_EMAILS.includes((user?.email || '').toLowerCase()) && betaDesign && canEdit();
+  useEffect(() => {
+    betaStore.set(betaOn ? {
+      enabled: true, view, unread: getTrainerUnreadCount(), navTo, getCats: buildQuickCategories,
+      openProfile: () => { navTo('home'); setShowProfile(true); setPwSuccess(false); },
+      canSwitchRole: (userProfile?.roles || [userRole]).filter(r => r !== 'pending').length > 1,
+      switchRole: () => setShowRolePicker(true),
+      disable: () => setBeta(false), logout: handleLogout,
+    } : { enabled: false });
+  });
+
   if (loading) return <div style={{...s.page(activeGroup?.color),display:'flex',alignItems:'center',justifyContent:'center'}}><p style={{color:'white',fontSize:'20px'}}>Laden...</p></div>;
 
   // ── Passwort-Reset Screen ─────────────────────────────────────
@@ -4005,6 +4099,14 @@ export default function TrainingsApp() {
                 <button onClick={handleChangePassword} style={{padding:'11px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>Passwort ändern</button>
               </div>
               {renderNotifSettings()}
+              {BETA_EMAILS.includes((user?.email||'').toLowerCase()) && (
+                <button onClick={()=>{setBeta(!betaDesign);setShowProfile(false);}}
+                  style={{width:'100%',marginBottom:'10px',padding:'12px 14px',background:betaDesign?'rgba(182,243,106,0.14)':'rgba(255,255,255,0.05)',border:'1px solid '+(betaDesign?'rgba(182,243,106,0.45)':'rgba(255,255,255,0.12)'),borderRadius:'12px',cursor:'pointer',display:'flex',alignItems:'center',gap:'10px',textAlign:'left'}}>
+                  <span style={{fontSize:'18px'}}>✨</span>
+                  <span style={{flex:1}}><b style={{display:'block',color:'white',fontSize:'14px'}}>Neues Design (Beta)</b><span style={{color:'rgba(255,255,255,0.55)',fontSize:'12px'}}>Nur für dich sichtbar · {betaDesign?'eingeschaltet':'ausgeschaltet'}</span></span>
+                  <span style={{width:'40px',height:'23px',borderRadius:'99px',background:betaDesign?'#84cc16':'rgba(255,255,255,0.18)',position:'relative',flexShrink:0}}><span style={{position:'absolute',top:'3px',left:betaDesign?'20px':'3px',width:'17px',height:'17px',borderRadius:'50%',background:'white',transition:'left .15s'}}/></span>
+                </button>
+              )}
               <button onClick={()=>{setShowProfile(false);setPwError('');setPwSuccess(false);setPwCurrent('');setPwNew('');setPwConfirm('');}}
                 style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.65)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button>
             </div>
@@ -4666,89 +4768,12 @@ export default function TrainingsApp() {
       borderRadius:'16px',cursor:'pointer',display:'flex',flexDirection:'column',
       alignItems:'center',gap:'8px',transition:'transform 0.12s',textAlign:'center'
     });
-    const quickCategories = [
-      {
-        label: 'Training & Gruppen',
-        color: 'rgba(134,239,172,0.45)',
-        links: [
-          {label:'Trainingsplan',    icon:'📅', color:'#86efac', bg:'rgba(134,239,172,0.1)',  border:'rgba(134,239,172,0.25)', action:()=>navTo('trainingsplan')},
-          {label:'Meine Gruppen',    icon:'👥', color:'#6ee7b7', bg:'rgba(110,231,183,0.1)',  border:'rgba(110,231,183,0.25)', action:()=>navTo('meingruppen')},
-          {label:'Übungswettkämpfe',icon:'🎮', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)',  border:'rgba(196,181,253,0.25)', action:()=>navTo('practiceTournaments')},
-          ...(canEdit()?[
-            {label:'Trikotgrößen', icon:'👕', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.2)', action:()=>navTo('trikotgroessen')},
-          ]:[]),
-          {label:'Materialverwaltung',icon:'🏓', color:'#fb923c', bg:'rgba(251,146,60,0.08)', border:'rgba(251,146,60,0.25)',  action:()=>navTo('materialverwaltung')},
-        ],
-      },
-      {
-        label: 'Wettkampf & Leistung',
-        color: 'rgba(253,230,138,0.45)',
-        links: [
-          {label:'Rangliste',        icon:'📊', color:'#fcd34d', bg:'rgba(252,211,77,0.1)',   border:'rgba(252,211,77,0.25)',  action:()=>navTo('rangliste')},
-          {label:'Errungenschaften', icon:'🏅', color:'#d9f99d', bg:'rgba(217,249,157,0.1)',  border:'rgba(217,249,157,0.25)', action:()=>navTo('achievements')},
-          {label:'TTC Mannschaften', icon:'🏆', color:'#2dd4bf', bg:'rgba(45,212,191,0.1)',   border:'rgba(45,212,191,0.25)',  action:()=>navTo('ttcMannschaften')},
-          {label:'Spielplan',        icon:'📆', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)', action:()=>navTo('spielplan')},
-          {label:'TTR Werte',        icon:'📈', color:'#fbbf24', bg:'rgba(251,191,36,0.08)',  border:'rgba(251,191,36,0.25)',  action:()=>navTo('ttrWerte')},
-          {label:'Gegnerlogbuch',    icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.08)',   border:'rgba(8,145,178,0.25)',   action:()=>navTo('gegnerlogbuch')},
-          {label:'Live-Statistiken', icon:'📡', color:'#a78bfa', bg:'rgba(167,139,250,0.08)', border:'rgba(167,139,250,0.25)', action:()=>navTo('livestats')},
-          ...(userRole==='admin'?[
-            {label:'Trainingsmatches',icon:'⚔️', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.25)', action:()=>navTo('trainingsmatches')},
-          ]:[]),
-        ],
-      },
-      {
-        label: 'Verein & Kommunikation',
-        color: 'rgba(147,197,253,0.45)',
-        links: [
-          {label:'TTC News',         icon:'📰', color:'#86efac', bg:'rgba(74,222,128,0.08)',  border:'rgba(74,222,128,0.2)',   action:()=>{navTo('ttcnews');fetchTtcNews();}},
-          ...(canAccessRedaktion()?[{label:'Redaktion', icon:'✍️', color:'#4ade80', bg:'rgba(74,222,128,0.08)', border:'rgba(74,222,128,0.25)', action:()=>navTo('redaktion')}]:[]),
-          {label:'Nachrichten',      icon:'💬', color:'#bbf7d0', bg:'rgba(187,247,208,0.1)',  border:'rgba(187,247,208,0.25)', action:()=>navTo('notifications'), badge: unreadCount},
-          {label:'Vereinskalender',  icon:'📅', color:'#fcd34d', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)', action:()=>{navTo('kalender');fetchKalender();}},
-          {label:'Wer fährt wann',   icon:'🚗', color:'#93c5fd', bg:'rgba(147,197,253,0.08)', border:'rgba(147,197,253,0.25)', action:()=>{navTo('fahrplan');fetchFahrplan();}},
-          ...(canAccessPinnwand()?[{label:'Pinnwand',  icon:'📋', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.2)',  action:()=>navTo('wettenZitate'), badge: wettenZitate.filter(e=>e.dueDate&&e.dueDate<=TODAY&&!e.dueSeen).length||0}]:[]),
-          {label:'Verbesserungen', icon:'💡', color:'#c4b5fd', bg:'rgba(196,181,253,0.08)', border:'rgba(196,181,253,0.25)', blink: verbesserungenNeedsAttention, action:openVerbesserungen},
-        ],
-      },
-      {
-        label: 'Freizeit',
-        color: 'rgba(244,114,182,0.45)',
-        links: [
-          {label: tippspielNeedsAttention&&tippspielConfig?.deadline ? `Tippspiel bis ${new Date(tippspielConfig.deadline+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}` : 'TTC Tippspiel', icon:'🎱', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.25)', blink: tippspielNeedsAttention, action:()=>{markTippspielSeen();navTo('tippspiel');fetchTippspiel();}},
-          ...(canAccessRompel()?[
-            {label:'Rompel Bereich', icon:{type:'img',src:'/rompel.jpg'}, color:'#fda4af', bg:'rgba(253,164,175,0.08)', border:'rgba(253,164,175,0.25)', action:()=>navTo('rompel')},
-          ]:[]),
-          ...(canAccessPfand()?[
-            {label:'Pfandkasse', icon:'♻️', color:'#86efac', bg:'rgba(134,239,172,0.08)', border:'rgba(134,239,172,0.2)', action:()=>navTo('pfandkasse')},
-          ]:[]),
-        ],
-      },
-      ...(userRole==='admin'?[{
-        label: 'Verwaltung',
-        color: 'rgba(196,181,253,0.45)',
-        links: [
-          {label:'Abrechnung', icon:'🧾', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.25)', action:()=>navTo('abrechnung')},
-          {label:'Mitglieder', icon:'🗂️', color:'#c4b5fd', bg:'rgba(196,181,253,0.08)', border:'rgba(196,181,253,0.2)', action:()=>navTo('mitglieder')},
-          {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
-          {label:'Datenlöschen',   icon:'🗑️', color:'#fca5a5', bg:'rgba(220,38,38,0.08)', border:'rgba(220,38,38,0.25)', action:()=>navTo('datenloeschen')},
-          {label:'App-Statistik',  icon:'📈', color:'#7dd3fc', bg:'rgba(125,211,252,0.1)', border:'rgba(125,211,252,0.25)', action:()=>navTo('usageStats')},
-        ],
-      }]:[
-        {
-          label: 'Verwaltung',
-          color: 'rgba(196,181,253,0.45)',
-          links: [
-            {label:'Abrechnung', icon:'🧾', color:'#fde68a', bg:'rgba(253,230,138,0.08)', border:'rgba(253,230,138,0.25)', action:()=>navTo('abrechnung')},
-            {label:'Archiv',           icon:'📦', color:'#e2e8f0', bg:'rgba(226,232,240,0.08)', border:'rgba(226,232,240,0.2)',  action:()=>navTo('archiv')},
-          ],
-        },
-      ]),
-    ];
+    const quickCategories = buildQuickCategories();
     const groups = FIXED_GROUPS.filter(g=>canAccessGroup(g.id));
 
     const inputStyle = {padding:'10px 14px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(134,239,172,0.2)',borderRadius:'10px',color:'white',fontSize:'14px',outline:'none',width:'100%',boxSizing:'border-box'};
 
-    return (
-      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+    const homeModals = (<>
         {/* Profil-Modal */}
         {showProfile&&(
           <Modal>
@@ -4766,6 +4791,14 @@ export default function TrainingsApp() {
                 <button onClick={handleChangePassword} style={{padding:'11px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>Passwort ändern</button>
               </div>
               {renderNotifSettings()}
+              {BETA_EMAILS.includes((user?.email||'').toLowerCase()) && (
+                <button onClick={()=>{setBeta(!betaDesign);setShowProfile(false);}}
+                  style={{width:'100%',marginBottom:'10px',padding:'12px 14px',background:betaDesign?'rgba(182,243,106,0.14)':'rgba(255,255,255,0.05)',border:'1px solid '+(betaDesign?'rgba(182,243,106,0.45)':'rgba(255,255,255,0.12)'),borderRadius:'12px',cursor:'pointer',display:'flex',alignItems:'center',gap:'10px',textAlign:'left'}}>
+                  <span style={{fontSize:'18px'}}>✨</span>
+                  <span style={{flex:1}}><b style={{display:'block',color:'white',fontSize:'14px'}}>Neues Design (Beta)</b><span style={{color:'rgba(255,255,255,0.55)',fontSize:'12px'}}>Nur für dich sichtbar · {betaDesign?'eingeschaltet':'ausgeschaltet'}</span></span>
+                  <span style={{width:'40px',height:'23px',borderRadius:'99px',background:betaDesign?'#84cc16':'rgba(255,255,255,0.18)',position:'relative',flexShrink:0}}><span style={{position:'absolute',top:'3px',left:betaDesign?'20px':'3px',width:'17px',height:'17px',borderRadius:'50%',background:'white',transition:'left .15s'}}/></span>
+                </button>
+              )}
               <button onClick={()=>{setShowProfile(false);setPwError('');setPwSuccess(false);setPwCurrent('');setPwNew('');setPwConfirm('');}}
                 style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.65)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button>
             </div>
@@ -4793,6 +4826,43 @@ export default function TrainingsApp() {
           </div>
           </Modal>
         )}
+
+    </>);
+
+    if (betaOn) {
+      const toBeta = (session, past) => {
+        const kids = (session.subgroupIds||[]).flatMap(sid=>getChildrenForSubgroup(sid)).filter(c=>!c.nachwuchsKarriereBeendet);
+        return {
+          id: session.id, date: session.date, time: formatSessionTime(session), past, today: session.date===todayStr,
+          groups: (session.subgroupIds||[]).map(sid=>subgroups[sid]).filter(Boolean).map(sub=>({ name: sub.name, color: FIXED_GROUPS.find(x=>x.id===sub.groupId)?.color })),
+          total: past ? kids.length : 0, recorded: past ? kids.filter(c=>!!(children[c.id]?.attendance||{})[session.date]).length : 0,
+          onOpen: ()=>{ setActiveSession(session); navTo('sessionAttendance'); },
+        };
+      };
+      const betaSessions = [...pastSess.map(x=>toBeta(x,true)), ...upcomingSess.map(x=>toBeta(x,false))];
+      const offen = betaSessions.filter(x=>x.past && x.total>0 && x.recorded<x.total).length;
+      const linkedId = userProfile?.linkedPlayerId;
+      const hist = linkedId ? (ttrHistory[linkedId]?.entries||[]).slice().sort((a,b)=>a.month.localeCompare(b.month)) : [];
+      const lastTtr = hist[hist.length-1];
+      const kpis = [
+        lastTtr ? { label:'Dein TTR', value: lastTtr.ttr, onClick: ()=>navTo('ttrWerte') } : { label:'Offen', value: offen, warn: offen>0 },
+        { label:'Neue Nachr.', value: unreadCount, onClick: ()=>navTo('notifications') },
+        { label:'Trainings', value: upcomingSess.length, onClick: ()=>navTo('trainingsplan') },
+      ];
+      return (
+        <BetaHome key={viewKey}
+          firstName={(userProfile?.name||'').split(' ')[0]}
+          roleLabel={userRole==='admin'?'Admin':'Trainer'}
+          dateLabel={new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'})}
+          kpis={kpis} sessions={betaSessions} cats={quickCategories} unread={unreadCount}
+          onBell={()=>navTo('notifications')} onProfile={()=>{setShowProfile(true);setPwSuccess(false);}} onPlan={()=>navTo('trainingsplan')}
+          modals={homeModals} />
+      );
+    }
+
+    return (
+      <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
+        {homeModals}
 
         {/* ── Top-Bar (volle Browserbreite) ──────────────────────── */}
         <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px'}}>
@@ -5002,6 +5072,14 @@ export default function TrainingsApp() {
                 <button onClick={handleChangePassword} style={{padding:'11px',background:`linear-gradient(135deg,${accentColor},#0e7490)`,color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>Passwort ändern</button>
               </div>
               {renderNotifSettings()}
+              {BETA_EMAILS.includes((user?.email||'').toLowerCase()) && (
+                <button onClick={()=>{setBeta(!betaDesign);setShowProfile(false);}}
+                  style={{width:'100%',marginBottom:'10px',padding:'12px 14px',background:betaDesign?'rgba(182,243,106,0.14)':'rgba(255,255,255,0.05)',border:'1px solid '+(betaDesign?'rgba(182,243,106,0.45)':'rgba(255,255,255,0.12)'),borderRadius:'12px',cursor:'pointer',display:'flex',alignItems:'center',gap:'10px',textAlign:'left'}}>
+                  <span style={{fontSize:'18px'}}>✨</span>
+                  <span style={{flex:1}}><b style={{display:'block',color:'white',fontSize:'14px'}}>Neues Design (Beta)</b><span style={{color:'rgba(255,255,255,0.55)',fontSize:'12px'}}>Nur für dich sichtbar · {betaDesign?'eingeschaltet':'ausgeschaltet'}</span></span>
+                  <span style={{width:'40px',height:'23px',borderRadius:'99px',background:betaDesign?'#84cc16':'rgba(255,255,255,0.18)',position:'relative',flexShrink:0}}><span style={{position:'absolute',top:'3px',left:betaDesign?'20px':'3px',width:'17px',height:'17px',borderRadius:'50%',background:'white',transition:'left .15s'}}/></span>
+                </button>
+              )}
               <button onClick={()=>{setShowProfile(false);setPwError('');setPwSuccess(false);setPwCurrent('');setPwNew('');setPwConfirm('');}}
                 style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.65)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button>
             </div>
@@ -5592,6 +5670,14 @@ export default function TrainingsApp() {
                 <button onClick={handleChangePassword} style={{padding:'11px',background:'linear-gradient(135deg,#16a34a,#15803d)',color:'white',border:'none',borderRadius:'10px',cursor:'pointer',fontWeight:'700',fontSize:'14px'}}>Passwort ändern</button>
               </div>
               {renderNotifSettings()}
+              {BETA_EMAILS.includes((user?.email||'').toLowerCase()) && (
+                <button onClick={()=>{setBeta(!betaDesign);setShowProfile(false);}}
+                  style={{width:'100%',marginBottom:'10px',padding:'12px 14px',background:betaDesign?'rgba(182,243,106,0.14)':'rgba(255,255,255,0.05)',border:'1px solid '+(betaDesign?'rgba(182,243,106,0.45)':'rgba(255,255,255,0.12)'),borderRadius:'12px',cursor:'pointer',display:'flex',alignItems:'center',gap:'10px',textAlign:'left'}}>
+                  <span style={{fontSize:'18px'}}>✨</span>
+                  <span style={{flex:1}}><b style={{display:'block',color:'white',fontSize:'14px'}}>Neues Design (Beta)</b><span style={{color:'rgba(255,255,255,0.55)',fontSize:'12px'}}>Nur für dich sichtbar · {betaDesign?'eingeschaltet':'ausgeschaltet'}</span></span>
+                  <span style={{width:'40px',height:'23px',borderRadius:'99px',background:betaDesign?'#84cc16':'rgba(255,255,255,0.18)',position:'relative',flexShrink:0}}><span style={{position:'absolute',top:'3px',left:betaDesign?'20px':'3px',width:'17px',height:'17px',borderRadius:'50%',background:'white',transition:'left .15s'}}/></span>
+                </button>
+              )}
               <button onClick={()=>{setShowProfile(false);setPwError('');setPwSuccess(false);setPwCurrent('');setPwNew('');setPwConfirm('');}}
                 style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.65)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',cursor:'pointer',fontWeight:'600',fontSize:'14px'}}>Schließen</button>
             </div>
