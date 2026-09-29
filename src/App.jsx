@@ -47,6 +47,9 @@ if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styl
     .ttc-redaktion-editor h3, .ttc-redaktion-preview h3 { font-size: 1.3em; margin: 1em 0 0.4em; }
     .ttc-redaktion-editor:focus { box-shadow: 0 0 0 4px rgba(74,222,128,0.45); }
     .ttc-redaktion-preview img { max-width: 100%; height: auto; }
+    .ttc-redaktion-editor figure, .ttc-redaktion-preview figure { margin: 0.9em 0; }
+    .ttc-redaktion-editor img { max-width: 100%; height: auto; display: block; border-radius: 6px; cursor: pointer; }
+    .ttc-redaktion-editor .ttc-img-sel img, .ttc-redaktion-editor img.ttc-img-sel { outline: 4px solid #4ade80; outline-offset: 2px; }
     .ttc-view-enter {
       animation: ttcFadeSlide 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
     }

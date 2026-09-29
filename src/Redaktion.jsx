@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Home, ArrowLeft, Bold, Heading2, List, Undo2, ImagePlus, Star, Trash2, Eye, CheckCircle2, X, Loader2, PenLine, Plus, ExternalLink, Search, AlignJustify, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
+import { Home, ArrowLeft, Bold, Italic, Underline, Heading2, List, Undo2, ImagePlus, Star, ArrowUp, ArrowDown, Trash2, Eye, CheckCircle2, X, Loader2, PenLine, Plus, ExternalLink, Search, AlignJustify, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 
 // ── Redaktion: Berichte für die Vereinswebseite schreiben ────────────────────────
 // Die Berichte werden über die Schnittstelle der Webseite gespeichert (gleiches Firebase-Konto).
@@ -17,7 +17,13 @@ const catLabel = (id) => (id === 'presse' ? 'Presse' : id && CATEGORIES.find(c =
 const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
 const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
 const imgSrc = (u) => (u?.startsWith('/') ? WEB_URL + u : u);
-const EMPTY = { title: '', category: '', html: '', images: [], date: today(), textAlign: 'justify' };
+const EMPTY = { title: '', category: '', html: '', images: [], coverImage: '', date: today(), textAlign: 'justify' };
+
+// ---------- Fotos im Schreibfeld: Adressen für die Anzeige in der App vollständig machen, beim Speichern wieder kürzen ----------
+const absImages = (html) => (html || '').replace(/(src=")(\/media\/web\/)/g, `$1${WEB_URL}$2`);
+const toEditorHtml = (html) => absImages(html).replace(/<figure>/g, '<figure contenteditable="false">');
+const fromEditorHtml = (html) => (html || '').split(`${WEB_URL}/media/web/`).join('/media/web/')
+  .replace(/ contenteditable="false"/g, '').replace(/ class="ttc-img-sel"/g, '').replace(/ class=""/g, '');
 // Textausrichtung des Berichts auf der Webseite – Standard ist Blocksatz
 const ALIGNS = [
   { id: 'justify', label: 'Blocksatz', Icon: AlignJustify },
@@ -249,14 +255,14 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
   useEffect(() => {
     if (!id) return;
     api(`/news/${id}`).then(d => {
-      setForm({ title: d.title, category: d.category || '', html: d.html, images: d.images || [], date: d.date || today(), textAlign: d.textAlign || 'justify' });
+      setForm({ title: d.title, category: d.category || '', html: d.html, images: d.images || [], coverImage: d.coverImage || '', date: d.date || today(), textAlign: d.textAlign || 'justify' });
       setStatus(d.status);
       setLoaded(true);
     }).catch(e => setError(e.message));
   }, [id, api]);
 
   useEffect(() => {
-    if (loaded && editorRef.current && editorRef.current.innerHTML !== form.html) editorRef.current.innerHTML = form.html;
+    if (loaded && editorRef.current) editorRef.current.innerHTML = toEditorHtml(form.html);
     // nur beim Laden setzen – danach ist das Textfeld selbst die Quelle
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, restored]);
@@ -268,7 +274,81 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
     return () => clearTimeout(t);
   }, [form, dirty, id, draftKey]);
 
-  const onInput = () => update({ html: editorRef.current.innerHTML });
+  const onInput = () => update({ html: fromEditorHtml(editorRef.current.innerHTML) });
+
+  // Letzte Schreibstelle merken – dort landen eingefügte Fotos
+  const lastRange = useRef(null);
+  const [fmt, setFmt] = useState({ bold: false, italic: false, underline: false });
+  const [sel, setSel] = useState(null); // ausgewähltes Foto im Text: { el, block, top }
+  const wrapRef = useRef(null);
+  useEffect(() => {
+    const onSel = () => {
+      const root = editorRef.current; const s = window.getSelection();
+      if (!root || !s?.rangeCount || !root.contains(s.anchorNode)) return;
+      lastRange.current = s.getRangeAt(0).cloneRange();
+      setFmt({ bold: document.queryCommandState('bold'), italic: document.queryCommandState('italic'), underline: document.queryCommandState('underline') });
+    };
+    document.addEventListener('selectionchange', onSel);
+    return () => document.removeEventListener('selectionchange', onSel);
+  }, []);
+
+  // oberster Absatz im Schreibfeld, der den Knoten enthält
+  const topBlock = (node) => {
+    const root = editorRef.current;
+    if (!node || node === root || !root.contains(node)) return null;
+    while (node.parentNode && node.parentNode !== root) node = node.parentNode;
+    return node.parentNode === root ? node : null;
+  };
+  const clearSel = () => { editorRef.current?.querySelectorAll('.ttc-img-sel').forEach(e => e.classList.remove('ttc-img-sel')); setSel(null); };
+  const selectImg = (el) => {
+    clearSel();
+    const target = el.closest('figure') || el;
+    target.classList.add('ttc-img-sel');
+    const block = topBlock(target);
+    const top = target.getBoundingClientRect().top - wrapRef.current.getBoundingClientRect().top;
+    setSel({ el: target, block, top });
+  };
+  const insertPhoto = (url, after) => {
+    const root = editorRef.current;
+    const fig = document.createElement('figure');
+    fig.setAttribute('contenteditable', 'false');
+    const img = document.createElement('img');
+    img.src = imgSrc(url); img.alt = '';
+    fig.appendChild(img);
+    const block = after !== undefined ? after : topBlock(lastRange.current?.startContainer);
+    if (block) block.after(fig); else root.appendChild(fig);
+    if (!fig.nextElementSibling) { const p = document.createElement('p'); p.innerHTML = '<br>'; fig.after(p); }
+    onInput();
+    selectImg(img);
+    fig.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  };
+  const moveSel = (dir) => {
+    if (!sel?.block) return;
+    const b = sel.block;
+    if (dir < 0 && b.previousElementSibling) b.previousElementSibling.before(b);
+    if (dir > 0 && b.nextElementSibling) b.nextElementSibling.after(b);
+    onInput(); selectImg(sel.el.querySelector?.('img') || sel.el);
+    sel.el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  };
+  const removeSel = () => {
+    if (!sel) return;
+    const b = sel.block;
+    sel.el.remove();
+    if (b && b !== sel.el && !b.textContent.trim() && !b.querySelector('img')) b.remove();
+    clearSel(); onInput();
+  };
+  const onEditorClick = (e) => {
+    const img = e.target.closest?.('img');
+    if (img && editorRef.current.contains(img)) selectImg(img); else if (sel) clearSel();
+  };
+  const onEditorDrop = (e) => {
+    const url = e.dataTransfer.getData('text/ttc-foto');
+    if (!url) return;
+    e.preventDefault();
+    const at = document.elementFromPoint(e.clientX, e.clientY);
+    insertPhoto(url, topBlock(at) || null);
+  };
+  const inText = (url) => (form.html || '').includes(url);
   const onPaste = (e) => {
     e.preventDefault();
     const html = e.clipboardData.getData('text/html');
@@ -276,7 +356,10 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
     document.execCommand('insertHTML', false, html ? cleanPaste(html) : textToHtml(text));
     onInput();
   };
-  const cmd = (command, value) => { editorRef.current.focus(); document.execCommand(command, false, value); onInput(); };
+  const cmd = (command, value) => {
+    editorRef.current.focus(); document.execCommand(command, false, value); onInput();
+    setFmt({ bold: document.queryCommandState('bold'), italic: document.queryCommandState('italic'), underline: document.queryCommandState('underline') });
+  };
 
   const addPhotos = async (files) => {
     setError('');
@@ -300,7 +383,8 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
 
   const save = async (targetStatus) => {
     setError('');
-    const body = { ...form, html: editorRef.current?.innerHTML || form.html, status: targetStatus };
+    clearSel();
+    const body = { ...form, html: editorRef.current ? fromEditorHtml(editorRef.current.innerHTML) : form.html, coverImage: form.coverImage || form.images[0] || '', status: targetStatus };
     if (!body.title.trim()) return setError('Bitte oben eine Überschrift eingeben (Schritt 1).');
     setBusy(true);
     try {
@@ -333,6 +417,8 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
 
   const toolBtn = { display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '7px 10px', fontSize: '13px', fontWeight: 600, color: 'white', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.16)', borderRadius: '8px', cursor: 'pointer' };
   const blocked = busy || uploads > 0;
+  const photoBtn = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '6px 8px', fontSize: '12px', fontWeight: 600, color: 'white', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '8px', cursor: 'pointer' };
+  const imgBtn = { display: 'flex', alignItems: 'center', gap: '4px', padding: '7px 10px', fontSize: '13px', fontWeight: 700, color: 'white', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '8px', cursor: 'pointer' };
 
   return (
     <>
@@ -353,64 +439,50 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
       </Step>
 
       <Step n="2" title="Worum geht es?" note="(freiwillig)">
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: '8px' }} role="radiogroup">
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }} role="radiogroup">
           {CATEGORIES.map(c => {
             const on = form.category === c.id;
             return (
-              <button key={c.id} role="radio" aria-checked={on} onClick={() => update({ category: c.id })}
-                style={{ textAlign: 'left', padding: '9px 11px', borderRadius: '10px', cursor: 'pointer', color: 'white', background: on ? 'rgba(74,222,128,0.16)' : 'rgba(255,255,255,0.04)', border: `1px solid ${on ? A : 'rgba(255,255,255,0.16)'}` }}>
-                <strong style={{ display: 'block', fontSize: '14px' }}>{on ? '✓ ' : ''}{c.label}</strong>
-                <span style={{ ...C.muted, fontSize: '11px' }}>{c.hint}</span>
+              <button key={c.id || 'keine'} role="radio" aria-checked={on} onClick={() => update({ category: c.id })}
+                style={{ padding: '7px 12px', borderRadius: '999px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: on ? '#052e16' : 'white', background: on ? A : 'rgba(255,255,255,0.05)', border: `1px solid ${on ? A : 'rgba(255,255,255,0.18)'}` }}>
+                {c.label}
               </button>
             );
           })}
         </div>
       </Step>
 
-      <Step n="3" title="Text">
-        <p style={{ ...C.muted, margin: '0 0 10px', fontSize: '12px' }}>Einfach hineinschreiben – oder einen fertigen Text aus Word bzw. einer E-Mail kopieren und hier einfügen.</p>
-        <div role="toolbar" aria-label="Formatierung" style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
-          <button onMouseDown={e => e.preventDefault()} onClick={() => cmd('bold')} style={toolBtn}><Bold size={14} /> Fett</button>
-          <button onMouseDown={e => e.preventDefault()} onClick={() => cmd('formatBlock', 'h3')} style={toolBtn}><Heading2 size={14} /> Zwischenüberschrift</button>
-          <button onMouseDown={e => e.preventDefault()} onClick={() => cmd('formatBlock', 'p')} style={toolBtn}>Normaler Text</button>
-          <button onMouseDown={e => e.preventDefault()} onClick={() => cmd('insertUnorderedList')} style={toolBtn}><List size={14} /> Liste</button>
-          <button onMouseDown={e => e.preventDefault()} onClick={() => cmd('undo')} style={toolBtn}><Undo2 size={14} /> Rückgängig</button>
-        </div>
-        <div role="radiogroup" aria-label="Ausrichtung" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '5px', marginBottom: '8px' }}>
-          <span style={{ ...C.muted, fontSize: '12px', marginRight: '2px' }}>Ausrichtung:</span>
-          {ALIGNS.map(({ id: a, label, Icon }) => {
-            const on = (form.textAlign || 'justify') === a;
-            return (
-              <button key={a} role="radio" aria-checked={on} onMouseDown={e => e.preventDefault()} onClick={() => update({ textAlign: a })}
-                style={{ ...toolBtn, ...(on ? { background: 'rgba(74,222,128,0.16)', borderColor: A, color: '#bbf7d0' } : {}) }}>
-                <Icon size={14} /> {label}
-              </button>
-            );
-          })}
-        </div>
-        <div ref={editorRef} className="ttc-redaktion-editor" contentEditable suppressContentEditableWarning onInput={onInput} onPaste={onPaste}
-          role="textbox" aria-multiline="true" aria-label="Text des Berichts" data-placeholder="Hier den Bericht schreiben …"
-          lang="de" style={{ minHeight: '240px', padding: '12px 14px', fontSize: '15px', lineHeight: 1.65, color: '#111', background: '#fff', borderRadius: '10px', outline: 'none', overflowWrap: 'anywhere', textAlign: form.textAlign || 'justify', hyphens: 'auto', WebkitHyphens: 'auto' }} />
-      </Step>
-
-      <Step n="4" title="Fotos" note="(freiwillig)">
-        <p style={{ ...C.muted, margin: '0 0 10px', fontSize: '12px' }}>Das erste Foto wird groß über dem Bericht gezeigt (Titelbild). Weitere Fotos erscheinen darunter.</p>
+      <Step n="3" title="Fotos hochladen" note="(freiwillig)">
+        <p style={{ ...C.muted, margin: '0 0 10px', fontSize: '12px' }}>Erst alle Fotos hochladen – dann das <b style={{ color: '#bbf7d0' }}>Titelbild</b> wählen (Vorschaubild bei „Aktuelles“) und Fotos in den Text setzen.</p>
         <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={e => { addPhotos(e.target.files); e.target.value = ''; }} />
         <button onClick={() => fileRef.current.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); addPhotos(e.dataTransfer.files); }}
-          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '16px', borderRadius: '12px', border: '2px dashed rgba(74,222,128,0.4)', background: 'rgba(74,222,128,0.05)', color: '#bbf7d0', cursor: 'pointer', fontSize: '14px', fontWeight: 700 }}>
-          <ImagePlus size={22} /> Fotos auswählen
+          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '14px', borderRadius: '12px', border: '2px dashed rgba(74,222,128,0.4)', background: 'rgba(74,222,128,0.05)', color: '#bbf7d0', cursor: 'pointer', fontSize: '14px', fontWeight: 700 }}>
+          <ImagePlus size={20} /> Fotos auswählen
         </button>
         {(form.images.length > 0 || uploads > 0) && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(110px,1fr))', gap: '8px', marginTop: '12px' }}>
-            {form.images.map((url, i) => (
-              <div key={url} style={{ position: 'relative', aspectRatio: '4/3', borderRadius: '10px', overflow: 'hidden', border: `2px solid ${i === 0 ? A : 'transparent'}` }}>
-                <img src={imgSrc(url)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                {i === 0
-                  ? <span style={{ ...photoTag, background: A, color: '#052e16' }}><Star size={11} /> Titelbild</span>
-                  : <button onClick={() => update({ images: [url, ...form.images.filter(u => u !== url)] })} style={{ ...photoTag, border: 'none', cursor: 'pointer' }}><Star size={11} /> Titelbild</button>}
-                <button onClick={() => update({ images: form.images.filter(u => u !== url) })} aria-label="Foto entfernen" style={{ position: 'absolute', top: '4px', right: '4px', width: '30px', height: '30px', borderRadius: '8px', border: 'none', background: 'rgba(255,255,255,0.95)', color: '#b91c1c', display: 'grid', placeItems: 'center', cursor: 'pointer' }}><Trash2 size={15} /></button>
-              </div>
-            ))}
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill,minmax(${isMobile ? 140 : 160}px,1fr))`, gap: '10px', marginTop: '12px' }}>
+            {form.images.map((url) => {
+              const cover = (form.coverImage || form.images[0]) === url;
+              const used = inText(url);
+              return (
+                <div key={url} style={{ borderRadius: '10px', overflow: 'hidden', background: 'rgba(255,255,255,0.05)', border: `2px solid ${cover ? A : 'rgba(255,255,255,0.12)'}` }}>
+                  <div style={{ position: 'relative', aspectRatio: '4/3' }}>
+                    <img src={imgSrc(url)} alt="" draggable onDragStart={e => e.dataTransfer.setData('text/ttc-foto', url)} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', cursor: 'grab' }} />
+                    {cover && <span style={{ ...photoTag, background: A, color: '#052e16' }}><Star size={11} fill="currentColor" /> Titelbild</span>}
+                    {used && <span style={{ ...photoTag, left: 'auto', right: '6px', background: 'rgba(5,26,12,0.85)' }}>im Text</span>}
+                  </div>
+                  <div style={{ display: 'grid', gap: '4px', padding: '6px' }}>
+                    {!cover && <button onClick={() => update({ coverImage: url })} style={photoBtn}><Star size={13} /> Als Titelbild</button>}
+                    <button onClick={() => insertPhoto(url)} style={{ ...photoBtn, background: 'rgba(74,222,128,0.14)', borderColor: 'rgba(74,222,128,0.4)', color: '#bbf7d0' }}><Plus size={13} /> {used ? 'Nochmal in Text' : 'In Text einfügen'}</button>
+                    <button onClick={() => {
+                      editorRef.current?.querySelectorAll('img').forEach(i => { if (i.getAttribute('src')?.endsWith(url)) { const f = i.closest('figure') || i; f.remove(); } });
+                      clearSel();
+                      update({ images: form.images.filter(u => u !== url), coverImage: form.coverImage === url ? '' : form.coverImage, html: fromEditorHtml(editorRef.current?.innerHTML || '') });
+                    }} style={{ ...photoBtn, color: '#fca5a5', borderColor: 'rgba(252,165,165,0.3)' }}><Trash2 size={13} /> Entfernen</button>
+                  </div>
+                </div>
+              );
+            })}
             {Array.from({ length: uploads }).map((_, i) => (
               <div key={`u${i}`} style={{ aspectRatio: '4/3', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '11px' }}>
                 <Loader2 size={20} className="ttc-spin" /> lädt hoch …
@@ -418,6 +490,45 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
             ))}
           </div>
         )}
+      </Step>
+
+      <Step n="4" title="Text">
+        <p style={{ ...C.muted, margin: '0 0 10px', fontSize: '12px' }}>Einfach hineinschreiben – oder einen fertigen Text aus Word bzw. einer E-Mail einfügen. Fotos: in Schritt 3 „In Text einfügen“ tippen – sie erscheinen unter dem Absatz, in dem du zuletzt geschrieben hast. Ein Foto im Text antippen, um es zu verschieben oder zu entfernen.</p>
+        <div role="toolbar" aria-label="Formatierung" style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
+          {[['bold', Bold, 'Fett'], ['italic', Italic, 'Kursiv'], ['underline', Underline, 'Unterstrichen']].map(([c, Icon, label]) => (
+            <button key={c} aria-pressed={fmt[c]} onMouseDown={e => e.preventDefault()} onClick={() => cmd(c)}
+              style={{ ...toolBtn, ...(fmt[c] ? { background: A, borderColor: A, color: '#052e16' } : {}) }}><Icon size={14} /> {label}</button>
+          ))}
+          <button onMouseDown={e => e.preventDefault()} onClick={() => cmd('formatBlock', 'h3')} style={toolBtn}><Heading2 size={14} /> Zwischenüberschrift</button>
+          <button onMouseDown={e => e.preventDefault()} onClick={() => cmd('formatBlock', 'p')} style={toolBtn}>Normaler Text</button>
+          <button onMouseDown={e => e.preventDefault()} onClick={() => cmd('insertUnorderedList')} style={toolBtn}><List size={14} /> Liste</button>
+          <button onMouseDown={e => e.preventDefault()} onClick={() => cmd('undo')} style={toolBtn}><Undo2 size={14} /> Rückgängig</button>
+        </div>
+        <div role="radiogroup" aria-label="Ausrichtung" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '5px', marginBottom: '8px' }}>
+          <span style={{ ...C.muted, fontSize: '12px', marginRight: '2px' }}>Ausrichtung:</span>
+          {ALIGNS.map(({ id: al, label, Icon }) => {
+            const on = (form.textAlign || 'justify') === al;
+            return (
+              <button key={al} role="radio" aria-checked={on} onMouseDown={e => e.preventDefault()} onClick={() => update({ textAlign: al })}
+                style={{ ...toolBtn, ...(on ? { background: 'rgba(74,222,128,0.16)', borderColor: A, color: '#bbf7d0' } : {}) }}>
+                <Icon size={14} /> {label}
+              </button>
+            );
+          })}
+        </div>
+        <div ref={wrapRef} style={{ position: 'relative' }}>
+          <div ref={editorRef} className="ttc-redaktion-editor" contentEditable suppressContentEditableWarning onInput={onInput} onPaste={onPaste}
+            onClick={onEditorClick} onKeyDown={() => sel && clearSel()} onDragOver={e => { if ([...e.dataTransfer.types].includes('text/ttc-foto')) e.preventDefault(); }} onDrop={onEditorDrop}
+            role="textbox" aria-multiline="true" aria-label="Text des Berichts" data-placeholder="Hier den Bericht schreiben …"
+            lang="de" style={{ minHeight: '240px', padding: '12px 14px', fontSize: '15px', lineHeight: 1.65, color: '#111', background: '#fff', borderRadius: '10px', outline: 'none', overflowWrap: 'anywhere', textAlign: form.textAlign || 'justify', hyphens: 'auto', WebkitHyphens: 'auto' }} />
+          {sel && (
+            <div role="toolbar" aria-label="Foto im Text" style={{ position: 'absolute', top: Math.max(4, sel.top + 8), right: '10px', display: 'flex', gap: '4px', padding: '4px', borderRadius: '10px', background: '#052e16', boxShadow: '0 6px 20px rgba(0,0,0,0.35)', zIndex: 5 }}>
+              <button onMouseDown={e => e.preventDefault()} onClick={() => moveSel(-1)} style={imgBtn} aria-label="Foto nach oben"><ArrowUp size={16} /> Hoch</button>
+              <button onMouseDown={e => e.preventDefault()} onClick={() => moveSel(1)} style={imgBtn} aria-label="Foto nach unten"><ArrowDown size={16} /> Runter</button>
+              <button onMouseDown={e => e.preventDefault()} onClick={removeSel} style={{ ...imgBtn, color: '#fca5a5' }} aria-label="Foto aus dem Text nehmen"><X size={16} /></button>
+            </div>
+          )}
+        </div>
       </Step>
 
       <Step n="5" title="Datum">
@@ -442,7 +553,7 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
             <p style={{ margin: '0 0 6px', color: '#5f6b63', fontSize: '13px' }}>{catLabel(form.category)} · {fmtDate(form.date)}</p>
             <h1 style={{ fontSize: isMobile ? '24px' : '32px', lineHeight: 1.1, margin: '0 0 16px' }}>{form.title || 'Ohne Überschrift'}</h1>
             {form.images[0] && <img src={imgSrc(form.images[0])} alt="" style={{ width: '100%', borderRadius: '8px', marginBottom: '16px' }} />}
-            <div className="ttc-redaktion-preview" lang="de" style={{ fontSize: '16px', lineHeight: 1.65, textAlign: form.textAlign || 'justify', hyphens: 'auto', WebkitHyphens: 'auto' }} dangerouslySetInnerHTML={{ __html: form.html }} />
+            <div className="ttc-redaktion-preview" lang="de" style={{ fontSize: '16px', lineHeight: 1.65, textAlign: form.textAlign || 'justify', hyphens: 'auto', WebkitHyphens: 'auto' }} dangerouslySetInnerHTML={{ __html: absImages(form.html) }} />
             {form.images.length > 1 && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: '6px', marginTop: '18px' }}>{form.images.slice(1).map(u => <img key={u} src={imgSrc(u)} alt="" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover' }} />)}</div>}
           </div>
         </div>
