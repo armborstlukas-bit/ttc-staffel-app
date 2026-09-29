@@ -150,6 +150,8 @@ export async function getFahrplanItems() {
         liga: ligaCode,
         ligaName: g.league_name || '',
         halle: g.location?.label || '',
+        // volle Anschrift des Spiellokals (nur Anzeige – nicht Teil der Wechsel-Erkennung)
+        hallenAdresse: g.location ? [g.location.street, [g.location.zip, g.location.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') : '',
         heim,
         gast,
         isHeimspiel,

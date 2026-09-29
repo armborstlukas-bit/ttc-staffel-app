@@ -15168,6 +15168,7 @@ export default function TrainingsApp() {
                     {it.liga&&<span style={{color:'#93c5fd'}}>[{it.liga}] </span>}
                     {fmtDate(it.datum)}{it.zeit?` ${it.zeit}`:''} · {it.heim} – {it.gast}
                     {it.treffpunkt&&<span style={{color:'#fbbf24'}}> ({it.isHeimspiel?'Treffpunkt':'Abfahrt'}: {it.treffpunkt})</span>}
+                    {it.halle&&<div style={{fontSize:'11px',fontWeight:'500',color:'rgba(255,255,255,0.6)'}}>📍 {it.halle}{it.hallenAdresse?`, ${it.hallenAdresse}`:''}</div>}
                   </div>
                 ))}
               </div>
@@ -15227,6 +15228,7 @@ export default function TrainingsApp() {
                       </div>
                       {it.treffpunkt&&<div style={{color:'#fbbf24',fontSize:'11px',fontWeight:'600'}}>{it.isHeimspiel?'Treffpunkt':'Abfahrt'}: {it.treffpunkt}</div>}
                       <div style={{color:'white',fontWeight:'600',lineHeight:'1.35'}}>{it.heim} <span style={{color:'rgba(255,255,255,0.48)'}}>–</span> {it.gast}</div>
+                      {it.halle&&<a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([it.halle, it.hallenAdresse].filter(Boolean).join(', '))}`} target="_blank" rel="noopener noreferrer" title="Spiellokal in Google Maps öffnen" style={{color:'rgba(255,255,255,0.62)',fontSize:'11px',textDecoration:'none'}}>📍 {it.halle}{it.hallenAdresse?`, ${it.hallenAdresse}`:''}</a>}
                       {fahrerNode}
                     </div>
                   ) : (
@@ -15235,6 +15237,7 @@ export default function TrainingsApp() {
                       <span style={{color:'rgba(255,255,255,0.65)',fontWeight:'700',flexShrink:0}}>{fmtDate(it.datum)}{it.zeit?` ${it.zeit}`:''}{it.treffpunkt?` (${it.isHeimspiel?'Treffpunkt':'Abfahrt'}: ${it.treffpunkt})`:''}</span>
                       <span style={{color:'white',fontWeight:'600',flex:'1 1 auto',minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.heim} <span style={{color:'rgba(255,255,255,0.48)'}}>–</span> {it.gast}</span>
                       {fahrerNode}
+                      {it.halle&&<a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([it.halle, it.hallenAdresse].filter(Boolean).join(', '))}`} target="_blank" rel="noopener noreferrer" title="Spiellokal in Google Maps öffnen" style={{color:'rgba(255,255,255,0.62)',fontSize:'11px',textDecoration:'none',flexBasis:'100%',paddingLeft:it.liga?'2px':0}}>📍 {it.halle}{it.hallenAdresse?`, ${it.hallenAdresse}`:''}</a>}
                     </div>
                   ));
                 });
