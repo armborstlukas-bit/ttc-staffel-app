@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Home, Plus, Trash2, Download, Check, Search, ChevronLeft, ChevronRight, UserPlus, X, Pencil } from 'lucide-react';
+import { Home, Plus, Trash2, Download, Check, Search, ChevronLeft, ChevronRight, ChevronDown, UserPlus, X, Pencil } from 'lucide-react';
 import { parseBetrag } from './abrechnungPdf.js';
 import { lehrgangPdf, lehrgangXlsx, fmtEuro, dm, dmy, dateiName } from './lehrgangExport.js';
 
@@ -271,20 +271,21 @@ export default function Lehrgang({ isMobile, onHome, lehrgaenge = {}, kinder = [
                 <input style={{ ...input, paddingLeft: '36px' }} value={suche} onChange={(e) => setSuche(e.target.value)} placeholder="Kind suchen…" />
                 {suche && <button onClick={() => setSuche('')} aria-label="Suche leeren" style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', display: 'flex' }}><X size={18} /></button>}
               </div>
-              {gruppen.length > 1 && (
-                <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', margin: '0 -14px 12px', padding: '0 14px 2px', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
-                  {[{ name: '', farbe: '' }, ...gruppen].map((g) => {
-                    const on = gruppe === g.name;
-                    const n = g.name ? personen.filter((p) => p.gruppe === g.name && da(tag, p.id)).length : anzahlTag;
-                    return (
-                      <button key={g.name || 'alle'} onClick={() => setGruppe(g.name)} style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 12px', borderRadius: '99px', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: 700, fontSize: '13px', border: `1.5px solid ${on ? '#4ade80' : 'rgba(255,255,255,0.14)'}`, background: on ? 'rgba(74,222,128,0.16)' : 'rgba(255,255,255,0.04)', color: on ? 'white' : 'rgba(255,255,255,0.75)' }}>
-                        {g.farbe && <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: g.farbe }} />}
-                        {g.name || 'Alle'}{n > 0 && <span style={{ fontSize: '11px', color: on ? '#bbf7d0' : 'rgba(255,255,255,0.5)' }}>✓{n}</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              {gruppen.length > 1 && (() => {
+                const aktiv = gruppen.find((g) => g.name === gruppe);
+                const zahl = (name) => (name ? personen.filter((p) => p.gruppe === name && da(tag, p.id)).length : anzahlTag);
+                return (
+                  <label style={{ display: 'block', position: 'relative', marginBottom: '12px' }}>
+                    <span style={{ position: 'absolute', left: '13px', top: '50%', transform: 'translateY(-50%)', width: '9px', height: '9px', borderRadius: '50%', background: aktiv?.farbe || 'rgba(255,255,255,0.35)', pointerEvents: 'none' }} />
+                    <select value={gruppe} onChange={(e) => setGruppe(e.target.value)} aria-label="Nach Gruppe filtern"
+                      style={{ ...input, paddingLeft: '32px', paddingRight: '38px', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer', fontWeight: 700, border: `1px solid ${gruppe ? '#4ade80' : 'rgba(134,239,172,0.2)'}`, background: gruppe ? 'rgba(74,222,128,0.12)' : 'rgba(255,255,255,0.07)' }}>
+                      <option value="" style={{ background: '#0a2210' }}>Alle Gruppen{zahl('') ? ` (✓ ${zahl('')})` : ''}</option>
+                      {gruppen.map((g) => <option key={g.name} value={g.name} style={{ background: '#0a2210' }}>{g.name}{zahl(g.name) ? ` (✓ ${zahl(g.name)})` : ''}</option>)}
+                    </select>
+                    <ChevronDown size={18} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.6, pointerEvents: 'none' }} />
+                  </label>
+                );
+              })()}
               {obenListe.length > 0 && <>
                 <div style={{ ...lbl, marginTop: '4px', marginBottom: '8px' }}>Lehrgangsteilnehmer</div>
                 <div style={{ display: 'grid', gap: '6px', marginBottom: '14px' }}>{obenListe.map((p) => <KindZeile key={p.id} p={p} />)}</div>
