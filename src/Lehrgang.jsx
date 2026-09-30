@@ -25,6 +25,7 @@ export default function Lehrgang({ isMobile, onHome, lehrgaenge = {}, kinder = [
   const [tag, setTag] = useState(null);
   const [neu, setNeu] = useState(null); // {name, preis}
   const [suche, setSuche] = useState('');
+  const [gruppe, setGruppe] = useState(''); // Filter nach Trainingsgruppe ('' = alle)
   const [neuerTag, setNeuerTag] = useState('');
   const [gastName, setGastName] = useState('');
   const [laeuft, setLaeuft] = useState('');
@@ -37,7 +38,7 @@ export default function Lehrgang({ isMobile, onHome, lehrgaenge = {}, kinder = [
   // alle Personen: Vereinskinder + Gäste dieses Lehrgangs
   const personen = useMemo(() => {
     if (!lg) return [];
-    const g = Object.entries(lg.gaeste || {}).filter(([, v]) => v && v.name).map(([id, v]) => ({ id, name: v.name, gruppe: 'Gast', gast: true }));
+    const g = Object.entries(lg.gaeste || {}).filter(([, v]) => v && v.name).map(([id, v]) => ({ id, name: v.name, gruppe: 'Gäste', gast: true, ordnung: 99999 }));
     return [...kinder, ...g];
   }, [lg, kinder]);
 
@@ -106,7 +107,7 @@ export default function Lehrgang({ isMobile, onHome, lehrgaenge = {}, kinder = [
     </div>
   );
   const seite = { minHeight: '100vh', background: 'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)', fontFamily: "'Inter','Segoe UI',system-ui,-apple-system,sans-serif", color: 'white' };
-  const inhalt = { padding: isMobile ? '14px 16px 48px' : '20px', maxWidth: '760px', margin: '0 auto', display: 'grid', gap: '14px' };
+  const inhalt = { padding: isMobile ? '14px 16px 48px' : '20px', maxWidth: '760px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '14px' };
 
   // ── Übersicht ─────────────────────────────
   if (!lg) {
@@ -142,7 +143,7 @@ export default function Lehrgang({ isMobile, onHome, lehrgaenge = {}, kinder = [
                 <span style={{ fontSize: '26px' }}>🎒</span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <b style={{ display: 'block', fontSize: '16px' }}>{l.name}</b>
-                  <span style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.6)' }}>{t.length ? `${dmy(t[0])}${t.length > 1 ? ' – ' + dmy(t[t.length - 1]) : ''} · ${t.length} Tage` : 'Noch keine Tage'} · {kids.size} Kinder · {fmtEuro(Number(l.preis) || 0)} €/Tag</span>
+                  <span style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.6)' }}>{t.length ? `${dmy(t[0])}${t.length > 1 ? ' – ' + dmy(t[t.length - 1]) : ''} · ${t.length} ${t.length === 1 ? 'Tag' : 'Tage'}` : 'Noch keine Tage'} · {kids.size} Kinder · {fmtEuro(Number(l.preis) || 0)} €/Tag</span>
                 </span>
                 <b style={{ color: C.accent, whiteSpace: 'nowrap' }}>{fmtEuro(summe)} €</b>
               </button>
@@ -156,7 +157,8 @@ export default function Lehrgang({ isMobile, onHome, lehrgaenge = {}, kinder = [
   // ── Lehrgang ──────────────────────────────
   const q = suche.trim().toLowerCase();
   const teilnehmerIds = new Set(abrechnung.zeilen.map((z) => z.id));
-  const gefiltert = personen.filter((p) => !q || p.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  const gruppen = [...new Map(personen.filter((p) => p.gruppe).sort((a, b) => (a.ordnung ?? 0) - (b.ordnung ?? 0) || a.gruppe.localeCompare(b.gruppe, 'de')).map((p) => [p.gruppe, { name: p.gruppe, farbe: p.farbe }])).values()];
+  const gefiltert = personen.filter((p) => (!q || p.name.toLowerCase().includes(q)) && (!gruppe || p.gruppe === gruppe)).sort((a, b) => a.name.localeCompare(b.name, 'de'));
   const obenListe = gefiltert.filter((p) => teilnehmerIds.has(p.id) || (tag && da(tag, p.id)));
   const restListe = gefiltert.filter((p) => !obenListe.includes(p));
   const anzahlTag = tag ? personen.filter((p) => da(tag, p.id)).length : 0;
@@ -168,7 +170,7 @@ export default function Lehrgang({ isMobile, onHome, lehrgaenge = {}, kinder = [
         <span style={{ width: '26px', height: '26px', borderRadius: '8px', flexShrink: 0, display: 'grid', placeItems: 'center', background: an ? '#16a34a' : 'transparent', border: an ? 'none' : '2px solid rgba(255,255,255,0.25)' }}>{an && <Check size={17} strokeWidth={3} />}</span>
         <span style={{ flex: 1, minWidth: 0 }}>
           <b style={{ display: 'block', fontSize: '15px', fontWeight: 700 }}>{p.name}</b>
-          <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>{p.gruppe || ''}{teilnehmerIds.has(p.id) ? ` · ${abrechnung.zeilen.find((z) => z.id === p.id)?.tage.length || 0} Tage` : ''}</span>
+          <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>{p.gruppe || ''}{teilnehmerIds.has(p.id) ? (() => { const n = abrechnung.zeilen.find((z) => z.id === p.id)?.tage.length || 0; return ` · ${n} ${n === 1 ? 'Tag' : 'Tage'}`; })() : ''}</span>
         </span>
       </button>
     );
@@ -219,6 +221,20 @@ export default function Lehrgang({ isMobile, onHome, lehrgaenge = {}, kinder = [
                 <input style={{ ...input, paddingLeft: '36px' }} value={suche} onChange={(e) => setSuche(e.target.value)} placeholder="Kind suchen…" />
                 {suche && <button onClick={() => setSuche('')} aria-label="Suche leeren" style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', display: 'flex' }}><X size={18} /></button>}
               </div>
+              {gruppen.length > 1 && (
+                <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', margin: '0 -14px 12px', padding: '0 14px 2px', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
+                  {[{ name: '', farbe: '' }, ...gruppen].map((g) => {
+                    const on = gruppe === g.name;
+                    const n = g.name ? personen.filter((p) => p.gruppe === g.name && da(tag, p.id)).length : anzahlTag;
+                    return (
+                      <button key={g.name || 'alle'} onClick={() => setGruppe(g.name)} style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 12px', borderRadius: '99px', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: 700, fontSize: '13px', border: `1.5px solid ${on ? '#4ade80' : 'rgba(255,255,255,0.14)'}`, background: on ? 'rgba(74,222,128,0.16)' : 'rgba(255,255,255,0.04)', color: on ? 'white' : 'rgba(255,255,255,0.75)' }}>
+                        {g.farbe && <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: g.farbe }} />}
+                        {g.name || 'Alle'}{n > 0 && <span style={{ fontSize: '11px', color: on ? '#bbf7d0' : 'rgba(255,255,255,0.5)' }}>✓{n}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               {obenListe.length > 0 && <>
                 <div style={{ ...lbl, marginTop: '4px', marginBottom: '8px' }}>Lehrgangsteilnehmer</div>
                 <div style={{ display: 'grid', gap: '6px', marginBottom: '14px' }}>{obenListe.map((p) => <KindZeile key={p.id} p={p} />)}</div>
@@ -227,7 +243,7 @@ export default function Lehrgang({ isMobile, onHome, lehrgaenge = {}, kinder = [
                 <div style={{ ...lbl, marginBottom: '8px' }}>{obenListe.length ? 'Weitere Kinder' : 'Alle Kinder'}</div>
                 <div style={{ display: 'grid', gap: '6px' }}>{restListe.map((p) => <KindZeile key={p.id} p={p} />)}</div>
               </>}
-              {gefiltert.length === 0 && <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', margin: '4px 0 10px' }}>Kein Kind gefunden.</p>}
+              {gefiltert.length === 0 && <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', margin: '4px 0 10px' }}>Kein Kind gefunden{gruppe ? ` in „${gruppe}“` : ''}.</p>}
               <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
                 <input style={input} value={gastName} onChange={(e) => setGastName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && gastHinzu()} placeholder="Gastkind (nicht im Verein) hinzufügen" />
                 <button style={{ ...btn(false), flexShrink: 0 }} onClick={gastHinzu} aria-label="Gast hinzufügen"><UserPlus size={17} /></button>

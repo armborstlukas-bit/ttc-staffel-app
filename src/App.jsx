@@ -16949,7 +16949,7 @@ export default function TrainingsApp() {
   // ── REDAKTION (Berichte für die Vereinswebseite) ──────────────────────
   if (view === 'lehrgang' && canEdit()) {
     const kinderListe = Object.values(children).filter(c => c && c.name && !c.nachwuchsKarriereBeendet)
-      .map(c => ({ id: c.id, name: c.name, gruppe: subgroups[c.subgroupId]?.name || '' }));
+      .map(c => { const sub = subgroups[c.subgroupId]; const gi = FIXED_GROUPS.findIndex(g => g.id === sub?.groupId); return { id: c.id, name: c.name, gruppe: sub?.name || '', farbe: FIXED_GROUPS[gi]?.color || '', ordnung: (gi < 0 ? 9 : gi) * 1000 + (Number(sub?.order) || 0) }; });
     return (
       <React.Suspense fallback={<div style={{minHeight:'100vh',background:'#021a0a'}}/>}>
         <Lehrgang key={viewKey} isMobile={isMobile} userName={userProfile?.name||''} onHome={()=>navTo('home')}
