@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import {
   CalendarDays, Users, Gamepad2, Shirt, Package, BarChart3, Medal, Trophy, CalendarRange, TrendingUp, Target, Radio, Swords,
   Newspaper, PenLine, MessageCircle, CalendarHeart, Car, ClipboardList, Lightbulb, Dices, Recycle, Receipt, FolderOpen, Archive,
-  Trash2, Activity, LayoutGrid, ArrowUpRight,
+  Trash2, Activity, LayoutGrid, ArrowUpRight, Backpack,
 } from 'lucide-react';
 
 // Neues App-Design (Beta) – bewusst sehr nah an der Webseite (ttc-staffel-web):
@@ -29,9 +29,9 @@ const ICONS = {
   'Gegnerlogbuch': Target, 'Live-Statistiken': Radio, 'Trainingsmatches': Swords, 'TTC News': Newspaper, 'Redaktion': PenLine,
   'Nachrichten': MessageCircle, 'Vereinskalender': CalendarHeart, 'Wer fährt wann': Car, 'Pinnwand': ClipboardList,
   'Verbesserungen': Lightbulb, 'Pfandkasse': Recycle, 'Abrechnung': Receipt, 'Mitglieder': FolderOpen, 'Archiv': Archive,
-  'Datenlöschen': Trash2, 'App-Statistik': Activity,
+  'Datenlöschen': Trash2, 'App-Statistik': Activity, 'Lehrgangsabrechnung': Backpack,
 };
-const SHORT = { 'TTC Mannschaften': 'Mannschaften', 'Materialverwaltung': 'Material', 'Live-Statistiken': 'Live-Statistiken', 'Vereinskalender': 'Kalender', 'Verbesserungen': 'Ideen & Wünsche', 'Rompel Bereich': 'Rompel', 'Datenlöschen': 'Daten löschen' };
+const SHORT = { 'TTC Mannschaften': 'Mannschaften', 'Materialverwaltung': 'Material', 'Live-Statistiken': 'Live-Statistiken', 'Vereinskalender': 'Kalender', 'Verbesserungen': 'Ideen & Wünsche', 'Rompel Bereich': 'Rompel', 'Datenlöschen': 'Daten löschen', 'Lehrgangsabrechnung': 'Lehrgänge' };
 export const shortLabel = (l) => (/tippspiel/i.test(l) ? 'Tippspiel' : SHORT[l] || l);
 
 export function LinkIcon({ link, size = 20 }) {

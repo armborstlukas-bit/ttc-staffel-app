@@ -169,6 +169,7 @@ import LaunchCountdown from './LaunchCountdown.jsx';
 import BetaHome from './BetaHome.jsx';
 import { betaStore, BETA_LS_KEY, BETA_EMAILS } from './betaStore.js';
 const Abrechnung = React.lazy(() => import('./Abrechnung.jsx'));
+const Lehrgang = React.lazy(() => import('./Lehrgang.jsx'));
 
 const firebaseConfig = {
   apiKey: "AIzaSyCrx34HEgaHnRE187Cja4JNAtbexvrA6Vg",
@@ -876,6 +877,7 @@ export default function TrainingsApp() {
   const [showRangStats, setShowRangStats] = useState(false);
   const [rangStatsH2H, setRangStatsH2H] = useState(['', '']);
   const [ranglistenspiele, setRanglistenspiele] = useState({ active: [], archived: [] });
+  const [lehrgaenge, setLehrgaenge] = useState({});
   const [newSpielForm, setNewSpielForm] = useState({ open: false, challengerId: '', defenderId: '' });
   const [rangSelectionMode, setRangSelectionMode] = useState(false);
   const [rangSelection, setRangSelection] = useState([]);
@@ -1249,6 +1251,7 @@ export default function TrainingsApp() {
       onSnapshot(doc(db,'ttc','trainingsdoppel'), s => setTrainingsdoppel(s.exists()&&Array.isArray(s.data().matches)?s.data().matches:[])),
       onSnapshot(doc(db,'ttc','wettenZitate'), s => setWettenZitate(s.exists()&&Array.isArray(s.data().entries)?s.data().entries:[])),
       onSnapshot(doc(db,'ttc','trikotDaten'), s => setTrikotDaten(s.exists()?s.data():{})),
+      onSnapshot(doc(db,'ttc','lehrgaenge'), s => setLehrgaenge(s.exists()?s.data():{})),
       onSnapshot(doc(db,'ttc','betreuungStatusOverrides'), s => setBetreuungOverrides(s.exists()?s.data():{})),
     ];
     if (['admin','aktiver','trainer'].includes(userRole))
@@ -3732,6 +3735,7 @@ export default function TrainingsApp() {
         color: 'rgba(134,239,172,0.45)',
         links: [
           {label:'Trainingsplan',    icon:'📅', color:'#86efac', bg:'rgba(134,239,172,0.1)',  border:'rgba(134,239,172,0.25)', action:()=>navTo('trainingsplan')},
+          {label:'Lehrgangsabrechnung', icon:'🎒', color:'#fcd34d', bg:'rgba(252,211,77,0.08)', border:'rgba(252,211,77,0.25)', action:()=>navTo('lehrgang')},
           {label:'Meine Gruppen',    icon:'👥', color:'#6ee7b7', bg:'rgba(110,231,183,0.1)',  border:'rgba(110,231,183,0.25)', action:()=>navTo('meingruppen')},
           {label:'Übungswettkämpfe',icon:'🎮', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)',  border:'rgba(196,181,253,0.25)', action:()=>navTo('practiceTournaments')},
           ...(canEdit()?[
@@ -16943,6 +16947,19 @@ export default function TrainingsApp() {
   }
 
   // ── REDAKTION (Berichte für die Vereinswebseite) ──────────────────────
+  if (view === 'lehrgang' && canEdit()) {
+    const kinderListe = Object.values(children).filter(c => c && c.name && !c.nachwuchsKarriereBeendet)
+      .map(c => ({ id: c.id, name: c.name, gruppe: subgroups[c.subgroupId]?.name || '' }));
+    return (
+      <React.Suspense fallback={<div style={{minHeight:'100vh',background:'#021a0a'}}/>}>
+        <Lehrgang key={viewKey} isMobile={isMobile} userName={userProfile?.name||''} onHome={()=>navTo('home')}
+          lehrgaenge={lehrgaenge} kinder={kinderListe}
+          onSave={(id, patch) => { setLehrgaenge(prev => ({ ...prev, [id]: { ...(prev[id]||{}), ...patch, teilnahme: patch.teilnahme ? Object.fromEntries(Object.entries({ ...(prev[id]?.teilnahme||{}) }).concat(Object.entries(patch.teilnahme).map(([d, m]) => [d, { ...(prev[id]?.teilnahme?.[d]||{}), ...m }]))) : (prev[id]?.teilnahme||{}), gaeste: patch.gaeste ? { ...(prev[id]?.gaeste||{}), ...patch.gaeste } : (prev[id]?.gaeste||{}) } }));
+            setDoc(doc(db,'ttc','lehrgaenge'), { [id]: patch }, { merge: true }).catch(e => alert('Speichern fehlgeschlagen: ' + e.message)); }}
+          onDelete={(id) => { setLehrgaenge(prev => { const n = { ...prev }; delete n[id]; return n; }); updateDoc(doc(db,'ttc','lehrgaenge'), { [id]: deleteField() }).catch(() => {}); }} />
+      </React.Suspense>
+    );
+  }
   if (view === 'abrechnung' && canEdit()) {
     return (
       <React.Suspense fallback={<div style={{minHeight:'100vh',background:'#021a0a'}}/>}>
