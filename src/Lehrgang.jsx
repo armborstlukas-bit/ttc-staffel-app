@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Home, Plus, Trash2, Download, Check, Search, ChevronLeft, UserPlus, X } from 'lucide-react';
+import { Home, Plus, Trash2, Download, Check, Search, ChevronLeft, ChevronRight, UserPlus, X, Pencil } from 'lucide-react';
 import { parseBetrag } from './abrechnungPdf.js';
 import { lehrgangPdf, lehrgangXlsx, fmtEuro, dm, dmy, dateiName } from './lehrgangExport.js';
 
@@ -19,6 +19,36 @@ const logoLaden = async () => {
 };
 const speichernAls = (blob, name) => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); };
 
+const wocheVon = (iso) => {
+  const d = new Date(iso + 'T12:00:00'); const mo = new Date(d); mo.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return Array.from({ length: 5 }, (_, i) => { const x = new Date(mo); x.setDate(mo.getDate() + i); return x.toISOString().slice(0, 10); });
+};
+
+// Tage auswählen: Datum + „Tag“ oder ganze Woche „Mo–Fr“; vorhandene Tage mit ✕ entfernen
+function TageEditor({ tage, onAdd, onRemove, isMobile, anzahl }) {
+  const [datum, setDatum] = useState('');
+  return (
+    <div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+        {tage.length === 0 && <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)' }}>Noch keine Tage ausgewählt.</span>}
+        {tage.map((iso) => (
+          <span key={iso} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 8px 7px 11px', borderRadius: '10px', border: '1.5px solid rgba(255,255,255,0.16)', background: 'rgba(255,255,255,0.05)', fontWeight: 700, fontSize: '13px' }}>
+            {wochentag(iso)} {dm(iso)}{anzahl ? <span style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>· {anzahl(iso)}</span> : null}
+            <button onClick={() => onRemove(iso)} aria-label={`${dmy(iso)} entfernen`} style={{ background: 'rgba(248,113,113,0.15)', border: 'none', color: '#fca5a5', cursor: 'pointer', display: 'grid', placeItems: 'center', width: '22px', height: '22px', borderRadius: '6px', padding: 0 }}><X size={14} /></button>
+          </span>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto auto', gap: '8px', alignItems: 'end' }}>
+        <label><span style={lbl}>Datum</span><input type="date" style={input} value={datum} onChange={(e) => setDatum(e.target.value)} /></label>
+        <div style={isMobile ? { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } : { display: 'contents' }}>
+          <button style={{ ...btn(true), opacity: datum ? 1 : 0.5 }} disabled={!datum} onClick={() => { onAdd([datum]); setDatum(''); }}><Plus size={16} /> Tag</button>
+          <button style={{ ...btn(false), opacity: datum ? 1 : 0.5 }} disabled={!datum} onClick={() => { onAdd(wocheVon(datum)); setDatum(''); }} title="Montag bis Freitag dieser Woche hinzufügen"><Plus size={16} /> Mo–Fr</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Lehrgang({ isMobile, onHome, lehrgaenge = {}, kinder = [], onSave, onDelete, userName = '' }) {
   const [aktivId, setAktivId] = useState(null);
   const [tab, setTab] = useState('anwesenheit');
@@ -26,7 +56,7 @@ export default function Lehrgang({ isMobile, onHome, lehrgaenge = {}, kinder = [
   const [neu, setNeu] = useState(null); // {name, preis}
   const [suche, setSuche] = useState('');
   const [gruppe, setGruppe] = useState(''); // Filter nach Trainingsgruppe ('' = alle)
-  const [neuerTag, setNeuerTag] = useState('');
+  const [tageEdit, setTageEdit] = useState(false);
   const [gastName, setGastName] = useState('');
   const [laeuft, setLaeuft] = useState('');
   const [fehler, setFehler] = useState('');
@@ -62,20 +92,15 @@ export default function Lehrgang({ isMobile, onHome, lehrgaenge = {}, kinder = [
     if (!neu.name.trim()) return setFehler('Bitte einen Namen eingeben.');
     if (!Number.isFinite(p) || p < 0) return setFehler('Bitte einen gültigen Preis pro Tag eingeben (z. B. 15,00).');
     const id = neueId('lg_');
-    onSave(id, { name: neu.name.trim(), preis: p, tage: [], teilnahme: {}, gaeste: {}, hinweis: '', createdAt: new Date().toISOString(), createdBy: userName });
-    setNeu(null); setFehler(''); setAktivId(id); setTab('anwesenheit'); setTag(null);
+    const t = [...new Set(neu.tage)].sort();
+    onSave(id, { name: neu.name.trim(), preis: p, tage: t, teilnahme: {}, gaeste: {}, hinweis: '', createdAt: new Date().toISOString(), createdBy: userName });
+    setNeu(null); setFehler(''); setAktivId(id); setTab('anwesenheit'); setTag(t[0] || null); setTageEdit(false);
   };
 
-  const tagHinzu = (iso) => {
-    if (!iso || tage.includes(iso)) return;
-    save({ tage: [...tage, iso].sort() }); setTag(iso); setNeuerTag('');
-  };
-  const wocheHinzu = (iso) => {
-    if (!iso) return;
-    const d = new Date(iso + 'T12:00:00'); const mo = new Date(d); mo.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-    const neuTage = Array.from({ length: 5 }, (_, i) => { const x = new Date(mo); x.setDate(mo.getDate() + i); return x.toISOString().slice(0, 10); });
-    const alle = [...new Set([...tage, ...neuTage])].sort();
-    save({ tage: alle }); setTag(neuTage[0]); setNeuerTag('');
+  const tageHinzu = (liste) => {
+    const alle = [...new Set([...tage, ...liste])].sort();
+    if (alle.length === tage.length) return;
+    save({ tage: alle }); if (!tag) setTag(liste[0]);
   };
   const tagEntfernen = (iso) => {
     const n = Object.values(lg.teilnahme?.[iso] || {}).filter(Boolean).length;
@@ -123,6 +148,12 @@ export default function Lehrgang({ isMobile, onHome, lehrgaenge = {}, kinder = [
                 <label><span style={lbl}>Name</span><input autoFocus style={input} value={neu.name} placeholder="z. B. Herbstlehrgang 2026" onChange={(e) => setNeu({ ...neu, name: e.target.value })} /></label>
                 <label><span style={lbl}>Kosten pro Tag in €</span><input style={input} value={neu.preis} placeholder="z. B. 15,00" inputMode="decimal" onChange={(e) => setNeu({ ...neu, preis: e.target.value })} /></label>
               </div>
+              <div style={{ marginTop: '14px' }}>
+                <span style={lbl}>Lehrgangstage</span>
+                <TageEditor isMobile={isMobile} tage={[...neu.tage].sort()}
+                  onAdd={(l) => setNeu((n) => ({ ...n, tage: [...new Set([...n.tage, ...l])] }))}
+                  onRemove={(iso) => setNeu((n) => ({ ...n, tage: n.tage.filter((t) => t !== iso) }))} />
+              </div>
               {fehler && <p style={{ color: '#fca5a5', fontSize: '13px', margin: '10px 0 0' }}>{fehler}</p>}
               <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                 <button style={btn(true)} onClick={anlegen}><Check size={16} /> Anlegen</button>
@@ -130,23 +161,40 @@ export default function Lehrgang({ isMobile, onHome, lehrgaenge = {}, kinder = [
               </div>
             </div>
           ) : (
-            <button style={{ ...btn(true), padding: '14px' }} onClick={() => setNeu({ name: '', preis: '' })}><Plus size={18} /> Neuen Lehrgang anlegen</button>
+            <button style={{ ...btn(true), padding: '14px' }} onClick={() => setNeu({ name: '', preis: '', tage: [] })}><Plus size={18} /> Neuen Lehrgang anlegen</button>
           )}
           {liste.length === 0 && !neu && <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.45)', padding: '24px 0', margin: 0 }}>Noch keine Lehrgänge angelegt.</p>}
           {liste.map((l) => {
             const t = [...(l.tage || [])].sort();
             const kids = new Set(); t.forEach((iso) => Object.entries(l.teilnahme?.[iso] || {}).forEach(([k, v]) => v && kids.add(k)));
             const summe = t.reduce((s, iso) => s + Object.values(l.teilnahme?.[iso] || {}).filter(Boolean).length, 0) * (Number(l.preis) || 0);
+            const heute = new Date().toISOString().slice(0, 10);
+            const status = !t.length ? ['Ohne Tage', '#9ca3af'] : t[t.length - 1] < heute ? ['Abgeschlossen', '#9ca3af'] : t[0] > heute ? ['Geplant', '#93c5fd'] : ['Läuft', '#4ade80'];
+            const pill = { fontSize: '11.5px', fontWeight: 700, padding: '3px 8px', borderRadius: '99px', background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.75)', whiteSpace: 'nowrap' };
             return (
-              <button key={l.id} onClick={() => { setAktivId(l.id); setTab('anwesenheit'); setTag(t[0] || null); setSuche(''); }}
-                style={{ ...card, all: undefined, textAlign: 'left', cursor: 'pointer', color: 'white', display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: '14px', padding: '14px', fontFamily: 'inherit' }}>
-                <span style={{ fontSize: '26px' }}>🎒</span>
+              <div key={l.id} role="button" tabIndex={0}
+                onClick={() => { setAktivId(l.id); setTab('anwesenheit'); setTag(t[0] || null); setSuche(''); setGruppe(''); setTageEdit(false); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
+                style={{ cursor: 'pointer', color: 'white', display: 'flex', alignItems: 'center', gap: '14px', backgroundColor: 'rgba(255,255,255,0.045)', backgroundImage: 'linear-gradient(135deg, rgba(74,222,128,0.07), rgba(255,255,255,0) 55%)', border: '1px solid rgba(134,239,172,0.18)', borderRadius: '16px', padding: '14px', boxShadow: '0 6px 18px -10px rgba(0,0,0,0.6)' }}>
+                <span style={{ width: '48px', height: '48px', borderRadius: '13px', flexShrink: 0, display: 'grid', placeItems: 'center', fontSize: '24px', background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.28)' }}>🎒</span>
                 <span style={{ flex: 1, minWidth: 0 }}>
-                  <b style={{ display: 'block', fontSize: '16px' }}>{l.name}</b>
-                  <span style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.6)' }}>{t.length ? `${dmy(t[0])}${t.length > 1 ? ' – ' + dmy(t[t.length - 1]) : ''} · ${t.length} ${t.length === 1 ? 'Tag' : 'Tage'}` : 'Noch keine Tage'} · {kids.size} Kinder · {fmtEuro(Number(l.preis) || 0)} €/Tag</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <b style={{ fontSize: '16px', fontWeight: 800 }}>{l.name}</b>
+                    <span style={{ fontSize: '10.5px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.4px', color: status[1] }}>● {status[0]}</span>
+                  </span>
+                  <span style={{ display: 'block', fontSize: '12.5px', color: 'rgba(255,255,255,0.6)', margin: '3px 0 7px' }}>{t.length ? `${dmy(t[0])}${t.length > 1 ? ' – ' + dmy(t[t.length - 1]) : ''}` : 'Noch keine Tage eingetragen'}</span>
+                  <span style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                    <span style={pill}>{t.length} {t.length === 1 ? 'Tag' : 'Tage'}</span>
+                    <span style={pill}>{kids.size} {kids.size === 1 ? 'Kind' : 'Kinder'}</span>
+                    <span style={pill}>{fmtEuro(Number(l.preis) || 0)} €/Tag</span>
+                  </span>
                 </span>
-                <b style={{ color: C.accent, whiteSpace: 'nowrap' }}>{fmtEuro(summe)} €</b>
-              </button>
+                <span style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <b style={{ display: 'block', color: C.accent, fontSize: '17px', whiteSpace: 'nowrap' }}>{fmtEuro(summe)} €</b>
+                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)' }}>gesamt</span>
+                </span>
+                <ChevronRight size={18} color="rgba(255,255,255,0.35)" style={{ flexShrink: 0 }} />
+              </div>
             );
           })}
         </div>
@@ -188,9 +236,18 @@ export default function Lehrgang({ isMobile, onHome, lehrgaenge = {}, kinder = [
 
         {tab === 'anwesenheit' && (<>
           <section style={card}>
-            <h2 style={{ margin: '0 0 10px', fontSize: '15px', fontWeight: 800, color: C.accent }}>Lehrgangstage</h2>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
-              {tage.length === 0 && <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)' }}>Noch keine Tage – unten Datum wählen.</span>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+              <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: C.accent, flex: 1 }}>Lehrgangstage</h2>
+              <button onClick={() => setTageEdit(!tageEdit)} aria-label={tageEdit ? 'Bearbeiten beenden' : 'Tage bearbeiten'}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 11px', borderRadius: '9px', cursor: 'pointer', fontWeight: 800, fontSize: '12.5px', border: `1px solid ${tageEdit ? '#4ade80' : 'rgba(255,255,255,0.18)'}`, background: tageEdit ? '#16a34a' : 'rgba(255,255,255,0.06)', color: 'white' }}>
+                {tageEdit ? <><Check size={15} /> Fertig</> : <><Pencil size={14} /> Bearbeiten</>}
+              </button>
+            </div>
+            {tageEdit ? (
+              <TageEditor isMobile={isMobile} tage={tage} onAdd={tageHinzu} onRemove={tagEntfernen} anzahl={(iso) => Object.values(lg.teilnahme?.[iso] || {}).filter(Boolean).length} />
+            ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {tage.length === 0 && <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)' }}>Noch keine Tage – über „Bearbeiten“ hinzufügen.</span>}
               {tage.map((iso) => {
                 const n = Object.values(lg.teilnahme?.[iso] || {}).filter(Boolean).length;
                 const on = tag === iso;
@@ -201,20 +258,13 @@ export default function Lehrgang({ isMobile, onHome, lehrgaenge = {}, kinder = [
                 );
               })}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto auto', gap: '8px', alignItems: 'end' }}>
-              <label><span style={lbl}>Datum</span><input type="date" style={input} value={neuerTag} onChange={(e) => setNeuerTag(e.target.value)} /></label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', ...(isMobile ? {} : { display: 'contents' }) }}>
-                <button style={{ ...btn(true), opacity: neuerTag ? 1 : 0.5 }} disabled={!neuerTag} onClick={() => tagHinzu(neuerTag)}><Plus size={16} /> Tag</button>
-                <button style={{ ...btn(false), opacity: neuerTag ? 1 : 0.5 }} disabled={!neuerTag} onClick={() => wocheHinzu(neuerTag)} title="Montag bis Freitag dieser Woche hinzufügen"><Plus size={16} /> Mo–Fr</button>
-              </div>
-            </div>
+            )}
           </section>
 
-          {tag && tage.includes(tag) && (
+          {!tageEdit && tag && tage.includes(tag) && (
             <section style={card}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                 <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: C.accent, flex: 1 }}>{new Date(tag + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit' })} · {anzahlTag} da</h2>
-                <button onClick={() => tagEntfernen(tag)} aria-label="Tag entfernen" style={{ background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer', display: 'flex', padding: '4px' }}><Trash2 size={17} /></button>
               </div>
               <div style={{ position: 'relative', marginBottom: '10px' }}>
                 <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }} />
