@@ -346,6 +346,8 @@ const austrittsBestaetigung = (m = {}, fin = {}) => {
     fin.eintrittsdatum ? `Mitglied seit: ${de(fin.eintrittsdatum)}` : null,
     `Austritt zum: ${de(fin.austrittsdatum)}`,
     '',
+    `Der entsprechende Beitrag wird für das Jahr ${/^\d{4}/.test(fin.austrittsdatum || '') ? fin.austrittsdatum.slice(0, 4) : new Date().getFullYear()} noch eingezogen, danach erlischt die Einzugsermächtigung.`,
+    '',
     'Wir bedanken uns herzlich für die gemeinsame Zeit im Verein. Eine Rückkehr ist jederzeit herzlich willkommen – ob beim Training, beim Osterturnier oder einfach als Gast in der Halle.',
     '',
     'Mit sportlichen Grüßen',
