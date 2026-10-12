@@ -23,8 +23,10 @@ export default async function handler(req, res) {
 
     const stateSnap = await db.collection('ttc').doc('newsState').get();
     const lastSeenLink = stateSnap.exists ? stateSnap.data().lastSeenLink : null;
+    // Nur den Pfad vergleichen – so löst ein Domainwechsel (vercel.app → ttc-staffel.de) keine doppelte Meldung aus
+    const pfad = (u) => { try { return new URL(u).pathname; } catch { return u || ''; } };
 
-    if (lastSeenLink === latest.link) {
+    if (lastSeenLink && pfad(lastSeenLink) === pfad(latest.link)) {
       res.status(200).json({ sent: 0, message: 'Kein neuer Artikel' });
       return;
     }
