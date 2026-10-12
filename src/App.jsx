@@ -4015,7 +4015,7 @@ export default function TrainingsApp() {
   }
 
   // ── PASSIVES MITGLIED: stark eingeschränkter Bereich ──────────────────────
-  if (userRole === 'passiv' && !['ttcnews','kalender','tippspiel','wettenZitate','ttcMannschaften','spielplan','verbesserungswuensche','livestats'].includes(view)) {
+  if (userRole === 'passiv' && !['redaktion','ttcnews','kalender','tippspiel','wettenZitate','ttcMannschaften','spielplan','verbesserungswuensche','livestats'].includes(view)) {
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px'}}>
@@ -4993,7 +4993,7 @@ export default function TrainingsApp() {
 
 
   // ── AKTIVER DASHBOARD ────────────────────────────────────────────────────
-  if (userRole === 'aktiver' && !['gegnerlogbuch','ttcnews','trainingsmatches','wettenZitate','fahrplan','tippspiel','kalender','verbesserungswuensche','ttcMannschaften','spielplan','livestats'].includes(view)) {
+  if (userRole === 'aktiver' && !['redaktion','gegnerlogbuch','ttcnews','trainingsmatches','wettenZitate','fahrplan','tippspiel','kalender','verbesserungswuensche','ttcMannschaften','spielplan','livestats'].includes(view)) {
     const dateLabel = new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
 
     const submitGegner = () => {
