@@ -3,9 +3,9 @@ import React, { useEffect, useState } from 'react';
 // Countdown zum Launch der neuen TTC-Webseite
 // Mittwoch, 14.10.2026, 15:00 Uhr (MESZ). Wird auf allen Startseiten unter der Begrüßung gezeigt
 // und verschwindet 7 Tage nach dem Start von selbst.
-export const LAUNCH_AT = new Date('2026-10-14T15:00:00+02:00').getTime();
+export const LAUNCH_AT = new Date('2026-10-13T15:30:00+02:00').getTime(); // Start vorgezogen: 13.10.2026, 15:30 Uhr
 const AUSBLENDEN_NACH = 7 * 24 * 3600 * 1000;
-const WEBSEITE = 'https://ttc-staffel-web.vercel.app';
+const WEBSEITE = 'https://ttc-staffel.de';
 
 const CSS = `
 @keyframes lc-spin { to { --lc-a: 360deg; } }
@@ -50,7 +50,7 @@ export default function LaunchCountdown() {
           <span className="lc-dot" />
           <span style={{ fontSize: '10.5px', fontWeight: 900, letterSpacing: '2px', textTransform: 'uppercase', color: '#86efac' }}>{live ? 'Jetzt online' : 'Die neue TTC-Webseite'}</span>
           <span style={{ flex: 1 }} />
-          <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(250,204,21,.9)', whiteSpace: 'nowrap' }}>Mi · 14.10. · 15:00</span>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(250,204,21,.9)', whiteSpace: 'nowrap' }}>{live ? 'ttc-staffel.de' : 'Di · 13.10. · 15:30'}</span>
         </div>
 
         {live ? (<>
