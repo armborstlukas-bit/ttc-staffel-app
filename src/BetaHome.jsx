@@ -9,7 +9,7 @@ import { LAUNCH_AT } from './LaunchCountdown.jsx';
 function Launch() {
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
-  if (LAUNCH_AT - now < -7 * 86400e3) return null;
+  if (LAUNCH_AT - now < -14 * 86400e3) return null;
   const r = Math.max(0, Math.floor((LAUNCH_AT - now) / 1000));
   const pad = (n) => String(n).padStart(2, '0');
   return (

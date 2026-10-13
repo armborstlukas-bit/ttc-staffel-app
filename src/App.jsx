@@ -166,6 +166,7 @@ import { getMessaging, getToken as getFcmToken, onMessage, isSupported as isFcmS
 import { Check, X, Plus, Trash2, Download, LogOut, ArrowLeft, Clock, MoveRight, Shield, Users, Calendar, Info, RefreshCw, ChevronRight, Edit2, Save, Trophy, Home, Archive, MessageSquare, Bell, Send, Pencil } from 'lucide-react';
 import Redaktion from './Redaktion.jsx';
 import LaunchCountdown from './LaunchCountdown.jsx';
+import WebsiteLaunch, { WEBSITE_URL, websiteAnnounceActive } from './WebsiteLaunch.jsx';
 import BetaHome from './BetaHome.jsx';
 import { betaStore, BETA_LS_KEY, BETA_EMAILS } from './betaStore.js';
 const Abrechnung = React.lazy(() => import('./Abrechnung.jsx'));
@@ -902,6 +903,7 @@ export default function TrainingsApp() {
   const [liveStatsMsg, setLiveStatsMsg] = useState('');
   const [liveStatsExpanded, setLiveStatsExpanded] = useState(null);
   const [showLiveStatsAnnouncement, setShowLiveStatsAnnouncement] = useState(false);
+  const [showWebsiteLaunch, setShowWebsiteLaunch] = useState(false);
   const [editingSession, setEditingSession]     = useState(null); // session being edited
   const [editForm, setEditForm]                 = useState({});
   const [deleteDialog, setDeleteDialog]         = useState(null);
@@ -2004,6 +2006,25 @@ export default function TrainingsApp() {
     if (userProfile.seenLiveStatsAnnouncement) return;
     setShowLiveStatsAnnouncement(true);
   }, [userProfile?.seenLiveStatsAnnouncement, userProfile?.roles, userProfile?.role, !!user]);
+
+  // Neue Vereinswebseite: einmalige Ankündigung pro Konto beim nächsten App-Öffnen (14 Tage ab Start)
+  useEffect(() => {
+    if (!userProfile || !user || !websiteAnnounceActive()) return;
+    const roles = userProfile.roles?.length ? userProfile.roles : (userProfile.role ? [userProfile.role] : []);
+    if (roles.includes('pending') || roles.includes('blocked') || roles.length === 0) return;
+    if (userProfile.seenWebsiteLaunch) return;
+    setShowWebsiteLaunch(true);
+  }, [userProfile?.seenWebsiteLaunch, userProfile?.roles, userProfile?.role, !!user]);
+
+  const dismissWebsiteLaunch = (open) => {
+    if (open) window.open(WEBSITE_URL, '_blank', 'noopener');
+    setShowWebsiteLaunch(false);
+    if (userProfile) setUserProfile(p => ({ ...p, seenWebsiteLaunch: true }));
+    if (user?.uid) {
+      setDoc(doc(db,'users',user.uid), { seenWebsiteLaunch: true }, { merge: true }).catch(()=>{});
+      updateDoc(doc(db,'ttc','users'), { [`${user.uid}.seenWebsiteLaunch`]: true }).catch(()=>{});
+    }
+  };
 
   const dismissLiveStatsAnnouncement = (goTo) => {
     setShowLiveStatsAnnouncement(false);
@@ -4294,6 +4315,11 @@ export default function TrainingsApp() {
       onOpen={()=>dismissLiveStatsAnnouncement(true)}
       onDismiss={()=>dismissLiveStatsAnnouncement(false)}
     />;
+  }
+
+  // ── Ankündigung neue Vereinswebseite (einmalig pro Account) ──
+  if (showWebsiteLaunch) {
+    return <WebsiteLaunch onOpen={()=>dismissWebsiteLaunch(true)} onLater={()=>dismissWebsiteLaunch(false)} />;
   }
 
   // ── TRAININGSPLAN ────────────────────────────────────────────

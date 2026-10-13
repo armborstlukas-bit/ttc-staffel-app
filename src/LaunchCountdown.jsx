@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 
 // Countdown zum Launch der neuen TTC-Webseite
 // Mittwoch, 14.10.2026, 15:00 Uhr (MESZ). Wird auf allen Startseiten unter der Begrüßung gezeigt
-// und verschwindet 7 Tage nach dem Start von selbst.
+// und verschwindet 14 Tage nach dem Start von selbst.
 export const LAUNCH_AT = new Date('2026-10-13T15:30:00+02:00').getTime(); // Start vorgezogen: 13.10.2026, 15:30 Uhr
-const AUSBLENDEN_NACH = 7 * 24 * 3600 * 1000;
+const AUSBLENDEN_NACH = 14 * 24 * 3600 * 1000;
 const WEBSEITE = 'https://ttc-staffel.de';
 
 const CSS = `
