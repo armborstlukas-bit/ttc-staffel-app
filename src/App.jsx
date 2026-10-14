@@ -70,6 +70,10 @@ if (typeof document !== 'undefined' && !document.getElementById('ttc-global-styl
     .ttc-redaktion-editor figure[class*="img-w-"]:not(.img-left):not(.img-right), .ttc-redaktion-preview figure[class*="img-w-"]:not(.img-left):not(.img-right) { margin-left: auto; margin-right: auto; }
     .ttc-redaktion-preview { font-size: 17px; line-height: 1.7; color: #1a2a20; overflow-wrap: anywhere; }
     .ttc-redaktion-editor figure { -webkit-user-drag: none; user-select: none; }
+    .ttc-redaktion-editor figure:has(img[data-video]) { position: relative; }
+    .ttc-redaktion-editor figure:has(img[data-video])::before { content: '▶'; position: absolute; inset: 0; display: grid; place-items: center; font-size: 34px; color: white; text-shadow: 0 2px 12px rgba(0,0,0,0.7); pointer-events: none; z-index: 1; }
+    .ttc-redaktion-editor img[data-video] { filter: brightness(0.85); }
+    .ttc-redaktion-preview video { width: 100%; display: block; border-radius: 6px; background: #000; }
     .ttc-redaktion-editor figcaption, .ttc-redaktion-preview figcaption { margin-top: 0.45em; font-size: 0.85em; line-height: 1.4; color: #5f6b63; text-align: left; hyphens: auto; }
     .ttc-redaktion-editor figcaption { user-select: text; cursor: text; outline: none; border-bottom: 1px dashed rgba(29,127,63,0.45); padding-bottom: 2px; min-height: 1.4em; }
     .ttc-redaktion-editor figcaption:focus { border-bottom-color: #1d7f3f; background: rgba(74,222,128,0.12); }

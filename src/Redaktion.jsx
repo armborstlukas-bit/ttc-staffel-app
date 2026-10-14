@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Home, ArrowLeft, Bold, Italic, Underline, Heading2, List, Undo2, ImagePlus, Star, ArrowUp, ArrowDown, PanelLeft, PanelRight, RectangleHorizontal, Trash2, Eye, CheckCircle2, X, Loader2, PenLine, Plus, ExternalLink, Search, AlignJustify, AlignLeft, AlignCenter, AlignRight, Captions } from 'lucide-react';
+import { Home, ArrowLeft, Bold, Italic, Underline, Heading2, List, Undo2, ImagePlus, Star, ArrowUp, ArrowDown, PanelLeft, PanelRight, RectangleHorizontal, Trash2, Eye, CheckCircle2, X, Loader2, PenLine, Plus, ExternalLink, Search, AlignJustify, AlignLeft, AlignCenter, AlignRight, Captions, Film } from 'lucide-react';
+import { prepareVideo, putWithProgress, VIDEO_MAX_SECONDS } from './videoTools.js';
 
 // ── Redaktion: Berichte für die Vereinswebseite schreiben ────────────────────────
 // Die Berichte werden über die Schnittstelle der Webseite gespeichert (gleiches Firebase-Konto).
@@ -22,10 +23,15 @@ const EMPTY = { title: '', category: '', html: '', images: [], coverImage: '', d
 
 // ---------- Fotos im Schreibfeld: Adressen für die Anzeige in der App vollständig machen, beim Speichern wieder kürzen ----------
 const absImages = (html) => (html || '').replace(/(src=")(\/media\/web\/)/g, `$1${WEB_URL}$2`);
-const toEditorHtml = (html) => absImages(html).replace(/<figure(?=[\s>])/g, '<figure contenteditable="false"').replace(/<figcaption(?=[\s>])/g, '<figcaption contenteditable="true"');
+// Videos erscheinen im Schreibfeld als Vorschaubild (mit ▶) – so funktionieren Verschieben, Seite, Größe und Unterschrift wie bei Fotos
+const attr = (tag, name) => (tag.match(new RegExp(`\\s${name}="([^"]*)"`)) || [])[1] || '';
+const videoToPlaceholder = (html) => (html || '').replace(/<video\b[^>]*>(\s*<\/video>)?/g, (m) => `<img src="${attr(m, 'poster')}" data-video="${attr(m, 'src')}" alt="">`);
+const placeholderToVideo = (html) => (html || '').replace(/<img\b[^>]*\sdata-video="[^"]*"[^>]*>/g, (m) => `<video src="${attr(m, 'data-video')}" poster="${attr(m, 'src')}" controls playsinline preload="none"></video>`);
+const toEditorHtml = (html) => absImages(videoToPlaceholder(html)).replace(/<figure(?=[\s>])/g, '<figure contenteditable="false"').replace(/<figcaption(?=[\s>])/g, '<figcaption contenteditable="true"');
 const fromEditorHtml = (html) => (html || '').split(`${WEB_URL}/media/web/`).join('/media/web/')
   .replace(/ contenteditable="(false|true)"/g, '').replace(/\s*ttc-img-(sel|drag)/g, '').replace(/ class="\s*"/g, '')
   .replace(/ data-placeholder="[^"]*"/g, '')
+  .replace(/<img\b[^>]*\sdata-video=[^>]*>/g, (m) => placeholderToVideo(m))
   .replace(/<figcaption[^>]*>(\s|<br\s*\/?>|&nbsp;)*<\/figcaption>/g, '');
 // Textausrichtung des Berichts auf der Webseite – Standard ist Blocksatz
 const ALIGNS = [
@@ -247,6 +253,9 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
   const [loaded, setLoaded] = useState(!id);
   const [status, setStatus] = useState('draft');
   const [uploads, setUploads] = useState(0);
+  const [video, setVideo] = useState(null); // { phase: 'pruefen'|'verkleinern'|'hochladen'|'fertig', pct }
+  const [videoQuota, setVideoQuota] = useState(null);
+  const videoRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [restored, setRestored] = useState(!!initialDraft);
@@ -314,12 +323,13 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
     target.classList.add('ttc-img-sel');
     setSel({ el: target, block: topBlock(target), rect: measure(target) });
   };
-  const insertPhoto = (url, after) => {
+  const insertPhoto = (url, after, videoUrl) => {
     const root = editorRef.current;
     const fig = document.createElement('figure');
     fig.setAttribute('contenteditable', 'false');
     const img = document.createElement('img');
     img.src = imgSrc(url); img.alt = '';
+    if (videoUrl) img.setAttribute('data-video', videoUrl);
     fig.appendChild(img);
     const block = after !== undefined ? after : topBlock(lastRange.current?.startContainer);
     if (block) block.after(fig); else root.appendChild(fig);
@@ -496,6 +506,32 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
     }
   };
 
+  // Kurzvideo: prüfen → verkleinern (720p) → Vorschaubild + Video hochladen → an der Schreibstelle einfügen
+  useEffect(() => { api('/video').then(setVideoQuota).catch(() => {}); }, [api]);
+  const addVideo = async (file) => {
+    if (!file) return;
+    setError('');
+    const after = topBlock(lastRange.current?.startContainer);
+    try {
+      if (videoQuota && videoQuota.used >= videoQuota.limits.perMonth) throw new Error(`In diesem Monat wurden bereits ${videoQuota.limits.perMonth} Videos hochgeladen. Ab dem 1. des nächsten Monats geht es wieder.`);
+      setVideo({ phase: 'verkleinern', pct: 0 });
+      const { blob, type, duration, poster } = await prepareVideo(file, (p) => setVideo({ phase: 'verkleinern', pct: p }));
+      setVideo({ phase: 'hochladen', pct: 0 });
+      let posterUrl = '';
+      if (poster) { const fd = new FormData(); fd.append('file', new File([poster], 'vorschau.jpg', { type: 'image/jpeg' })); posterUrl = (await api('/upload', { method: 'POST', form: fd })).url; }
+      const { uploadUrl, path } = await api('/video', { method: 'POST', body: { action: 'start', size: blob.size, duration, contentType: type } });
+      await putWithProgress(uploadUrl, blob, type, (p) => setVideo({ phase: 'hochladen', pct: p }));
+      const { url } = await api('/video', { method: 'POST', body: { action: 'finish', path } });
+      insertPhoto(posterUrl, after ?? undefined, url);
+      setVideo({ phase: 'fertig', pct: 1 });
+      api('/video').then(setVideoQuota).catch(() => {});
+      setTimeout(() => setVideo(null), 4000);
+    } catch (e) {
+      setVideo(null);
+      setError(e.message);
+    }
+  };
+
   const save = async (targetStatus) => {
     setError('');
     clearSel();
@@ -531,7 +567,7 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
   if (!loaded) return error ? <p style={alertS}>{error}</p> : <Spinner />;
 
   const toolBtn = { display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '7px 10px', fontSize: '13px', fontWeight: 600, color: 'white', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.16)', borderRadius: '8px', cursor: 'pointer' };
-  const blocked = busy || uploads > 0;
+  const blocked = busy || uploads > 0 || (!!video && video.phase !== 'fertig');
   const photoBtn = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '6px 8px', fontSize: '12px', fontWeight: 600, color: 'white', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '8px', cursor: 'pointer' };
   const imgBtn = { display: 'flex', alignItems: 'center', gap: '4px', padding: '7px 10px', fontSize: '13px', fontWeight: 700, color: 'white', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '8px', cursor: 'pointer' };
 
@@ -567,13 +603,36 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
         </div>
       </Step>
 
-      <Step n="3" title="Fotos hochladen" note="(freiwillig)">
+      <Step n="3" title="Fotos & Videos hochladen" note="(freiwillig)">
         <p style={{ ...C.muted, margin: '0 0 10px', fontSize: '12px' }}>Erst alle Fotos hochladen – dann das <b style={{ color: '#bbf7d0' }}>Titelbild</b> wählen (Vorschaubild bei „Aktuelles“) und Fotos in den Text setzen.</p>
         <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={e => { addPhotos(e.target.files); e.target.value = ''; }} />
         <button onClick={() => fileRef.current.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); addPhotos(e.dataTransfer.files); }}
           style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '14px', borderRadius: '12px', border: '2px dashed rgba(74,222,128,0.4)', background: 'rgba(74,222,128,0.05)', color: '#bbf7d0', cursor: 'pointer', fontSize: '14px', fontWeight: 700 }}>
           <ImagePlus size={20} /> Fotos auswählen
         </button>
+        <input ref={videoRef} type="file" accept="video/*" hidden onChange={e => { addVideo(e.target.files?.[0]); e.target.value = ''; }} />
+        <button onClick={() => videoRef.current.click()} disabled={!!video && video.phase !== 'fertig'}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '12px', marginTop: '8px', borderRadius: '12px', border: '2px dashed rgba(147,197,253,0.45)', background: 'rgba(147,197,253,0.06)', color: '#bfdbfe', cursor: 'pointer', fontSize: '14px', fontWeight: 700, opacity: video && video.phase !== 'fertig' ? 0.6 : 1 }}>
+          <Film size={20} /> Kurzvideo hinzufügen <span style={{ fontWeight: 500, fontSize: '12px', opacity: 0.8 }}>(max. {VIDEO_MAX_SECONDS} Sek.)</span>
+        </button>
+        <p style={{ ...C.muted, margin: '6px 2px 0', fontSize: '11.5px' }}>
+          Das Video wird an der Stelle im Text eingefügt, an der zuletzt geschrieben wurde, und kann dort wie ein Foto verschoben werden.
+          {videoQuota && <> Diesen Monat: <b style={{ color: '#bfdbfe' }}>{videoQuota.used} von {videoQuota.limits.perMonth}</b> Videos.</>}
+        </p>
+        {video && (
+          <div role="status" style={{ marginTop: '10px', padding: '12px', borderRadius: '10px', background: 'rgba(147,197,253,0.08)', border: '1px solid rgba(147,197,253,0.3)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, color: '#dbeafe', fontSize: '13px' }}>
+              {video.phase === 'fertig' ? <CheckCircle2 size={16} color="#4ade80" /> : <Loader2 size={16} className="ttc-spin" />}
+              {video.phase === 'verkleinern' && <>Video wird verkleinert … {Math.round(video.pct * 100)} %</>}
+              {video.phase === 'hochladen' && <>Video wird hochgeladen … {Math.round(video.pct * 100)} %</>}
+              {video.phase === 'fertig' && <>Video ist im Text eingefügt.</>}
+            </div>
+            {video.phase !== 'fertig' && <>
+              <div style={{ height: '6px', borderRadius: '99px', background: 'rgba(255,255,255,0.1)', marginTop: '8px', overflow: 'hidden' }}><div style={{ width: `${Math.round(video.pct * 100)}%`, height: '100%', background: '#93c5fd', transition: 'width .3s' }} /></div>
+              <p style={{ margin: '6px 0 0', fontSize: '11.5px', color: 'rgba(255,255,255,0.6)' }}>Bitte die App geöffnet und den Bildschirm an lassen.</p>
+            </>}
+          </div>
+        )}
         {(form.images.length > 0 || uploads > 0) && (
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill,minmax(${isMobile ? 140 : 160}px,1fr))`, gap: '10px', marginTop: '12px' }}>
             {form.images.map((url) => {
@@ -672,7 +731,7 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
         <button onClick={() => { update({ html: fromEditorHtml(editorRef.current.innerHTML) }); setPreview(true); }} style={btn('ghost')}><Eye size={15} /> Vorschau</button>
         <button disabled={blocked} onClick={() => save('draft')} style={btn('ghost')}>{status === 'published' ? 'Offline nehmen' : 'Als Entwurf speichern'}</button>
         <button disabled={blocked} onClick={() => save('published')} style={btn('primary', { opacity: blocked ? 0.6 : 1 })}>
-          {busy ? 'Wird gespeichert …' : uploads > 0 ? 'Fotos werden hochgeladen …' : id && status === 'published' ? 'Änderungen speichern' : 'Veröffentlichen'}
+          {busy ? 'Wird gespeichert …' : video && video.phase !== 'fertig' ? 'Video wird verarbeitet …' : uploads > 0 ? 'Fotos werden hochgeladen …' : id && status === 'published' ? 'Änderungen speichern' : 'Veröffentlichen'}
         </button>
       </div>
 
