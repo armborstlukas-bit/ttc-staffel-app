@@ -1,8 +1,8 @@
 // Kurzvideos für die Redaktion: im Browser prüfen, auf max. 720p verkleinern (H.264/MP4, wo möglich) und ein Vorschaubild erzeugen.
 // Das Verkleinern läuft in Echtzeit (ein 40-Sekunden-Video braucht ca. 40 Sekunden) – der Bildschirm sollte so lange an bleiben.
 
-export const VIDEO_MAX_SECONDS = 60;
-export const VIDEO_MAX_BYTES = 30 * 1024 * 1024;
+export const VIDEO_MAX_SECONDS = 120;
+export const VIDEO_MAX_BYTES = 60 * 1024 * 1024;
 const MAX_SIDE = 1280; // 720p
 const VIDEO_BPS = 2_000_000;
 const AUDIO_BPS = 96_000;

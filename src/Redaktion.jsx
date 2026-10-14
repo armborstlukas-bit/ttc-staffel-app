@@ -613,7 +613,7 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
         <input ref={videoRef} type="file" accept="video/*" hidden onChange={e => { addVideo(e.target.files?.[0]); e.target.value = ''; }} />
         <button onClick={() => videoRef.current.click()} disabled={!!video && video.phase !== 'fertig'}
           style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '12px', marginTop: '8px', borderRadius: '12px', border: '2px dashed rgba(147,197,253,0.45)', background: 'rgba(147,197,253,0.06)', color: '#bfdbfe', cursor: 'pointer', fontSize: '14px', fontWeight: 700, opacity: video && video.phase !== 'fertig' ? 0.6 : 1 }}>
-          <Film size={20} /> Kurzvideo hinzufügen <span style={{ fontWeight: 500, fontSize: '12px', opacity: 0.8 }}>(max. {VIDEO_MAX_SECONDS} Sek.)</span>
+          <Film size={20} /> Kurzvideo hinzufügen <span style={{ fontWeight: 500, fontSize: '12px', opacity: 0.8 }}>(max. {VIDEO_MAX_SECONDS / 60} Min.)</span>
         </button>
         <p style={{ ...C.muted, margin: '6px 2px 0', fontSize: '11.5px' }}>
           Das Video wird an der Stelle im Text eingefügt, an der zuletzt geschrieben wurde, und kann dort wie ein Foto verschoben werden.
