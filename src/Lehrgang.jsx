@@ -49,7 +49,7 @@ function TageEditor({ tage, onAdd, onRemove, isMobile, anzahl }) {
   );
 }
 
-export default function Lehrgang({ isMobile, onHome, lehrgaenge = {}, kinder = [], onSave, onDelete, userName = '' }) {
+export default function Lehrgang({ isMobile, onHome, lehrgaenge = {}, kinder = [], onSave, onDelete, userName = '', accessRow = null }) {
   const [aktivId, setAktivId] = useState(null);
   const [tab, setTab] = useState('anwesenheit');
   const [tag, setTag] = useState(null);
@@ -140,6 +140,7 @@ export default function Lehrgang({ isMobile, onHome, lehrgaenge = {}, kinder = [
       <div className="ttc-view-enter" style={seite}>
         <Kopf titel="🎒 Lehrgangsabrechnung" />
         <div style={inhalt}>
+          {accessRow}
           <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '13px', lineHeight: 1.5 }}>Ferien-Lehrgänge kosten pro Tag. Lehrgang anlegen, Tage eintragen, Kinder abhaken – am Ende PDF oder Excel mit dem Betrag für jedes Kind erstellen.</p>
           {neu ? (
             <div style={card}>

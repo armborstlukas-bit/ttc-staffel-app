@@ -1465,6 +1465,7 @@ export default function TrainingsApp() {
   const saveAktiveSpieler                = d => { setAktiveSpieler(d);               setDoc(doc(db,'ttc','aktiveSpieler'),                  d); };
   const canAccessRompel    = () => userRole === 'admin' || (appSettings.rompelTrainers  || []).includes(user?.uid);
   const canAccessPfand     = () => userRole === 'admin' || (appSettings.pfandTrainers   || []).includes(user?.uid);
+  const canAccessLehrgang  = () => userRole === 'admin' || (appSettings.lehrgangMembers || []).includes(user?.uid); // Lehrgangsabrechnung
   const canAccessRedaktion = () => userRole === 'admin' || (appSettings.redaktionMembers || []).includes(user?.uid); // Redaktion der Vereinswebseite
   const canAccessPinnwand  = () => !!user; // Pinnwand ist fuer alle eingeloggten Nutzer sichtbar; Sichtbarkeit einzelner Beitraege wird pro Beitrag geregelt
   const canAccessTeams = () => !!user; // TTC Mannschaften ist fuer alle eingeloggten Nutzer sichtbar (Admin, Trainer, Aktive, Eltern, Jugendliche, Passive)
@@ -3765,7 +3766,7 @@ export default function TrainingsApp() {
         color: 'rgba(134,239,172,0.45)',
         links: [
           {label:'Trainingsplan',    icon:'📅', color:'#86efac', bg:'rgba(134,239,172,0.1)',  border:'rgba(134,239,172,0.25)', action:()=>navTo('trainingsplan')},
-          {label:'Lehrgangsabrechnung', icon:'🎒', color:'#fcd34d', bg:'rgba(252,211,77,0.08)', border:'rgba(252,211,77,0.25)', action:()=>navTo('lehrgang')},
+          ...(canAccessLehrgang()?[{label:'Lehrgangsabrechnung', icon:'🎒', color:'#fcd34d', bg:'rgba(252,211,77,0.08)', border:'rgba(252,211,77,0.25)', action:()=>navTo('lehrgang')}]:[]),
           {label:'Meine Gruppen',    icon:'👥', color:'#6ee7b7', bg:'rgba(110,231,183,0.1)',  border:'rgba(110,231,183,0.25)', action:()=>navTo('meingruppen')},
           {label:'Übungswettkämpfe',icon:'🎮', color:'#c4b5fd', bg:'rgba(196,181,253,0.1)',  border:'rgba(196,181,253,0.25)', action:()=>navTo('practiceTournaments')},
           ...(canEdit()?[
@@ -16982,12 +16983,12 @@ export default function TrainingsApp() {
   }
 
   // ── REDAKTION (Berichte für die Vereinswebseite) ──────────────────────
-  if (view === 'lehrgang' && canEdit()) {
+  if (view === 'lehrgang' && canAccessLehrgang()) {
     const kinderListe = Object.values(children).filter(c => c && c.name && !c.nachwuchsKarriereBeendet)
       .map(c => { const sub = subgroups[c.subgroupId]; const gi = FIXED_GROUPS.findIndex(g => g.id === sub?.groupId); return { id: c.id, name: c.name, gruppe: sub?.name || '', farbe: FIXED_GROUPS[gi]?.color || '', ordnung: (gi < 0 ? 9 : gi) * 1000 + (Number(sub?.order) || 0) }; });
     return (
       <React.Suspense fallback={<div style={{minHeight:'100vh',background:'#021a0a'}}/>}>
-        <Lehrgang key={viewKey} isMobile={isMobile} userName={userProfile?.name||''} onHome={()=>navTo('home')}
+        <Lehrgang key={viewKey} isMobile={isMobile} userName={userProfile?.name||''} onHome={()=>navTo('home')} accessRow={renderAccessManagerRow('lehrgangMembers','Lehrgangsabrechnung','#fcd34d')}
           lehrgaenge={lehrgaenge} kinder={kinderListe}
           onSave={(id, patch) => { setLehrgaenge(prev => ({ ...prev, [id]: { ...(prev[id]||{}), ...patch, teilnahme: patch.teilnahme ? Object.fromEntries(Object.entries({ ...(prev[id]?.teilnahme||{}) }).concat(Object.entries(patch.teilnahme).map(([d, m]) => [d, { ...(prev[id]?.teilnahme?.[d]||{}), ...m }]))) : (prev[id]?.teilnahme||{}), gaeste: patch.gaeste ? { ...(prev[id]?.gaeste||{}), ...patch.gaeste } : (prev[id]?.gaeste||{}) } }));
             setDoc(doc(db,'ttc','lehrgaenge'), { [id]: patch }, { merge: true }).catch(e => alert('Speichern fehlgeschlagen: ' + e.message)); }}
