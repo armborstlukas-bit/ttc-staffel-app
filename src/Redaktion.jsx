@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Home, ArrowLeft, Bold, Italic, Underline, Heading2, List, Undo2, ImagePlus, Star, ArrowUp, ArrowDown, PanelLeft, PanelRight, RectangleHorizontal, Trash2, Eye, CheckCircle2, X, Loader2, PenLine, Plus, ExternalLink, Search, AlignJustify, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
+import { Home, ArrowLeft, Bold, Italic, Underline, Heading2, List, Undo2, ImagePlus, Star, ArrowUp, ArrowDown, PanelLeft, PanelRight, RectangleHorizontal, Trash2, Eye, CheckCircle2, X, Loader2, PenLine, Plus, ExternalLink, Search, AlignJustify, AlignLeft, AlignCenter, AlignRight, Captions } from 'lucide-react';
 
 // ── Redaktion: Berichte für die Vereinswebseite schreiben ────────────────────────
 // Die Berichte werden über die Schnittstelle der Webseite gespeichert (gleiches Firebase-Konto).
@@ -22,9 +22,11 @@ const EMPTY = { title: '', category: '', html: '', images: [], coverImage: '', d
 
 // ---------- Fotos im Schreibfeld: Adressen für die Anzeige in der App vollständig machen, beim Speichern wieder kürzen ----------
 const absImages = (html) => (html || '').replace(/(src=")(\/media\/web\/)/g, `$1${WEB_URL}$2`);
-const toEditorHtml = (html) => absImages(html).replace(/<figure(?=[\s>])/g, '<figure contenteditable="false"');
+const toEditorHtml = (html) => absImages(html).replace(/<figure(?=[\s>])/g, '<figure contenteditable="false"').replace(/<figcaption(?=[\s>])/g, '<figcaption contenteditable="true"');
 const fromEditorHtml = (html) => (html || '').split(`${WEB_URL}/media/web/`).join('/media/web/')
-  .replace(/ contenteditable="false"/g, '').replace(/\s*ttc-img-(sel|drag)/g, '').replace(/ class="\s*"/g, '');
+  .replace(/ contenteditable="(false|true)"/g, '').replace(/\s*ttc-img-(sel|drag)/g, '').replace(/ class="\s*"/g, '')
+  .replace(/ data-placeholder="[^"]*"/g, '')
+  .replace(/<figcaption[^>]*>(\s|<br\s*\/?>|&nbsp;)*<\/figcaption>/g, '');
 // Textausrichtung des Berichts auf der Webseite – Standard ist Blocksatz
 const ALIGNS = [
   { id: 'justify', label: 'Blocksatz', Icon: AlignJustify },
@@ -358,6 +360,22 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
     return fig;
   };
   const ensureFigure = () => figureFor(sel.el);
+  // Bildunterschrift: kleines Textfeld direkt unter dem Foto (leer = wird nicht gespeichert)
+  const captionSel = () => {
+    if (!sel) return;
+    const fig = ensureFigure();
+    let cap = fig.querySelector('figcaption');
+    if (!cap) {
+      cap = document.createElement('figcaption');
+      cap.setAttribute('contenteditable', 'true');
+      cap.setAttribute('data-placeholder', 'Bildunterschrift eingeben …');
+      fig.appendChild(cap);
+    }
+    clearSel();
+    cap.focus();
+    const r = document.createRange(); r.selectNodeContents(cap); r.collapse(false);
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  };
 
   // Foto mit Maus oder Finger an eine andere Stelle im Text ziehen (verschiebt – keine Kopie)
   const [dropLine, setDropLine] = useState(null);
@@ -614,7 +632,7 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
         </div>
         <div ref={wrapRef} style={{ position: 'relative' }}>
           <div ref={editorRef} className="ttc-redaktion-editor" contentEditable suppressContentEditableWarning onInput={onInput} onPaste={onPaste}
-            onClick={onEditorClick} onPointerDown={onEditorPointerDown} onDragStart={e => { if (e.target.closest?.('img, figure')) e.preventDefault(); }} onKeyDown={() => sel && clearSel()} onDragOver={e => { if ([...e.dataTransfer.types].includes('text/ttc-foto')) e.preventDefault(); }} onDrop={onEditorDrop}
+            onClick={onEditorClick} onPointerDown={onEditorPointerDown} onDragStart={e => { if (e.target.closest?.('img, figure')) e.preventDefault(); }} onKeyDown={e => { if (e.key === 'Enter' && e.target.closest?.('figcaption')) { e.preventDefault(); e.target.closest('figcaption').blur(); return; } if (sel) clearSel(); }} onDragOver={e => { if ([...e.dataTransfer.types].includes('text/ttc-foto')) e.preventDefault(); }} onDrop={onEditorDrop}
             role="textbox" aria-multiline="true" aria-label="Text des Berichts" data-placeholder="Hier den Bericht schreiben …"
             lang="de" style={{ minHeight: '240px', padding: '12px 14px', fontSize: '15px', lineHeight: 1.65, color: '#111', background: '#fff', borderRadius: '10px', outline: 'none', overflowWrap: 'anywhere', textAlign: form.textAlign || 'justify', hyphens: 'auto', WebkitHyphens: 'auto' }} />
           {dropLine !== null && <div aria-hidden style={{ position: 'absolute', left: '10px', right: '10px', top: dropLine, height: '4px', borderRadius: '2px', background: A, boxShadow: '0 0 0 3px rgba(74,222,128,0.3)', zIndex: 7, pointerEvents: 'none' }} />}
@@ -634,6 +652,7 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
                   style={{ ...imgBtn, ...(selSide === side ? { background: A, color: '#052e16' } : {}) }}><Icon size={16} />{!isMobile && ` ${label}`}</button>
               ))}
               <span style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '4px 2px' }} />
+              <button onMouseDown={e => e.preventDefault()} onClick={captionSel} style={imgBtn} aria-label="Bildunterschrift" title="Bildunterschrift hinzufügen oder ändern"><Captions size={16} />{!isMobile && ' Unterschrift'}</button>
               <button onMouseDown={e => e.preventDefault()} onClick={() => moveSel(-1)} style={imgBtn} aria-label="Foto nach oben"><ArrowUp size={16} />{!isMobile && ' Hoch'}</button>
               <button onMouseDown={e => e.preventDefault()} onClick={() => moveSel(1)} style={imgBtn} aria-label="Foto nach unten"><ArrowDown size={16} />{!isMobile && ' Runter'}</button>
               <button onMouseDown={e => e.preventDefault()} onClick={removeSel} style={{ ...imgBtn, color: '#fca5a5' }} aria-label="Foto aus dem Text nehmen"><X size={16} /></button>
@@ -650,7 +669,7 @@ function Editor({ api, id, isMobile, onBack, onDone }) {
 
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', gap: '8px', justifyContent: 'flex-end', padding: '12px 0 6px', position: 'sticky', bottom: 0, background: 'linear-gradient(to top, #051a0c 70%, rgba(5,26,12,0))' }}>
         {id && <button onClick={remove} disabled={busy} style={btn('danger', isMobile ? {} : { marginRight: 'auto' })}><Trash2 size={15} /> Löschen</button>}
-        <button onClick={() => { update({ html: editorRef.current.innerHTML }); setPreview(true); }} style={btn('ghost')}><Eye size={15} /> Vorschau</button>
+        <button onClick={() => { update({ html: fromEditorHtml(editorRef.current.innerHTML) }); setPreview(true); }} style={btn('ghost')}><Eye size={15} /> Vorschau</button>
         <button disabled={blocked} onClick={() => save('draft')} style={btn('ghost')}>{status === 'published' ? 'Offline nehmen' : 'Als Entwurf speichern'}</button>
         <button disabled={blocked} onClick={() => save('published')} style={btn('primary', { opacity: blocked ? 0.6 : 1 })}>
           {busy ? 'Wird gespeichert …' : uploads > 0 ? 'Fotos werden hochgeladen …' : id && status === 'published' ? 'Änderungen speichern' : 'Veröffentlichen'}
