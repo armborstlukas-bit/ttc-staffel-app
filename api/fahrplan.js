@@ -95,7 +95,7 @@ function shortName(full) {
 }
 
 // Öffentliche Fassung für die Vereinswebseite (Spielbetrieb → Wer fährt wann): nur kommende Spiele,
-// E-Mail-Adressen werden über Mitgliederliste/Konten in Namen übersetzt, sonst nur „eingetragen“.
+// E-Mail-Adressen werden über Mitgliederliste/Konten in Namen übersetzt, sonst nur „siehe App“.
 async function handlePublic(req, res) {
   const items = await getFahrplanItems();
   const byMail = new Map();
@@ -113,7 +113,7 @@ async function handlePublic(req, res) {
   const display = (f) => {
     const v = String(f || '').trim();
     if (!v) return '';
-    if (v.includes('@')) { const n = byMail.get(v.toLowerCase()); return n ? shortName(n) : 'eingetragen'; }
+    if (v.includes('@')) { const n = byMail.get(v.toLowerCase()); return n ? shortName(n) : 'siehe App'; }
     return shortName(v);
   };
   const today = new Date(); today.setHours(0, 0, 0, 0);
