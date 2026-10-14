@@ -86,10 +86,51 @@ async function handleSendIntro(req, res) {
   res.status(200).json({ sent, recipients: byEmail.size });
 }
 
+// "Vorname N." – auf der öffentlichen Webseite nur abgekürzte Namen, nie E-Mail-Adressen.
+function shortName(full) {
+  const words = String(full || '').trim().split(/\s+/).filter(Boolean);
+  if (words.length < 2) return words[0] || '';
+  const last = words[words.length - 1];
+  return [...words.slice(0, -1), last.length > 2 ? last[0].toUpperCase() + '.' : last].join(' ');
+}
+
+// Öffentliche Fassung für die Vereinswebseite (Spielbetrieb → Wer fährt wann): nur kommende Spiele,
+// E-Mail-Adressen werden über Mitgliederliste/Konten in Namen übersetzt, sonst nur „eingetragen“.
+async function handlePublic(req, res) {
+  const items = await getFahrplanItems();
+  const byMail = new Map();
+  try {
+    const [ml, users] = await Promise.all([
+      adminDb().collection('ttc').doc('mitgliederListe').get(),
+      adminDb().collection('users').get(),
+    ]);
+    users.docs.forEach(d => { const u = d.data(); if (u.email && u.name) byMail.set(u.email.trim().toLowerCase(), u.name); });
+    Object.values(ml.data()?.list || {}).forEach(m => {
+      const name = [m.vorname, m.nachname].filter(Boolean).join(' ');
+      if (m.email && name) byMail.set(m.email.trim().toLowerCase(), name);
+    });
+  } catch { /* ohne Namensabgleich weiter */ }
+  const display = (f) => {
+    const v = String(f || '').trim();
+    if (!v) return '';
+    if (v.includes('@')) { const n = byMail.get(v.toLowerCase()); return n ? shortName(n) : 'eingetragen'; }
+    return shortName(v);
+  };
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const iso = (d) => d.split('.').reverse().join('-');
+  const out = items
+    .filter(it => it.datum && new Date(iso(it.datum) + 'T23:59:59') >= today)
+    .map(({ meetingId, datum, zeit, liga, ligaName, halle, hallenAdresse, heim, gast, isHeimspiel, ourTeam, treffpunkt, fahrer }) =>
+      ({ id: meetingId, date: iso(datum), zeit, liga, ligaName, halle, hallenAdresse, heim, gast, isHeimspiel, ourTeam, treffpunkt, fahrer: display(fahrer) }));
+  res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=900');
+  res.status(200).json({ items: out, fetchedAt: new Date().toISOString() });
+}
+
 export default async function handler(req, res) {
   try {
     if (req.method === 'POST' && req.query.action === 'set-fahrer') return handleSetFahrer(req, res);
     if (req.method === 'POST' && req.query.action === 'send-intro') return handleSendIntro(req, res);
+    if (req.method === 'GET' && req.query.public === '1') return handlePublic(req, res);
     // "fahrer" enthält personenbezogene Daten (E-Mail-Adressen von Fahrern/Betreuern) —
     // dieser Endpunkt war bisher komplett unauthentifiziert abrufbar, daher jetzt Login-Pflicht.
     if (!(await verifyRequestUser(req))) { res.status(401).json({ error: 'Nicht angemeldet' }); return; }
