@@ -14815,7 +14815,10 @@ export default function TrainingsApp() {
         if (e.allDay) endDt.setDate(endDt.getDate() - 1);
         range += ' – ' + endDt.toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
       }
-      const timeStr = e.time || (!e.allDay && e.start?.includes('T') ? e.start.split('T')[1]?.slice(0,5) : '');
+      // Google liefert Uhrzeiten in UTC („…Z“) – in deutsche Zeit umrechnen, sonst stimmt die Uhrzeit um 1–2 Std. nicht
+      const timeStr = e.time || (!e.allDay && e.start?.includes('T')
+        ? (e.start.endsWith('Z') ? new Date(e.start).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit', timeZone:'Europe/Berlin' }) : e.start.split('T')[1]?.slice(0,5))
+        : '');
       return range + (timeStr ? `, ${timeStr} Uhr` : '');
     };
 
