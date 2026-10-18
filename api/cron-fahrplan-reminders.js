@@ -35,7 +35,7 @@ export default async function handler(req, res) {
   // 0 Spiele geleert hatte.
   if (req.query.diag === '1') {
     try {
-      const items = await getFahrplanItems();
+      const items = await getFahrplanItems({ fresh: true });
       const db = adminDb();
       if (req.query.repair === '1') {
         const rebuilt = {};
@@ -59,7 +59,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const items = await getFahrplanItems();
+    const items = await getFahrplanItems({ fresh: true });
     const db = adminDb();
 
     // Notbremse: eine verdächtig leere/stark geschrumpfte Spielplan-Antwort (z.B. durch eine

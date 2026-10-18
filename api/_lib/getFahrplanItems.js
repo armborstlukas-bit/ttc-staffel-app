@@ -57,7 +57,19 @@ const BROWSER_HEADERS = {
   'Upgrade-Insecure-Requests': '1',
 };
 
-export async function getFahrplanItems() {
+// Zwischenspeicher pro Serverinstanz: spart den teuren Abruf+Parse (~1,2 MB) bei jedem App-Aufruf.
+// Der taegliche Mail-Cron fordert mit { fresh: true } immer frische Daten an.
+let cache = null; // { at, items }
+const CACHE_MS = 10 * 60 * 1000;
+
+export async function getFahrplanItems({ fresh = false } = {}) {
+  if (!fresh && cache && Date.now() - cache.at < CACHE_MS) return cache.items;
+  const items = await loadFahrplanItems();
+  cache = { at: Date.now(), items };
+  return items;
+}
+
+async function loadFahrplanItems() {
   const response = await fetch(SPIELPLAN_URL, { headers: BROWSER_HEADERS });
   if (!response.ok) throw new Error('Seite nicht erreichbar: ' + response.status);
   const html = await response.text();

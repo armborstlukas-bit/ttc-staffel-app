@@ -77,6 +77,9 @@ export default async function handler(req, res) {
     }
     matches.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
+    // Spart Server-Rechenzeit (Vercel Free-Tarif): Antwort 10 Min im CDN halten, danach
+    // noch bis 1 h veraltet ausliefern, waehrend im Hintergrund neu geladen wird.
+    res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=3600');
     res.status(200).json({ matches });
   } catch (e) {
     res.status(500).json({ error: String(e?.message || e) });

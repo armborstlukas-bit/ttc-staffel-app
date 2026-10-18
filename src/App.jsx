@@ -2186,7 +2186,7 @@ export default function TrainingsApp() {
     if (spielplanMatches !== null || spielplanLoading) return;
     setSpielplanLoading(true);
     try {
-      const r = await fetch('/api/spielplan?date_start=2026-08-01&date_end=2027-05-31&_='+Date.now());
+      const r = await fetch('/api/spielplan?date_start=2026-08-01&date_end=2027-05-31');
       const d = await r.json();
       if (d.error === 'bot_detection') {
         setSpielplanMatches('bot_blocked'); // Sonderwert
