@@ -33,6 +33,42 @@ export default async function handler(req, res) {
   // (nur die reinen Vergleichsdaten, KEINE Mails) aus dem aktuellen, funktionierenden Abruf neu
   // aufgebaut -- notwendig, weil der heutige Lauf ihn durch eine leere Bot-Schutz-Antwort auf
   // 0 Spiele geleert hatte.
+  if (req.query.diag === 'betreuung') {
+    const db = adminDb();
+    const ws = s => (s||'').replace(/,/g,' ').trim().toLowerCase().replace(/\s+/g,' ').split(' ').filter(Boolean).sort().join(' ');
+    const lev = (a,b)=>{const d=Array.from({length:a.length+1},(_,i)=>[i,...Array(b.length).fill(0)]);for(let j=0;j<=b.length;j++)d[0][j]=j;for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++)d[i][j]=a[i-1]===b[j-1]?d[i-1][j-1]:1+Math.min(d[i-1][j],d[i][j-1],d[i-1][j-1]);return d[a.length][b.length];};
+    const [items, akt, kids, hist, ml, ov] = await Promise.all([
+      getFahrplanItems({ fresh: true }),
+      db.collection('ttc').doc('aktiveSpieler').get(), db.collection('ttc').doc('children').get(),
+      db.collection('ttc').doc('ttrHistory').get(), db.collection('ttc').doc('mitgliederListe').get(),
+      db.collection('ttc').doc('betreuungStatusOverrides').get(),
+    ]);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const upcoming = items.filter(it => { const [d,m,y]=(it.datum||'').split('.'); return y && new Date(`${y}-${m}-${d}T12:00:00`) >= today; });
+    const fahrerRoh = upcoming.map(it=>(it.fahrer||'').trim()).filter(Boolean);
+    const mails = new Set(fahrerRoh.filter(f=>f.includes('@')).map(f=>f.toLowerCase()));
+    const namen = fahrerRoh.filter(f=>!f.includes('@')).map(ws);
+    const list = ml.exists ? (ml.data().list||{}) : {};
+    const overrides = ov.exists ? ov.data() : {};
+    const ttrPeople = [];
+    Object.values(akt.exists?akt.data():{}).forEach(p=>{ if(p?.name && Number(p.ttr)>0) ttrPeople.push({name:p.name, ttr:Number(p.ttr), typ:'Aktiv'}); });
+    const h = hist.exists ? hist.data() : {};
+    Object.values(kids.exists?kids.data():{}).forEach(c=>{ const e=(h[c.id]?.entries||[]).slice().sort((a,b)=>a.month.localeCompare(b.month)); const last=e[e.length-1]; if(c?.name && last?.ttr && !c.nachwuchsKarriereBeendet) ttrPeople.push({name:c.name, ttr:Number(last.ttr), typ:'Jugend'}); });
+    const seen = new Set(); const rows = [];
+    for (const p of ttrPeople) {
+      const w = ws(p.name); if (seen.has(w)) continue; seen.add(w);
+      const m = Object.values(list).find(x => ws(`${x.vorname} ${x.nachname}`) === w);
+      const emails = m ? [m.email, ...(m.zusatzEmails||[])].map(e=>(e||'').trim().toLowerCase()).filter(Boolean) : [];
+      const key = m ? `${m.vorname}|${m.nachname}`.trim().toLowerCase() : null;
+      let hat = emails.some(e=>mails.has(e)) || namen.some(n => n===w || lev(n,w)<=2);
+      if (key && overrides[key]) hat = overrides[key]==='mit';
+      rows.push({ ...p, hatBetreuung: hat, imMitgliederverzeichnis: !!m, email: emails[0]||null });
+    }
+    rows.sort((a,b)=>b.ttr-a.ttr);
+    res.status(200).json({ kommendeSpiele: upcoming.length, ohne: rows.filter(r=>!r.hatBetreuung), mitAnzahl: rows.filter(r=>r.hatBetreuung).length });
+    return;
+  }
+
   if (req.query.diag === '1') {
     try {
       const items = await getFahrplanItems({ fresh: true });
