@@ -1,6 +1,6 @@
 // Holt und parst den RSS-Feed der neuen Vereinswebseite (Berichte erscheinen seit Okt. 2026 nur noch dort).
 // Nach dem Domain-Umzug WEB_URL auf https://ttc-staffel.de setzen (oder Default anpassen).
-const WEB_URL = process.env.WEB_URL || 'https://ttc-staffel-web.vercel.app';
+const WEB_URL = process.env.WEB_URL || 'https://ttc-staffel-web.web.app';
 export async function fetchTtcNewsItems(limit = 3) {
   const response = await fetch(`${WEB_URL}/feed.xml`, {
     headers: { 'User-Agent': 'Mozilla/5.0' },

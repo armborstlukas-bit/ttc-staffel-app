@@ -1,0 +1,10 @@
+.git
+node_modules
+dist
+src
+public
+scripts
+.vercel
+.claude
+.env*
+*.log

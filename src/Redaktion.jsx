@@ -6,7 +6,7 @@ import { prepareVideo, putWithProgress, VIDEO_MAX_SECONDS } from './videoTools.j
 // ── Redaktion: Berichte für die Vereinswebseite schreiben ────────────────────────
 // Die Berichte werden über die Schnittstelle der Webseite gespeichert (gleiches Firebase-Konto).
 // Größen wie in den übrigen App-Bereichen (z. B. Rompel-Bereich).
-const WEB_URL = import.meta.env.VITE_WEB_URL || 'https://ttc-staffel-web.vercel.app';
+const WEB_URL = import.meta.env.VITE_WEB_URL || 'https://ttc-staffel.de';
 
 const CATEGORIES = [
   { id: 'mannschaften', label: 'Mannschaften', hint: 'Punktspiele, Pokal' },

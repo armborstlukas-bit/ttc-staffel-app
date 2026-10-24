@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    { "glob": "/api/**", "run": { "serviceId": "ttc-staffel-app-api", "region": "europe-west1" } },
+    { "glob": "**", "path": "/index.html" }
+  ],
+  "headers": [
+    { "glob": "/assets/**", "headers": { "Cache-Control": "public, max-age=31536000, immutable" } },
+    { "glob": "/index.html", "headers": { "Cache-Control": "no-cache" } },
+    { "glob": "/firebase-messaging-sw.js", "headers": { "Cache-Control": "no-cache" } },
+    { "glob": "/manifest.json", "headers": { "Cache-Control": "no-cache" } }
+  ]
+}
