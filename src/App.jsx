@@ -179,6 +179,7 @@ import { betaStore, BETA_LS_KEY, BETA_EMAILS } from './betaStore.js';
 const Abrechnung = React.lazy(() => import('./Abrechnung.jsx'));
 const Lehrgang = React.lazy(() => import('./Lehrgang.jsx'));
 const SpielAnzahl = React.lazy(() => import('./SpielAnzahl.jsx'));
+const SpielAnzahlIntro = React.lazy(() => import('./SpielAnzahlIntro.jsx'));
 
 const firebaseConfig = {
   apiKey: "AIzaSyCrx34HEgaHnRE187Cja4JNAtbexvrA6Vg",
@@ -911,6 +912,7 @@ export default function TrainingsApp() {
   const [liveStatsMsg, setLiveStatsMsg] = useState('');
   const [liveStatsExpanded, setLiveStatsExpanded] = useState(null);
   const [showLiveStatsAnnouncement, setShowLiveStatsAnnouncement] = useState(false);
+  const [showSpielAnzahlIntro, setShowSpielAnzahlIntro] = useState(false);
   const [showWebsiteLaunch, setShowWebsiteLaunch] = useState(false);
   const [editingSession, setEditingSession]     = useState(null); // session being edited
   const [editForm, setEditForm]                 = useState({});
@@ -2033,6 +2035,26 @@ export default function TrainingsApp() {
       setDoc(doc(db,'users',user.uid), { seenWebsiteLaunch: true }, { merge: true }).catch(()=>{});
       updateDoc(doc(db,'ttc','users'), { [`${user.uid}.seenWebsiteLaunch`]: true }).catch(()=>{});
     }
+  };
+
+  // Neuer Reiter "Anzahl der Spiele": einmalige Ankündigung pro Konto, erst wenn die anderen
+  // Ankündigungen (Live-Statistiken, Webseite) durch sind -- sonst stapeln sie sich.
+  useEffect(() => {
+    if (!userProfile || !user || showLiveStatsAnnouncement || showWebsiteLaunch) return;
+    const roles = userProfile.roles?.length ? userProfile.roles : (userProfile.role ? [userProfile.role] : []);
+    if (roles.includes('pending') || roles.includes('blocked') || roles.length === 0) return;
+    if (userProfile.seenSpielAnzahlIntro) return;
+    setShowSpielAnzahlIntro(true);
+  }, [userProfile?.seenSpielAnzahlIntro, userProfile?.roles, userProfile?.role, !!user, showLiveStatsAnnouncement, showWebsiteLaunch]);
+
+  const dismissSpielAnzahlIntro = (goTo) => {
+    setShowSpielAnzahlIntro(false);
+    if (userProfile) setUserProfile(p => ({ ...p, seenSpielAnzahlIntro: true }));
+    if (user?.uid) {
+      setDoc(doc(db,'users',user.uid), { seenSpielAnzahlIntro: true }, { merge: true }).catch(()=>{});
+      updateDoc(doc(db,'ttc','users'), { [`${user.uid}.seenSpielAnzahlIntro`]: true }).catch(()=>{});
+    }
+    if (goTo) navTo('spielanzahl');
   };
 
   const dismissLiveStatsAnnouncement = (goTo) => {
@@ -4331,6 +4353,15 @@ export default function TrainingsApp() {
   // ── Ankündigung neue Vereinswebseite (einmalig pro Account) ──
   if (showWebsiteLaunch) {
     return <WebsiteLaunch onOpen={()=>dismissWebsiteLaunch(true)} onLater={()=>dismissWebsiteLaunch(false)} />;
+  }
+
+  // ── Ankündigung "Anzahl der Spiele" (einmalig pro Account) ──
+  if (showSpielAnzahlIntro) {
+    return (
+      <React.Suspense fallback={<div style={{position:'fixed',inset:0,background:'#010a04'}}/>}>
+        <SpielAnzahlIntro onOpen={()=>dismissSpielAnzahlIntro(true)} onLater={()=>dismissSpielAnzahlIntro(false)} />
+      </React.Suspense>
+    );
   }
 
   // ── TRAININGSPLAN ────────────────────────────────────────────
