@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import {
   CalendarDays, Users, Gamepad2, Shirt, Package, BarChart3, Medal, Trophy, CalendarRange, TrendingUp, Target, Radio, Swords,
   Newspaper, PenLine, MessageCircle, CalendarHeart, Car, ClipboardList, Lightbulb, Dices, Recycle, Receipt, FolderOpen, Archive,
-  Trash2, Activity, LayoutGrid, ArrowUpRight, Backpack,
+  Trash2, Activity, LayoutGrid, ArrowUpRight, Backpack, Hash,
 } from 'lucide-react';
 
 // Neues App-Design (Beta) – bewusst sehr nah an der Webseite (ttc-staffel-web):
@@ -26,12 +26,12 @@ export function useBetaFonts(active = true) {
 const ICONS = {
   'Trainingsplan': CalendarDays, 'Meine Gruppen': Users, 'Übungswettkämpfe': Gamepad2, 'Trikotgrößen': Shirt, 'Materialverwaltung': Package,
   'Rangliste': BarChart3, 'Errungenschaften': Medal, 'TTC Mannschaften': Trophy, 'Spielplan': CalendarRange, 'TTR Werte': TrendingUp,
-  'Gegnerlogbuch': Target, 'Live-Statistiken': Radio, 'Trainingsmatches': Swords, 'TTC News': Newspaper, 'Redaktion': PenLine,
+  'Gegnerlogbuch': Target, 'Live-Statistiken': Radio, 'Anzahl der Spiele': Hash, 'Trainingsmatches': Swords, 'TTC News': Newspaper, 'Redaktion': PenLine,
   'Nachrichten': MessageCircle, 'Vereinskalender': CalendarHeart, 'Wer fährt wann': Car, 'Pinnwand': ClipboardList,
   'Verbesserungen': Lightbulb, 'Pfandkasse': Recycle, 'Abrechnung': Receipt, 'Mitglieder': FolderOpen, 'Archiv': Archive,
   'Datenlöschen': Trash2, 'App-Statistik': Activity, 'Lehrgangsabrechnung': Backpack,
 };
-const SHORT = { 'TTC Mannschaften': 'Mannschaften', 'Materialverwaltung': 'Material', 'Live-Statistiken': 'Live-Statistiken', 'Vereinskalender': 'Kalender', 'Verbesserungen': 'Ideen & Wünsche', 'Rompel Bereich': 'Rompel', 'Datenlöschen': 'Daten löschen', 'Lehrgangsabrechnung': 'Lehrgänge' };
+const SHORT = { 'TTC Mannschaften': 'Mannschaften', 'Materialverwaltung': 'Material', 'Live-Statistiken': 'Live-Statistiken', 'Anzahl der Spiele': 'Spielanzahl', 'Vereinskalender': 'Kalender', 'Verbesserungen': 'Ideen & Wünsche', 'Rompel Bereich': 'Rompel', 'Datenlöschen': 'Daten löschen', 'Lehrgangsabrechnung': 'Lehrgänge' };
 export const shortLabel = (l) => (/tippspiel/i.test(l) ? 'Tippspiel' : SHORT[l] || l);
 
 export function LinkIcon({ link, size = 20 }) {

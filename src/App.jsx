@@ -178,6 +178,7 @@ import BetaHome from './BetaHome.jsx';
 import { betaStore, BETA_LS_KEY, BETA_EMAILS } from './betaStore.js';
 const Abrechnung = React.lazy(() => import('./Abrechnung.jsx'));
 const Lehrgang = React.lazy(() => import('./Lehrgang.jsx'));
+const SpielAnzahl = React.lazy(() => import('./SpielAnzahl.jsx'));
 
 const firebaseConfig = {
   apiKey: "AIzaSyCrx34HEgaHnRE187Cja4JNAtbexvrA6Vg",
@@ -3786,6 +3787,7 @@ export default function TrainingsApp() {
           {label:'TTR Werte',        icon:'📈', color:'#fbbf24', bg:'rgba(251,191,36,0.08)',  border:'rgba(251,191,36,0.25)',  action:()=>navTo('ttrWerte')},
           {label:'Gegnerlogbuch',    icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.08)',   border:'rgba(8,145,178,0.25)',   action:()=>navTo('gegnerlogbuch')},
           {label:'Live-Statistiken', icon:'📡', color:'#a78bfa', bg:'rgba(167,139,250,0.08)', border:'rgba(167,139,250,0.25)', action:()=>navTo('livestats')},
+                  {label:'Anzahl der Spiele', icon:'🏓', color:'#4ade80', bg:'rgba(74,222,128,0.08)', border:'rgba(74,222,128,0.22)', action:()=>navTo('spielanzahl')},
           ...(userRole==='admin'?[
             {label:'Trainingsmatches',icon:'⚔️', color:'#f9a8d4', bg:'rgba(244,114,182,0.08)', border:'rgba(244,114,182,0.25)', action:()=>navTo('trainingsmatches')},
           ]:[]),
@@ -4044,7 +4046,7 @@ export default function TrainingsApp() {
   }
 
   // ── PASSIVES MITGLIED: stark eingeschränkter Bereich ──────────────────────
-  if (userRole === 'passiv' && !['redaktion','ttcnews','kalender','tippspiel','wettenZitate','ttcMannschaften','spielplan','verbesserungswuensche','livestats'].includes(view)) {
+  if (userRole === 'passiv' && !['redaktion','ttcnews','kalender','tippspiel','wettenZitate','ttcMannschaften','spielplan','verbesserungswuensche','livestats','spielanzahl'].includes(view)) {
     return (
       <div className="ttc-view-enter" key={viewKey} style={{minHeight:'100vh',background:'linear-gradient(170deg,#021a0a 0%,#042d12 45%,#021508 100%)',fontFamily:"'Inter','Segoe UI',system-ui,-apple-system,sans-serif",color:'white'}}>
         <div className="ttc-sticky-hdr" style={{display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(74,222,128,0.08)',padding:isMobile?'12px 14px':'18px 24px'}}>
@@ -4080,6 +4082,7 @@ export default function TrainingsApp() {
                   ...(canAccessTeams()?[{label:'TTC Mannschaften', icon:'🏆', color:'#2dd4bf', bg:'rgba(45,212,191,0.08)', border:'rgba(45,212,191,0.2)', action:()=>navTo('ttcMannschaften')}]:[]),
                   {label:'Spielplan', icon:'📆', color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)', action:()=>navTo('spielplan')},
                   {label:'Live-Statistiken', icon:'📡', color:'#a78bfa', bg:'rgba(167,139,250,0.07)', border:'rgba(167,139,250,0.2)', action:()=>navTo('livestats')},
+                  {label:'Anzahl der Spiele', icon:'🏓', color:'#4ade80', bg:'rgba(74,222,128,0.08)', border:'rgba(74,222,128,0.22)', action:()=>navTo('spielanzahl')},
                 ],
               },
               {
@@ -5027,7 +5030,7 @@ export default function TrainingsApp() {
 
 
   // ── AKTIVER DASHBOARD ────────────────────────────────────────────────────
-  if (userRole === 'aktiver' && !['redaktion','gegnerlogbuch','ttcnews','trainingsmatches','wettenZitate','fahrplan','tippspiel','kalender','verbesserungswuensche','ttcMannschaften','spielplan','livestats'].includes(view)) {
+  if (userRole === 'aktiver' && !['redaktion','gegnerlogbuch','ttcnews','trainingsmatches','wettenZitate','fahrplan','tippspiel','kalender','verbesserungswuensche','ttcMannschaften','spielplan','livestats','spielanzahl'].includes(view)) {
     const dateLabel = new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
 
     const submitGegner = () => {
@@ -5182,6 +5185,7 @@ export default function TrainingsApp() {
                   ...(canAccessTeams()?[{label:'TTC Mannschaften', icon:'🏆', color:'#2dd4bf', bg:'rgba(45,212,191,0.08)', border:'rgba(45,212,191,0.2)', action:()=>navTo('ttcMannschaften')}]:[]),
                   {label:'Spielplan', icon:'📆', color:'#fcd34d', bg:'rgba(251,191,36,0.07)', border:'rgba(251,191,36,0.2)', action:()=>navTo('spielplan')},
                   {label:'Live-Statistiken', icon:'📡', color:'#a78bfa', bg:'rgba(167,139,250,0.07)', border:'rgba(167,139,250,0.2)', action:()=>navTo('livestats')},
+                  {label:'Anzahl der Spiele', icon:'🏓', color:'#4ade80', bg:'rgba(74,222,128,0.08)', border:'rgba(74,222,128,0.22)', action:()=>navTo('spielanzahl')},
                 ],
               },
               {
@@ -5855,6 +5859,7 @@ export default function TrainingsApp() {
                   {label:'Spielplan',        icon:'📆', color:'#fcd34d', bg:'rgba(252,211,77,0.1)',   border:'rgba(252,211,77,0.25)',   action:()=>navTo('spielplan')},
                   ...(isJugend ? [{label:'Gegnerlogbuch', icon:'🎯', color:'#67e8f9', bg:'rgba(8,145,178,0.1)', border:'rgba(8,145,178,0.25)', action:()=>navTo('gegnerlogbuch')}] : []),
                   {label:'Live-Statistiken', icon:'📡', color:'#a78bfa', bg:'rgba(167,139,250,0.1)', border:'rgba(167,139,250,0.25)', action:()=>navTo('livestats')},
+                  {label:'Anzahl der Spiele', icon:'🏓', color:'#4ade80', bg:'rgba(74,222,128,0.08)', border:'rgba(74,222,128,0.22)', action:()=>navTo('spielanzahl')},
                 ],
               },
               {
@@ -15421,6 +15426,14 @@ export default function TrainingsApp() {
   }
 
   // ── LIVE-STATISTIKEN (TESTFEATURE, nur Admin) ────────────────────────────
+  if (view === 'spielanzahl' && !!user) {
+    return (
+      <React.Suspense fallback={<div style={{minHeight:'100vh',background:'#021a0a'}}/>}>
+        <SpielAnzahl key={viewKey} isMobile={isMobile} onHome={()=>navTo('home')} />
+      </React.Suspense>
+    );
+  }
+
   if (view === 'livestats' && !!user) {
     if (liveStats === null && !liveStatsLoading) loadLiveStats('get');
     const empty3 = { meisteSiege: [], laengsteSerie: [], besteSiegquote: [] };
