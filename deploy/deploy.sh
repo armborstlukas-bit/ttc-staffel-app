@@ -11,5 +11,5 @@ if [ "${1:-}" != "--nur-oberflaeche" ]; then
   "$GC" run deploy ttc-staffel-app-api --project $P --region $R --image "$IMG" --quiet
 fi
 npm run build
-TOKEN=$("$GC" auth print-access-token) MESSAGE="$(git log -1 --format=%s)" node deploy/hosting-deploy.mjs ttc-staffel-app dist deploy/hosting-app.json $P
+TOKEN=$("$GC" auth print-access-token) MESSAGE="$(git log -1 --format=%s | cut -c1-250)" node deploy/hosting-deploy.mjs ttc-staffel-app dist deploy/hosting-app.json $P
 echo "Fertig: https://app.ttc-staffel.de"
