@@ -76,7 +76,7 @@ export default function SpielAnzahl({ isMobile, onHome }) {
         </div>
 
         <p style={{ margin: 0, fontSize: '12px', color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
-          {zr.info}. Gezählt werden Einzel und Doppel für den TTC Staffel; Turniere nur in der Zeit, in der jemand für Staffel gespielt hat.
+          {zr.info}. Gezählt werden Einzelspiele für den TTC Staffel (Doppel gehen nicht in den TTR-Wert ein und sind deshalb nicht enthalten); Turniere nur in der Zeit, in der jemand für Staffel gespielt hat.
           {mitHoch && ' Hochrechnung: 24 Mannschaftsspiele pro Saison.'} Stand: {stand}.
         </p>
 
