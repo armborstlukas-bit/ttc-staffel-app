@@ -1,8 +1,18 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { readFileSync } from 'node:fs'
+
+// Stellt die Spielanzahl-Daten zusätzlich öffentlich bereit (app.ttc-staffel.de/spielanzahl.json),
+// damit die Vereinswebseite dieselbe Liste anzeigen kann wie die App.
+const spielAnzahlOeffentlich = {
+  name: 'spielanzahl-json',
+  generateBundle() {
+    this.emitFile({ type: 'asset', fileName: 'spielanzahl.json', source: readFileSync('src/data/spielAnzahl.json', 'utf8') });
+  },
+}
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), spielAnzahlOeffentlich],
   build: {
     rollupOptions: {
       output: {

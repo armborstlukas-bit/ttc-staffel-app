@@ -9,8 +9,14 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+// Nur lokal (npm run dev): Einzelansichten ohne Login ansehen, z. B. #vorschau=spielanzahl
+const vorschau = import.meta.env.DEV && (location.hash.match(/vorschau=(\w+)/) || [])[1];
+if (vorschau) {
+  import('./devVorschau.jsx').then(({ default: Vorschau }) => createRoot(document.getElementById('root')).render(<Vorschau name={vorschau} />));
+} else {
+  createRoot(document.getElementById('root')).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  );
+}
