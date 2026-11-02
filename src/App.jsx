@@ -12216,6 +12216,8 @@ export default function TrainingsApp() {
         </div>
         <div style={{maxWidth:'820px',margin:'0 auto',padding:isMobile?'0 14px 40px':'0 24px 60px'}}>
 
+          {latestImportMonth&&<p style={{margin:'0 0 12px',fontSize:'13px',fontWeight:'700',color:accent}}>Stand: 01.{latestImportMonth.slice(5)}.{latestImportMonth.slice(0,4)}</p>}
+
           {/* TTR Import + Spieler des Monats Buttons */}
           <div style={{display:'flex',gap:'8px',marginBottom:'16px'}}>
             <button onClick={()=>navTo('ttrImport')}
