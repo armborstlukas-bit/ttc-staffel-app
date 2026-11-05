@@ -17,6 +17,8 @@ const ZEITRAUM = [
 const AKTIV_AB = '2025-08-01'; // wer seitdem noch für Staffel gespielt hat, gilt als aktiv
 const jahr = (iso) => (iso || '').slice(0, 4);
 const fmt = (n) => n.toLocaleString('de-DE');
+// Beginn der Karriere: vonJahr stammt aus der alten Liste und liegt teils nach dem ersten offiziell erfassten Spiel
+const startJahr = (s) => (s.seit ? Math.min(s.vonJahr || 9999, Number(jahr(s.seit))) : s.vonJahr);
 
 const CSS = `
 @keyframes saRays { to { transform: rotate(360deg) } }
@@ -80,7 +82,7 @@ export default function SpielAnzahl({ isMobile, onHome }) {
   });
 
   const unterzeile = (s) => {
-    const zeit = s.nurHoch || mitHoch ? `${s.vonJahr}–${s.ehemalig ? jahr(s.bis) : 'heute'}` : (s.ehemalig ? `${jahr(s.seit)}–${jahr(s.bis)}` : `seit ${jahr(s.seit)}`);
+    const zeit = s.nurHoch || mitHoch ? `${startJahr(s)}–${s.ehemalig ? jahr(s.bis) : 'heute'}` : (s.ehemalig ? `${jahr(s.seit)}–${jahr(s.bis)}` : `seit ${jahr(s.seit)}`);
     const teile = [s.ehemalig ? `ehemalig · ${zeit}` : zeit];
     if (art === 'gesamt' && !s.nurHoch) teile.push(`${fmt(s.mannschaft)} M · ${fmt(s.turnier)} T`);
     if (s.hoch > 0) teile.push(s.nurHoch ? 'hochgerechnet' : `~${fmt(s.hoch)} hochger.`);
